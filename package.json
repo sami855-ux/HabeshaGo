@@ -1,0 +1,16 @@
+{
+  "name": "smart-mobility-in-addis",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "web": "npm --prefix ./web run dev",
+    "server": "npm --prefix ./server run start:dev",
+    "mobile:android": "npm --prefix ./mobile run android",
+    "mobile:ios": "npm --prefix ./mobile run ios",
+    "mobile:web": "npm --prefix ./mobile run web"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

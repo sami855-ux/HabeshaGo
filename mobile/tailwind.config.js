@@ -10,9 +10,11 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        geist: ["Geist"],
-        jakarta: ["jakarta"],
-        grotesk: ["grotesk"],
+        inter: ["Inter_400Regular"],
+        interBold: ["Inter_700Bold"],
+        jakarta: ["PlusJakartaSans_400Regular"],
+        jakartaSemi: ["PlusJakartaSans_600SemiBold"],
+        alata: ["Alata_400Regular"],
       },
     },
   },

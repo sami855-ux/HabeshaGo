@@ -1,15 +1,11 @@
-import { Text, View } from "react-native";
-
-export default function Index() {
+import "../global.css"
+import {  View } from "react-native";
+import Welcome from "@/components/welcome"
+ 
+export default function App() {
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
+    <View>
+      <Welcome/>
     </View>
   );
 }

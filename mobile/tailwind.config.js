@@ -16,6 +16,31 @@ module.exports = {
         jakartaSemi: ["PlusJakartaSans_600SemiBold"],
         alata: ["Alata_400Regular"],
       },
+      colors: {
+        // Primary Colors
+        deepTeal: "#00897B",
+        tealShadow: "#00695C",
+
+        // Accent Colors
+        limeGreen: "#C0CA33",
+        softEmerald: "#66BB6A",
+
+        // Background Colors
+        mistGray: "#F5F5F5",
+        warmWhite: "#FAFAFA",
+
+        // Text Colors
+        charcoal: "#212121",
+        slateGray: "#616161",
+
+        // Status Colors
+        coralRed: "#E53935",
+        leafGreen: "#43A047",
+
+        // Dark Mode Colors
+        deepBlueGray: "#263238",
+        offWhite: "#ECEFF1",
+      },
     },
   },
   plugins: [],

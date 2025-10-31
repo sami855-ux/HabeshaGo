@@ -27,6 +27,7 @@
       "bundler": "metro"
     },
     "plugins": [
+      "react-native-reanimated/plugin",
       "expo-router",
       [
         "expo-splash-screen",

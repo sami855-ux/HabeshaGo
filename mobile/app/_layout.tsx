@@ -51,6 +51,18 @@ export default function RootLayout() {
                 headerShown: false,
               }}
             />
+            <Stack.Screen
+              name="auth/phone/index"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="auth/email/index"
+              options={{
+                headerShown: false,
+              }}
+            />
           </Stack>
         </SafeScreen>
         <StatusBar barStyle={"dark-content"} />

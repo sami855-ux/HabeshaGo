@@ -20,6 +20,13 @@ import {
   TrendingUp,
 } from "lucide-react-native";
 import { FontAwesome, AntDesign, Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+
+import { useRouter } from "expo-router";
+import GoogleIcon from "./utils/GoogleIcon";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get("window");
 
@@ -120,11 +127,10 @@ const FloatingElement = ({ Icon, color, delay, position }) => {
       }}
     >
       <View
-        className="w-14 h-14 rounded-full items-center justify-center backdrop-blur-sm"
+        className="w-14 h-14 border border-white rounded-3xl  items-center justify-center backdrop-blur-sm "
         style={{
           backgroundColor: color + "20",
           borderWidth: 1.5,
-          borderColor: color + "5",
         }}
       >
         <Icon size={24} color={color} strokeWidth={1.5} />
@@ -157,20 +163,20 @@ const Slide1 = () => {
         <Ionicons name="compass" size={50} color={"#00796B"} />
       </View>
 
-      <Text className="font-inter text-4xl text-center text-[#00796B] mb-4 leading-tight">
+      <Text className="font-groteskBold text-4xl text-center text-[#00796B] mb-4 leading-tight">
         Smart Navigation
       </Text>
 
-      <Text className="text-[17px] font-jakarta text-center text-[#095048] leading-7 max-w-xs">
+      <Text className="text-[17px] font-geist text-center text-[#095048] leading-7 max-w-sm">
         Discover optimal routes with AI-powered suggestions and live traffic
         intelligence
       </Text>
 
       <View
-        className="mt-10 rounded-3xl p-3 border border-[#bcf3ed] backdrop-blur-sm"
+        className="mt-10 rounded-3xl p-3 border border-[#cffaf5] backdrop-blur-sm"
         style={{ backgroundColor: "rgba(59, 130, 246, 0.08)" }}
       >
-        <Text className="text-sm font-inter text-[#00796B] text-center font-medium">
+        <Text className="text-sm font-geist text-[#00796B] text-center font-medium">
           Advanced AI algorithms power every route
         </Text>
       </View>
@@ -207,11 +213,11 @@ const Slide2 = () => {
         />
       </View>
 
-      <Text className="font-inter text-4xl text-center text-purple-950 mb-4 leading-tight">
+      <Text className="font-groteskBold text-4xl text-center text-purple-950 mb-4 leading-tight">
         Lightning Fast
       </Text>
 
-      <Text className="text-lg font-jakarta text-center text-purple-800 leading-7 max-w-xs">
+      <Text className="text-lg font-geist text-center text-purple-800 leading-7 max-w-sm">
         Get real-time updates and instant booking confirmations for stress-free
         travel
       </Text>
@@ -220,7 +226,7 @@ const Slide2 = () => {
         className="mt-10 rounded-3xl p-3 border border-purple-200 backdrop-blur-sm"
         style={{ backgroundColor: "rgba(139, 92, 246, 0.08)" }}
       >
-        <Text className="text-sm font-inter text-purple-800 text-center font-medium">
+        <Text className="text-sm font-geist text-purple-800 text-center font-medium">
           Real-time tracking & instant confirmations
         </Text>
       </View>
@@ -257,11 +263,11 @@ const Slide3 = () => {
         />
       </View>
 
-      <Text className="font-semibold font-inter text-4xl text-center text-emerald-950 mb-4 leading-tight">
+      <Text className="font-semibold font-groteskBold text-4xl text-center text-emerald-950 mb-4 leading-tight">
         Best Value
       </Text>
 
-      <Text className="text-lg font-jakarta text-center text-emerald-800 leading-7 max-w-xs">
+      <Text className="text-lg font-geist text-center text-emerald-800 leading-7 max-w-sm">
         Compare prices across all providers and save up to 40% on your daily
         commute
       </Text>
@@ -270,7 +276,7 @@ const Slide3 = () => {
         className="mt-10 rounded-3xl p-3 border border-emerald-200 backdrop-blur-sm"
         style={{ backgroundColor: "rgba(16, 185, 129, 0.08)" }}
       >
-        <Text className="text-sm font-inter text-emerald-800 text-center font-medium">
+        <Text className="text-sm font-geist text-emerald-800 text-center font-medium">
           Save up to 40% on every journey
         </Text>
       </View>
@@ -307,11 +313,11 @@ const Slide4 = () => {
         />
       </View>
 
-      <Text className="font-semibold font-inter text-4xl text-center text-rose-950 mb-4 leading-tight">
+      <Text className="font-semibold font-groteskBold text-4xl text-center text-rose-950 mb-4 leading-tight">
         Loved by Thousands
       </Text>
 
-      <Text className="text-lg text-center font-jakarta text-rose-800 leading-7 max-w-md">
+      <Text className="text-lg text-center font-geist text-rose-800 leading-7 max-w-sm">
         Join our community of happy travelers enjoying seamless transportation
         experiences
       </Text>
@@ -320,7 +326,7 @@ const Slide4 = () => {
         className="mt-10 rounded-3xl p-3 border border-rose-200 backdrop-blur-sm"
         style={{ backgroundColor: "rgba(244, 63, 94, 0.08)" }}
       >
-        <Text className="text-sm font-inter text-rose-800 text-center font-medium">
+        <Text className="text-sm font-geist text-rose-800 text-center font-medium">
           Trusted by over 100,000 happy users
         </Text>
       </View>
@@ -333,6 +339,8 @@ const LoginSlide = ({ onPhonePress }) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const fadeInAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(30)).current;
+
+  const router = useRouter();
 
   useEffect(() => {
     Animated.parallel([
@@ -378,9 +386,24 @@ const LoginSlide = ({ onPhonePress }) => {
     transform: [{ translateY: slideUpAnim }],
   };
 
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: "<YOUR_EXPO_WEB_CLIENT_ID>",
+    iosClientId: "<YOUR_IOS_CLIENT_ID>",
+    androidClientId: "<YOUR_ANDROID_CLIENT_ID>",
+    scopes: ["profile", "email"],
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { authentication } = response;
+      console.log("Google Auth Success", authentication);
+      // You can now send `authentication.accessToken` to your backend
+    }
+  }, [response]);
+
   return (
     <View
-      className="w-full px-8 justify-center items-center bg-gray-900"
+      className="w-full px-6 justify-center items-center "
       style={{ width }}
     >
       {/* Logo Section */}
@@ -394,27 +417,27 @@ const LoginSlide = ({ onPhonePress }) => {
           }}
         >
           <View
-            className="w-36 h-36 bg-blue-500 rounded-[45px]"
+            className="w-36 h-36 bg-blue-500 rounded-[55px]"
             style={{ opacity: 0.25 }}
           />
         </Animated.View>
 
-        <View className="w-32 h-32 bg-blue-600 rounded-[35px] flex items-center justify-center shadow-2xl shadow-blue-500/30 border border-blue-400">
+        <View className="w-32 h-32 bg-blue-600 rounded-[45px] flex items-center justify-center shadow-2xl shadow-blue-500/30 border border-blue-400">
           <Train size={46} color="white" strokeWidth={1.8} />
         </View>
 
-        <View className="absolute -top-2 -right-2 w-12 h-12 bg-amber-500 rounded-full items-center justify-center shadow-lg border-4 border-gray-900">
+        <View className="absolute -top-2 -right-2 w-12 h-12 bg-amber-500 rounded-full items-center justify-center shadow-lg border-4 border-white">
           <Sparkles size={16} color="white" strokeWidth={2.5} />
         </View>
       </Animated.View>
 
       {/* Content Section */}
       <Animated.View style={contentStyle} className="w-full items-center">
-        <Text className="text-4xl font-interBold text-center text-white mb-4 leading-tight">
+        <Text className="text-4xl font-groteskBold text-center text-light-text-primary mb-4 leading-tight">
           Start Your Journey
         </Text>
 
-        <Text className="text-lg font-inter text-center text-gray-300 mb-10 leading-7 max-w-[320px]">
+        <Text className="text-lg font-geist text-center text-light-text-primary mb-10 leading-7 max-w-md">
           Join thousands of travelers enjoying seamless transportation
           experiences
         </Text>
@@ -422,42 +445,48 @@ const LoginSlide = ({ onPhonePress }) => {
         {/* Auth Buttons */}
         <View className="w-full gap-4">
           <TouchableOpacity
-            className="w-full h-16 bg-blue-600 rounded-2xl justify-center items-center shadow-xl shadow-blue-500/30 border border-blue-500"
-            onPress={onPhonePress}
+            className="w-full h-16 bg-light-bg-primary rounded-xl justify-center items-center shadow-xl shadow-blue-500/30 border border-light-border"
+            onPress={() => {
+              router.push("/(auth)/phone/");
+            }}
           >
-            <Text className="font-interBold text-lg text-white">
+            <Text className="font-geist text-lg text-light-text-primary">
               Continue with Phone
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity className="w-full h-16 bg-gray-800 rounded-2xl justify-center items-center border border-gray-700 shadow-lg">
-            <Text className="font-interBold text-lg text-gray-200">
+          <TouchableOpacity
+            className="w-full h-16 bg-gray-800 rounded-xl justify-center items-center border border-gray-700 shadow-lg"
+            onPress={() => {
+              router.push("/(auth)/email/");
+            }}
+          >
+            <Text className="font-geist text-lg text-gray-200">
               Continue with Email
             </Text>
           </TouchableOpacity>
 
           <View className="flex-row items-center my-6">
-            <View className="flex-1 h-px bg-gray-700" />
-            <Text className="mx-4 font-inter text-gray-500 text-sm">
+            <View className="flex-1 h-px bg-gray-300" />
+            <Text className="mx-4 font-geist text-gray-500 text-sm">
               or continue with
             </Text>
-            <View className="flex-1 h-px bg-gray-700" />
+            <View className="flex-1 h-px bg-gray-300" />
           </View>
 
           <View className="w-full flex-row gap-3">
-            <TouchableOpacity className="flex-1 h-14 bg-gray-800 rounded-xl items-center justify-center border border-gray-700 shadow-lg">
-              <FontAwesome name="google" size={20} color="#DB4437" />
+            <TouchableOpacity
+              onPress={() =>
+                promptAsync({ useProxy: true, showInRecents: true })
+              }
+              className="flex-1 h-14 bg-gray-100 rounded-xl items-center justify-center border border-gray-200 shadow-md"
+            >
+              <GoogleIcon />
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 h-14 bg-gray-800 rounded-xl items-center justify-center border border-gray-700 shadow-lg">
-              <AntDesign name="apple1" size={22} color="#FFFFFF" />
+            <TouchableOpacity className="flex-1 h-14 bg-gray-100 rounded-xl items-center justify-center border border-gray-200 shadow-lg">
+              <AntDesign name="apple" size={25} color="#111" />
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View className="mt-8 bg-gray-800 rounded-xl p-3 border border-gray-700">
-          <Text className="font-inter text-gray-400 text-center text-xs">
-            By continuing, you agree to our Terms & Privacy Policy
-          </Text>
         </View>
       </Animated.View>
     </View>
@@ -558,42 +587,6 @@ const PaginationDots = ({ scrollX, totalSlides }) => {
   );
 };
 
-// Action Button
-const ActionButton = ({ currentIndex, totalSlides, onNext, onPhonePress }) => {
-  const colors = ["#3B82F6", "#8B5CF6", "#10B981", "#F43F5E", "#3B82F6"];
-  const currentColor = colors[Math.min(currentIndex, colors.length - 1)];
-
-  if (currentIndex < totalSlides - 1) {
-    return (
-      <TouchableOpacity
-        className="w-full h-14 rounded-2xl justify-center items-center flex-row gap-2 shadow-lg"
-        style={{ backgroundColor: currentColor }}
-        onPress={onNext}
-      >
-        <Text className="font-semibold text-lg text-white">
-          {currentIndex === totalSlides - 2 ? "Get Started" : "Continue"}
-        </Text>
-        <ChevronRight size={20} color="white" strokeWidth={2} />
-      </TouchableOpacity>
-    );
-  }
-
-  return (
-    <View className="w-full flex-row gap-3">
-      <TouchableOpacity
-        className="flex-1 h-14 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl justify-center items-center shadow-lg"
-        onPress={onPhonePress}
-      >
-        <Text className="font-semibold text-lg text-white">Phone</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity className="flex-1 h-14 bg-white border-2 border-gray-200 rounded-2xl justify-center items-center shadow-lg">
-        <Text className="font-semibold text-lg text-gray-900">Email</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
 // Main Component
 export default function Welcome() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -661,15 +654,15 @@ export default function Welcome() {
     backgroundGradients[Math.min(currentIndex, backgroundGradients.length - 1)];
 
   return (
-    <View className={`flex-1 bg-gradient-to-br ${currentBackground}`}>
+    <View className={`flex-1 bg-white`}>
       <View className="flex-1 justify-center items-center pt-10">
-        <View className="w-11/12 h-[70vh] rounded-3xl overflow-hidden">
-          <NavigationArrows
+        <View className="w-full h-[78vh] rounded-3xl overflow-hidden">
+          {/* <NavigationArrows
             currentIndex={currentIndex}
             totalSlides={allSlides.length}
             onPrev={prevSlide}
             onNext={nextSlide}
-          />
+          /> */}
 
           <FlatList
             ref={flatListRef}
@@ -707,3 +700,4 @@ export default function Welcome() {
     </View>
   );
 }
+// ios:505583262465-b9b3cok4u4noumh31lj70qjvrn7t2jhp.apps.googleusercontent.com

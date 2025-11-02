@@ -203,7 +203,7 @@ const AlertModal = ({
             className={`px-6 pb-6 ${theme === "dark" ? "bg-deepBlueGray" : "bg-white"}`}
           >
             <Text
-              className={`text-xl font-bold mb-3 font-inter ${
+              className={`text-xl mb-3 font-groteskBold ${
                 theme === "dark" ? "text-offWhite" : "text-charcoal"
               }`}
               numberOfLines={2}
@@ -213,10 +213,10 @@ const AlertModal = ({
             </Text>
             {message && (
               <Text
-                className={`text-base leading-6 font-inter ${
+                className={`text-base leading-6 font-geist ${
                   theme === "dark" ? "text-offWhite/80" : "text-slateGray"
                 }`}
-                numberOfLines={4}
+                numberOfLines={3}
                 ellipsizeMode="tail"
               >
                 {message}
@@ -240,15 +240,15 @@ const AlertModal = ({
               onPress={handlePrimaryPress}
               className={`flex-row items-center justify-center py-4 px-6 rounded-xl ${
                 type === "success"
-                  ? "bg-leafGreen"
+                  ? "bg-[#21af50]"
                   : type === "error"
-                    ? "bg-coralRed"
+                    ? "bg-red-400"
                     : type === "warning"
                       ? "bg-amber-500"
                       : "bg-deepTeal"
               } ${buttonDirection === "horizontal" ? "flex-1" : "w-full"}`}
             >
-              <Text className="text-white text-base font-semibold font-inter mr-2">
+              <Text className="text-white font-geist text-lg font-semibold mr-2">
                 {primaryButtonText}
               </Text>
               <ChevronRight size={16} color="#FFFFFF" />

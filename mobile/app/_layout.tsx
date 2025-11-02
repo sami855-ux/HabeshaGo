@@ -16,6 +16,7 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Geist: require("../assets/fonts/Geist-VariableFont_wght.ttf"),
     grotesk: require("../assets/fonts/SpaceGrotesk-VariableFont_wght.ttf"),
+    groteskBold: require("../assets/fonts/SpaceGrotesk-Bold.ttf"),
   });
 
   useEffect(() => {
@@ -34,6 +35,14 @@ export default function RootLayout() {
         <SafeScreen>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="(auth)/phone"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(auth)/email"
+              options={{ headerShown: false }}
+            />
           </Stack>
         </SafeScreen>
 

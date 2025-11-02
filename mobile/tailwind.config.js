@@ -9,12 +9,10 @@ module.exports = {
     extend: {
       fontFamily: {
         inter: ["Inter_400Regular"],
-        interBold: ["Inter_700Bold"],
-        jakarta: ["PlusJakartaSans_400Regular"],
-        jakartaSemi: ["PlusJakartaSans_600SemiBold"],
-        alata: ["Alata_400Regular"],
+        jakarta: ["jakarta"],
         geist: ["Geist"],
         grotesk: ["grotesk"],
+        groteskBold: ["groteskBold"],
       },
       colors: {
         // Light Mode Colors

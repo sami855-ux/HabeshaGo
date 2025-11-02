@@ -1,6 +1,4 @@
-/** @type {import('tailwindcss').Config} */
 module.exports = {
-  // 👇 Include *all* files where you might use Tailwind classes
   content: [
     "./App.{js,jsx,ts,tsx}",
     "./app/**/*.{js,jsx,ts,tsx}",
@@ -15,31 +13,73 @@ module.exports = {
         jakarta: ["PlusJakartaSans_400Regular"],
         jakartaSemi: ["PlusJakartaSans_600SemiBold"],
         alata: ["Alata_400Regular"],
+        geist: ["Geist"],
+        grotesk: ["grotesk"],
       },
       colors: {
-        // Primary Colors
-        deepTeal: "#00897B",
-        tealShadow: "#00695C",
-
-        // Accent Colors
-        limeGreen: "#C0CA33",
-        softEmerald: "#66BB6A",
-
-        // Background Colors
-        mistGray: "#F5F5F5",
-        warmWhite: "#FAFAFA",
-
-        // Text Colors
-        charcoal: "#212121",
-        slateGray: "#616161",
-
-        // Status Colors
-        coralRed: "#E53935",
-        leafGreen: "#43A047",
+        // Light Mode Colors
+        light: {
+          bg: {
+            primary: "#f9fafb",
+            secondary: "#ffffff",
+            tertiary: "#f3f4f6",
+          },
+          button: {
+            primary: {
+              bg: "#2563eb",
+              text: "#ffffff",
+              hover: "#1d4ed8",
+            },
+            secondary: {
+              bg: "#06b6d4",
+              text: "#ffffff",
+              hover: "#0891b2",
+            },
+            ghost: {
+              bg: "transparent",
+              text: "#374151",
+              hover: "#f3f4f6",
+            },
+          },
+          text: {
+            primary: "#1f2937",
+            secondary: "#6b7280",
+            inverse: "#ffffff",
+          },
+          border: "#e5e7eb",
+        },
 
         // Dark Mode Colors
-        deepBlueGray: "#263238",
-        offWhite: "#ECEFF1",
+        dark: {
+          bg: {
+            primary: "#111827",
+            secondary: "#1f2937",
+            tertiary: "#374151",
+          },
+          button: {
+            primary: {
+              bg: "#3b82f6",
+              text: "#ffffff",
+              hover: "#2563eb",
+            },
+            secondary: {
+              bg: "#06b6d4",
+              text: "#ffffff",
+              hover: "#0891b2",
+            },
+            ghost: {
+              bg: "transparent",
+              text: "#d1d5db",
+              hover: "#374151",
+            },
+          },
+          text: {
+            primary: "#f9fafb",
+            secondary: "#d1d5db",
+            inverse: "#1f2937",
+          },
+          border: "#374151",
+        },
       },
     },
   },

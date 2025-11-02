@@ -699,13 +699,6 @@ export default function Welcome() {
         </View>
 
         <View className="mt-8 px-8 w-full gap-4">
-          {/* <ActionButton
-            currentIndex={currentIndex}
-            totalSlides={allSlides.length}
-            onNext={nextSlide}
-            onPhonePress={goToAuth}
-          /> */}
-
           <Text className="text-xs text-gray-600 text-center">
             By continuing, you agree to our Terms • Privacy • Policy
           </Text>

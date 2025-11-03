@@ -1,108 +1,143 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Animated,
+  Easing,
+  Dimensions,
 } from "react-native";
 import {
-  ArrowRight,
   Mail,
-  Lock,
-  Eye,
-  EyeOff,
+  ArrowRight,
+  Clock,
+  RotateCcw,
+  CheckCircle2,
+  Shield,
   Sparkles,
+  Zap,
+  Lock,
 } from "lucide-react-native";
-import { useRouter } from "expo-router";
 import AlertModal from "@/components/utils/AlertModal";
 
-export default function EmailSignIn() {
+const { width } = Dimensions.get("window");
+
+const ContinueWithEmail = () => {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [isResending, setIsResending] = useState(false);
+  const [activeInput, setActiveInput] = useState(0);
+
+  const inputRefs = useRef([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({});
-  const [focusedField, setFocusedField] = useState("");
 
-  const router = useRouter();
-
-  // Animation values
-  const buttonScale = useState(new Animated.Value(1))[0];
-  const cardOpacity = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(20))[0];
-
-  useEffect(() => {
-    // Animate card entrance
-    Animated.parallel([
-      Animated.timing(cardOpacity, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const animateButtonPress = () => {
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
+  // Function to show alert modal
   const showAlert = (config) => {
     setAlertConfig(config);
     setAlertVisible(true);
   };
 
-  const handleSignIn = async () => {
-    animateButtonPress();
+  // Pulse animation for CTA button
+  useEffect(() => {
+    if (!codeSent && email.length > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [email, codeSent]);
 
-    if (!email.trim() || !password.trim()) {
-      showAlert({
-        type: "error",
-        title: "Missing Information",
-        message: "Please fill in both email and password fields to continue.",
-        primaryButtonText: "Got it",
-      });
+  // Progress animation for timer
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: (60 - timeLeft) / 60,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+  }, [timeLeft]);
+
+  useEffect(() => {
+    if (codeSent) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [codeSent]);
+
+  useEffect(() => {
+    if (!codeSent || timeLeft <= 0) return;
+
+    const timer = setTimeout(() => {
+      setTimeLeft(timeLeft - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [timeLeft, codeSent]);
+
+  const handleContinue = async () => {
+    if (!email) {
+      triggerShake();
+      Alert.alert("Oops!", "Please enter your email address");
       return;
     }
 
-    if (!isValidEmail(email)) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      triggerShake();
       showAlert({
         type: "error",
         title: "Invalid Email",
-        message: "Please enter a valid email address (e.g., name@example.com).",
-        primaryButtonText: "Try Again",
+        message: "Please enter a valid email address",
+        primaryButtonText: "Got it",
       });
-      return;
-    }
-
-    if (password.length < 6) {
-      showAlert({
-        type: "warning",
-        title: "Password Too Short",
-        message: "Password should be at least 6 characters long for security.",
-        primaryButtonText: "Understand",
-      });
+      // Alert.alert("Invalid Email", "Please enter a valid email address");
       return;
     }
 
@@ -110,440 +145,359 @@ export default function EmailSignIn() {
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      showAlert({
-        type: "success",
-        title: "Welcome Back! 🎉",
-        message: "You have successfully signed in to your account.",
-        primaryButtonText: "Continue",
-        onPrimaryPress: () => {
-          console.log("Navigate to home screen");
-        },
-      });
+      setCodeSent(true);
+      setTimeLeft(60);
+      // Focus first code input
+      setTimeout(() => inputRefs.current[0]?.focus(), 500);
     } catch (error) {
       showAlert({
         type: "error",
-        title: "Sign In Failed",
-        message:
-          "Unable to sign in. Please check your credentials and try again.",
-        primaryButtonText: "Retry",
-        secondaryButtonText: "Reset Password",
-        onSecondaryPress: handleForgotPassword,
+        title: "Error",
+        message: "Failed to send verification code. Please try again",
+        primaryButtonText: "Got it",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const triggerShake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const handleForgotPassword = () => {
-    showAlert({
-      type: "info",
-      title: "Reset Password",
-      message: "A password reset link will be sent to your email address.",
-      primaryButtonText: "Send Link",
-      secondaryButtonText: "Cancel",
-      onPrimaryPress: () => {
-        console.log("Password reset email sent to:", email);
-      },
-    });
+  const handleCodeChange = (text: string, index: number) => {
+    const newCode = [...verificationCode];
+    newCode[index] = text;
+    setVerificationCode(newCode);
+
+    // Auto-advance to next input
+    if (text && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when all digits are entered
+    if (newCode.every((digit) => digit !== "") && index === 5) {
+      handleVerifyCode();
+    }
   };
 
-  const handleSignUp = () => {
-    showAlert({
-      type: "info",
-      title: "Create Account",
-      message:
-        "Ready to create your account? You'll be redirected to the sign up page.",
-      primaryButtonText: "Continue",
-      secondaryButtonText: "Not Now",
-      onPrimaryPress: () => {
-        console.log("Navigate to sign up screen");
-      },
-    });
+  const handleCodeKeyPress = (e: any, index: number) => {
+    if (
+      e.nativeEvent.key === "Backspace" &&
+      !verificationCode[index] &&
+      index > 0
+    ) {
+      inputRefs.current[index - 1]?.focus();
+    }
   };
+
+  const handleVerifyCode = () => {
+    const code = verificationCode.join("");
+    if (code.length !== 6) {
+      triggerShake();
+
+      Alert.alert("Incomplete Code", "Please enter all 6 digits");
+      return;
+    }
+
+    Alert.alert("Success!", "Your email has been verified successfully! 🎉");
+  };
+
+  const handleResendCode = async () => {
+    if (timeLeft > 0) return;
+
+    setIsResending(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setTimeLeft(60);
+      setVerificationCode(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+      Alert.alert("Code Sent!", "New verification code has been sent!");
+    } catch (error) {
+      Alert.alert("Error", "Failed to resend code. Please try again.");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
 
   return (
     <>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1, backgroundColor: "#f8fafc" }}
+        className="flex-1 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900"
       >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Enhanced Header */}
-          <View
-            style={{
-              paddingHorizontal: 24,
-              paddingTop: 64,
-              paddingBottom: 32,
-              backgroundColor: "#00897B",
-              borderBottomLeftRadius: 32,
-              borderBottomRightRadius: 32,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 24,
-              }}
-            ></View>
+          <View className="flex-1 px-6 justify-center bg-white">
+            {/* Animated Background Elements */}
+            <View className="absolute bottom-40 -right-20 w-60 h-60 bg-blue-500/10 rounded-full blur-2xl" />
 
-            <View style={{ marginBottom: 8 }}>
-              <Text
-                className="font-groteskBold"
+            {/* Header */}
+            <View className="items-center mb-12">
+              <Animated.View
+                className="w-28 h-28 bg-black/5 rounded-full items-center justify-center mb-6 shadow-2xl shadow-purple-500/30"
                 style={{
-                  fontSize: 32,
-                  color: "white",
-                  marginBottom: 12,
-                  lineHeight: 38,
+                  transform: [{ scale: pulseAnim }],
                 }}
               >
-                Welcome Back
+                <Shield size={36} color="#A78BFA" />
+              </Animated.View>
+
+              <Text className="text-4xl font-groteskBold text-light-text-primary mb-3 text-center">
+                {codeSent ? "Verify Your Email" : "Welcome Back!"}
               </Text>
-              <Text
-                className="font-geist"
-                style={{
-                  fontSize: 16,
-                  color: "rgba(255,255,255,0.9)",
-                  lineHeight: 24,
-                }}
-              >
-                Sign in to continue your journey
+              <Text className="text-lg text-light-text-secondary font-geist text-center leading-6 mb-2">
+                {codeSent
+                  ? `We've sent a magic code to`
+                  : "Enter your email to continue your journey"}
               </Text>
+              {codeSent && (
+                <View className="flex-row items-center mt-2 bg-white/10 px-4 py-2 rounded-full">
+                  <Mail size={16} color="#222" />
+                  <Text className="text-lg font-semibold text-light-text-primary font-geist ml-2">
+                    {email}
+                  </Text>
+                </View>
+              )}
             </View>
-          </View>
 
-          {/* Enhanced Main Content */}
-          <Animated.View
-            className={"rounded-md relative -top-7"}
-            style={{
-              opacity: cardOpacity,
-              transform: [{ translateY }],
-              flex: 1,
-              paddingHorizontal: 10,
-              paddingBottom: 32,
-            }}
-          >
-            {/* Enhanced Input Card */}
-            <View
-              className="bg-white/90 pt-14"
+            <Animated.View
               style={{
-                borderRadius: 18,
-                padding: 24,
-                marginBottom: 24,
-                borderWidth: 1,
-                borderColor: "#f1f5f9",
+                transform: [{ translateX: shakeAnim }],
               }}
             >
               {/* Email Input */}
-              <View style={{ marginBottom: 24 }}>
-                <Text
-                  className="font-geist"
-                  style={{
-                    fontSize: 15,
-                    color: "#374151",
-                    marginBottom: 12,
-                  }}
-                >
-                  Email Address
-                </Text>
-                <View
-                  className=""
-                  style={[
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      borderRadius: 10,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      backgroundColor: "white",
-                      borderWidth: 2,
-                    },
-                    focusedField === "email"
-                      ? {
-                          borderColor: "#00897B",
-                          backgroundColor: "rgba(0,137,123,0.05)",
-                        }
-                      : { borderColor: "#f1f5f9" },
-                    email && !isValidEmail(email)
-                      ? { borderColor: "#FF6B6B" }
-                      : {},
-                  ]}
-                >
-                  <Mail
-                    size={22}
-                    color={focusedField === "email" ? "#00897B" : "#9CA3AF"}
-                    style={{ marginRight: 12 }}
-                  />
+              <View className="mb-8">
+                <View className="flex-row items-center mb-3">
+                  <Mail size={18} color="#222" />
+                  <Text className="text-sm font-semibold font-geist text-light-text-primary ml-2">
+                    EMAIL ADDRESS
+                  </Text>
+                </View>
+                <View className="relative">
                   <TextInput
-                    className="font-geist"
-                    style={{
-                      flex: 1,
-                      fontSize: 16,
-                      color: "#374151",
-                      paddingLeft: 4,
-                    }}
-                    placeholder="name@example.com"
-                    placeholderTextColor="#9CA3AF"
+                    className="w-full bg-white/10 border-2 border-gray-200 rounded-lg px-6 py-3 text-lg font-medium text-gray-700 font-geist placeholder-purple-300"
+                    placeholder="your@email.com"
+                    placeholderTextColor="#777"
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoComplete="email"
-                    editable={!isLoading}
-                    onFocus={() => setFocusedField("email")}
-                    onBlur={() => setFocusedField(null)}
+                    editable={!isLoading && !codeSent}
                   />
+                  {email && (
+                    <TouchableOpacity
+                      className="absolute right-4 top-5 bg-white/20 w-6 h-6 rounded-full items-center justify-center"
+                      onPress={() => setEmail("")}
+                    >
+                      <Text className="text-light-text-secondary text-sm font-bold">
+                        x
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                {email && !isValidEmail(email) && (
-                  <Text
-                    className="font-geist"
-                    style={{
-                      color: "#FF6B6B",
-                      fontSize: 12,
-                      marginTop: 8,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    Please enter a valid email address
-                  </Text>
-                )}
               </View>
 
-              {/* Password Input */}
-              <View style={{ marginBottom: 24 }}>
-                <Text
-                  className="font-geist"
-                  style={{
-                    fontSize: 15,
-                    color: "#374151",
-                    marginBottom: 12,
-                  }}
-                >
-                  Password
-                </Text>
-                <View
-                  style={[
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      borderRadius: 10,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      backgroundColor: "white",
-                      borderWidth: 2,
-                    },
-                    focusedField === "password"
-                      ? {
-                          borderColor: "#00897B",
-                          backgroundColor: "rgba(0,137,123,0.05)",
+              {/* Verification Code Input - Animated */}
+              <Animated.View
+                style={{
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                }}
+                className={codeSent ? "block" : "hidden"}
+              >
+                <View className="mb-6">
+                  <View className="flex-row items-center justify-between mb-4">
+                    <View className="flex-row items-center">
+                      <Lock size={18} color="#222" />
+                      <Text className="text-sm font-semibold font-geist text-light-text-primary ml-2">
+                        6-DIGIT VERIFICATION CODE
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center  bg-white/10 px-3 py-1 rounded-full">
+                      <Clock
+                        size={14}
+                        color={timeLeft > 10 ? "#139419" : "#EF4444"}
+                      />
+                      <Text
+                        className={`text-sm font-groteskBold ml-1 ${timeLeft > 10 ? "text-green-600" : "text-red-400"}`}
+                      >
+                        {formatTime(timeLeft)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Progress Bar */}
+                  <View className="w-full bg-white/10 rounded-full h-1 mb-6 overflow-hidden">
+                    <Animated.View
+                      style={{ width: progressWidth }}
+                      className="h-full bg-gradient-to-r from-green-400 to-cyan-400 rounded-full"
+                    />
+                  </View>
+
+                  {/* Code Inputs Grid */}
+                  <View className="flex-row justify-between mb-6">
+                    {verificationCode.map((digit, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => inputRefs.current[index]?.focus()}
+                        className={`w-12 h-14 rounded-xl border-2 items-center justify-center ${
+                          activeInput === index
+                            ? "border-green-600 bg-green-400/20"
+                            : digit
+                              ? "border-green-400 bg-green-400/20"
+                              : "border-black/25 bg-white/5"
+                        }`}
+                      >
+                        <TextInput
+                          ref={(ref) => (inputRefs.current[index] = ref)}
+                          className="w-full text-center text-light-text-primary font-groteskBold text-xl "
+                          value={digit}
+                          onChangeText={(text) => handleCodeChange(text, index)}
+                          onKeyPress={(e) => handleCodeKeyPress(e, index)}
+                          onFocus={() => setActiveInput(index)}
+                          keyboardType="number-pad"
+                          maxLength={1}
+                          selectTextOnFocus
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Resend Code */}
+                  <View className="flex-row justify-center items-center space-x-3 mb-6">
+                    <Text className="text-light-text-primary text-sm">
+                      Didn't receive the code?
+                    </Text>
+                    <TouchableOpacity
+                      onPress={handleResendCode}
+                      disabled={timeLeft > 0 || isResending}
+                      className="flex-row items-center space-x-4 bg-white/10 px-4 py-2 rounded-full"
+                    >
+                      <RotateCcw
+                        size={16}
+                        color={
+                          timeLeft > 0 || isResending ? "#6B7280" : "#A78BFA"
                         }
-                      : { borderColor: "#f1f5f9" },
-                  ]}
-                >
-                  <Lock
-                    size={22}
-                    color={focusedField === "password" ? "#00897B" : "#9CA3AF"}
-                    style={{ marginRight: 12 }}
-                  />
-                  <TextInput
-                    className="font-geist"
-                    style={{ flex: 1, fontSize: 16, color: "#374151" }}
-                    placeholder="Enter your password"
-                    placeholderTextColor="#9CA3AF"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoComplete="password"
-                    editable={!isLoading}
-                    onFocus={() => setFocusedField("password")}
-                    onBlur={() => setFocusedField(null)}
-                  />
+                      />
+                      <Text
+                        className={`text-sm font-semibold pl-2 ${
+                          timeLeft > 0 || isResending
+                            ? "text-gray-400"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {isResending ? "Sending..." : "Resend Code"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Animated.View>
+            </Animated.View>
+
+            {/* Action Buttons */}
+            <View className="space-y-4">
+              {!codeSent ? (
+                <Animated.View>
                   <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={{ padding: 4, borderRadius: 8 }}
+                    className={`w-full bg-green-500 rounded-lg py-4 flex-row items-center justify-center shadow-2xl shadow-purple-500/40 ${
+                      isLoading ? "opacity-80" : ""
+                    }`}
+                    onPress={handleContinue}
+                    disabled={isLoading}
                   >
-                    {showPassword ? (
-                      <EyeOff size={22} color="#616161" />
+                    {isLoading ? (
+                      <View className="flex-row items-center">
+                        <Text className="text-light-text-inverse font-geist text-lg mr-3">
+                          Sending Magic Code...
+                        </Text>
+                      </View>
                     ) : (
-                      <Eye size={22} color="#616161" />
+                      <>
+                        <Text className="text-light-text-inverse font-geist text-lg">
+                          Send Verification Code
+                        </Text>
+                      </>
                     )}
                   </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Remember Me & Forgot Password */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 24,
-                }}
-              >
+                </Animated.View>
+              ) : (
                 <TouchableOpacity
-                  onPress={() => setRememberMe(!rememberMe)}
-                  style={{ flexDirection: "row", alignItems: "center" }}
+                  className="w-full bg-green-500 rounded-lg py-4 flex-row items-center justify-center shadow-2xl shadow-green-400/30"
+                  onPress={handleVerifyCode}
+                  disabled={verificationCode.join("").length !== 6}
                 >
-                  <View
-                    style={[
-                      {
-                        width: 20,
-                        height: 20,
-                        borderRadius: 4,
-                        borderWidth: 2,
-                        marginRight: 8,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      },
-                      rememberMe
-                        ? { backgroundColor: "#00897B", borderColor: "#00897B" }
-                        : { borderColor: "#D1D5DB" },
-                    ]}
-                  >
-                    {rememberMe && (
-                      <Text
-                        className="font-geist"
-                        style={{
-                          color: "white",
-                          fontSize: 12,
-                        }}
-                      >
-                        ✓
-                      </Text>
-                    )}
-                  </View>
-                  <Text
-                    className="font-geist"
-                    style={{ color: "#374151", fontWeight: "500" }}
-                  >
-                    Remember me
+                  <Text className="text-white font-geist text-lg">
+                    Verify & Continue
                   </Text>
                 </TouchableOpacity>
+              )}
 
-                <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text
-                    className="font-geist"
-                    style={{
-                      color: "#00897B",
-                      fontWeight: "600",
-                      backgroundColor: "rgba(0,137,123,0.1)",
-                      paddingHorizontal: 12,
-                      paddingVertical: 7,
-                      borderRadius: 8,
-                    }}
-                  >
-                    Forgot Password?
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Enhanced Sign In Button */}
-              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+              {codeSent && (
                 <TouchableOpacity
-                  onPress={handleSignIn}
-                  disabled={
-                    isLoading || !email || !password || !isValidEmail(email)
-                  }
-                  style={[
-                    {
-                      borderRadius: 10,
-                      paddingVertical: 16,
-                      paddingHorizontal: 20,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      shadowColor: "#00897B",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 8,
-                      elevation: 4,
-                    },
-                    isLoading || !email || !password || !isValidEmail(email)
-                      ? { backgroundColor: "#D1D5DB" }
-                      : {
-                          backgroundColor: "#00897B",
-                          backgroundGradient:
-                            "linear-gradient(to right, #00897B, #00796B)",
-                        },
-                  ]}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    className="font-geist"
-                    style={{
-                      color: "white",
-                      fontSize: 16,
-                      fontWeight: "600",
-                      marginRight: 8,
-                    }}
-                  >
-                    {isLoading ? "Signing In..." : "Sign In"}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-
-            {/* Enhanced Sign Up Section */}
-            <View
-              style={{
-                backgroundColor: "rgba(255,255,255,0.8)",
-                borderRadius: 16,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: "#f1f5f9",
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  className="font-geist"
-                  style={{
-                    color: "#64748B",
-                    marginRight: 8,
-                    textAlign: "center",
+                  className="w-full border-2 border-white/20 rounded-2xl py-4 mt-2"
+                  onPress={() => {
+                    setCodeSent(false);
+                    setVerificationCode(["", "", "", "", "", ""]);
                   }}
                 >
-                  New to our platform?
-                </Text>
-                <TouchableOpacity onPress={handleSignUp}>
-                  <Text
-                    className="font-geist"
-                    style={{
-                      color: "#00897B",
-                      fontWeight: "600",
-                      backgroundColor: "rgba(0,137,123,0.1)",
-                      paddingHorizontal: 14,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                    }}
-                  >
-                    Create Account
+                  <Text className="text-light-text-primary font-geist font-semibold text-center text-base">
+                    Change Email Address
                   </Text>
                 </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Security Footer */}
+            <View className="mt-12 px-4">
+              <View className="flex-row items-center justify-center mb-3">
+                <Shield size={14} color="#222" />
+                <Text className="text-sm text-light-text-secondary text-center ml-2">
+                  Your data is securely encrypted and protected
+                </Text>
               </View>
             </View>
-          </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Alert Modal */}
+      {/* Alert Modal - Add this at the end */}
       <AlertModal
         visible={alertVisible}
         onClose={() => setAlertVisible(false)}
@@ -551,4 +505,6 @@ export default function EmailSignIn() {
       />
     </>
   );
-}
+};
+
+export default ContinueWithEmail;

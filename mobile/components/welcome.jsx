@@ -18,6 +18,8 @@ import {
   ChevronLeft,
   MapPin,
   TrendingUp,
+  Mail,
+  Phone,
 } from "lucide-react-native";
 import { FontAwesome, AntDesign, Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
@@ -25,6 +27,8 @@ import * as Google from "expo-auth-session/providers/google";
 
 import { useRouter } from "expo-router";
 import GoogleIcon from "./utils/GoogleIcon";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -386,20 +390,20 @@ const LoginSlide = ({ onPhonePress }) => {
     transform: [{ translateY: slideUpAnim }],
   };
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: "<YOUR_EXPO_WEB_CLIENT_ID>",
-    iosClientId: "<YOUR_IOS_CLIENT_ID>",
-    androidClientId: "<YOUR_ANDROID_CLIENT_ID>",
-    scopes: ["profile", "email"],
-  });
+  // const [request, response, promptAsync] = Google.useAuthRequest({
+  //   expoClientId: "<YOUR_EXPO_WEB_CLIENT_ID>",
+  //   iosClientId: "<YOUR_IOS_CLIENT_ID>",
+  //   androidClientId: "<YOUR_ANDROID_CLIENT_ID>",
+  //   scopes: ["profile", "email"],
+  // });
 
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { authentication } = response;
-      console.log("Google Auth Success", authentication);
-      // You can now send `authentication.accessToken` to your backend
-    }
-  }, [response]);
+  // useEffect(() => {
+  //   if (response?.type === "success") {
+  //     const { authentication } = response;
+  //     console.log("Google Auth Success", authentication);
+  //     // You can now send `authentication.accessToken` to your backend
+  //   }
+  // }, [response]);
 
   return (
     <View
@@ -444,27 +448,73 @@ const LoginSlide = ({ onPhonePress }) => {
 
         {/* Auth Buttons */}
         <View className="w-full gap-4">
-          <TouchableOpacity
-            className="w-full h-16 bg-light-bg-primary rounded-xl justify-center items-center shadow-xl shadow-blue-500/30 border border-light-border"
-            onPress={() => {
-              router.push("/(auth)/phone/");
-            }}
-          >
-            <Text className="font-geist text-lg text-light-text-primary">
-              Continue with Phone
-            </Text>
-          </TouchableOpacity>
+          <View className="w-full space-y-4">
+            {/* Phone Button */}
+            <TouchableOpacity
+              className="w-full h-16 mb-2 rounded-xl overflow-hidden active:scale-[0.98]"
+              onPress={() => router.push("/(auth)/phone/")}
+            >
+              <BlurView
+                intensity={55}
+                tint="dark"
+                className="flex-1 rounded-xl"
+              >
+                <LinearGradient
+                  colors={["#1c1c1c", "#2b2b2b"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  className="flex-1 rounded-xl border border-white shadow-2xl shadow-black/40 items-center justify-center relative"
+                >
+                  {/* Shine line */}
+                  <View className="absolute top-0 left-0 right-0 h-px bg-white/20" />
 
-          <TouchableOpacity
-            className="w-full h-16 bg-gray-800 rounded-xl justify-center items-center border border-gray-700 shadow-lg"
-            onPress={() => {
-              router.push("/(auth)/email/");
-            }}
-          >
-            <Text className="font-geist text-lg text-gray-200">
-              Continue with Email
-            </Text>
-          </TouchableOpacity>
+                  <View className="flex-row items-center justify-between w-full px-6">
+                    <View className="flex-row items-center space-x-3">
+                      <View className="w-8 h-8 bg-[#121212] rounded-lg items-center justify-center">
+                        <Phone size={18} color="white" />
+                      </View>
+                      <Text className="font-geist-semibold text-lg text-white pl-3">
+                        Continue with Phone
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </TouchableOpacity>
+
+            {/* Email Button */}
+            <TouchableOpacity
+              className="w-full h-16 rounded-lg overflow-hidden active:scale-[0.98]"
+              onPress={() => router.push("/(auth)/email/")}
+            >
+              <BlurView
+                intensity={55}
+                tint="dark"
+                className="flex-1 rounded-lg"
+              >
+                <LinearGradient
+                  colors={["#e2e2e2", "#f1f5f5"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  className="flex-1 rounded-lg border border-gray-100  shadow-2xl shadow-black/40 items-center justify-center relative"
+                >
+                  {/* Shine line */}
+                  <View className="absolute top-0 left-0 right-0 h-px bg-white/20" />
+
+                  <View className="flex-row items-center justify-between w-full px-6">
+                    <View className="flex-row items-center space-x-3">
+                      <View className="w-8 h-8 bg-purple-500/20 rounded-lg items-center justify-center">
+                        <Mail size={18} color="#A78BFA" />
+                      </View>
+                      <Text className="font-geist-semibold text-lg text-light-text-primary pl-3">
+                        Continue with Email
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </TouchableOpacity>
+          </View>
 
           <View className="flex-row items-center my-6">
             <View className="flex-1 h-px bg-gray-300" />
@@ -474,17 +524,34 @@ const LoginSlide = ({ onPhonePress }) => {
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
-          <View className="w-full flex-row gap-3">
+          <View className="w-full flex-row gap-4">
             <TouchableOpacity
-              onPress={() =>
-                promptAsync({ useProxy: true, showInRecents: true })
-              }
-              className="flex-1 h-14 bg-gray-100 rounded-xl items-center justify-center border border-gray-200 shadow-md"
+              // onPress={() =>
+              //   promptAsync({ useProxy: true, showInRecents: true })
+              // }
+              className="flex-1 h-14 rounded-2xl overflow-hidden"
             >
-              <GoogleIcon />
+              <BlurView
+                intensity={40}
+                tint="light"
+                className="flex-1 rounded-2xl"
+              >
+                <View className="flex-1 bg-white/20 border border-white/30 shadow-2xl shadow-black/20 items-center justify-center rounded-2xl">
+                  <GoogleIcon />
+                </View>
+              </BlurView>
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 h-14 bg-gray-100 rounded-xl items-center justify-center border border-gray-200 shadow-lg">
-              <AntDesign name="apple" size={25} color="#111" />
+
+            <TouchableOpacity className="flex-1 h-14 rounded-2xl overflow-hidden">
+              <BlurView
+                intensity={40}
+                tint="light"
+                className="flex-1 rounded-2xl"
+              >
+                <View className="flex-1 bg-white/20 border border-white/30 shadow-2xl shadow-black/20 items-center justify-center rounded-2xl">
+                  <AntDesign name="apple" size={25} color="black" />
+                </View>
+              </BlurView>
             </TouchableOpacity>
           </View>
         </View>

@@ -7,7 +7,7 @@ import { Provider } from "react-redux";
 import { useFonts } from "expo-font";
 
 import SafeScreen from "@/components/SafeScreen";
-import { store } from "@/store/main";
+import { store } from "@/src/store/main";
 
 // Prevent splash screen from auto-hiding before fonts load
 SplashScreen.preventAutoHideAsync();

@@ -279,7 +279,7 @@ const ContinueWithEmail = () => {
               </Animated.View>
 
               <Text className="text-4xl font-groteskBold text-light-text-primary mb-3 text-center">
-                {codeSent ? "Verify Your Email" : "Welcome Back!"}
+                {codeSent ? "Verify Your Email" : "Continue With Email!"}
               </Text>
               <Text className="text-lg text-light-text-secondary font-geist text-center leading-6 mb-2">
                 {codeSent

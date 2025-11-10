@@ -1,16 +1,39 @@
 {
   "name": "smart-mobility-in-addis",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
+  "description": "Smart Mobility Hub platform for Addis Ababa (Monorepo with Web, Server, and Mobile apps)",
+  "packageManager": "npm@10.8.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "web": "npm --prefix ./web run dev",
-    "server": "npm --prefix ./server run start:dev",
-    "mobile:android": "npm --prefix ./mobile run android",
-    "mobile:ios": "npm --prefix ./mobile run ios",
-    "mobile:web": "npm --prefix ./mobile run web"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "clean": "turbo run clean",
+    "web": "npm --prefix apps/web run dev",
+    "server": "npm --prefix apps/server run start:dev",
+    "mobile:android": "npm --prefix apps/mobile run android",
+    "mobile:ios": "npm --prefix apps/mobile run ios",
+    "mobile:web": "npm --prefix apps/mobile run web"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "keywords": [
+    "turborepo",
+    "nestjs",
+    "react",
+    "expo",
+    "graphql",
+    "prisma",
+    "mobility",
+    "smart-transport"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "turbo": "2.6.0"
+  }
 }

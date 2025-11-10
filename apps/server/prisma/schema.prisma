@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String?  @unique
+  password      String? // optional for social/otp flows
+  phone         String?  @unique
+  role          UserRole @default(PASSENGER)
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // relations
+  accounts      Account[]
+  otpCodes      OtpCode[]
+  refreshTokens RefreshToken[]
+
+  bookings   Booking[]
+  parkings   ParkingReservation[]
+  minibuses  MinibusReservation[]
+  chargings  ChargingSession[]
+  driverInfo Driver? // if this user is a driver
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+model Account {
+  id         Int      @id @default(autoincrement())
+  provider   String
+  providerId String
+  email      String?
+  createdAt  DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+
+  @@unique([provider, providerId], name: "provider_providerId_unique")
+}
+
+model OtpCode {
+  id        Int      @id @default(autoincrement())
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?
+  email     String? // either email or phone will be filled
+  phone     String?
+  codeHash  String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+}
+
+//
+// --- existing models unchanged (copy them back) ---
+// EVStation, ChargingSlot, ChargingSession, Route, Driver, Bus, Minibus, MinibusReservation, Booking, ParkingLot, ParkingReservation
+//
+// Paste your existing models here (unchanged)...
+//
+model EVStation {
+  id        Int      @id @default(autoincrement())
+  name      String
+  location  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slots ChargingSlot[]
+}
+
+model ChargingSlot {
+  id         Int        @id @default(autoincrement())
+  slotNumber String
+  status     SlotStatus @default(AVAILABLE)
+  station    EVStation  @relation(fields: [stationId], references: [id])
+  stationId  Int
+
+  sessions ChargingSession[]
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+model ChargingSession {
+  id         Int          @id @default(autoincrement())
+  user       User         @relation(fields: [userId], references: [id])
+  userId     Int
+  slot       ChargingSlot @relation(fields: [slotId], references: [id])
+  slotId     Int
+  startTime  DateTime
+  endTime    DateTime?
+  energyUsed Float?
+  cost       Float?
+  createdAt  DateTime     @default(now())
+}
+
+model Route {
+  id          Int      @id @default(autoincrement())
+  name        String
+  origin      String
+  destination String
+  distanceKm  Float?
+  createdAt   DateTime @default(now())
+
+  minibuses Minibus[]
+  buses     Bus[]
+}
+
+model Driver {
+  id              Int      @id @default(autoincrement())
+  user            User     @relation(fields: [userId], references: [id])
+  userId          Int      @unique
+  licenseNo       String
+  experience      Int?
+  assignedBus     Bus?
+  assignedMinibus Minibus?
+}
+
+model Bus {
+  id        Int       @id @default(autoincrement())
+  busNumber String    @unique
+  capacity  Int
+  status    BusStatus @default(ACTIVE)
+  driver    Driver?   @relation(fields: [driverId], references: [id])
+  driverId  Int?      @unique
+  route     Route?    @relation(fields: [routeId], references: [id])
+  routeId   Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  bookings Booking[]
+}
+
+enum BusStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+model Minibus {
+  id          Int      @id @default(autoincrement())
+  plateNumber String   @unique
+  capacity    Int
+  driver      Driver?  @relation(fields: [driverId], references: [id])
+  driverId    Int?     @unique
+  route       Route?   @relation(fields: [routeId], references: [id])
+  routeId     Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reservations MinibusReservation[]
+}
+
+model MinibusReservation {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  minibus   Minibus  @relation(fields: [minibusId], references: [id])
+  minibusId Int
+  seat      Int
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  bus        Bus      @relation(fields: [busId], references: [id])
+  busId      Int
+  seatNumber Int
+  date       DateTime
+  createdAt  DateTime @default(now())
+}
+
+model ParkingLot {
+  id         Int      @id @default(autoincrement())
+  name       String
+  location   String
+  totalSlots Int
+  occupied   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  reservations ParkingReservation[]
+}
+
+model ParkingReservation {
+  id         Int        @id @default(autoincrement())
+  user       User       @relation(fields: [userId], references: [id])
+  userId     Int
+  lot        ParkingLot @relation(fields: [lotId], references: [id])
+  lotId      Int
+  slotNumber Int
+  startTime  DateTime
+  endTime    DateTime
+  createdAt  DateTime   @default(now())
+}

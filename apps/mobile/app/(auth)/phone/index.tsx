@@ -1,75 +1,76 @@
-import React, { useState, useRef } from "react";
 import {
-  View,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle,
+  Phone,
+} from "lucide-react-native"
+import React, { useState } from "react"
+import {
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
-import {
-  ChevronDown,
-  CheckCircle,
-  AlertCircle,
-  Phone,
-  ArrowRight,
-} from "lucide-react-native";
+  View,
+} from "react-native"
 
-import AlertModal from "@/components/utils/AlertModal";
+import AlertModal from "@/components/utils/AlertModal"
+import { useRouter } from "expo-router"
 
 const PhoneNumberScreen = () => {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
-  const [isValid, setIsValid] = useState(true);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({});
+  const router = useRouter()
+
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [isFocused, setIsFocused] = useState(false)
+  const [isValid, setIsValid] = useState(true)
+  const [alertVisible, setAlertVisible] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({})
 
   // Function to show alert modal
   const showAlert = (config) => {
-    setAlertConfig(config);
-    setAlertVisible(true);
-  };
+    setAlertConfig(config)
+    setAlertVisible(true)
+  }
 
   const validatePhoneNumber = (number: string) => {
     // Remove any non-digit characters
-    const cleanNumber = number.replace(/\D/g, "");
+    const cleanNumber = number.replace(/\D/g, "")
 
     // Ethiopian number validation: must start with 9 or 7 and be 9 digits after country code
     if (cleanNumber.length === 9) {
-      const firstDigit = cleanNumber.charAt(0);
-      return firstDigit === "9" || firstDigit === "7";
+      const firstDigit = cleanNumber.charAt(0)
+      return firstDigit === "9" || firstDigit === "7"
     }
-    return false;
-  };
+    return false
+  }
 
   const handlePhoneNumberChange = (text: string) => {
     // Remove any non-digit characters
-    const cleanText = text.replace(/\D/g, "");
+    const cleanText = text.replace(/\D/g, "")
 
     // Format the number as user types
-    let formattedText = "";
+    let formattedText = ""
     if (cleanText.length > 0) {
-      formattedText = cleanText;
+      formattedText = cleanText
       if (cleanText.length > 3) {
-        formattedText = `${cleanText.slice(0, 3)} ${cleanText.slice(3)}`;
+        formattedText = `${cleanText.slice(0, 3)} ${cleanText.slice(3)}`
       }
       if (cleanText.length > 6) {
-        formattedText = `${cleanText.slice(0, 3)} ${cleanText.slice(3, 6)} ${cleanText.slice(6, 9)}`;
+        formattedText = `${cleanText.slice(0, 3)} ${cleanText.slice(3, 6)} ${cleanText.slice(6, 9)}`
       }
     }
 
-    setPhoneNumber(formattedText);
+    setPhoneNumber(formattedText)
 
     // Validate the number (without spaces)
-    const isValidNumber = validatePhoneNumber(cleanText);
-    setIsValid(isValidNumber);
-  };
+    const isValidNumber = validatePhoneNumber(cleanText)
+    setIsValid(isValidNumber)
+  }
 
   const handleContinue = () => {
-    const cleanNumber = phoneNumber.replace(/\D/g, "");
+    const cleanNumber = phoneNumber.replace(/\D/g, "")
 
     if (!validatePhoneNumber(cleanNumber)) {
       showAlert({
@@ -78,11 +79,11 @@ const PhoneNumberScreen = () => {
         message:
           "Please enter a valid Ethiopian phone number starting with 9 or 7 (e.g., 978109304)",
         primaryButtonText: "Got it",
-      });
-      return;
+      })
+      return
     }
 
-    const fullNumber = `+251${cleanNumber}`;
+    const fullNumber = `+251${cleanNumber}`
 
     showAlert({
       type: "success",
@@ -91,20 +92,20 @@ const PhoneNumberScreen = () => {
       primaryButtonText: "Enter Code",
       onPrimaryPress: () => {
         // Navigate to OTP verification screen
-        console.log("Navigate to OTP screen");
-        // router.push('/verify-otp');
+        console.log("Navigate to OTP screen")
+        router.push("/(passenger)")
       },
-    });
-  };
+    })
+  }
 
   const getInputBorderColor = () => {
-    if (!isValid && phoneNumber.length >= 9) return "border-red-500";
-    if (isFocused) return "border-blue-500";
-    return "border-gray-300";
-  };
+    if (!isValid && phoneNumber.length >= 9) return "border-red-500"
+    if (isFocused) return "border-blue-500"
+    return "border-gray-300"
+  }
 
   const isContinueDisabled =
-    !isValid || phoneNumber.replace(/\D/g, "").length < 9;
+    !isValid || phoneNumber.replace(/\D/g, "").length < 9
 
   return (
     <>
@@ -232,7 +233,7 @@ const PhoneNumberScreen = () => {
         {...alertConfig}
       />
     </>
-  );
-};
+  )
+}
 
-export default PhoneNumberScreen;
+export default PhoneNumberScreen

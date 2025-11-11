@@ -1,32 +1,22 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { PrismaModule } from 'src/prisma/prisma.module';
-import { JwtStrategy } from './jwt.strategy';
-import { OtpService } from 'src/otp/otp.service';
-import { SmsService } from 'src/otp/sms.service';
-import { OAuthController } from './oauth.controller';
-import { GoogleStrategy } from './social/google.strategy';
+import { PrismaService } from '../prisma/prisma.service';
+import { MailerService } from '../mailer/mailer.service';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    PrismaModule,
-    PassportModule,
-    JwtModule.register({ secret: process.env.JWT_SECRET }),
+    ConfigModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => ({
+        secret: cfg.get('JWT_SECRET'),
+        signOptions: { expiresIn: cfg.get('JWT_EXPIRES_IN') || '15m' },
+      }),
+    }),
   ],
-  providers: [
-    AuthService,
-    AuthResolver,
-    PrismaService,
-    JwtStrategy,
-    OtpService,
-    SmsService,
-    GoogleStrategy,
-  ],
-  controllers: [OAuthController],
-  exports: [AuthService],
+  providers: [AuthService, AuthResolver, PrismaService, MailerService],
 })
 export class AuthModule {}

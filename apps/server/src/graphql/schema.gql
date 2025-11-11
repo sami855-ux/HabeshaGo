@@ -2,20 +2,9 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
-type User {
-  id: Int!
-  name: String!
-  email: String!
-  phone: String
-  role: UserRole!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-enum UserRole {
-  PASSENGER
-  DRIVER
-  ADMIN
+type RequestOtpResponse {
+  success: Boolean!
+  expiresAt: DateTime!
 }
 
 """
@@ -23,20 +12,43 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+type AuthUser {
+  id: Int!
+  email: String
+  name: String
+  phone: String
+  role: UserRole!
+}
+
+"""User role type"""
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+type VerifyOtpResponse {
+  message: String!
+  accessToken: String!
+  refreshToken: String!
+  user: AuthUser!
+}
+
 type Query {
   hello: String!
-  users: [User!]!
-  user(id: Int!): User
 }
 
 type Mutation {
-  createUser(data: CreateUserInput!): User!
+  requestOtp(input: RequestOtpInput!): RequestOtpResponse!
+  verifyOtp(input: VerifyOtpInput!): VerifyOtpResponse!
 }
 
-input CreateUserInput {
-  name: String!
+input RequestOtpInput {
   email: String!
-  password: String!
-  phone: String
-  role: UserRole = PASSENGER
+  name: String
+}
+
+input VerifyOtpInput {
+  email: String!
+  code: String!
 }

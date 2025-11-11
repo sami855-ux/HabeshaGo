@@ -9,9 +9,9 @@ datasource db {
 
 model User {
   id            Int      @id @default(autoincrement())
-  name          String
+  name          String?
   email         String?  @unique
-  password      String? // optional for social/otp flows
+  password      String?  // optional for social/otp flows
   phone         String?  @unique
   role          UserRole @default(PASSENGER)
   emailVerified Boolean  @default(false)
@@ -19,7 +19,6 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // relations
   accounts      Account[]
   otpCodes      OtpCode[]
   refreshTokens RefreshToken[]
@@ -72,12 +71,6 @@ model RefreshToken {
   userId Int
 }
 
-//
-// --- existing models unchanged (copy them back) ---
-// EVStation, ChargingSlot, ChargingSession, Route, Driver, Bus, Minibus, MinibusReservation, Booking, ParkingLot, ParkingReservation
-//
-// Paste your existing models here (unchanged)...
-//
 model EVStation {
   id        Int      @id @default(autoincrement())
   name      String

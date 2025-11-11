@@ -24,7 +24,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       }}
     >
       <BlurView
-        intensity={80}
+        intensity={20}
         tint="light"
         style={{
           flexDirection: "row",
@@ -87,10 +87,14 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             switch (route.name) {
               case "index":
                 return isFocused ? "home" : "home-outline"
-              case "search/index":
-                return isFocused ? "search" : "search-outline"
+              case "map/index":
+                return isFocused ? "map" : "map-outline"
+              case "payment/index":
+                return isFocused ? "card" : "card-outline"
+              case "activity/index":
+                return isFocused ? "time" : "time-outline"
               case "profile/index":
-                return isFocused ? "person" : "person-outline"
+                return isFocused ? "person-circle" : "person-circle-outline"
               default:
                 return "home-outline"
             }
@@ -157,11 +161,29 @@ export default function TabsLayout() {
           title: "Home",
         }}
       />
+      <Tabs.Screen
+        name="payment/index"
+        options={{
+          title: "Payment",
+        }}
+      />
+      <Tabs.Screen
+        name="activity/index"
+        options={{
+          title: "Activity",
+        }}
+      />
+      <Tabs.Screen
+        name="map/index"
+        options={{
+          title: "Map",
+        }}
+      />
 
       <Tabs.Screen
         name="profile/index"
         options={{
-          title: "Profile",
+          title: "Account",
         }}
       />
     </Tabs>

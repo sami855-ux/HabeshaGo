@@ -1,43 +1,44 @@
-import { useState, useRef, useEffect } from "react";
+import { AntDesign, Ionicons } from "@expo/vector-icons"
+import * as WebBrowser from "expo-web-browser"
 import {
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Heart,
+  Mail,
+  MapPin,
+  Navigation,
+  Phone,
+  Sparkles,
+  Train,
+  TrendingUp,
+  Zap,
+} from "lucide-react-native"
+import { useEffect, useRef, useState } from "react"
+import {
+  Animated,
   Dimensions,
+  FlatList,
+  ImageBackground,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Animated,
-  FlatList,
-} from "react-native";
-import {
-  Navigation,
-  Zap,
-  DollarSign,
-  Heart,
-  Train,
-  Sparkles,
-  ChevronRight,
-  ChevronLeft,
-  MapPin,
-  TrendingUp,
-  Mail,
-  Phone,
-} from "lucide-react-native";
-import { FontAwesome, AntDesign, Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
+} from "react-native"
 
-import { useRouter } from "expo-router";
-import GoogleIcon from "./utils/GoogleIcon";
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
+import { useRouter } from "expo-router"
+import GoogleIcon from "./utils/GoogleIcon"
 
-WebBrowser.maybeCompleteAuthSession();
+WebBrowser.maybeCompleteAuthSession()
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window")
 
 // Animated Icon Component
 const AnimatedIcon = ({ Icon, color, delay = 0 }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current
+  const rotateAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Animated.sequence([
@@ -64,13 +65,13 @@ const AnimatedIcon = ({ Icon, color, delay = 0 }) => {
           ])
         ),
       ]),
-    ]).start();
-  }, []);
+    ]).start()
+  }, [])
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
-  });
+  })
 
   return (
     <Animated.View
@@ -80,13 +81,13 @@ const AnimatedIcon = ({ Icon, color, delay = 0 }) => {
     >
       <Icon size={60} color={color} strokeWidth={1.5} />
     </Animated.View>
-  );
-};
+  )
+}
 
 // Floating Element with Animation
 const FloatingElement = ({ Icon, color, delay, position }) => {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0.6)).current;
+  const translateY = useRef(new Animated.Value(0)).current
+  const opacity = useRef(new Animated.Value(0.6)).current
 
   useEffect(() => {
     Animated.sequence([
@@ -119,8 +120,8 @@ const FloatingElement = ({ Icon, color, delay, position }) => {
           ]),
         ])
       ),
-    ]).start();
-  }, []);
+    ]).start()
+  }, [])
 
   return (
     <Animated.View
@@ -140,15 +141,15 @@ const FloatingElement = ({ Icon, color, delay, position }) => {
         <Icon size={24} color={color} strokeWidth={1.5} />
       </View>
     </Animated.View>
-  );
-};
+  )
+}
 
 // Slide 1: Smart Navigation
 const Slide1 = () => {
   return (
     <View
       className="w-full items-center justify-center px-8 bg-gradient-to-br from-blue-50 to-cyan-50"
-      style={{ width }}
+      style={{ width, height: height * 0.78 }}
     >
       <FloatingElement
         Icon={MapPin}
@@ -185,15 +186,15 @@ const Slide1 = () => {
         </Text>
       </View>
     </View>
-  );
-};
+  )
+}
 
 // Slide 2: Lightning Fast
 const Slide2 = () => {
   return (
     <View
       className="w-full items-center justify-center px-8 bg-gradient-to-br from-purple-50 to-pink-50"
-      style={{ width }}
+      style={{ width, height: height * 0.78 }}
     >
       <FloatingElement
         Icon={Zap}
@@ -235,15 +236,15 @@ const Slide2 = () => {
         </Text>
       </View>
     </View>
-  );
-};
+  )
+}
 
 // Slide 3: Best Value
 const Slide3 = () => {
   return (
     <View
       className="w-full items-center justify-center px-8 bg-gradient-to-br from-emerald-50 to-green-50"
-      style={{ width }}
+      style={{ width, height: height * 0.78 }}
     >
       <FloatingElement
         Icon={DollarSign}
@@ -285,15 +286,15 @@ const Slide3 = () => {
         </Text>
       </View>
     </View>
-  );
-};
+  )
+}
 
 // Slide 4: Loved by Thousands
 const Slide4 = () => {
   return (
     <View
       className="w-full items-center justify-center px-8 bg-gradient-to-br from-rose-50 to-red-50"
-      style={{ width }}
+      style={{ width, height: height * 0.78 }}
     >
       <FloatingElement
         Icon={Heart}
@@ -335,234 +336,278 @@ const Slide4 = () => {
         </Text>
       </View>
     </View>
-  );
-};
+  )
+}
 
 // Slide 5: Auth Slide
-const LoginSlide = ({ onPhonePress }) => {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  const fadeInAnim = useRef(new Animated.Value(0)).current;
-  const slideUpAnim = useRef(new Animated.Value(30)).current;
+const LoginSlide = ({ onPhonePress, isActive = true }) => {
+  const fadeInAnim = useRef(new Animated.Value(0)).current
+  const slideUpAnim = useRef(new Animated.Value(50)).current
+  const scaleAnim = useRef(new Animated.Value(0.9)).current
+  const backgroundImageOpacity = useRef(new Animated.Value(0)).current
+  const slideInAnim = useRef(new Animated.Value(width)).current
 
-  const router = useRouter();
+  const router = useRouter()
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 3000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0,
-            duration: 3000,
-            useNativeDriver: true,
-          }),
-        ])
-      ),
-      Animated.timing(fadeInAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideUpAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const logoScale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.05],
-  });
-
-  const glowOpacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.15, 0.4],
-  });
+    if (isActive) {
+      // Mount animation - slide in from right and fade in
+      Animated.parallel([
+        Animated.timing(slideInAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeInAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideUpAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backgroundImageOpacity, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    } else {
+      // Unmount animation - slide out to left and fade out
+      Animated.parallel([
+        Animated.timing(slideInAnim, {
+          toValue: -width,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeInAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backgroundImageOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+  }, [
+    isActive,
+    fadeInAnim,
+    slideUpAnim,
+    scaleAnim,
+    backgroundImageOpacity,
+    slideInAnim,
+  ])
 
   const contentStyle = {
     opacity: fadeInAnim,
-    transform: [{ translateY: slideUpAnim }],
-  };
+    transform: [{ translateY: slideUpAnim }, { scale: scaleAnim }],
+  }
 
-  // const [request, response, promptAsync] = Google.useAuthRequest({
-  //   expoClientId: "<YOUR_EXPO_WEB_CLIENT_ID>",
-  //   iosClientId: "<YOUR_IOS_CLIENT_ID>",
-  //   androidClientId: "<YOUR_ANDROID_CLIENT_ID>",
-  //   scopes: ["profile", "email"],
-  // });
+  const backgroundStyle = {
+    opacity: backgroundImageOpacity,
+    transform: [{ translateX: slideInAnim }],
+  }
 
-  // useEffect(() => {
-  //   if (response?.type === "success") {
-  //     const { authentication } = response;
-  //     console.log("Google Auth Success", authentication);
-  //     // You can now send `authentication.accessToken` to your backend
-  //   }
-  // }, [response]);
+  const containerStyle = {
+    transform: [{ translateX: slideInAnim }],
+  }
 
   return (
-    <View
-      className="w-full px-6 justify-center items-center "
-      style={{ width }}
-    >
-      {/* Logo Section */}
-      <Animated.View style={contentStyle} className="mb-14 relative">
-        <Animated.View
-          style={{
-            transform: [{ scale: logoScale }],
-            opacity: glowOpacity,
-            position: "absolute",
-            inset: -25,
+    <Animated.View style={[{ width, height, flex: 1 }, containerStyle]}>
+      {/* Background Image */}
+      <Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]}>
+        <ImageBackground
+          source={{
+            uri: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1200&q=80",
           }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
         >
-          <View
-            className="w-36 h-36 bg-blue-500 rounded-[55px]"
-            style={{ opacity: 0.25 }}
+          {/* Gradient Overlay */}
+          <LinearGradient
+            colors={[
+              "rgba(234, 88, 12, 0.85)",
+              "rgba(249, 115, 22, 0.75)",
+              "rgba(251, 146, 60, 0.85)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
-        </Animated.View>
-
-        <View className="w-32 h-32 bg-blue-600 rounded-[45px] flex items-center justify-center shadow-2xl shadow-blue-500/30 border border-blue-400">
-          <Train size={46} color="white" strokeWidth={1.8} />
-        </View>
-
-        <View className="absolute -top-2 -right-2 w-12 h-12 bg-amber-500 rounded-full items-center justify-center shadow-lg border-4 border-white">
-          <Sparkles size={16} color="white" strokeWidth={2.5} />
-        </View>
+        </ImageBackground>
       </Animated.View>
 
-      {/* Content Section */}
-      <Animated.View style={contentStyle} className="w-full items-center">
-        <Text className="text-4xl font-groteskBold text-center text-light-text-primary mb-4 leading-tight">
-          Start Your Journey
-        </Text>
+      {/* Content */}
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          paddingHorizontal: 32,
+          paddingBottom: 48,
+        }}
+      >
+        <Animated.View style={contentStyle} className="items-center">
+          {/* Logo Section */}
+          <View className="mb-12 items-center relative">
+            <View className="w-24 h-24 bg-white/20 rounded-3xl items-center justify-center mb-6 border-2 border-white/30 shadow-2xl">
+              <Train size={48} color="white" strokeWidth={2} />
+            </View>
+            <View className="absolute top-0 right-0 w-10 h-10 bg-white rounded-full items-center justify-center shadow-lg">
+              <Sparkles size={14} color="#ea580c" strokeWidth={2.5} />
+            </View>
+          </View>
 
-        <Text className="text-lg font-geist text-center text-light-text-primary mb-10 leading-7 max-w-md">
-          Join thousands of travelers enjoying seamless transportation
-          experiences
-        </Text>
+          {/* Title Section */}
+          <View className="mb-8 items-center">
+            <Text className="text-5xl font-groteskBold text-center text-white mb-4 leading-tight">
+              Welcome to
+            </Text>
+            <Text className="text-5xl font-groteskBold text-center text-white mb-4 leading-tight">
+              Addis Pulse
+            </Text>
+            <Text className="text-lg font-geist text-center text-white/90 leading-6 max-w-sm">
+              Your smart transportation companion for seamless journeys across
+              the city
+            </Text>
+          </View>
 
-        {/* Auth Buttons */}
-        <View className="w-full gap-4">
-          <View className="w-full space-y-4">
+          {/* Auth Buttons */}
+          <View className="w-full gap-4">
             {/* Phone Button */}
             <TouchableOpacity
-              className="w-full h-16 mb-2 rounded-xl overflow-hidden active:scale-[0.98]"
               onPress={() => router.push("/(auth)/phone/")}
+              activeOpacity={0.9}
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
             >
-              <BlurView
-                intensity={55}
-                tint="dark"
-                className="flex-1 rounded-xl"
+              <LinearGradient
+                colors={["#ffffff", "#f8f9fa"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                className="rounded-2xl p-1"
               >
-                <LinearGradient
-                  colors={["#1c1c1c", "#2b2b2b"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  className="flex-1 rounded-xl border border-white shadow-2xl shadow-black/40 items-center justify-center relative"
-                >
-                  {/* Shine line */}
-                  <View className="absolute top-0 left-0 right-0 h-px bg-white/20" />
-
-                  <View className="flex-row items-center justify-between w-full px-6">
-                    <View className="flex-row items-center space-x-3">
-                      <View className="w-8 h-8 bg-[#121212] rounded-lg items-center justify-center">
-                        <Phone size={18} color="white" />
-                      </View>
-                      <Text className="font-geist-semibold text-lg text-white pl-3">
-                        Continue with Phone
-                      </Text>
-                    </View>
+                <View className="bg-white rounded-2xl px-6 py-4 flex-row items-center justify-center">
+                  <View className="w-10 h-10 bg-[#ea580c]/10 rounded-xl items-center justify-center mr-4">
+                    <Phone size={20} color="#ea580c" />
                   </View>
-                </LinearGradient>
-              </BlurView>
+                  <Text className="font-groteskBold text-lg text-gray-900 flex-1">
+                    Continue with Phone
+                  </Text>
+                  <ChevronRight size={20} color="#6B7280" />
+                </View>
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Email Button */}
             <TouchableOpacity
-              className="w-full h-16 rounded-lg overflow-hidden active:scale-[0.98]"
               onPress={() => router.push("/(auth)/email/")}
+              activeOpacity={0.9}
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
             >
-              <BlurView
-                intensity={55}
-                tint="dark"
-                className="flex-1 rounded-lg"
+              <LinearGradient
+                colors={["#ffffff", "#f8f9fa"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                className="rounded-2xl p-1"
               >
-                <LinearGradient
-                  colors={["#e2e2e2", "#f1f5f5"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  className="flex-1 rounded-lg border border-gray-100  shadow-2xl shadow-black/40 items-center justify-center relative"
-                >
-                  {/* Shine line */}
-                  <View className="absolute top-0 left-0 right-0 h-px bg-white/20" />
-
-                  <View className="flex-row items-center justify-between w-full px-6">
-                    <View className="flex-row items-center space-x-3">
-                      <View className="w-8 h-8 bg-purple-500/20 rounded-lg items-center justify-center">
-                        <Mail size={18} color="#A78BFA" />
-                      </View>
-                      <Text className="font-geist-semibold text-lg text-light-text-primary pl-3">
-                        Continue with Email
-                      </Text>
-                    </View>
+                <View className="bg-white rounded-2xl px-6 py-4 flex-row items-center justify-center">
+                  <View className="w-10 h-10 bg-[#f97316]/10 rounded-xl items-center justify-center mr-4">
+                    <Mail size={20} color="#f97316" />
                   </View>
-                </LinearGradient>
-              </BlurView>
+                  <Text className="font-groteskBold text-lg text-gray-900 flex-1">
+                    Continue with Email
+                  </Text>
+                  <ChevronRight size={20} color="#6B7280" />
+                </View>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
 
-          <View className="flex-row items-center my-6">
-            <View className="flex-1 h-px bg-gray-300" />
-            <Text className="mx-4 font-geist text-gray-500 text-sm">
+          {/* Divider */}
+          <View className="flex-row items-center my-8 w-full">
+            <View className="flex-1 h-px bg-white/30" />
+            <Text className="mx-4 font-geist text-white/80 text-sm">
               or continue with
             </Text>
-            <View className="flex-1 h-px bg-gray-300" />
+            <View className="flex-1 h-px bg-white/30" />
           </View>
 
-          <View className="w-full flex-row gap-4">
+          {/* Social Login Buttons */}
+          <View className="w-full flex-row gap-3">
             <TouchableOpacity
-              // onPress={() =>
-              //   promptAsync({ useProxy: true, showInRecents: true })
-              // }
+              activeOpacity={0.8}
               className="flex-1 h-14 rounded-2xl overflow-hidden"
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 4,
+              }}
             >
               <BlurView
-                intensity={40}
+                intensity={80}
                 tint="light"
                 className="flex-1 rounded-2xl"
               >
-                <View className="flex-1 bg-white/20 border border-white/30 shadow-2xl shadow-black/20 items-center justify-center rounded-2xl">
+                <View className="flex-1 bg-white/95 border border-white/50 items-center justify-center rounded-2xl">
                   <GoogleIcon />
                 </View>
               </BlurView>
             </TouchableOpacity>
 
-            <TouchableOpacity className="flex-1 h-14 rounded-2xl overflow-hidden">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              className="flex-1 h-14 rounded-2xl overflow-hidden"
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 4,
+              }}
+            >
               <BlurView
-                intensity={40}
+                intensity={80}
                 tint="light"
                 className="flex-1 rounded-2xl"
               >
-                <View className="flex-1 bg-white/20 border border-white/30 shadow-2xl shadow-black/20 items-center justify-center rounded-2xl">
-                  <AntDesign name="apple" size={25} color="black" />
+                <View className="flex-1 bg-white/95 border border-white/50 items-center justify-center rounded-2xl">
+                  <AntDesign name="apple" size={24} color="#000" />
                 </View>
               </BlurView>
             </TouchableOpacity>
           </View>
-        </View>
-      </Animated.View>
-    </View>
-  );
-};
+        </Animated.View>
+      </View>
+    </Animated.View>
+  )
+}
 
 // Navigation Arrows
 const NavigationArrows = ({ currentIndex, totalSlides, onPrev, onNext }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current
 
   const handlePress = (callback) => {
     Animated.sequence([
@@ -576,9 +621,9 @@ const NavigationArrows = ({ currentIndex, totalSlides, onPrev, onNext }) => {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start();
-    callback();
-  };
+    ]).start()
+    callback()
+  }
 
   return (
     <>
@@ -604,35 +649,31 @@ const NavigationArrows = ({ currentIndex, totalSlides, onPrev, onNext }) => {
         </TouchableOpacity>
       )}
     </>
-  );
-};
+  )
+}
 
 // Pagination Dots
 const PaginationDots = ({ scrollX, totalSlides }) => {
   const renderDot = (index) => {
-    const inputRange = [
-      (index - 1) * width,
-      index * width,
-      (index + 1) * width,
-    ];
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width]
 
     const dotWidth = scrollX.interpolate({
       inputRange,
       outputRange: [6, 24, 6],
       extrapolate: "clamp",
-    });
+    })
 
     const opacity = scrollX.interpolate({
       inputRange,
       outputRange: [0.4, 1, 0.4],
       extrapolate: "clamp",
-    });
+    })
 
     const scale = scrollX.interpolate({
       inputRange,
       outputRange: [0.8, 1.2, 0.8],
       extrapolate: "clamp",
-    });
+    })
 
     return (
       <Animated.View
@@ -644,70 +685,77 @@ const PaginationDots = ({ scrollX, totalSlides }) => {
           transform: [{ scale }],
         }}
       />
-    );
-  };
+    )
+  }
 
   return (
     <View className="flex-row justify-center items-center mt-8 mb-6">
       {Array.from({ length: totalSlides }).map((_, index) => renderDot(index))}
     </View>
-  );
-};
+  )
+}
 
 // Main Component
 export default function Welcome() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const scrollX = useRef(new Animated.Value(0)).current
+  const flatListRef = useRef(null)
 
-  const slideComponents = [Slide1, Slide2, Slide3, Slide4, LoginSlide];
+  const slideComponents = [Slide1, Slide2, Slide3, Slide4, LoginSlide]
   const allSlides = slideComponents.map((_, index) => ({
     id: String(index + 1),
-  }));
+  }))
 
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     { useNativeDriver: false }
-  );
+  )
 
   const onMomentumScrollEnd = (event) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(offsetX / width);
+    const offsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(offsetX / width)
     if (newIndex >= 0 && newIndex < allSlides.length) {
-      setCurrentIndex(newIndex);
+      setCurrentIndex(newIndex)
     }
-  };
+  }
 
   const scrollTo = (index) => {
     if (flatListRef.current && index >= 0 && index < allSlides.length) {
-      flatListRef.current.scrollToIndex({ index, animated: true });
+      flatListRef.current.scrollToIndex({ index, animated: true })
     }
-  };
+  }
 
   const nextSlide = () => {
     if (currentIndex < allSlides.length - 1) {
-      scrollTo(currentIndex + 1);
+      scrollTo(currentIndex + 1)
     }
-  };
+  }
 
   const prevSlide = () => {
     if (currentIndex > 0) {
-      scrollTo(currentIndex - 1);
+      scrollTo(currentIndex - 1)
     }
-  };
+  }
 
   const goToAuth = () => {
-    console.log("Navigate to phone auth");
-  };
+    console.log("Navigate to phone auth")
+  }
 
   const renderItem = ({ item, index }) => {
-    const SlideComponent = slideComponents[index];
-    return index === slideComponents.length - 1 ? (
-      <SlideComponent onPhonePress={goToAuth} />
-    ) : (
-      <SlideComponent />
-    );
-  };
+    const SlideComponent = slideComponents[index]
+    const isLoginSlide = index === slideComponents.length - 1
+    const isActive = currentIndex === index
+
+    if (isLoginSlide) {
+      return <SlideComponent onPhonePress={goToAuth} isActive={isActive} />
+    }
+
+    return (
+      <View style={{ width, height: height * 0.78 }}>
+        <SlideComponent />
+      </View>
+    )
+  }
 
   const backgroundGradients = [
     "from-blue-50 to-cyan-50",
@@ -715,15 +763,24 @@ export default function Welcome() {
     "from-emerald-50 to-green-50",
     "from-rose-50 to-red-50",
     "from-slate-900 to-black",
-  ];
+  ]
 
   const currentBackground =
-    backgroundGradients[Math.min(currentIndex, backgroundGradients.length - 1)];
+    backgroundGradients[Math.min(currentIndex, backgroundGradients.length - 1)]
+
+  const isLoginSlide = currentIndex === allSlides.length - 1
 
   return (
     <View className={`flex-1 bg-white`}>
       <View className="flex-1 justify-center items-center pt-10">
-        <View className="w-full h-[78vh] rounded-3xl overflow-hidden">
+        <View
+          style={{
+            width: "100%",
+            height: isLoginSlide ? height : height * 0.78,
+            borderRadius: isLoginSlide ? 0 : 24,
+            overflow: "hidden",
+          }}
+        >
           {/* <NavigationArrows
             currentIndex={currentIndex}
             totalSlides={allSlides.length}
@@ -749,13 +806,15 @@ export default function Welcome() {
                   flatListRef.current.scrollToIndex({
                     index: currentIndex,
                     animated: true,
-                  });
+                  })
                 }
-              }, 100);
+              }, 100)
             }}
           />
 
-          <PaginationDots scrollX={scrollX} totalSlides={allSlides.length} />
+          {!isLoginSlide && (
+            <PaginationDots scrollX={scrollX} totalSlides={allSlides.length} />
+          )}
         </View>
 
         <View className="mt-8 px-8 w-full gap-4">
@@ -765,6 +824,6 @@ export default function Welcome() {
         </View>
       </View>
     </View>
-  );
+  )
 }
 // ios:505583262465-b9b3cok4u4noumh31lj70qjvrn7t2jhp.apps.googleusercontent.com

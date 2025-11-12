@@ -1,26 +1,37 @@
+import ServiceDashboard from "@/components/passenger/ServiceDashbaord"
+import SmartSuggestions from "@/components/passenger/SmartSuggestion"
+import SystemInfoCarousel from "@/components/passenger/SystemInfo"
 import AccountCard from "@/components/utils/AccountCard"
+import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { Search } from "lucide-react-native"
-import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native"
+import {
+  Image,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
 const PassengerHome = () => {
   const router = useRouter()
 
   return (
-    <View className="bg-white h-screen">
+    <View className="bg-white flex-1">
       <StatusBar
         translucent={true}
         backgroundColor="transparent"
         barStyle="light-content"
       />
 
-      {/* Gradient Header Section */}
+      {/* Gradient Header Section - Fixed */}
       <LinearGradient
         colors={["#ea580c", "#f97316", "#fb923c"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="p-6 pb-10 h-80 pt-10"
+        className="p-6 pb-10 mb-3 h-80 pt-10"
       >
         {/* Top Row: Profile + Search */}
         <View className="flex-row justify-between items-center mb-9">
@@ -42,18 +53,60 @@ const PassengerHome = () => {
             </View>
           </View>
 
-          {/* Right: Search Button */}
-          <TouchableOpacity
-            className="bg-white/20 p-3 rounded-full"
-            onPress={() => router.push("/(passenger)/search")}
-          >
-            <Search size={20} color="white" />
-          </TouchableOpacity>
+          {/* Right: Search and QR Code Buttons */}
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              className="bg-white/20 p-3 rounded-full mr-3"
+              onPress={() => router.push("/(passenger)/search")}
+            >
+              <Search size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-white/20 p-3 rounded-full"
+              onPress={() => {
+                // Add QR code scanner functionality here
+                console.log("QR Code pressed")
+                router.push("/(passenger)/qrScanner")
+              }}
+            >
+              <Ionicons name="qr-code-outline" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Account Summary Card */}
         <AccountCard />
       </LinearGradient>
+
+      {/* Scrollable Content Area */}
+      <ScrollView
+        className="flex-1 -mt-8"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        <View
+          className="bg-white"
+          style={{
+            borderTopLeftRadius: 30,
+            borderTopRightRadius: 30,
+            paddingTop: 24,
+          }}
+        >
+          {/* Service Dashboard */}
+          <View className="px-4">
+            <ServiceDashboard />
+          </View>
+
+          {/* Smart Suggestions */}
+          <View className="mt-4">
+            <SmartSuggestions />
+          </View>
+
+          <View className="mt-4">
+            <SystemInfoCarousel />
+          </View>
+        </View>
+      </ScrollView>
     </View>
   )
 }

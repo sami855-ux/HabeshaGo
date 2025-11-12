@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router"
-import { ChevronRight, Eye, EyeOff } from "lucide-react-native"
-import React, { useState } from "react"
-import { Animated, Text, TouchableOpacity, View } from "react-native"
+import { ArrowRight, Eye, EyeOff } from "lucide-react-native"
+import React, { useEffect, useState } from "react"
+import { Animated, Easing, Text, TouchableOpacity, View } from "react-native"
 
 const AccountCard = () => {
   const [isAmountVisible, setIsAmountVisible] = useState(true)
@@ -11,32 +11,50 @@ const AccountCard = () => {
 
   const arrowAnim = useState(new Animated.Value(0))[0]
 
+  useEffect(() => {
+    // Create a smooth, continuous bounce animation
+    const bounceAnimation = Animated.loop(
+      Animated.sequence([
+        // Move right with smooth easing
+        Animated.timing(arrowAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        // Move back to center with smooth easing
+        Animated.timing(arrowAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+      { iterations: -1 } // Infinite loop
+    )
+
+    bounceAnimation.start()
+
+    // Cleanup on unmount
+    return () => {
+      bounceAnimation.stop()
+    }
+  }, [arrowAnim])
+
   const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 0.95,
-        useNativeDriver: true,
-      }),
-      Animated.spring(arrowAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-    ]).start()
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start()
   }
 
   const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 3,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.spring(arrowAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-      }),
-    ]).start()
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start()
   }
 
   const handleShowMore = () => {
@@ -109,26 +127,13 @@ const AccountCard = () => {
           onPress={handleShowMore}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          className="flex-row items-center justify-center bg-transparent border border-white/30 py-2 px-6 rounded-xl"
+          className="flex-row items-center justify-center bg-transparent border border-transparent py-2 px-6 rounded-xl"
           activeOpacity={0.8}
         >
-          <Text className="text-white font-jakartaBold text-base mr-2">
+          <Text className="text-white font-geist text-base mr-2">
             View More
           </Text>
-          <Animated.View
-            style={{
-              transform: [
-                {
-                  translateX: arrowAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 4],
-                  }),
-                },
-              ],
-            }}
-          >
-            <ChevronRight size={18} color="#FFFFFF" />
-          </Animated.View>
+          <ArrowRight size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
     </View>

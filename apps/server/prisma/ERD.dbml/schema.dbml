@@ -1,0 +1,236 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table User {
+  id Int [pk, increment]
+  name String
+  email String [unique]
+  password String
+  phone String [unique]
+  role UserRole [not null, default: 'PASSENGER']
+  provider String
+  emailVerified Boolean [not null, default: false]
+  phoneVerified Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  accounts Account [not null]
+  otpCodes OtpCode [not null]
+  refreshTokens RefreshToken [not null]
+  bookings Booking [not null]
+  parkings ParkingReservation [not null]
+  minibuses MinibusReservation [not null]
+  chargings ChargingSession [not null]
+  driverInfo Driver
+}
+
+Table Account {
+  id Int [pk, increment]
+  provider String [not null]
+  providerId String [not null]
+  email String
+  createdAt DateTime [default: `now()`, not null]
+  user User [not null]
+  userId Int [not null]
+
+  indexes {
+    (provider, providerId) [unique]
+  }
+}
+
+Table OtpCode {
+  id Int [pk, increment]
+  user User
+  userId Int
+  email String
+  phone String
+  codeHash String [not null]
+  expiresAt DateTime [not null]
+  used Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table RefreshToken {
+  id Int [pk, increment]
+  tokenHash String [not null]
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  user User [not null]
+  userId Int [not null]
+}
+
+Table EVStation {
+  id Int [pk, increment]
+  name String [not null]
+  location String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  slots ChargingSlot [not null]
+}
+
+Table ChargingSlot {
+  id Int [pk, increment]
+  slotNumber String [not null]
+  status SlotStatus [not null, default: 'AVAILABLE']
+  station EVStation [not null]
+  stationId Int [not null]
+  sessions ChargingSession [not null]
+}
+
+Table ChargingSession {
+  id Int [pk, increment]
+  user User [not null]
+  userId Int [not null]
+  slot ChargingSlot [not null]
+  slotId Int [not null]
+  startTime DateTime [not null]
+  endTime DateTime
+  energyUsed Float
+  cost Float
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table Route {
+  id Int [pk, increment]
+  name String [not null]
+  origin String [not null]
+  destination String [not null]
+  distanceKm Float
+  createdAt DateTime [default: `now()`, not null]
+  minibuses Minibus [not null]
+  buses Bus [not null]
+}
+
+Table Driver {
+  id Int [pk, increment]
+  user User [not null]
+  userId Int [unique, not null]
+  licenseNo String [not null]
+  experience Int
+  assignedBus Bus
+  assignedMinibus Minibus
+}
+
+Table Bus {
+  id Int [pk, increment]
+  busNumber String [unique, not null]
+  capacity Int [not null]
+  status BusStatus [not null, default: 'ACTIVE']
+  driver Driver
+  driverId Int [unique]
+  route Route
+  routeId Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  bookings Booking [not null]
+}
+
+Table Minibus {
+  id Int [pk, increment]
+  plateNumber String [unique, not null]
+  capacity Int [not null]
+  driver Driver
+  driverId Int [unique]
+  route Route
+  routeId Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  reservations MinibusReservation [not null]
+}
+
+Table MinibusReservation {
+  id Int [pk, increment]
+  user User [not null]
+  userId Int [not null]
+  minibus Minibus [not null]
+  minibusId Int [not null]
+  seat Int [not null]
+  date DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table Booking {
+  id Int [pk, increment]
+  user User [not null]
+  userId Int [not null]
+  bus Bus [not null]
+  busId Int [not null]
+  seatNumber Int [not null]
+  date DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table ParkingLot {
+  id Int [pk, increment]
+  name String [not null]
+  location String [not null]
+  totalSlots Int [not null]
+  occupied Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  reservations ParkingReservation [not null]
+}
+
+Table ParkingReservation {
+  id Int [pk, increment]
+  user User [not null]
+  userId Int [not null]
+  lot ParkingLot [not null]
+  lotId Int [not null]
+  slotNumber Int [not null]
+  startTime DateTime [not null]
+  endTime DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+Enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+Enum BusStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+Ref: Account.userId > User.id
+
+Ref: OtpCode.userId > User.id
+
+Ref: RefreshToken.userId > User.id
+
+Ref: ChargingSlot.stationId > EVStation.id
+
+Ref: ChargingSession.userId > User.id
+
+Ref: ChargingSession.slotId > ChargingSlot.id
+
+Ref: Driver.userId - User.id
+
+Ref: Bus.driverId - Driver.id
+
+Ref: Bus.routeId > Route.id
+
+Ref: Minibus.driverId - Driver.id
+
+Ref: Minibus.routeId > Route.id
+
+Ref: MinibusReservation.userId > User.id
+
+Ref: MinibusReservation.minibusId > Minibus.id
+
+Ref: Booking.userId > User.id
+
+Ref: Booking.busId > Bus.id
+
+Ref: ParkingReservation.userId > User.id
+
+Ref: ParkingReservation.lotId > ParkingLot.id

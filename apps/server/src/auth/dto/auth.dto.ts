@@ -6,68 +6,47 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
+import { Wallet } from './wallet.dto';
 
-registerEnumType(UserRole, {
-  name: 'UserRole',
-  description: 'User role type',
-});
+registerEnumType(UserRole, { name: 'UserRole' });
 
 @InputType()
 export class RequestOtpInput {
-  @Field()
-  email: string ;
-
-  @Field({ nullable: true })
-  name?: string;
+  @Field() email: string;
+  @Field({ nullable: true }) name?: string;
 }
 
 @ObjectType()
 export class RequestOtpResponse {
-  @Field()
-  success: boolean;
-
-  @Field(() => Date) // GraphQL Date type
-  expiresAt: Date;
+  @Field() success: boolean;
+  @Field(() => Date) expiresAt: Date;
 }
 
 @InputType()
 export class VerifyOtpInput {
-  @Field()
-  email: string;
-
-  @Field()
-  code: string;
+  @Field() email: string;
+  @Field() code: string;
 }
 
 @ObjectType()
 export class AuthUser {
-  @Field(() => Int)
-  id: number;
-
-  @Field(() => String, { nullable: true }) // allow null
-  email?: string | null;
-
-  @Field(() => String, { nullable: true })
-  name?: string | null;
-
-  @Field(() => String, { nullable: true })
-  phone?: string | null;
-
-  @Field(() => UserRole) // add this
-  role: UserRole;
+  @Field(() => Int) id: number;
+  @Field(() => String, { nullable: true }) email?: string | null;
+  @Field(() => String, { nullable: true }) name?: string | null;
+  @Field(() => String, { nullable: true }) phone?: string | null;
+  @Field(() => UserRole) role: UserRole;
+  @Field(() => Wallet, { nullable: true }) wallet?: Wallet | null;
 }
 
 @ObjectType()
 export class VerifyOtpResponse {
-  @Field()
-  message: string;
+  @Field() message: string;
+  @Field() accessToken: string;
+  @Field() refreshToken: string;
+  @Field(() => AuthUser) user: AuthUser;
+}
 
-  @Field()
-  accessToken: string;
-
-  @Field()
-  refreshToken: string;
-
-  @Field(() => AuthUser)
-  user: AuthUser;
+@InputType()
+export class RegisterPhoneInput {
+  @Field() phone: string;
 }

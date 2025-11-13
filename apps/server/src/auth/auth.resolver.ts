@@ -2,10 +2,12 @@ import { Resolver, Mutation, Query, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
+  RegisterPhoneInput,
   RequestOtpInput,
   RequestOtpResponse,
   VerifyOtpInput,
   VerifyOtpResponse,
+  AuthUser,
 } from './dto/auth.dto';
 import { GqlAuthGuard } from './guard/gql-auth.guard';
 import { CurrentUser } from './decorator/current-user.decorator';
@@ -14,33 +16,33 @@ import { CurrentUser } from './decorator/current-user.decorator';
 export class AuthResolver {
   constructor(private readonly auth: AuthService) {}
 
-  // Request OTP
   @Mutation(() => RequestOtpResponse)
   async requestOtp(
     @Args('input') input: RequestOtpInput,
   ): Promise<RequestOtpResponse> {
-    const result = await this.auth.requestOtp(input.email, input.name);
-    return { success: result.success, expiresAt: result.expiresAt };
+    return await this.auth.requestOtp(input.email, input.name);
   }
 
-  // Verify OTP
   @Mutation(() => VerifyOtpResponse)
   async verifyOtp(
     @Args('input') input: VerifyOtpInput,
   ): Promise<VerifyOtpResponse> {
-    const result = await this.auth.verifyOtp(input.email, input.code);
-    return {
-      message: result.message,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      user: result.user,
-    };
+    return await this.auth.verifyOtp(input.email, input.code);
   }
 
-  // Protected route example: Get current user info
-  @Query(() => String)
+  @Query(() => AuthUser)
   @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: any) {
-    return `Hello ${user.email}, your ID is ${user.userId}`;
+    return await this.auth.getUserWithWallet(user.userId);
+  }
+
+  @Mutation(() => String)
+  @UseGuards(GqlAuthGuard)
+  async registerPhone(
+    @Args('input') input: RegisterPhoneInput,
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.auth.registerPhone(user.userId, input.phone);
+    return result.message;
   }
 }

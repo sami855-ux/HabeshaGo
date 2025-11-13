@@ -2,6 +2,12 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type Wallet {
+  id: Float!
+  balance: Float!
+  currency: String!
+}
+
 type RequestOtpResponse {
   success: Boolean!
   expiresAt: DateTime!
@@ -18,9 +24,9 @@ type AuthUser {
   name: String
   phone: String
   role: UserRole!
+  wallet: Wallet
 }
 
-"""User role type"""
 enum UserRole {
   PASSENGER
   DRIVER
@@ -36,12 +42,13 @@ type VerifyOtpResponse {
 
 type Query {
   hello: String!
-  me: String!
+  me: AuthUser!
 }
 
 type Mutation {
   requestOtp(input: RequestOtpInput!): RequestOtpResponse!
   verifyOtp(input: VerifyOtpInput!): VerifyOtpResponse!
+  registerPhone(input: RegisterPhoneInput!): String!
   loginWithGoogle(token: String!): AuthUser!
   loginWithApple(token: String!): AuthUser!
 }
@@ -54,4 +61,8 @@ input RequestOtpInput {
 input VerifyOtpInput {
   email: String!
   code: String!
+}
+
+input RegisterPhoneInput {
+  phone: String!
 }

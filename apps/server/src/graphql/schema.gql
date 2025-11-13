@@ -36,11 +36,14 @@ type VerifyOtpResponse {
 
 type Query {
   hello: String!
+  me: String!
 }
 
 type Mutation {
   requestOtp(input: RequestOtpInput!): RequestOtpResponse!
   verifyOtp(input: VerifyOtpInput!): VerifyOtpResponse!
+  loginWithGoogle(token: String!): AuthUser!
+  loginWithApple(token: String!): AuthUser!
 }
 
 input RequestOtpInput {

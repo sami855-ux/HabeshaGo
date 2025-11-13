@@ -14,6 +14,7 @@ model User {
   password      String?  // optional for social/otp flows
   phone         String?  @unique
   role          UserRole @default(PASSENGER)
+  provider      String? 
   emailVerified Boolean  @default(false)
   phoneVerified Boolean  @default(false)
   createdAt     DateTime @default(now())

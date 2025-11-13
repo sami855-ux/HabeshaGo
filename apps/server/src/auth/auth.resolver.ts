@@ -1,4 +1,5 @@
-import { Resolver, Mutation, Args } from '@nestjs/graphql';
+import { Resolver, Mutation, Query, Args } from '@nestjs/graphql';
+import { UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
   RequestOtpInput,
@@ -6,11 +7,14 @@ import {
   VerifyOtpInput,
   VerifyOtpResponse,
 } from './dto/auth.dto';
+import { GqlAuthGuard } from './guard/gql-auth.guard';
+import { CurrentUser } from './decorator/current-user.decorator';
 
 @Resolver()
 export class AuthResolver {
   constructor(private readonly auth: AuthService) {}
 
+  // Request OTP
   @Mutation(() => RequestOtpResponse)
   async requestOtp(
     @Args('input') input: RequestOtpInput,
@@ -19,6 +23,7 @@ export class AuthResolver {
     return { success: result.success, expiresAt: result.expiresAt };
   }
 
+  // Verify OTP
   @Mutation(() => VerifyOtpResponse)
   async verifyOtp(
     @Args('input') input: VerifyOtpInput,
@@ -30,5 +35,12 @@ export class AuthResolver {
       refreshToken: result.refreshToken,
       user: result.user,
     };
+  }
+
+  // Protected route example: Get current user info
+  @Query(() => String)
+  @UseGuards(GqlAuthGuard)
+  async me(@CurrentUser() user: any) {
+    return `Hello ${user.email}, your ID is ${user.userId}`;
   }
 }

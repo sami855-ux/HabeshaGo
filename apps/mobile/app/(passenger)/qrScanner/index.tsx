@@ -6,6 +6,7 @@ import {
   Alert,
   Animated,
   Easing,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -81,10 +82,10 @@ const QRScannerScreen = () => {
       <View className="flex-1 justify-center items-center bg-white">
         <View className="items-center">
           <MaterialIcons name="qr-code-scanner" size={64} color="#ea580c" />
-          <Text className="text-gray-900 text-lg font-semibold mt-4">
+          <Text className="text-gray-900 text-lg font-semibold font-geist mt-4">
             Requesting Camera Access
           </Text>
-          <Text className="text-gray-600 text-center mt-2">
+          <Text className="text-gray-600 text-center mt-2 font-geist">
             Please allow camera permissions to scan QR codes
           </Text>
         </View>
@@ -97,10 +98,10 @@ const QRScannerScreen = () => {
       <View className="flex-1 justify-center items-center bg-white p-6">
         <View className="items-center">
           <MaterialIcons name="no-photography" size={64} color="#dc2626" />
-          <Text className="text-gray-900 text-xl font-bold mt-4 text-center">
+          <Text className="text-gray-900 text-xl font-groteskBold mt-4 text-center">
             Camera Access Required
           </Text>
-          <Text className="text-gray-600 text-center mt-2 leading-6">
+          <Text className="text-gray-600 text-center mt-2 leading-6 font-geist">
             To scan QR codes, please enable camera permissions in your device
             settings
           </Text>
@@ -109,7 +110,9 @@ const QRScannerScreen = () => {
             // onPress={() => router.back()}
           >
             <MaterialIcons name="arrow-back" size={20} color="white" />
-            <Text className="text-white font-semibold ml-2">Go Back</Text>
+            <Text className="text-white font-semibold ml-2 font-geist">
+              Go Back
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -123,8 +126,9 @@ const QRScannerScreen = () => {
 
   return (
     <View className="flex-1 bg-white">
+      <StatusBar translucent={true} barStyle={"dark-content"} />
       {/* Enhanced Header */}
-      <View className="pt-12 px-6 pb-4 bg-white border-b border-gray-200">
+      <View className="pt-12 px-6 pb-4 ">
         <View className="flex-row justify-between items-center">
           <TouchableOpacity
             // onPress={() => router.back()}
@@ -133,10 +137,10 @@ const QRScannerScreen = () => {
             <MaterialIcons name="arrow-back" size={24} color="#374151" />
           </TouchableOpacity>
           <View className="items-center">
-            <Text className="text-gray-900 text-xl font-bold">
+            <Text className="text-gray-900 text-xl  font-geist">
               Scan QR Code
             </Text>
-            <Text className="text-gray-600 text-sm">
+            <Text className="text-gray-600 text-sm font-geist">
               Point camera at the QR code
             </Text>
           </View>
@@ -167,7 +171,7 @@ const QRScannerScreen = () => {
             {/* Rounded Scanner Frame */}
             <View className="relative">
               {/* Main Rounded Frame */}
-              <View className="w-72 h-72 rounded-3xl border-4 border-white/80 bg-transparent overflow-hidden">
+              <View className="w-72 h-72 rounded-3xl  bg-transparent overflow-hidden">
                 {/* Animated Scan Line */}
                 <Animated.View
                   style={{
@@ -196,10 +200,10 @@ const QRScannerScreen = () => {
 
             {/* Instructions */}
             <View className="absolute bottom-20 items-center px-8">
-              <Text className="text-white text-lg font-semibold text-center mb-2">
+              <Text className="text-white text-lg font-semibold text-center mb-2 font-groteskBold">
                 Align QR Code within Frame
               </Text>
-              <Text className="text-gray-200 text-center text-sm leading-5">
+              <Text className="text-gray-200 text-center text-sm leading-5 font-geist">
                 Position the QR code in the center to scan automatically
               </Text>
             </View>
@@ -208,11 +212,11 @@ const QRScannerScreen = () => {
       </View>
 
       {/* Enhanced Bottom Wallet Section - White Theme */}
-      <View className="bg-white p-6 border-t border-gray-200 shadow-lg">
+      <View className="bg-white p-6 border-t border-gray-200 ">
         <View className="flex-row justify-between items-center mb-4">
           {/* Wallet Balance with White Theme */}
           <View className="flex-1">
-            <Text className="text-gray-600 text-sm font-medium mb-1">
+            <Text className="text-gray-600 text-sm font-groteskBold font-medium mb-1">
               CURRENT BALANCE
             </Text>
             <View className="flex-row items-center">
@@ -220,10 +224,10 @@ const QRScannerScreen = () => {
                 <FontAwesome5 name="wallet" size={20} color="#ea580c" />
               </View>
               <View className="ml-3">
-                <Text className="text-gray-900 text-2xl font-bold">
+                <Text className="text-gray-900 text-2xl font-groteskBold">
                   ${walletBalance.toFixed(2)}
                 </Text>
-                <Text className="text-green-600 text-xs font-medium">
+                <Text className="text-green-600 text-xs font-medium font-geist">
                   ● Sufficient funds
                 </Text>
               </View>
@@ -236,7 +240,7 @@ const QRScannerScreen = () => {
             onPress={handleTopUp}
           >
             <MaterialIcons name="add" size={20} color="white" />
-            <Text className="text-white font-bold ml-2">Top Up</Text>
+            <Text className="text-white font-geist ml-2">Top Up</Text>
           </TouchableOpacity>
         </View>
 
@@ -246,7 +250,7 @@ const QRScannerScreen = () => {
             className="bg-gray-900 py-4 rounded-xl items-center shadow-lg mb-2"
             onPress={() => setScanned(false)}
           >
-            <Text className="text-white font-bold text-base">
+            <Text className="text-white font-geist text-base">
               Scan Another Code
             </Text>
           </TouchableOpacity>
@@ -254,7 +258,7 @@ const QRScannerScreen = () => {
 
         {/* Help Text */}
         {!scanned && (
-          <Text className="text-gray-500 text-center text-xs mt-2">
+          <Text className="text-gray-500 text-center text-xs mt-2 font-geist">
             Scan bus tickets, charging station codes, or payment QR codes
           </Text>
         )}

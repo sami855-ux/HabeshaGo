@@ -1,11 +1,15 @@
 import React from "react"
-import { Text, View } from "react-native"
+import { StatusBar, Text, View } from "react-native"
 
 const PaymentPage = () => {
   return (
-    <View>
-      <Text>PaymentPage</Text>
-    </View>
+    <>
+      <StatusBar translucent={true} barStyle={"dark-content"} />
+
+      <View className="pt-8">
+        <Text>PaymentPage</Text>
+      </View>
+    </>
   )
 }
 

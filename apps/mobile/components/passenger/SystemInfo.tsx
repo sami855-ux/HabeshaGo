@@ -92,7 +92,7 @@ const SystemInfoCarousel = () => {
   }
 
   return (
-    <View className="mb-8">
+    <View className="">
       {/* Carousel Container */}
       <View className="relative">
         <ScrollView

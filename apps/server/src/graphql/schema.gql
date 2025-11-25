@@ -2,65 +2,8 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
-type Wallet {
-  id: Float!
-  balance: Float!
-  currency: String!
-}
-
-type RequestOtpResponse {
-  success: Boolean!
-  expiresAt: DateTime!
-}
-
-"""
-A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
-"""
-scalar DateTime
-
-type AuthUser {
-  id: Int!
-  email: String
-  name: String
-  phone: String
-  role: UserRole!
-  wallet: Wallet
-}
-
-enum UserRole {
-  PASSENGER
-  DRIVER
-  ADMIN
-}
-
-type VerifyOtpResponse {
-  message: String!
-  accessToken: String!
-  refreshToken: String!
-  user: AuthUser!
-}
-
 type Query {
   hello: String!
-  me: AuthUser!
-}
-
-type Mutation {
-  requestOtp(input: RequestOtpInput!): RequestOtpResponse!
-  verifyOtp(input: VerifyOtpInput!): VerifyOtpResponse!
-  registerPhone(input: RegisterPhoneInput!): String!
-  loginWithGoogle(token: String!): AuthUser!
-  loginWithApple(token: String!): AuthUser!
-}
-
-input RequestOtpInput {
-  email: String!
-  name: String
-}
-
-input VerifyOtpInput {
-  email: String!
-  code: String!
 }
 
 input RegisterPhoneInput {

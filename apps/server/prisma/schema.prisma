@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,21 +7,24 @@ generator dbml {
   provider = "prisma-dbml-generator"
   output   = "./ERD.dbml"
 }
-
+// generator erd {
+//   provider = "prisma-erd-generator"
+//   output   = "./ERD.svg"
+// }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url      = env("DATABASE_URL")
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
+id              String   @id @default(cuid())
   name          String?
   email         String?  @unique
-  password      String?  // optional for social/otp flows
+  password      String? // optional for social/otp flows
   phone         String?  @unique
   role          UserRole @default(PASSENGER)
-  provider      String? 
+  provider      String?
   emailVerified Boolean  @default(false)
   phoneVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -36,6 +40,10 @@ model User {
   minibuses  MinibusReservation[]
   chargings  ChargingSession[]
   driverInfo Driver? // if this user is a driver
+  image      String?
+  sessions   Session[]
+
+  @@map("user")
 }
 
 enum UserRole {
@@ -47,7 +55,7 @@ enum UserRole {
 model Wallet {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
-  userId    Int      @unique
+  userId    String      @unique
   balance   Float    @default(0)
   currency  String   @default("ETB")
   createdAt DateTime @default(now())
@@ -62,15 +70,27 @@ model Account {
   createdAt  DateTime @default(now())
 
   user   User @relation(fields: [userId], references: [id])
-  userId Int
+  userId String
+
+  accountId             String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  updatedAt             DateTime  @updatedAt
 
   @@unique([provider, providerId], name: "provider_providerId_unique")
+  @@index([userId])
+  @@map("account")
 }
 
 model OtpCode {
   id        Int      @id @default(autoincrement())
   user      User?    @relation(fields: [userId], references: [id])
-  userId    Int?
+  userId    String?
   email     String? // either email or phone will be filled
   phone     String?
   codeHash  String
@@ -86,7 +106,7 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user   User @relation(fields: [userId], references: [id])
-  userId Int
+  userId String
 }
 
 model EVStation {
@@ -118,7 +138,7 @@ enum SlotStatus {
 model ChargingSession {
   id         Int          @id @default(autoincrement())
   user       User         @relation(fields: [userId], references: [id])
-  userId     Int
+  userId     String
   slot       ChargingSlot @relation(fields: [slotId], references: [id])
   slotId     Int
   startTime  DateTime
@@ -143,7 +163,7 @@ model Route {
 model Driver {
   id              Int      @id @default(autoincrement())
   user            User     @relation(fields: [userId], references: [id])
-  userId          Int      @unique
+  userId          String      @unique
   licenseNo       String
   experience      Int?
   assignedBus     Bus?
@@ -188,7 +208,7 @@ model Minibus {
 model MinibusReservation {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
-  userId    Int
+  userId    String
   minibus   Minibus  @relation(fields: [minibusId], references: [id])
   minibusId Int
   seat      Int
@@ -199,7 +219,7 @@ model MinibusReservation {
 model Booking {
   id         Int      @id @default(autoincrement())
   user       User     @relation(fields: [userId], references: [id])
-  userId     Int
+  userId     String
   bus        Bus      @relation(fields: [busId], references: [id])
   busId      Int
   seatNumber Int
@@ -222,7 +242,7 @@ model ParkingLot {
 model ParkingReservation {
   id         Int        @id @default(autoincrement())
   user       User       @relation(fields: [userId], references: [id])
-  userId     Int
+  userId     String
   lot        ParkingLot @relation(fields: [lotId], references: [id])
   lotId      Int
   slotNumber Int
@@ -231,3 +251,30 @@ model ParkingReservation {
   createdAt  DateTime   @default(now())
 }
 
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}

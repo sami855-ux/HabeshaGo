@@ -1,6 +1,6 @@
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons"
-import { Camera, CameraView } from "expo-camera"
-// import { useRouter } from "expo-router"
+import { CameraView, useCameraPermissions } from "expo-camera" // New API
+import { useRouter } from "expo-router"
 import React, { useEffect, useState } from "react"
 import {
   Alert,
@@ -13,256 +13,181 @@ import {
 } from "react-native"
 
 const QRScannerScreen = () => {
-  // //   const router = useRouter()
-  const [hasPermission, setHasPermission] = useState(null)
+  const router = useRouter()
+  const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
-  const [walletBalance, setWalletBalance] = useState(245.75)
   const [isFlashOn, setIsFlashOn] = useState(false)
   const scanLineAnim = useState(new Animated.Value(0))[0]
 
+  // Animated scan line loop
   useEffect(() => {
-    ;(async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync()
-      setHasPermission(status === "granted")
-    })()
-  }, [])
-
-  // Animated scan line
-  useEffect(() => {
-    const animateScanLine = () => {
+    const animate = () => {
       scanLineAnim.setValue(0)
       Animated.timing(scanLineAnim, {
         toValue: 1,
-        duration: 2000,
+        duration: 2200,
         easing: Easing.linear,
         useNativeDriver: true,
-      }).start(() => animateScanLine())
+      }).start(() => animate())
     }
-    animateScanLine()
+    animate()
   }, [])
 
-  const handleBarCodeScanned = ({ type, data }) => {
+  const handleBarCodeScanned = ({ data }) => {
     setScanned(true)
-    Alert.alert("QR Code Scanned Successfully!", `Payment Code: ${data}`, [
-      {
-        text: "Scan Again",
-        onPress: () => setScanned(false),
-      },
-      {
-        text: "Done",
-        // onPress: () => router.back(),
-        style: "cancel",
-      },
-    ])
-  }
-
-  const handleTopUp = () => {
-    Alert.alert("Top Up Wallet", "Choose your payment method", [
-      {
-        text: "Credit Card",
-        onPress: () => console.log("Credit card selected"),
-      },
-      {
-        text: "Bank Transfer",
-        onPress: () => console.log("Bank transfer selected"),
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
+    Alert.alert("QR Scanned!", `Code: ${data}`, [
+      { text: "Scan Again", onPress: () => setScanned(false) },
+      { text: "Done", style: "cancel" },
     ])
   }
 
   const toggleFlash = () => {
-    setIsFlashOn(!isFlashOn)
+    setIsFlashOn((prev) => !prev)
   }
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
-        <View className="items-center">
-          <MaterialIcons name="qr-code-scanner" size={64} color="#ea580c" />
-          <Text className="text-gray-900 text-lg font-semibold font-geist mt-4">
-            Requesting Camera Access
-          </Text>
-          <Text className="text-gray-600 text-center mt-2 font-geist">
-            Please allow camera permissions to scan QR codes
-          </Text>
-        </View>
+        <Text className="text-gray-700">Requesting camera permission...</Text>
       </View>
     )
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
-      <View className="flex-1 justify-center items-center bg-white p-6">
-        <View className="items-center">
-          <MaterialIcons name="no-photography" size={64} color="#dc2626" />
-          <Text className="text-gray-900 text-xl font-groteskBold mt-4 text-center">
-            Camera Access Required
-          </Text>
-          <Text className="text-gray-600 text-center mt-2 leading-6 font-geist">
-            To scan QR codes, please enable camera permissions in your device
-            settings
-          </Text>
-          <TouchableOpacity
-            className="bg-orange-500 px-8 py-4 rounded-xl mt-6 flex-row items-center"
-            // onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={20} color="white" />
-            <Text className="text-white font-semibold ml-2 font-geist">
-              Go Back
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <View className="flex-1 justify-center items-center bg-white p-8">
+        <MaterialIcons name="no-photography" size={80} color="#dc2626" />
+        <Text className="text-2xl font-groteskBold text-center mt-6 text-gray-900">
+          Camera Access Required
+        </Text>
+        <Text className="text-gray-600 text-center mt-4 leading-6">
+          Please enable camera in Settings to scan QR codes
+        </Text>
+        <TouchableOpacity
+          onPress={requestPermission}
+          className="bg-orange-500 px-8 py-4 rounded-xl mt-8"
+        >
+          <Text className="text-white font-bold">Allow Camera</Text>
+        </TouchableOpacity>
       </View>
     )
   }
 
   const scanLineTranslate = scanLineAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 260],
+    outputRange: [0, 280],
   })
 
   return (
-    <View className="flex-1 bg-white">
-      <StatusBar translucent={true} barStyle={"dark-content"} />
-      {/* Enhanced Header */}
-      <View className="pt-12 px-6 pb-4 ">
-        <View className="flex-row justify-between items-center">
-          <TouchableOpacity
-            // onPress={() => router.back()}
-            className="p-3 bg-gray-100 rounded-xl"
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          <View className="items-center">
-            <Text className="text-gray-900 text-xl  font-geist">
-              Scan QR Code
-            </Text>
-            <Text className="text-gray-600 text-sm font-geist">
-              Point camera at the QR code
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={toggleFlash}
-            className="p-3 bg-gray-100 rounded-xl"
-          >
-            <MaterialIcons
-              name={isFlashOn ? "flash-on" : "flash-off"}
-              size={24}
-              color="#374151"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View className="flex-1 bg-black">
+      <StatusBar barStyle="light-content" />
 
-      {/* Enhanced Camera View with White Theme */}
-      <View className="flex-1 justify-center bg-gray-50">
-        <CameraView
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
-          style={{ flex: 1 }}
-          flash={isFlashOn ? "on" : "off"}
-        >
-          <View className="flex-1 justify-center items-center bg-black/20">
-            {/* Rounded Scanner Frame */}
+      {/* Camera View - Flashlight Fixed Here */}
+      <CameraView
+        style={{ flex: 1 }}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        torch={isFlashOn ? "on" : "off"} // This is the correct way in 2025
+      >
+        {/* Overlay UI */}
+        <View className="flex-1">
+          {/* Top Bar */}
+          <View className="pt-12 px-6 pb-4 bg-gradient-to-b from-black/60 to-transparent">
+            <View className="flex-row justify-between items-center">
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="p-3 bg-white/20 backdrop-blur-xl rounded-xl"
+              >
+                <MaterialIcons name="close" size={24} color="white" />
+              </TouchableOpacity>
+
+              <View className="items-center">
+                <Text className="text-white text-xl font-groteskBold">
+                  Scan QR
+                </Text>
+                <Text className="text-white/80 text-sm">
+                  Align code in frame
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={toggleFlash}
+                className="p-3 bg-white/20 backdrop-blur-xl rounded-xl"
+              >
+                <MaterialIcons
+                  name={isFlashOn ? "flash-on" : "flash-off"}
+                  size={28}
+                  color="white"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Scanner Frame */}
+          <View className="flex-1 justify-center items-center px-8">
             <View className="relative">
-              {/* Main Rounded Frame */}
-              <View className="w-72 h-72 rounded-3xl  bg-transparent overflow-hidden">
-                {/* Animated Scan Line */}
+              <View className="w-72 h-72 rounded-3xl overflow-hidden ">
                 <Animated.View
                   style={{
                     transform: [{ translateY: scanLineTranslate }],
                   }}
-                  className="absolute left-4 right-4 h-1 bg-orange-500 rounded-full shadow-lg shadow-orange-500/50"
+                  className="absolute left-0 right-0 h-1 bg-orange-500 shadow-lg shadow-orange-500"
                 />
               </View>
 
-              {/* Corner Accents */}
-              <View className="absolute -top-2 -left-2 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-2xl" />
-              <View className="absolute -top-2 -right-2 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-2xl" />
-              <View className="absolute -bottom-2 -left-2 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-2xl" />
-              <View className="absolute -bottom-2 -right-2 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-2xl" />
-
-              {/* Center Guide */}
-              <View className="absolute inset-0 justify-center items-center">
-                <MaterialIcons
-                  name="qr-code-2"
-                  size={40}
-                  color="white"
-                  opacity={0.4}
+              {/* Corner Brackets */}
+              {[
+                "top-0 left-0 border-t-8 border-l-8 rounded-tl-3xl",
+                "top-0 right-0 border-t-8 border-r-8 rounded-tr-3xl",
+                "bottom-0 left-0 border-b-8 border-l-8 rounded-bl-3xl",
+                "bottom-0 right-0 border-b-8 border-r-8 rounded-br-3xl",
+              ].map((style, i) => (
+                <View
+                  key={i}
+                  className={`absolute w-16 h-16 border-orange-500 ${style}`}
                 />
-              </View>
+              ))}
             </View>
 
-            {/* Instructions */}
-            <View className="absolute bottom-20 items-center px-8">
-              <Text className="text-white text-lg font-semibold text-center mb-2 font-groteskBold">
-                Align QR Code within Frame
-              </Text>
-              <Text className="text-gray-200 text-center text-sm leading-5 font-geist">
-                Position the QR code in the center to scan automatically
-              </Text>
-            </View>
-          </View>
-        </CameraView>
-      </View>
-
-      {/* Enhanced Bottom Wallet Section - White Theme */}
-      <View className="bg-white p-6 border-t border-gray-200 ">
-        <View className="flex-row justify-between items-center mb-4">
-          {/* Wallet Balance with White Theme */}
-          <View className="flex-1">
-            <Text className="text-gray-600 text-sm font-groteskBold font-medium mb-1">
-              CURRENT BALANCE
+            <Text className="text-white text-lg font-groteskBold mt-8 text-center">
+              Point camera at QR code
             </Text>
-            <View className="flex-row items-center">
-              <View className="bg-orange-100 p-2 rounded-lg">
-                <FontAwesome5 name="wallet" size={20} color="#ea580c" />
-              </View>
-              <View className="ml-3">
-                <Text className="text-gray-900 text-2xl font-groteskBold">
-                  ${walletBalance.toFixed(2)}
+          </View>
+
+          {/* Bottom Wallet Card */}
+          <View className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 shadow-2xl">
+            <View className="flex-row justify-between items-center">
+              <View>
+                <Text className="text-gray-600 text-sm font-medium">
+                  Wallet Balance
                 </Text>
-                <Text className="text-green-600 text-xs font-medium font-geist">
+                <Text className="text-3xl font-groteskBold text-gray-900 mt-1">
+                  ETB 245.75
+                </Text>
+                <Text className="text-green-700 pt-2 text-sm">
                   ● Sufficient funds
                 </Text>
               </View>
+              <TouchableOpacity className="bg-orange-500 px-6 py-3 rounded-xl flex-row items-center">
+                <MaterialIcons name="add" size={20} color="white" />
+                <Text className="text-white font-bold ml-1">Top Up</Text>
+              </TouchableOpacity>
             </View>
+
+            {scanned && (
+              <TouchableOpacity
+                onPress={() => setScanned(false)}
+                className="mt-4 bg-gray-900 py-4 rounded-xl"
+              >
+                <Text className="text-white text-center font-bold">
+                  Scan Again
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-
-          {/* Top Up Button */}
-          <TouchableOpacity
-            className="bg-orange-500 px-6 py-4 rounded-xl flex-row items-center shadow-lg shadow-orange-500/25"
-            onPress={handleTopUp}
-          >
-            <MaterialIcons name="add" size={20} color="white" />
-            <Text className="text-white font-geist ml-2">Top Up</Text>
-          </TouchableOpacity>
         </View>
-
-        {/* Scan Again Button */}
-        {scanned && (
-          <TouchableOpacity
-            className="bg-gray-900 py-4 rounded-xl items-center shadow-lg mb-2"
-            onPress={() => setScanned(false)}
-          >
-            <Text className="text-white font-geist text-base">
-              Scan Another Code
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Help Text */}
-        {!scanned && (
-          <Text className="text-gray-500 text-center text-xs mt-2 font-geist">
-            Scan bus tickets, charging station codes, or payment QR codes
-          </Text>
-        )}
-      </View>
+      </CameraView>
     </View>
   )
 }

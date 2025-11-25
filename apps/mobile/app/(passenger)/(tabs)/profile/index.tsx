@@ -79,76 +79,67 @@ const ProfilePage = () => {
               Personal Information
             </Text>
 
-            <View className="space-y-4">
-              <View
-                classNameIcon
-                title={email}
-                icon={<Mail size={20} color="#ea580c" />}
-              />
-              <View className="flex-row items-center">
-                <Phone size={20} color="#ea580c" />
-                <Text className="ml-4 text-gray-700">{phone}</Text>
-              </View>
-              <View className="flex-row items-center">
-                <MapPin size={20} color="#ea580c" />
-                <Text className="ml-4 text-gray-700">
-                  Addis Ababa, Ethiopia
-                </Text>
-              </View>
+            <View className="flex-row items-center">
+              <Phone size={20} color="#ea580c" />
+              <Text className="ml-4 text-gray-700">{phone}</Text>
+            </View>
+            <View className="flex-row items-center">
+              <MapPin size={20} color="#ea580c" />
+              <Text className="ml-4 text-gray-700">Addis Ababa, Ethiopia</Text>
             </View>
           </View>
+        </View>
 
-          {/* Quick Actions */}
-          <View className="bg-white rounded-2xl p-5 shadow-sm mb-5">
-            <Text className="text-lg font-groteskBold text-gray-800 mb-4">
-              Account & Settings
-            </Text>
+        {/* Quick Actions */}
+        <View className="bg-white rounded-2xl p-5 shadow-sm mb-5">
+          <Text className="text-lg font-groteskBold text-gray-800 mb-4">
+            Account & Settings
+          </Text>
 
-            <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
-              <View className="flex-row items-center">
-                <CreditCard size={22} color="#f97316" />
-                <Text className="ml-4 text-gray-700">Payment Methods</Text>
-              </View>
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
-              <View className="flex-row items-center">
-                <Bell size={22} color="#f97316" />
-                <Text className="ml-4 text-gray-700">Notifications</Text>
-              </View>
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
-              <View className="flex-row items-center">
-                <Shield size={22} color="#f97316" />
-                <Text className="ml-4 text-gray-700">Security & Privacy</Text>
-              </View>
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity className="flex-row justify-between items-center py-4">
-              <View className="flex-row items-center">
-                <HelpCircle size={22} color="#f97316" />
-                <Text className="ml-700">Help & Support</Text>
-              </View>
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Logout */}
-          <TouchableOpacity className="bg-white rounded-2xl p-5 shadow-sm flex-row items-center justify-center">
-            <LogOut size={22} color="#dc2626" />
-            <Text className="ml-3 text-red-600 font-groteskSemiBold">
-              Log Out
-            </Text>
+          <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
+            <View className="flex-row items-center">
+              <CreditCard size={22} color="#f97316" />
+              <Text className="ml-4 text-gray-700">Payment Methods</Text>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <Text className="text-center text-gray-400 text-xs mt-8 mb-10">
-            Version 2.4.1 • Made with love in Ethiopia
-          </Text>
+          <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
+            <View className="flex-row items-center">
+              <Bell size={22} color="#f97316" />
+              <Text className="ml-4 text-gray-700">Notifications</Text>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity className="flex-row justify-between items-center py-4 border-b border-gray-100">
+            <View className="flex-row items-center">
+              <Shield size={22} color="#f97316" />
+              <Text className="ml-4 text-gray-700">Security & Privacy</Text>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity className="flex-row justify-between items-center py-4">
+            <View className="flex-row items-center">
+              <HelpCircle size={22} color="#f97316" />
+              <Text className="ml-700">Help & Support</Text>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
+
+        {/* Logout */}
+        <TouchableOpacity className="bg-white rounded-2xl p-5 shadow-sm flex-row items-center justify-center">
+          <LogOut size={22} color="#dc2626" />
+          <Text className="ml-3 text-red-600 font-groteskSemiBold">
+            Log Out
+          </Text>
+        </TouchableOpacity>
+
+        <Text className="text-center text-gray-400 text-xs mt-8 mb-10">
+          Version 2.4.1 • Made with love in Ethiopia
+        </Text>
       </ScrollView>
     </>
   )

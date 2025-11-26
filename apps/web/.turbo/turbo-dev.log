@@ -31,3 +31,134 @@ Auth baseURL: [36m[Function (anonymous)][39m
  GET /verify-request [33m404[39m in 486ms
 Auth baseURL: [36m[Function (anonymous)][39m
  GET /login [32m200[39m in 980ms
+ [32m[1m✓[22m[39m Compiled in 1583ms
+ GET /verify-request [33m404[39m in 581ms
+ GET /verify-request [33m404[39m in 611ms
+ [37m[1m○[22m[39m Compiling /verify-request ...
+ [32m[1m✓[22m[39m Compiled /verify-request in 6.8s
+ [31m[1m⨯[22m[39m [Error: The default export is not a React Component in "/verify-request/page"]
+ [31m[1m⨯[22m[39m [Error: The default export is not a React Component in "/verify-request/page"] {
+  page: [32m'/verify-request'[39m
+}
+ [37m[1m○[22m[39m Compiling /_error ...
+ [32m[1m✓[22m[39m Compiled in 12.4s
+ [32m[1m✓[22m[39m Compiled /_error in 15.3s
+ GET /verify-request [31m500[39m in 34602ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 238ms
+ GET /verify-request [32m200[39m in 2226ms
+ GET /verify-request [32m200[39m in 2441ms
+ [32m[1m✓[22m[39m Compiled in 1138ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 155ms
+ GET /verify-request [32m200[39m in 1100ms
+ [32m[1m✓[22m[39m Compiled in 950ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 371ms
+ GET /verify-request [32m200[39m in 1432ms
+ [32m[1m✓[22m[39m Compiled in 1676ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 329ms
+ GET /verify-request [32m200[39m in 1190ms
+ [32m[1m✓[22m[39m Compiled in 571ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 493ms
+ GET /verify-request [32m200[39m in 2499ms
+ [32m[1m✓[22m[39m Compiled in 406ms
+ [32m[1m✓[22m[39m Compiled /verify-request in 330ms
+ GET /verify-request [32m200[39m in 2027ms
+ [32m[1m✓[22m[39m Compiled in 2.2s
+ [31m[1m⨯[22m[39m ./apps/web/app/(auth)/verify-request/page.tsx:13:17
+Ecmascript file had an error
+[0m [90m 11 |[39m   [33mInputOTPSlot[39m[33m,[39m
+ [90m 12 |[39m } [36mfrom[39m [32m"@/components/ui/input-otp"[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m [33mReact[39m[33m,[39m { useState } [36mfrom[39m [32m"react"[39m
+ [90m    |[39m                 [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 14 |[39m
+ [90m 15 |[39m [36mfunction[39m [33mVerifyPage[39m() {
+ [90m 16 |[39m   [36mconst[39m [otp[33m,[39m setOtp] [33m=[39m useState([32m""[39m)[0m
+
+You're importing a component that needs `useState`. This React Hook only works in a Client Component. To fix, mark the file (or its parent) with the `"use client"` directive.
+
+ Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+
+
+
+
+ GET /verify-request [31m500[39m in 3557ms
+ GET /favicon.ico [31m500[39m in 529ms
+ [32m[1m✓[22m[39m Compiled in 1797ms
+ [37m[1m○[22m[39m Compiling /verify-request ...
+ [32m[1m✓[22m[39m Compiled /verify-request in 571ms
+ GET /verify-request [32m200[39m in 5879ms
+ [32m[1m✓[22m[39m Compiled in 560ms
+ [32m[1m✓[22m[39m Compiled in 707ms
+ [32m[1m✓[22m[39m Compiled in 847ms
+ [32m[1m✓[22m[39m Compiled in 1035ms
+ [32m[1m✓[22m[39m Compiled in 1097ms
+ [32m[1m✓[22m[39m Compiled in 414ms
+ [32m[1m✓[22m[39m Compiled in 1986ms
+ [32m[1m✓[22m[39m Compiled in 509ms
+ [32m[1m✓[22m[39m Compiled in 774ms
+ [32m[1m✓[22m[39m Compiled in 791ms
+ [32m[1m✓[22m[39m Compiled in 732ms
+ [33m[1m⚠[22m[39m Fast Refresh had to perform a full reload due to a runtime error.
+ [32m[1m✓[22m[39m Compiled in 725ms
+ GET /verify-request [32m200[39m in 3275ms
+ [32m[1m✓[22m[39m Compiled in 2s
+ [37m[1m○[22m[39m Compiling / ...
+ [32m[1m✓[22m[39m Compiled / in 10.2s
+ GET / [32m200[39m in 10978ms
+Auth baseURL: [36m[Function (anonymous)][39m
+ GET /login [32m200[39m in 2838ms
+ GET /verify-request?email=samitale86%40gmail.com [32m200[39m in 1898ms
+ [32m[1m✓[22m[39m Compiled in 1316ms
+ [32m[1m✓[22m[39m Compiled in 753ms
+ [32m[1m✓[22m[39m Compiled in 1688ms
+ [32m[1m✓[22m[39m Compiled in 654ms
+ [32m[1m✓[22m[39m Compiled in 813ms
+ [32m[1m✓[22m[39m Compiled in 726ms
+ [32m[1m✓[22m[39m Compiled in 630ms
+ [32m[1m✓[22m[39m Compiled in 486ms
+ [32m[1m✓[22m[39m Compiled in 774ms
+ [32m[1m✓[22m[39m Compiled in 701ms
+ [32m[1m✓[22m[39m Compiled in 711ms
+ GET /verify-request?email=samitale86%40gmail.com [32m200[39m in 1640ms
+ GET / [32m200[39m in 623ms
+ [32m[1m✓[22m[39m Compiled in 1649ms
+ GET / [32m200[39m in 554ms
+ [32m[1m✓[22m[39m Compiled in 3.5s
+ [32m[1m✓[22m[39m Compiled in 2.4s
+ [37m[1m○[22m[39m Compiling /login ...
+ [32m[1m✓[22m[39m Compiled /login in 506ms
+ GET /login [32m200[39m in 2071ms
+ [32m[1m✓[22m[39m Compiled in 546ms
+ [32m[1m✓[22m[39m Compiled in 2.1s
+ [32m[1m✓[22m[39m Compiled in 675ms
+ [32m[1m✓[22m[39m Compiled in 853ms
+ [32m[1m✓[22m[39m Compiled in 461ms
+ [32m[1m✓[22m[39m Compiled in 666ms
+ [32m[1m✓[22m[39m Compiled in 538ms
+ [32m[1m✓[22m[39m Compiled in 324ms
+ [32m[1m✓[22m[39m Compiled in 536ms
+ [33m[1m⚠[22m[39m Fast Refresh had to perform a full reload due to a runtime error.
+ GET /login [32m200[39m in 3503ms
+ [32m[1m✓[22m[39m Compiled in 653ms
+ [32m[1m✓[22m[39m Compiled in 466ms
+ [32m[1m✓[22m[39m Compiled in 777ms
+ [32m[1m✓[22m[39m Compiled in 636ms
+ [32m[1m✓[22m[39m Compiled in 795ms
+ GET /favicon.ico [32m200[39m in 702ms
+ GET / [32m200[39m in 1291ms
+ GET /login [32m200[39m in 4082ms
+ GET /login [32m200[39m in 1588ms
+ [32m[1m✓[22m[39m Compiled in 920ms
+ GET /login [32m200[39m in 10438ms
+ [32m[1m✓[22m[39m Compiled in 5.7s
+ GET /login [32m200[39m in 8627ms
+ GET /login [32m200[39m in 1996ms
+ GET /login [32m200[39m in 2082ms
+ GET / [32m200[39m in 2418ms
+ GET /login [32m200[39m in 634ms
+ GET /login [32m200[39m in 1327ms
+ GET /login [32m200[39m in 1030ms
+ GET /login [32m200[39m in 2357ms
+ GET /login [32m200[39m in 580ms
+ GET /login [32m200[39m in 1317ms
+ GET /verify-request?email=samueltale331%40gmail.com [32m200[39m in 2005ms
+ GET / [32m200[39m in 354ms

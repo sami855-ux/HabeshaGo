@@ -11,22 +11,23 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
-import { GithubIcon, Globe, Loader, Send } from "lucide-react"
+import { Loader, Send } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
+import { FcGoogle } from "react-icons/fc"
+import { FaApple } from "react-icons/fa"
 
 function LoginPage() {
   const router = useRouter()
 
-  const [githubPending, startGithubTransition] = useTransition()
+  const [applePending, startAppleTransition] = useTransition()
+  const [googlePending, startGoogleTransition] = useTransition()
   const [emailPending, startEmailTransition] = useTransition()
   const [email, setEmail] = useState("")
 
-  console.log("Auth baseURL:", authClient.config.baseURL)
-
   async function signUnWithGithub() {
-    startGithubTransition(async () => {
+    startAppleTransition(async () => {
       await authClient.signIn.social({
         provider: "github",
         callbackURL: "/",
@@ -44,18 +45,26 @@ function LoginPage() {
   }
 
   async function signUnWithGoogle() {
-    await authClient.signIn.social({
-      provider: "google",
-      callbackURL: "/",
-      fetchOptions: {
-        onSuccess: () => {
-          toast.success("Signed in with Github, you will be redircted....")
-        },
-        onError: (error) => {
-          console.log(error)
-          toast.error("Internal server error")
-        },
-      },
+    startGoogleTransition(async () => {
+      try {
+        await authClient.signIn.social({
+          provider: "google",
+          callbackURL: "/",
+
+          fetchOptions: {
+            onSuccess: () => {
+              toast.success("Signed in with Google, you will be redirected...")
+            },
+            onError: (error) => {
+              console.error("Google sign-in error:", error)
+              toast.error("Internal server error")
+            },
+          },
+        })
+      } catch (err) {
+        console.error("Unexpected Google login failure:", err)
+        toast.error("Failed to sign in. Please try again.")
+      }
     })
   }
 
@@ -66,8 +75,8 @@ function LoginPage() {
         type: "sign-in",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Email sent")
-            router.push(`/verify-request`)
+            toast.success("Email sent successfully")
+            router.push(`/verify-request?email=${email}`)
           },
           onError: () => {
             toast.error("Error sending email")
@@ -81,32 +90,48 @@ function LoginPage() {
     <Card>
       <CardHeader>
         <CardTitle className="text-xl">Welcome back!</CardTitle>
-        <CardDescription>Login with your Github Email Account</CardDescription>
+        <CardDescription>
+          Login with your Google or Apple Account
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <Button
-          onClick={signUnWithGithub}
+          onClick={signUnWithGoogle}
           className="w-full font-geist cursor-pointer"
           variant={"outline"}
-          disabled={githubPending}
+          disabled={googlePending}
         >
-          {githubPending ? (
+          {googlePending ? (
             <>
               <Loader className="animate-spin mr-2 size-4" />
               Loading ....
             </>
           ) : (
             <>
-              <GithubIcon className="w-4 h-4"></GithubIcon>
-              Sigin in with Github
+              <FcGoogle className="w-4 h-4"></FcGoogle>
+              Sigin in with Google
             </>
           )}
         </Button>
 
-        <Button className="w-full cursor-pointer" variant={"outline"}>
-          <Globe className="w-4 h-4"></Globe>
-          Sigin in with Google
+        <Button
+          onClick={signUnWithGithub}
+          className="w-full font-geist cursor-pointer"
+          variant={"outline"}
+          disabled={applePending}
+        >
+          {applePending ? (
+            <>
+              <Loader className="animate-spin mr-2 size-4" />
+              Loading ....
+            </>
+          ) : (
+            <>
+              <FaApple className="w-4 h-4"></FaApple>
+              Sigin in with Apple
+            </>
+          )}
         </Button>
 
         <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border pt-1">

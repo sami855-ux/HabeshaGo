@@ -14,11 +14,11 @@ generator dbml {
 
 datasource db {
   provider = "postgresql"
-  // url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model User {
-id              String   @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String?
   email         String?  @unique
   password      String? // optional for social/otp flows
@@ -55,7 +55,7 @@ enum UserRole {
 model Wallet {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
-  userId    String      @unique
+  userId    String   @unique
   balance   Float    @default(0)
   currency  String   @default("ETB")
   createdAt DateTime @default(now())
@@ -63,26 +63,24 @@ model Wallet {
 }
 
 model Account {
-  id         Int      @id @default(autoincrement())
-  provider   String
-  providerId String
-  email      String?
-  createdAt  DateTime @default(now())
-
-  user   User @relation(fields: [userId], references: [id])
-  userId String
-
-  accountId             String
+  id                    String   @id @default(cuid())
+  provider              String
+  providerId            String
+  user                  User      @relation(fields: [userId], references: [id])
+  userId                String
   accessToken           String?
   refreshToken          String?
   idToken               String?
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
-  password              String?
+  createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  @@unique([provider, providerId], name: "provider_providerId_unique")
+  accountId String
+  password  String?
+
+  @@unique([provider, providerId])
   @@index([userId])
   @@map("account")
 }
@@ -105,7 +103,7 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
   userId String
 }
 
@@ -163,7 +161,7 @@ model Route {
 model Driver {
   id              Int      @id @default(autoincrement())
   user            User     @relation(fields: [userId], references: [id])
-  userId          String      @unique
+  userId          String   @unique
   licenseNo       String
   experience      Int?
   assignedBus     Bus?

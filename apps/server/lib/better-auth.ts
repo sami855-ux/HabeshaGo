@@ -7,13 +7,13 @@ import { sendEmail } from 'src/utils/email-send.util';
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID as string,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
   session: { expiresIn: 60 * 60 * 24 * 30 },
-  serverUrl: 'http://localhost:3001', // REQUIRED
+  serverUrl: 'http://localhost:3001',
   apiPrefix: '/api/auth',
 
   plugins: [
@@ -75,22 +75,12 @@ export const auth = betterAuth({
     // Development mode
     ...(process.env.NODE_ENV === 'development'
       ? [
-          'exp://*/*', // Trust all Expo development URLs
+          'exp://*/*', // Trust all Expo development URL
           'exp://10.0.0.*:*/*', // Trust 10.0.0.x IP range
           'exp://192.168.*.*:*/*', // Trust 192.168.x.x IP range
           'exp://172.*.*.*:*/*', // Trust 172.x.x.x IP range
-          'exp://localhost:*/*', // Trust localhost
+          'exp://localhost:*/*', 
         ]
       : []),
   ],
-  callbacks: {
-    signIn({ user }: { user: { email: string } }) {
-      console.log('User signed in:', user.email);
-      return true;
-    },
-    signUp({ user }: { user: { email: string } }) {
-      console.log('New user signed up:', user.email);
-      return true;
-    },
-  },
 });

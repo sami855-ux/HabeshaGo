@@ -2,8 +2,8 @@
 //// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 //// ------------------------------------------------------
 
-Table User {
-  id Int [pk, increment]
+Table user {
+  id String [pk]
   name String
   email String [unique]
   password String
@@ -14,7 +14,7 @@ Table User {
   phoneVerified Boolean [not null, default: false]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  accounts Account [not null]
+  accounts account [not null]
   otpCodes OtpCode [not null]
   refreshTokens RefreshToken [not null]
   wallet Wallet
@@ -23,26 +23,37 @@ Table User {
   minibuses MinibusReservation [not null]
   chargings ChargingSession [not null]
   driverInfo Driver
+  image String
+  sessions session [not null]
 }
 
 Table Wallet {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [unique, not null]
+  user user [not null]
+  userId String [unique, not null]
   balance Float [not null, default: 0]
   currency String [not null, default: 'ETB']
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
 }
 
-Table Account {
+Table account {
   id Int [pk, increment]
   provider String [not null]
   providerId String [not null]
   email String
   createdAt DateTime [default: `now()`, not null]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
+  accountId String [not null]
+  accessToken String
+  refreshToken String
+  idToken String
+  accessTokenExpiresAt DateTime
+  refreshTokenExpiresAt DateTime
+  scope String
+  password String
+  updatedAt DateTime [not null]
 
   indexes {
     (provider, providerId) [unique]
@@ -51,8 +62,8 @@ Table Account {
 
 Table OtpCode {
   id Int [pk, increment]
-  user User
-  userId Int
+  user user
+  userId String
   email String
   phone String
   codeHash String [not null]
@@ -66,8 +77,8 @@ Table RefreshToken {
   tokenHash String [not null]
   expiresAt DateTime [not null]
   createdAt DateTime [default: `now()`, not null]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
 }
 
 Table EVStation {
@@ -90,8 +101,8 @@ Table ChargingSlot {
 
 Table ChargingSession {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
   slot ChargingSlot [not null]
   slotId Int [not null]
   startTime DateTime [not null]
@@ -114,8 +125,8 @@ Table Route {
 
 Table Driver {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [unique, not null]
+  user user [not null]
+  userId String [unique, not null]
   licenseNo String [not null]
   experience Int
   assignedBus Bus
@@ -151,8 +162,8 @@ Table Minibus {
 
 Table MinibusReservation {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
   minibus Minibus [not null]
   minibusId Int [not null]
   seat Int [not null]
@@ -162,8 +173,8 @@ Table MinibusReservation {
 
 Table Booking {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
   bus Bus [not null]
   busId Int [not null]
   seatNumber Int [not null]
@@ -184,14 +195,35 @@ Table ParkingLot {
 
 Table ParkingReservation {
   id Int [pk, increment]
-  user User [not null]
-  userId Int [not null]
+  user user [not null]
+  userId String [not null]
   lot ParkingLot [not null]
   lotId Int [not null]
   slotNumber Int [not null]
   startTime DateTime [not null]
   endTime DateTime [not null]
   createdAt DateTime [default: `now()`, not null]
+}
+
+Table session {
+  id String [pk]
+  expiresAt DateTime [not null]
+  token String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  ipAddress String
+  userAgent String
+  userId String [not null]
+  user user [not null]
+}
+
+Table verification {
+  id String [pk]
+  identifier String [not null]
+  value String [not null]
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
 }
 
 Enum UserRole {
@@ -212,21 +244,21 @@ Enum BusStatus {
   OUT_OF_SERVICE
 }
 
-Ref: Wallet.userId - User.id
+Ref: Wallet.userId - user.id
 
-Ref: Account.userId > User.id
+Ref: account.userId > user.id
 
-Ref: OtpCode.userId > User.id
+Ref: OtpCode.userId > user.id
 
-Ref: RefreshToken.userId > User.id
+Ref: RefreshToken.userId > user.id
 
 Ref: ChargingSlot.stationId > EVStation.id
 
-Ref: ChargingSession.userId > User.id
+Ref: ChargingSession.userId > user.id
 
 Ref: ChargingSession.slotId > ChargingSlot.id
 
-Ref: Driver.userId - User.id
+Ref: Driver.userId - user.id
 
 Ref: Bus.driverId - Driver.id
 
@@ -236,14 +268,16 @@ Ref: Minibus.driverId - Driver.id
 
 Ref: Minibus.routeId > Route.id
 
-Ref: MinibusReservation.userId > User.id
+Ref: MinibusReservation.userId > user.id
 
 Ref: MinibusReservation.minibusId > Minibus.id
 
-Ref: Booking.userId > User.id
+Ref: Booking.userId > user.id
 
 Ref: Booking.busId > Bus.id
 
-Ref: ParkingReservation.userId > User.id
+Ref: ParkingReservation.userId > user.id
 
 Ref: ParkingReservation.lotId > ParkingLot.id
+
+Ref: session.userId > user.id [delete: Cascade]

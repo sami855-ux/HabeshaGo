@@ -16,10 +16,18 @@
    - Environments: .env
 
  [32m[1m✓[22m[39m Starting...
- [32m[1m✓[22m[39m Ready in 10.6s
+ [32m[1m✓[22m[39m Ready in 28.4s
  [37m[1m○[22m[39m Compiling /login ...
- [32m[1m✓[22m[39m Compiled /login in 16.7s
+ [32m[1m✓[22m[39m Compiled /login in 20.7s
 Auth baseURL: [36m[Function (anonymous)][39m
- GET /login [32m200[39m in 18580ms
+ GET /login [32m200[39m in 23351ms
+ [37m[1m○[22m[39m Compiling /favicon.ico ...
+ [32m[1m✓[22m[39m Compiled /favicon.ico in 3.2s
 Auth baseURL: [36m[Function (anonymous)][39m
- GET /login [32m200[39m in 1084ms
+ GET /login [32m200[39m in 656ms
+ [37m[1m○[22m[39m Compiling /_not-found/page ...
+ [32m[1m✓[22m[39m Compiled /_not-found/page in 3s
+ GET /verify-request [33m404[39m in 3758ms
+ GET /verify-request [33m404[39m in 486ms
+Auth baseURL: [36m[Function (anonymous)][39m
+ GET /login [32m200[39m in 980ms

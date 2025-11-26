@@ -13,6 +13,8 @@ export const auth = betterAuth({
     },
   },
   session: { expiresIn: 60 * 60 * 24 * 30 },
+  serverUrl: 'http://localhost:3001', // REQUIRED
+  apiPrefix: '/api/auth',
 
   plugins: [
     emailOTP({

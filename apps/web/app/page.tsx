@@ -9,10 +9,14 @@ export default function Home() {
   if (isLoading) {
     return <div className="">loading.....</div>
   }
+
+  if (session) {
+    return <div className="">There is session {session?.user.email}</div>
+  }
+
   return (
     <div className="">
       <ThemeToggle />
-      {session ? <p>{session.user.name}</p> : <p>No user </p>}
     </div>
   )
 }

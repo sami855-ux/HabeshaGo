@@ -7,7 +7,7 @@ import cors from 'cors';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    bodyParser: false, // required for BetterAuth
+    bodyParser: false,
   });
 
   // Manually add JSON body parser for non-BetterAuth routes
@@ -23,24 +23,13 @@ async function bootstrap() {
       'X-Requested-With',
       'Accept',
       'Origin',
+      'User-Agent', // explicitly allow this
     ],
     exposedHeaders: ['Set-Cookie'],
-    optionsSuccessStatus: 200, // Important for some browsers // allow all headers
+    optionsSuccessStatus: 200,
   });
 
-  // CRITICAL: Apply CORS specifically to Better-Auth routes BEFORE mounting the handler
-  app.use(
-    '/api/auth',
-    cors({
-      origin: ['http://localhost:3000'], // Adjust for prod
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      credentials: true,
-      optionsSuccessStatus: 200, // Some legacy browsers choke on 204
-    }),
-    auth.handler,
-  );
-
+  app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe());
 
   const port = process.env.PORT ? +process.env.PORT : 3001;

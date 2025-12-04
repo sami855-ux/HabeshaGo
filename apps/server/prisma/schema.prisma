@@ -3,10 +3,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator dbml {
-  provider = "prisma-dbml-generator"
-  output   = "./ERD.dbml"
-}
+// generator dbml {
+//   provider = "prisma-dbml-generator"
+//   output   = "./ERD.dbml"
+// }
 // generator erd {
 //   provider = "prisma-erd-generator"
 //   output   = "./ERD.svg"
@@ -107,6 +107,85 @@ model RefreshToken {
   userId String
 }
 
+
+//Bus features 
+model Bus {
+  id              Int         @id @default(autoincrement())
+  busNumber       String      @unique
+  capacity        Int
+  status          BusStatus   @default(ACTIVE)
+  driver          Driver?     @relation(fields: [driverId], references: [id])
+  driverId        Int?        @unique
+  route           Route?      @relation(fields: [routeId], references: [id])
+  routeId         Int?
+
+  currentStop     String?
+  nextDestination String?
+  isActive        Boolean     @default(true)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  bookings        Booking[]
+  positions       BusPosition[]  
+}
+
+model Booking {
+  id             Int        @id @default(autoincrement())
+  user           User       @relation(fields: [userId], references: [id])
+  userId         String
+  bus            Bus        @relation(fields: [busId], references: [id])
+  busId          Int
+  seatNumber     Int
+  date           DateTime
+  status         BookingStatus  @default(CONFIRMED)
+  boardingStop   String?        //  multi-stop routes
+  alightingStop  String?        //  multi-stop routes
+  bookingCode    String     @unique @default(uuid())
+  cancelledAt    DateTime?      //  timestamp if cancelled
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model BusPosition {
+  id        Int      @id @default(autoincrement())
+  bus       Bus      @relation(fields: [busId], references: [id])
+  busId     Int
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+
+  @@index([busId, timestamp])
+}
+
+
+model Route {
+  id          Int       @id @default(autoincrement())
+  name        String
+  origin      String
+  destination String
+  distanceKm  Float?
+  estimatedTimeMin Int?          // estimated travel time in minutes
+  midPoints   Json?              // array of intermediate stops: [{ name: "Stop1", lat: xx, lng: yy }, ...]
+  isActive    Boolean   @default(true)  // whether this route is currently active
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  minibuses   Minibus[]
+  buses       Bus[]
+}
+
+
+
+
+
 model EVStation {
   id        Int      @id @default(autoincrement())
   name      String
@@ -146,17 +225,6 @@ model ChargingSession {
   createdAt  DateTime     @default(now())
 }
 
-model Route {
-  id          Int      @id @default(autoincrement())
-  name        String
-  origin      String
-  destination String
-  distanceKm  Float?
-  createdAt   DateTime @default(now())
-
-  minibuses Minibus[]
-  buses     Bus[]
-}
 
 model Driver {
   id              Int      @id @default(autoincrement())
@@ -166,27 +234,6 @@ model Driver {
   experience      Int?
   assignedBus     Bus?
   assignedMinibus Minibus?
-}
-
-model Bus {
-  id        Int       @id @default(autoincrement())
-  busNumber String    @unique
-  capacity  Int
-  status    BusStatus @default(ACTIVE)
-  driver    Driver?   @relation(fields: [driverId], references: [id])
-  driverId  Int?      @unique
-  route     Route?    @relation(fields: [routeId], references: [id])
-  routeId   Int?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  bookings Booking[]
-}
-
-enum BusStatus {
-  ACTIVE
-  UNDER_MAINTENANCE
-  OUT_OF_SERVICE
 }
 
 model Minibus {
@@ -214,16 +261,7 @@ model MinibusReservation {
   createdAt DateTime @default(now())
 }
 
-model Booking {
-  id         Int      @id @default(autoincrement())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  bus        Bus      @relation(fields: [busId], references: [id])
-  busId      Int
-  seatNumber Int
-  date       DateTime
-  createdAt  DateTime @default(now())
-}
+
 
 model ParkingLot {
   id         Int      @id @default(autoincrement())
@@ -275,4 +313,11 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+
+enum BusStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
 }

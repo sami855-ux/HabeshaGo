@@ -1,23 +1,22 @@
-import React from "react";
 import {
-  View,
+  AlertTriangle,
+  CheckCircle,
+  ChevronRight,
+  Info,
+  XCircle,
+} from "lucide-react-native"
+import React from "react"
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  Modal,
   Text,
   TouchableOpacity,
-  Modal,
-  Dimensions,
-  Animated,
-  Easing,
-} from "react-native";
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Info,
-  X,
-  ChevronRight,
-} from "lucide-react-native";
+  View,
+} from "react-native"
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 
 const AlertModal = ({
   visible = false,
@@ -30,26 +29,24 @@ const AlertModal = ({
   onSecondaryPress,
   onClose,
   showCloseButton = true,
-  overlayClose = true, // Changed default to true
+  overlayClose = true,
   animationType = "fade",
   icon,
   customIcon,
   buttonDirection = "horizontal", // 'horizontal' or 'vertical'
   theme = "light", // 'light' or 'dark'
-  maxWidth = 400, // Maximum width for larger screens
-  minWidth = 300, // Minimum width
+  maxWidth = 400,
+  minWidth = 300,
 }) => {
-  const scaleValue = React.useRef(new Animated.Value(0)).current;
-  const opacityValue = React.useRef(new Animated.Value(0)).current;
+  const scaleValue = React.useRef(new Animated.Value(0)).current
+  const opacityValue = React.useRef(new Animated.Value(0)).current
 
   // Calculate responsive width
   const modalWidth = React.useMemo(() => {
-    const screenPadding = 48; // 24px on each side
-    const availableWidth = SCREEN_WIDTH - screenPadding;
-
-    // Use the smaller of: available screen width, maxWidth, but not less than minWidth
-    return Math.min(Math.max(availableWidth, minWidth), maxWidth);
-  }, [SCREEN_WIDTH, maxWidth, minWidth]);
+    const screenPadding = 48
+    const availableWidth = SCREEN_WIDTH - screenPadding
+    return Math.min(Math.max(availableWidth, minWidth), maxWidth)
+  }, [SCREEN_WIDTH, maxWidth, minWidth])
 
   React.useEffect(() => {
     if (visible) {
@@ -66,7 +63,7 @@ const AlertModal = ({
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start()
     } else {
       Animated.parallel([
         Animated.spring(scaleValue, {
@@ -81,65 +78,117 @@ const AlertModal = ({
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start()
     }
-  }, [visible]);
+  }, [visible])
 
   const getIconConfig = () => {
     const config = {
-      success: { icon: CheckCircle, color: "#43A047", bgColor: "#E8F5E8" },
-      error: { icon: XCircle, color: "#E53935", bgColor: "#FFEBEE" },
-      warning: { icon: AlertTriangle, color: "#FF9800", bgColor: "#FFF3E0" },
-      info: { icon: Info, color: "#00897B", bgColor: "#E0F2F1" },
-    };
-    return config[type] || config.info;
-  };
+      success: {
+        icon: CheckCircle,
+        color: "#10B981",
+        bgColor: theme === "dark" ? "#064E3B" : "#D1FAE5",
+        description: "Operation completed successfully",
+      },
+      error: {
+        icon: XCircle,
+        color: "#EF4444",
+        bgColor: theme === "dark" ? "#7F1D1D" : "#FEE2E2",
+        description: "An error occurred that needs your attention",
+      },
+      warning: {
+        icon: AlertTriangle,
+        color: "#F59E0B",
+        bgColor: theme === "dark" ? "#78350F" : "#FEF3C7",
+        description: "Important information requiring your review",
+      },
+      info: {
+        icon: Info,
+        color: "#3B82F6",
+        bgColor: theme === "dark" ? "#1E3A8A" : "#DBEAFE",
+        description: "Informational message for your reference",
+      },
+    }
+    return config[type] || config.info
+  }
 
   const getThemeColors = () => {
     return theme === "dark"
       ? {
-          bg: "#263238",
-          surface: "#37474F",
-          textPrimary: "#ECEFF1",
-          textSecondary: "#B0BEC5",
-          border: "#455A64",
+          // Dark theme colors
+          background: "#0F172A", // slate-900
+          surface: "#1E293B", // slate-800
+          card: "#334155", // slate-700
+          textPrimary: "#F1F5F9", // slate-100
+          textSecondary: "#94A3B8", // slate-400
+          textTertiary: "#64748B", // slate-500
+          border: "#475569", // slate-600
+          overlay: "rgba(15, 23, 42, 0.8)",
         }
       : {
-          bg: "#FFFFFF",
-          surface: "#FAFAFA",
-          textPrimary: "#212121",
-          textSecondary: "#616161",
-          border: "#E0E0E0",
-        };
-  };
+          // Light theme colors
+          background: "#FFFFFF",
+          surface: "#F8FAFC", // slate-50
+          card: "#F1F5F9", // slate-100
+          textPrimary: "#0F172A", // slate-900
+          textSecondary: "#475569", // slate-600
+          textTertiary: "#64748B", // slate-500
+          border: "#E2E8F0", // slate-200
+          overlay: "rgba(0, 0, 0, 0.5)",
+        }
+  }
 
-  const themeColors = getThemeColors();
-  const iconConfig = getIconConfig();
-  const IconComponent = customIcon || iconConfig.icon;
+  const themeColors = getThemeColors()
+  const iconConfig = getIconConfig()
+  const IconComponent = customIcon || iconConfig.icon
 
   const handleOverlayPress = () => {
     if (overlayClose && onClose) {
-      onClose();
+      onClose()
     }
-  };
+  }
 
   const handlePrimaryPress = () => {
     if (onPrimaryPress) {
-      onPrimaryPress();
+      onPrimaryPress()
     }
     if (onClose) {
-      onClose();
+      onClose()
     }
-  };
+  }
 
   const handleSecondaryPress = () => {
     if (onSecondaryPress) {
-      onSecondaryPress();
+      onSecondaryPress()
     }
     if (onClose) {
-      onClose();
+      onClose()
     }
-  };
+  }
+
+  const getButtonColors = () => {
+    const colors = {
+      success: {
+        primary: theme === "dark" ? "#059669" : "#10B981", // green-600/green-500
+        hover: theme === "dark" ? "#047857" : "#059669", // green-700/green-600
+      },
+      error: {
+        primary: theme === "dark" ? "#DC2626" : "#EF4444", // red-600/red-500
+        hover: theme === "dark" ? "#B91C1C" : "#DC2626", // red-700/red-600
+      },
+      warning: {
+        primary: theme === "dark" ? "#D97706" : "#F59E0B", // amber-600/amber-500
+        hover: theme === "dark" ? "#B45309" : "#D97706", // amber-700/amber-600
+      },
+      info: {
+        primary: theme === "dark" ? "#2563EB" : "#3B82F6", // blue-600/blue-500
+        hover: theme === "dark" ? "#1D4ED8" : "#2563EB", // blue-700/blue-600
+      },
+    }
+    return colors[type] || colors.info
+  }
+
+  const buttonColors = getButtonColors()
 
   return (
     <Modal
@@ -149,9 +198,10 @@ const AlertModal = ({
       statusBarTranslucent
     >
       <View className="flex-1 justify-center items-center px-6">
-        {/* Overlay - Now directly clickable */}
+        {/* Overlay */}
         <TouchableOpacity
-          className="absolute inset-0 bg-black/50"
+          className="absolute inset-0"
+          style={{ backgroundColor: themeColors.overlay }}
           onPress={handleOverlayPress}
           activeOpacity={1}
         >
@@ -166,57 +216,45 @@ const AlertModal = ({
             width: modalWidth,
             maxWidth: "100%",
           }}
-          className={`rounded-2xl overflow-hidden ${
-            theme === "dark" ? "bg-deepBlueGray" : "bg-white"
-          } shadow-2xl`}
+          className="rounded-2xl overflow-hidden shadow-2xl w-[75vw]"
+          style={{ backgroundColor: themeColors.background }}
         >
           {/* Header - Icon Row */}
           <View
-            className={`p-6 pb-0 ${theme === "dark" ? "bg-deepBlueGray" : "bg-white"}`}
+            className="p-6 pb-0"
+            style={{ backgroundColor: themeColors.background }}
           >
             <View className="flex-row items-center justify-between mb-4">
-              {/* Status Icon */}
-              <View
-                className="w-12 h-12 rounded-full items-center justify-center"
-                style={{ backgroundColor: iconConfig.bgColor }}
-              >
-                <IconComponent size={24} color={iconConfig.color} />
-              </View>
-
-              {/* Close Button */}
-              {showCloseButton && (
-                <TouchableOpacity
-                  onPress={onClose}
-                  className="w-8 h-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700"
+              {/* Status Icon with Description */}
+              <View className="flex-row items-center flex-1 mr-4">
+                <View
+                  className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                  style={{ backgroundColor: iconConfig.bgColor }}
                 >
-                  <X
-                    size={18}
-                    color={theme === "dark" ? "#ECEFF1" : "#616161"}
-                  />
-                </TouchableOpacity>
-              )}
+                  <IconComponent size={24} color={iconConfig.color} />
+                </View>
+              </View>
             </View>
           </View>
 
           {/* Content - Text Below Icons */}
           <View
-            className={`px-6 pb-6 ${theme === "dark" ? "bg-deepBlueGray" : "bg-white"}`}
+            className="px-6 pb-6"
+            style={{ backgroundColor: themeColors.background }}
           >
             <Text
-              className={`text-xl mb-3 font-groteskBold ${
-                theme === "dark" ? "text-offWhite" : "text-charcoal"
-              }`}
-              numberOfLines={2}
+              className="text-xl mb-3 font-groteskBold leading-7"
+              style={{ color: themeColors.textPrimary }}
+              numberOfLines={3}
               ellipsizeMode="tail"
             >
               {title}
             </Text>
             {message && (
               <Text
-                className={`text-base leading-6 font-geist ${
-                  theme === "dark" ? "text-offWhite/80" : "text-slateGray"
-                }`}
-                numberOfLines={3}
+                className="text-base leading-6 font-geist"
+                style={{ color: themeColors.textSecondary }}
+                numberOfLines={6}
                 ellipsizeMode="tail"
               >
                 {message}
@@ -224,12 +262,12 @@ const AlertModal = ({
             )}
           </View>
 
-          {/* Buttons */}
+          {/* Action Section */}
           <View
-            className={`p-4 border-t ${
-              theme === "dark" ? "border-gray-600" : "border-gray-100"
-            }`}
+            className="p-4 border-t"
             style={{
+              borderTopColor: themeColors.border,
+              backgroundColor: themeColors.surface,
               flexDirection:
                 buttonDirection === "vertical" ? "column" : "row-reverse",
               gap: 12,
@@ -239,16 +277,11 @@ const AlertModal = ({
             <TouchableOpacity
               onPress={handlePrimaryPress}
               className={`flex-row items-center justify-center py-4 px-6 rounded-xl ${
-                type === "success"
-                  ? "bg-[#21af50]"
-                  : type === "error"
-                    ? "bg-red-400"
-                    : type === "warning"
-                      ? "bg-amber-500"
-                      : "bg-deepTeal"
-              } ${buttonDirection === "horizontal" ? "flex-1" : "w-full"}`}
+                buttonDirection === "horizontal" ? "flex-1" : "w-full"
+              }`}
+              style={{ backgroundColor: buttonColors.primary }}
             >
-              <Text className="text-white font-geist text-lg font-semibold mr-2">
+              <Text className="text-white font-geist text-base font-semibold mr-2">
                 {primaryButtonText}
               </Text>
               <ChevronRight size={16} color="#FFFFFF" />
@@ -259,15 +292,16 @@ const AlertModal = ({
               <TouchableOpacity
                 onPress={handleSecondaryPress}
                 className={`py-4 px-6 rounded-xl border ${
-                  theme === "dark"
-                    ? "bg-deepBlueGray border-gray-600"
-                    : "bg-white border-gray-300"
-                } ${buttonDirection === "horizontal" ? "flex-1" : "w-full"}`}
+                  buttonDirection === "horizontal" ? "flex-1" : "w-full"
+                }`}
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                }}
               >
                 <Text
-                  className={`text-center text-base font-semibold font-inter ${
-                    theme === "dark" ? "text-offWhite" : "text-charcoal"
-                  }`}
+                  className="text-center text-base font-semibold font-geist"
+                  style={{ color: themeColors.textPrimary }}
                 >
                   {secondaryButtonText}
                 </Text>
@@ -277,7 +311,7 @@ const AlertModal = ({
         </Animated.View>
       </View>
     </Modal>
-  );
-};
+  )
+}
 
-export default AlertModal;
+export default AlertModal

@@ -1,17 +1,14 @@
-import { AntDesign, Ionicons } from "@expo/vector-icons"
-import * as WebBrowser from "expo-web-browser"
+import { Ionicons } from "@expo/vector-icons"
+import { useTheme } from "@react-navigation/native"
+import { useRouter } from "expo-router"
 import {
-  ChevronLeft,
-  ChevronRight,
+  Clock,
   DollarSign,
-  Heart,
   Mail,
   MapPin,
   Navigation,
   Phone,
-  Sparkles,
-  Train,
-  TrendingUp,
+  Users,
   Zap,
 } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
@@ -20,219 +17,200 @@ import {
   Dimensions,
   FlatList,
   ImageBackground,
-  StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native"
 
-import { BlurView } from "expo-blur"
-import { LinearGradient } from "expo-linear-gradient"
-import { useRouter } from "expo-router"
-import GoogleIcon from "./utils/GoogleIcon"
-
-WebBrowser.maybeCompleteAuthSession()
-
 const { width, height } = Dimensions.get("window")
 
-// Animated Icon Component
-const AnimatedIcon = ({ Icon, color, delay = 0 }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current
-  const rotateAnim = useRef(new Animated.Value(0)).current
+// Slide 1: Smart Navigation
+const Slide1 = ({ isActive }) => {
+  const { colors } = useTheme()
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(30)).current
+  const iconScale = useRef(new Animated.Value(0.8)).current
+  const featuresOpacity = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
+    if (isActive) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(iconScale, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(featuresOpacity, {
+          toValue: 1,
+          duration: 800,
+          delay: 300,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+  }, [isActive])
+
+  return (
+    <ImageBackground
+      source={{
+        uri: "https://images.unsplash.com/photo-1508780709619-79562169bc64?auto=format&fit=crop&w=800&q=80",
+      }}
+      className="flex-1"
+      imageStyle={{ resizeMode: "cover" }}
+    >
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }}
+        className="flex-1 px-4 py-20 justify-between bg-black/30"
+      >
+        <View className="items-center mt-10">
+          <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+            <View className="w-28 h-28 rounded-2xl items-center justify-center mb-8 bg-white/15 shadow-lg">
+              <Navigation size={56} color="white" />
+            </View>
+          </Animated.View>
+
+          <View className="items-center my-4">
+            <Text className="text-white text-4xl font-bold text-center">
+              Smart{"\n"}Navigation
+            </Text>
+            <Text className="text-white/80 text-lg text-center max-w-xs leading-7">
+              AI-powered routes that adapt to traffic conditions in real-time
+              for the fastest journey
+            </Text>
+          </View>
+        </View>
+
+        <Animated.View style={{ opacity: featuresOpacity }}>
+          <View className="my-2">
+            <Text className="text-white text-lg font-bold text-center mb-2">
+              Why choose our navigation?
+            </Text>
+
+            <View className="bg-white/10 border-l-4 border-blue-500 rounded-3xl p-4 my-1">
+              <View className="flex-row items-start gap-4">
+                <View className="w-10 h-10 rounded-full items-center justify-center bg-blue-500/30 mt-1">
+                  <MapPin size={20} color="#3B82F6" />
+                </View>
+                <Text className="flex-1 text-white/80 text-base leading-6">
+                  Real-time updates and alternative routes to avoid congestion
+                  and save time
+                </Text>
+              </View>
+            </View>
+
+            <View className="bg-white/10 border-l-4 border-blue-500 rounded-3xl p-4 my-1">
+              <View className="flex-row items-start gap-4">
+                <View className="w-10 h-10 rounded-full items-center justify-center bg-blue-500/30 mt-1">
+                  <Clock size={20} color="#3B82F6" />
+                </View>
+                <Text className="flex-1 text-white/80 text-base leading-6">
+                  Accurate arrival times using machine learning and historical
+                  data patterns
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </ImageBackground>
+  )
+}
+// Slide 2: Fast Booking
+const Slide2 = ({ isActive }) => {
+  const { colors } = useTheme()
+  const scaleAnim = useRef(new Animated.Value(0.8)).current
+  const pulseAnim = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (isActive) {
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
-          friction: 4,
-          tension: 40,
+          tension: 20,
+          friction: 5,
           useNativeDriver: true,
         }),
         Animated.loop(
           Animated.sequence([
-            Animated.timing(rotateAnim, {
-              toValue: 1,
-              duration: 3000,
+            Animated.timing(pulseAnim, {
+              toValue: 1.1,
+              duration: 1000,
               useNativeDriver: true,
             }),
-            Animated.timing(rotateAnim, {
-              toValue: 0,
-              duration: 0,
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
               useNativeDriver: true,
             }),
           ])
         ),
-      ]),
-    ]).start()
-  }, [])
+      ]).start()
+    }
+  }, [isActive])
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  })
-
-  return (
-    <Animated.View
-      style={{
-        transform: [{ scale: scaleAnim }, { rotate }],
-      }}
-    >
-      <Icon size={60} color={color} strokeWidth={1.5} />
-    </Animated.View>
-  )
-}
-
-// Floating Element with Animation
-const FloatingElement = ({ Icon, color, delay, position }) => {
-  const translateY = useRef(new Animated.Value(0)).current
-  const opacity = useRef(new Animated.Value(0.6)).current
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.loop(
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(translateY, {
-              toValue: -20,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.parallel([
-            Animated.timing(translateY, {
-              toValue: 0,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.6,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-          ]),
-        ])
-      ),
-    ]).start()
-  }, [])
-
-  return (
-    <Animated.View
-      className={`absolute ${position}`}
-      style={{
-        transform: [{ translateY }],
-        opacity,
-      }}
-    >
-      <View
-        className="w-14 h-14 border border-white rounded-3xl  items-center justify-center backdrop-blur-sm "
-        style={{
-          backgroundColor: color + "20",
-          borderWidth: 1.5,
-        }}
-      >
-        <Icon size={24} color={color} strokeWidth={1.5} />
-      </View>
-    </Animated.View>
-  )
-}
-
-// Slide 1: Smart Navigation
-const Slide1 = () => {
   return (
     <View
-      className="w-full items-center justify-center px-8 bg-gradient-to-br from-blue-50 to-cyan-50"
-      style={{ width, height: height * 0.78 }}
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        justifyContent: "center",
+        paddingHorizontal: 16,
+      }}
     >
-      <FloatingElement
-        Icon={MapPin}
-        color="#00796B"
-        delay={0}
-        position="top-12 right-10"
-      />
-      <FloatingElement
-        Icon={Navigation}
-        color="#00796B"
-        delay={300}
-        position="bottom-24 left-8"
-      />
-
-      <View className="mb-8 bg-[#b9e9e3] w-24 h-24 rounded-[50px] flex justify-center items-center">
-        <Ionicons name="compass" size={50} color={"#00796B"} />
+      <View style={{ alignItems: "center", marginBottom: 64 }}>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <View
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 16,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: colors.primary + "15",
+            }}
+          >
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Zap size={48} color={colors.primary} />
+            </Animated.View>
+          </View>
+        </Animated.View>
       </View>
 
-      <Text className="font-groteskBold text-4xl text-center text-[#00796B] mb-4 leading-tight">
-        Smart Navigation
-      </Text>
-
-      <Text className="text-[17px] font-geist text-center text-[#095048] leading-7 max-w-sm">
-        Discover optimal routes with AI-powered suggestions and live traffic
-        intelligence
-      </Text>
-
-      <View
-        className="mt-10 rounded-3xl p-3 border border-[#cffaf5] backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(59, 130, 246, 0.08)" }}
-      >
-        <Text className="text-sm font-geist text-[#00796B] text-center font-medium">
-          Advanced AI algorithms power every route
+      <View style={{ alignItems: "center", gap: 16 }}>
+        <Text
+          style={{
+            fontSize: 32,
+            fontWeight: "700",
+            textAlign: "center",
+            color: colors.text,
+          }}
+        >
+          Lightning Fast
         </Text>
-      </View>
-    </View>
-  )
-}
-
-// Slide 2: Lightning Fast
-const Slide2 = () => {
-  return (
-    <View
-      className="w-full items-center justify-center px-8 bg-gradient-to-br from-purple-50 to-pink-50"
-      style={{ width, height: height * 0.78 }}
-    >
-      <FloatingElement
-        Icon={Zap}
-        color="#A855F7"
-        delay={0}
-        position="top-16 right-12"
-      />
-      <FloatingElement
-        Icon={TrendingUp}
-        color="#EC4899"
-        delay={300}
-        position="bottom-16 left-10"
-      />
-
-      <View className="mb-8 bg-purple-200 w-24 h-24 rounded-full flex justify-center items-center">
-        <Ionicons
-          name="speedometer"
-          size={50}
-          color={"#c749f8"}
-          className="text-[#c749f8]"
-        />
-      </View>
-
-      <Text className="font-groteskBold text-4xl text-center text-purple-950 mb-4 leading-tight">
-        Lightning Fast
-      </Text>
-
-      <Text className="text-lg font-geist text-center text-purple-800 leading-7 max-w-sm">
-        Get real-time updates and instant booking confirmations for stress-free
-        travel
-      </Text>
-
-      <View
-        className="mt-10 rounded-3xl p-3 border border-purple-200 backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(139, 92, 246, 0.08)" }}
-      >
-        <Text className="text-sm font-geist text-purple-800 text-center font-medium">
-          Real-time tracking & instant confirmations
+        <Text
+          style={{
+            fontSize: 18,
+            textAlign: "center",
+            color: colors.text + "CC",
+            lineHeight: 28,
+          }}
+        >
+          Instant bookings and real-time updates for stress-free travel
         </Text>
       </View>
     </View>
@@ -240,125 +218,194 @@ const Slide2 = () => {
 }
 
 // Slide 3: Best Value
-const Slide3 = () => {
-  return (
-    <View
-      className="w-full items-center justify-center px-8 bg-gradient-to-br from-emerald-50 to-green-50"
-      style={{ width, height: height * 0.78 }}
-    >
-      <FloatingElement
-        Icon={DollarSign}
-        color="#10B981"
-        delay={0}
-        position="top-20 left-12"
-      />
-      <FloatingElement
-        Icon={TrendingUp}
-        color="#059669"
-        delay={300}
-        position="bottom-32 right-10"
-      />
-
-      <View className="mb-8 bg-[#a5f3e2] w-24 h-24 rounded-[50px] flex justify-center items-center">
-        <Ionicons
-          name="ribbon-outline"
-          size={50}
-          color={"#1d7e69"}
-          className="text-[#a5f3e2]"
-        />
-      </View>
-
-      <Text className="font-semibold font-groteskBold text-4xl text-center text-emerald-950 mb-4 leading-tight">
-        Best Value
-      </Text>
-
-      <Text className="text-lg font-geist text-center text-emerald-800 leading-7 max-w-sm">
-        Compare prices across all providers and save up to 40% on your daily
-        commute
-      </Text>
-
-      <View
-        className="mt-10 rounded-3xl p-3 border border-emerald-200 backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(16, 185, 129, 0.08)" }}
-      >
-        <Text className="text-sm font-geist text-emerald-800 text-center font-medium">
-          Save up to 40% on every journey
-        </Text>
-      </View>
-    </View>
-  )
-}
-
-// Slide 4: Loved by Thousands
-const Slide4 = () => {
-  return (
-    <View
-      className="w-full items-center justify-center px-8 bg-gradient-to-br from-rose-50 to-red-50"
-      style={{ width, height: height * 0.78 }}
-    >
-      <FloatingElement
-        Icon={Heart}
-        color="#F43F5E"
-        delay={0}
-        position="top-24 right-14"
-      />
-      <FloatingElement
-        Icon={Sparkles}
-        color="#FB7185"
-        delay={300}
-        position="bottom-28 left-12"
-      />
-
-      <View className="mb-8 bg-[#f0d3c2] w-24 h-24 rounded-[50px] flex justify-center items-center">
-        <Ionicons
-          name="heart-outline"
-          size={50}
-          color={"#ee6d22"}
-          className="text-[#f3b38e]"
-        />
-      </View>
-
-      <Text className="font-semibold font-groteskBold text-4xl text-center text-rose-950 mb-4 leading-tight">
-        Loved by Thousands
-      </Text>
-
-      <Text className="text-lg text-center font-geist text-rose-800 leading-7 max-w-sm">
-        Join our community of happy travelers enjoying seamless transportation
-        experiences
-      </Text>
-
-      <View
-        className="mt-10 rounded-3xl p-3 border border-rose-200 backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(244, 63, 94, 0.08)" }}
-      >
-        <Text className="text-sm font-geist text-rose-800 text-center font-medium">
-          Trusted by over 100,000 happy users
-        </Text>
-      </View>
-    </View>
-  )
-}
-
-// Slide 5: Auth Slide
-const LoginSlide = ({ onPhonePress, isActive = true }) => {
-  const fadeInAnim = useRef(new Animated.Value(0)).current
-  const slideUpAnim = useRef(new Animated.Value(50)).current
-  const scaleAnim = useRef(new Animated.Value(0.9)).current
-  const backgroundImageOpacity = useRef(new Animated.Value(0)).current
-  const slideInAnim = useRef(new Animated.Value(width)).current
-
-  const router = useRouter()
+const Slide3 = ({ isActive }) => {
+  const { colors } = useTheme()
+  const progressAnim = useRef(new Animated.Value(0)).current
+  const slideInAnim = useRef(new Animated.Value(-50)).current
 
   useEffect(() => {
     if (isActive) {
-      // Mount animation - slide in from right and fade in
       Animated.parallel([
+        Animated.timing(progressAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: false,
+        }),
         Animated.timing(slideInAnim, {
           toValue: 0,
           duration: 600,
           useNativeDriver: true,
         }),
-        Animated.timing(fadeInAnim, {
+      ]).start()
+    }
+  }, [isActive])
+
+  const widthInterpolate = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "70%"],
+  })
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        justifyContent: "center",
+        paddingHorizontal: 16,
+      }}
+    >
+      <Animated.View style={{ transform: [{ translateX: slideInAnim }] }}>
+        <View style={{ alignItems: "center", marginBottom: 64 }}>
+          <View
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 16,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 32,
+              backgroundColor: colors.primary + "15",
+            }}
+          >
+            <DollarSign size={48} color={colors.primary} />
+          </View>
+        </View>
+
+        <View style={{ alignItems: "center", gap: 16 }}>
+          <Text
+            style={{
+              fontSize: 32,
+              fontWeight: "700",
+              textAlign: "center",
+              color: colors.text,
+            }}
+          >
+            Best Value
+          </Text>
+          <Text
+            style={{
+              fontSize: 18,
+              textAlign: "center",
+              color: colors.text + "CC",
+              lineHeight: 28,
+            }}
+          >
+            Save up to 40% with smart price comparison across all providers
+          </Text>
+        </View>
+
+        <View style={{ marginTop: 64 }}>
+          <View
+            style={{
+              backgroundColor: colors.border + "40",
+              height: 8,
+              borderRadius: 4,
+              overflow: "hidden",
+            }}
+          >
+            <Animated.View
+              style={{
+                width: widthInterpolate,
+                height: "100%",
+                backgroundColor: colors.primary,
+              }}
+            />
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  )
+}
+
+// Slide 4: Trusted Community
+const Slide4 = ({ isActive }) => {
+  const { colors } = useTheme()
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const staggerAnim = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (isActive) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start()
+      Animated.stagger(200, [
+        Animated.timing(staggerAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+      ]).start()
+    }
+  }, [isActive])
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        justifyContent: "center",
+        paddingHorizontal: 16,
+      }}
+    >
+      <Animated.View
+        style={{ opacity: fadeAnim, alignItems: "center", marginBottom: 64 }}
+      >
+        <View
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.primary + "15",
+          }}
+        >
+          <Users size={48} color={colors.primary} />
+        </View>
+      </Animated.View>
+      <View style={{ alignItems: "center", gap: 16 }}>
+        <Text
+          style={{
+            fontSize: 32,
+            fontWeight: "700",
+            textAlign: "center",
+            color: colors.text,
+          }}
+        >
+          Trusted Community
+        </Text>
+        <Text
+          style={{
+            fontSize: 18,
+            textAlign: "center",
+            color: colors.text + "CC",
+            lineHeight: 28,
+          }}
+        >
+          Join 100,000+ travelers who trust us for their daily commute
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+// AuthSlide
+const AuthSlide = ({ isActive }) => {
+  const { colors } = useTheme()
+  const colorScheme = useColorScheme()
+  const router = useRouter()
+
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideUpAnim = useRef(new Animated.Value(50)).current
+  const buttonScale = useRef(new Animated.Value(0.95)).current
+  const socialScale = useRef(new Animated.Value(0.9)).current
+
+  useEffect(() => {
+    if (isActive) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 800,
           useNativeDriver: true,
@@ -368,329 +415,225 @@ const LoginSlide = ({ onPhonePress, isActive = true }) => {
           duration: 800,
           useNativeDriver: true,
         }),
-        Animated.timing(scaleAnim, {
+        Animated.spring(buttonScale, {
           toValue: 1,
-          duration: 800,
+          tension: 50,
+          friction: 7,
           useNativeDriver: true,
         }),
-        Animated.timing(backgroundImageOpacity, {
+        Animated.spring(socialScale, {
           toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start()
-    } else {
-      // Unmount animation - slide out to left and fade out
-      Animated.parallel([
-        Animated.timing(slideInAnim, {
-          toValue: -width,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeInAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backgroundImageOpacity, {
-          toValue: 0,
-          duration: 500,
+          tension: 50,
+          friction: 7,
+          delay: 200,
           useNativeDriver: true,
         }),
       ]).start()
     }
-  }, [
-    isActive,
-    fadeInAnim,
-    slideUpAnim,
-    scaleAnim,
-    backgroundImageOpacity,
-    slideInAnim,
-  ])
+  }, [isActive])
 
-  const contentStyle = {
-    opacity: fadeInAnim,
-    transform: [{ translateY: slideUpAnim }, { scale: scaleAnim }],
-  }
-
-  const backgroundStyle = {
-    opacity: backgroundImageOpacity,
-    transform: [{ translateX: slideInAnim }],
-  }
-
-  const containerStyle = {
-    transform: [{ translateX: slideInAnim }],
-  }
+  const handleSocialLogin = (provider) =>
+    console.log(`${provider} login pressed`)
 
   return (
-    <Animated.View style={[{ width, height, flex: 1 }, containerStyle]}>
-      {/* Background Image */}
-      <Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]}>
-        <ImageBackground
-          source={{
-            uri: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1200&q=80",
-          }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        >
-          {/* Gradient Overlay */}
-          <LinearGradient
-            colors={[
-              "rgba(234, 88, 12, 0.85)",
-              "rgba(249, 115, 22, 0.75)",
-              "rgba(251, 146, 60, 0.85)",
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </ImageBackground>
-      </Animated.View>
-
-      {/* Content */}
-      <View
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        justifyContent: "space-between",
+        padding: 32,
+      }}
+    >
+      <Animated.View
         style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: slideUpAnim }],
           flex: 1,
           justifyContent: "center",
-          paddingHorizontal: 32,
-          paddingBottom: 48,
         }}
       >
-        <Animated.View style={contentStyle} className="items-center">
-          {/* Logo Section */}
-          <View className="mb-12 items-center relative">
-            <View className="w-24 h-24 bg-white/20 rounded-3xl items-center justify-center mb-6 border-2 border-white/30 shadow-2xl">
-              <Train size={48} color="white" strokeWidth={2} />
+        <View style={{ alignItems: "center", marginBottom: 32 }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: "700",
+              textAlign: "center",
+              color: colors.text,
+            }}
+          >
+            Welcome to Addis Pulse
+          </Text>
+          <Text
+            style={{
+              fontSize: 16,
+              textAlign: "center",
+              maxWidth: 280,
+              marginTop: 8,
+              color: colorScheme === "light" ? "#6B7280" : colors.text + "CC",
+            }}
+          >
+            Your smart transportation companion for seamless city journeys
+          </Text>
+        </View>
+
+        <Animated.View style={{ transform: [{ scale: buttonScale }], gap: 12 }}>
+          <TouchableOpacity
+            onPress={() => router.push("/(auth)/phone/")}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 16,
+              padding: 16,
+            }}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.primary + "15",
+                marginRight: 16,
+              }}
+            >
+              <Phone size={24} color={"white"} strokeWidth={2} />
             </View>
-            <View className="absolute top-0 right-0 w-10 h-10 bg-white rounded-full items-center justify-center shadow-lg">
-              <Sparkles size={14} color="#ea580c" strokeWidth={2.5} />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 18, fontWeight: "700", color: colors.text }}
+              >
+                Continue with Phone
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.text + "99",
+                  marginTop: 4,
+                }}
+              >
+                Secure and instant verification
+              </Text>
             </View>
-          </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.text + "99"}
+            />
+          </TouchableOpacity>
 
-          {/* Title Section */}
-          <View className="mb-8 items-center">
-            <Text className="text-5xl font-groteskBold text-center text-white mb-4 leading-tight">
-              Welcome to
-            </Text>
-            <Text className="text-5xl font-groteskBold text-center text-white mb-4 leading-tight">
-              Addis Pulse
-            </Text>
-            <Text className="text-lg font-geist text-center text-white/90 leading-6 max-w-sm">
-              Your smart transportation companion for seamless journeys across
-              the city
-            </Text>
-          </View>
-
-          {/* Auth Buttons */}
-          <View className="w-full gap-4">
-            {/* Phone Button */}
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/phone/")}
-              activeOpacity={0.9}
+          <TouchableOpacity
+            onPress={() => router.push("/(auth)/email/")}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 16,
+              padding: 16,
+            }}
+          >
+            <View
               style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 8,
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.primary + "15",
+                marginRight: 16,
               }}
             >
-              <LinearGradient
-                colors={["#ffffff", "#f8f9fa"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="rounded-2xl p-1"
+              <Mail size={24} color={"white"} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 18, fontWeight: "700", color: colors.text }}
               >
-                <View className="bg-white rounded-2xl px-6 py-4 flex-row items-center justify-center">
-                  <View className="w-10 h-10 bg-[#ea580c]/10 rounded-xl items-center justify-center mr-4">
-                    <Phone size={20} color="#ea580c" />
-                  </View>
-                  <Text className="font-groteskBold text-lg text-gray-900 flex-1">
-                    Continue with Phone
-                  </Text>
-                  <ChevronRight size={20} color="#6B7280" />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Email Button */}
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/email/")}
-              activeOpacity={0.9}
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 8,
-              }}
-            >
-              <LinearGradient
-                colors={["#ffffff", "#f8f9fa"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="rounded-2xl p-1"
+                Continue with Email
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.text + "99",
+                  marginTop: 4,
+                }}
               >
-                <View className="bg-white rounded-2xl px-6 py-4 flex-row items-center justify-center">
-                  <View className="w-10 h-10 bg-[#f97316]/10 rounded-xl items-center justify-center mr-4">
-                    <Mail size={20} color="#f97316" />
-                  </View>
-                  <Text className="font-groteskBold text-lg text-gray-900 flex-1">
-                    Continue with Email
-                  </Text>
-                  <ChevronRight size={20} color="#6B7280" />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {/* Divider */}
-          <View className="flex-row items-center my-8 w-full">
-            <View className="flex-1 h-px bg-white/30" />
-            <Text className="mx-4 font-geist text-white/80 text-sm">
-              or continue with
-            </Text>
-            <View className="flex-1 h-px bg-white/30" />
-          </View>
-
-          {/* Social Login Buttons */}
-          <View className="w-full flex-row gap-3">
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="flex-1 h-14 rounded-2xl overflow-hidden"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 4,
-              }}
-            >
-              <BlurView
-                intensity={80}
-                tint="light"
-                className="flex-1 rounded-2xl"
-              >
-                <View className="flex-1 bg-white/95 border border-white/50 items-center justify-center rounded-2xl">
-                  <GoogleIcon />
-                </View>
-              </BlurView>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="flex-1 h-14 rounded-2xl overflow-hidden"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 4,
-              }}
-            >
-              <BlurView
-                intensity={80}
-                tint="light"
-                className="flex-1 rounded-2xl"
-              >
-                <View className="flex-1 bg-white/95 border border-white/50 items-center justify-center rounded-2xl">
-                  <AntDesign name="apple" size={24} color="#000" />
-                </View>
-              </BlurView>
-            </TouchableOpacity>
-          </View>
+                Traditional sign in method
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.text + "99"}
+            />
+          </TouchableOpacity>
         </Animated.View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   )
 }
 
-// Navigation Arrows
-const NavigationArrows = ({ currentIndex, totalSlides, onPrev, onNext }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current
-
-  const handlePress = (callback) => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start()
-    callback()
-  }
-
+// Progress Dots
+const ProgressDots = ({ currentIndex, total }) => {
+  const { colors } = useTheme()
   return (
-    <>
-      {currentIndex > 0 && (
-        <TouchableOpacity
-          className="absolute left-4 bottom-0 -translate-y-6 z-10 w-14 h-14 bg-white/90 rounded-2xl items-center justify-center shadow-2xl border border-white/80"
-          onPress={() => handlePress(onPrev)}
-        >
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <ChevronLeft size={28} color="#1F2937" strokeWidth={2} />
-          </Animated.View>
-        </TouchableOpacity>
-      )}
+    <View
+      style={{
+        position: "absolute",
+        top: 64,
+        left: 0,
+        right: 0,
+        flexDirection: "row",
+        justifyContent: "center",
+        gap: 4,
+      }}
+    >
+      {Array.from({ length: total }).map((_, index) => {
+        const widthAnim = useRef(
+          new Animated.Value(index === currentIndex ? 24 : 8)
+        ).current
+        const colorAnim = useRef(
+          new Animated.Value(index === currentIndex ? 1 : 0)
+        ).current
 
-      {currentIndex < totalSlides - 1 && (
-        <TouchableOpacity
-          className="absolute right-4 bottom-0 -translate-y-6 z-10 w-14 h-14 bg-white/90 rounded-2xl items-center justify-center shadow-2xl border border-white/80"
-          onPress={() => handlePress(onNext)}
-        >
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <ChevronRight size={28} color="#1F2937" strokeWidth={2} />
-          </Animated.View>
-        </TouchableOpacity>
-      )}
-    </>
-  )
-}
+        useEffect(() => {
+          Animated.parallel([
+            Animated.spring(widthAnim, {
+              toValue: index === currentIndex ? 24 : 8,
+              tension: 50,
+              friction: 5,
+              useNativeDriver: false,
+            }),
+            Animated.timing(colorAnim, {
+              toValue: index === currentIndex ? 1 : 0,
+              duration: 300,
+              useNativeDriver: false,
+            }),
+          ]).start()
+        }, [currentIndex])
 
-// Pagination Dots
-const PaginationDots = ({ scrollX, totalSlides }) => {
-  const renderDot = (index) => {
-    const inputRange = [(index - 1) * width, index * width, (index + 1) * width]
-
-    const dotWidth = scrollX.interpolate({
-      inputRange,
-      outputRange: [6, 24, 6],
-      extrapolate: "clamp",
-    })
-
-    const opacity = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.4, 1, 0.4],
-      extrapolate: "clamp",
-    })
-
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.8, 1.2, 0.8],
-      extrapolate: "clamp",
-    })
-
-    return (
-      <Animated.View
-        key={index}
-        className="h-1.5 bg-gray-800 rounded-full mx-1"
-        style={{
-          width: dotWidth,
-          opacity,
-          transform: [{ scale }],
-        }}
-      />
-    )
-  }
-
-  return (
-    <View className="flex-row justify-center items-center mt-8 mb-6">
-      {Array.from({ length: totalSlides }).map((_, index) => renderDot(index))}
+        const backgroundColor = colorAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [colors.text + "40", colors.primary],
+        })
+        return (
+          <Animated.View
+            key={index}
+            style={{
+              width: widthAnim,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor,
+              marginHorizontal: 2,
+            }}
+          />
+        )
+      })}
     </View>
   )
 }
@@ -698,132 +641,45 @@ const PaginationDots = ({ scrollX, totalSlides }) => {
 // Main Component
 export default function Welcome() {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const scrollX = useRef(new Animated.Value(0)).current
   const flatListRef = useRef(null)
+  const { colors } = useTheme()
 
-  const slideComponents = [Slide1, Slide2, Slide3, Slide4, LoginSlide]
-  const allSlides = slideComponents.map((_, index) => ({
-    id: String(index + 1),
-  }))
-
-  const onScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
-  )
+  const slides = [
+    { id: "1", component: Slide1 },
+    { id: "2", component: Slide2 },
+    { id: "3", component: Slide3 },
+    { id: "4", component: Slide4 },
+    { id: "5", component: AuthSlide },
+  ]
 
   const onMomentumScrollEnd = (event) => {
     const offsetX = event.nativeEvent.contentOffset.x
-    const newIndex = Math.round(offsetX / width)
-    if (newIndex >= 0 && newIndex < allSlides.length) {
-      setCurrentIndex(newIndex)
-    }
-  }
-
-  const scrollTo = (index) => {
-    if (flatListRef.current && index >= 0 && index < allSlides.length) {
-      flatListRef.current.scrollToIndex({ index, animated: true })
-    }
-  }
-
-  const nextSlide = () => {
-    if (currentIndex < allSlides.length - 1) {
-      scrollTo(currentIndex + 1)
-    }
-  }
-
-  const prevSlide = () => {
-    if (currentIndex > 0) {
-      scrollTo(currentIndex - 1)
-    }
-  }
-
-  const goToAuth = () => {
-    console.log("Navigate to phone auth")
+    setCurrentIndex(Math.round(offsetX / width))
   }
 
   const renderItem = ({ item, index }) => {
-    const SlideComponent = slideComponents[index]
-    const isLoginSlide = index === slideComponents.length - 1
-    const isActive = currentIndex === index
-
-    if (isLoginSlide) {
-      return <SlideComponent onPhonePress={goToAuth} isActive={isActive} />
-    }
-
+    const SlideComponent = item.component
     return (
-      <View style={{ width, height: height * 0.78 }}>
-        <SlideComponent />
+      <View style={{ width, height }}>
+        <SlideComponent isActive={currentIndex === index} />
       </View>
     )
   }
 
-  const backgroundGradients = [
-    "from-blue-50 to-cyan-50",
-    "from-purple-50 to-pink-50",
-    "from-emerald-50 to-green-50",
-    "from-rose-50 to-red-50",
-    "from-slate-900 to-black",
-  ]
-
-  const currentBackground =
-    backgroundGradients[Math.min(currentIndex, backgroundGradients.length - 1)]
-
-  const isLoginSlide = currentIndex === allSlides.length - 1
-
   return (
-    <View className={`flex-1 bg-white`}>
-      <View className="flex-1 justify-center items-center pt-10">
-        <View
-          style={{
-            width: "100%",
-            height: isLoginSlide ? height : height * 0.78,
-            borderRadius: isLoginSlide ? 0 : 24,
-            overflow: "hidden",
-          }}
-        >
-          {/* <NavigationArrows
-            currentIndex={currentIndex}
-            totalSlides={allSlides.length}
-            onPrev={prevSlide}
-            onNext={nextSlide}
-          /> */}
-
-          <FlatList
-            ref={flatListRef}
-            data={allSlides}
-            renderItem={renderItem}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            pagingEnabled
-            bounces={false}
-            keyExtractor={(item) => item.id}
-            onScroll={onScroll}
-            onMomentumScrollEnd={onMomentumScrollEnd}
-            scrollEventThrottle={16}
-            onScrollToIndexFailed={() => {
-              setTimeout(() => {
-                if (flatListRef.current) {
-                  flatListRef.current.scrollToIndex({
-                    index: currentIndex,
-                    animated: true,
-                  })
-                }
-              }, 100)
-            }}
-          />
-
-          {!isLoginSlide && (
-            <PaginationDots scrollX={scrollX} totalSlides={allSlides.length} />
-          )}
-        </View>
-
-        <View className="mt-8 px-8 w-full gap-4">
-          <Text className="text-xs text-gray-600 text-center">
-            By continuing, you agree to our Terms • Privacy • Policy
-          </Text>
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <FlatList
+        ref={flatListRef}
+        data={slides}
+        renderItem={renderItem}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        scrollEventThrottle={16}
+      />
+      <ProgressDots currentIndex={currentIndex} total={slides.length} />
     </View>
   )
 }
-// ios:505583262465-b9b3cok4u4noumh31lj70qjvrn7t2jhp.apps.googleusercontent.com

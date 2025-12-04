@@ -37,7 +37,6 @@
     "turbo": "2.6.0"
   },
   "dependencies": {
-    "@apollo/server": "^5.2.0",
-    "expo-camera": "^17.0.9"
+    "@apollo/server": "^5.2.0"
   }
 }

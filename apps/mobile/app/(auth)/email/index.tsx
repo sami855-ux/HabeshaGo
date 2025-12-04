@@ -1,7 +1,9 @@
 import AlertModal from "@/components/utils/AlertModal"
+import { authClient } from "@/lib/auth-client"
 import { useTheme } from "@react-navigation/native"
+import { useRouter } from "expo-router"
 import { Clock, RotateCcw, Shield } from "lucide-react-native"
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState, useTransition } from "react"
 import {
   Alert,
   Animated,
@@ -20,14 +22,18 @@ import {
 const { width } = Dimensions.get("window")
 
 const ContinueWithEmail = () => {
+  const router = useRouter()
   const { colors, dark } = useTheme()
-  const [email, setEmail] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [codeSent, setCodeSent] = useState(false)
+
+  const [emailPending, startEmailTransition] = useTransition()
+
   const [verificationCode, setVerificationCode] = useState(Array(6).fill(""))
-  const [timeLeft, setTimeLeft] = useState(60)
   const [isResending, setIsResending] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [activeInput, setActiveInput] = useState(0)
+  const [codeSent, setCodeSent] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(60)
+  const [email, setEmail] = useState("")
 
   const inputRefs = useRef([])
   const pulseAnim = useRef(new Animated.Value(1)).current
@@ -54,6 +60,24 @@ const ContinueWithEmail = () => {
     border: colors.border,
     error: "#EF4444",
     success: "#10B981",
+  }
+
+  function signinWithEmail() {
+    startEmailTransition(async () => {
+      await authClient.emailOtp.sendVerificationOtp({
+        email,
+        type: "sign-in",
+        fetchOptions: {
+          onSuccess: () => {
+            // toast.success("Email sent successfully")
+            // router.push(`/verify-request?email=${email}`)
+          },
+          onError: () => {
+            // toast.error("Error sending email")
+          },
+        },
+      })
+    })
   }
 
   // Pulse animation for CTA button
@@ -141,22 +165,23 @@ Please check for typos or missing characters and try again. `,
       return
     }
 
-    setIsLoading(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setCodeSent(true)
-      setTimeLeft(60)
-      setTimeout(() => inputRefs.current[0]?.focus(), 500)
-    } catch (error) {
-      showAlert({
-        type: "error",
-        title: "Error",
-        message: "Failed to send verification code. Please try again",
-        primaryButtonText: "Got it",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+    signinWithEmail()
+    // setIsLoading(true)
+    // try {
+    //   await new Promise((resolve) => setTimeout(resolve, 2000))
+    //   setCodeSent(true)
+    //   setTimeLeft(60)
+    //   setTimeout(() => inputRefs.current[0]?.focus(), 500)
+    // } catch (error) {
+    //   showAlert({
+    //     type: "error",
+    //     title: "Error",
+    //     message: "Failed to send verification code. Please try again",
+    //     primaryButtonText: "Got it",
+    //   })
+    // } finally {
+    //   setIsLoading(false)
+    // }
   }
 
   const handleCodeChange = (text, index) => {
@@ -414,12 +439,12 @@ Please check for typos or missing characters and try again. `,
                 <Animated.View>
                   <TouchableOpacity
                     className={`w-full bg-orange-500 rounded-xl py-4 flex-row items-center justify-center ${
-                      isLoading ? "opacity-80" : ""
+                      emailPending ? "opacity-80" : ""
                     }`}
                     onPress={handleContinue}
-                    disabled={isLoading}
+                    disabled={emailPending}
                   >
-                    {isLoading ? (
+                    {emailPending ? (
                       <View className="flex-row items-center">
                         <Text className="text-white font-geist text-lg mr-3">
                           Sending Code...

@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from '../src/prisma/index';
 import { emailOTP } from 'better-auth/plugins';
 import { sendEmail } from 'src/utils/email-send.util';
+import { expo } from '@better-auth/expo';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -17,6 +18,8 @@ export const auth = betterAuth({
   apiPrefix: '/api/auth',
 
   plugins: [
+    expo(),
+
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
         let subject = '';
@@ -79,7 +82,7 @@ export const auth = betterAuth({
           'exp://10.0.0.*:*/*', // Trust 10.0.0.x IP range
           'exp://192.168.*.*:*/*', // Trust 192.168.x.x IP range
           'exp://172.*.*.*:*/*', // Trust 172.x.x.x IP range
-          'exp://localhost:*/*', 
+          'exp://localhost:*/*',
         ]
       : []),
   ],

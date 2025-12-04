@@ -3,17 +3,16 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": ["./*"],
+      "tamagui.config": ["./tamagui.config.ts"]
+    },
+    "moduleResolution": "bundler"
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "nativewind-env.d.ts",
-    "app/index.tsx",
-    "app/_layout.tsx",
-    "components/welcome.jsx"
+    "nativewind-env.d.ts"
   ]
 }

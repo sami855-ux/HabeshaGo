@@ -1,63 +1,60 @@
-import React, { useState, useEffect, useRef } from "react";
+import AlertModal from "@/components/utils/AlertModal"
+import { useTheme } from "@react-navigation/native"
+import { Clock, RotateCcw, Shield } from "lucide-react-native"
+import React, { useEffect, useRef, useState } from "react"
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
+  Animated,
+  Dimensions,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated,
-  Easing,
-  Dimensions,
-} from "react-native";
-import {
-  Mail,
-  ArrowRight,
-  Clock,
-  RotateCcw,
-  CheckCircle2,
-  Shield,
-  Sparkles,
-  Zap,
-  Lock,
-} from "lucide-react-native";
-import AlertModal from "@/components/utils/AlertModal";
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get("window")
 
 const ContinueWithEmail = () => {
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState([
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [isResending, setIsResending] = useState(false);
-  const [activeInput, setActiveInput] = useState(0);
+  const { colors, dark } = useTheme()
+  const [email, setEmail] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [codeSent, setCodeSent] = useState(false)
+  const [verificationCode, setVerificationCode] = useState(Array(6).fill(""))
+  const [timeLeft, setTimeLeft] = useState(60)
+  const [isResending, setIsResending] = useState(false)
+  const [activeInput, setActiveInput] = useState(0)
 
-  const inputRefs = useRef([]);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const inputRefs = useRef([])
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const shakeAnim = useRef(new Animated.Value(0)).current
+  const progressAnim = useRef(new Animated.Value(0)).current
 
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({});
+  const [alertVisible, setAlertVisible] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({})
 
-  // Function to show alert modal
   const showAlert = (config) => {
-    setAlertConfig(config);
-    setAlertVisible(true);
-  };
+    setAlertConfig(config)
+    setAlertVisible(true)
+  }
+
+  // Map your existing orangeColors to theme colors
+  const orangeColors = {
+    primary: "#F97316",
+    primaryLight: "#FDBA74",
+    primaryDark: "#EA580C",
+    background: colors.background,
+    card: colors.card,
+    text: colors.text,
+    textSecondary: dark ? "#9CA3AF" : "#6B7280",
+    border: colors.border,
+    error: "#EF4444",
+    success: "#10B981",
+  }
 
   // Pulse animation for CTA button
   useEffect(() => {
@@ -65,7 +62,7 @@ const ContinueWithEmail = () => {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.05,
+            toValue: 1.02,
             duration: 1000,
             easing: Easing.ease,
             useNativeDriver: true,
@@ -77,11 +74,11 @@ const ContinueWithEmail = () => {
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      ).start()
     } else {
-      pulseAnim.setValue(1);
+      pulseAnim.setValue(1)
     }
-  }, [email, codeSent]);
+  }, [email, codeSent])
 
   // Progress animation for timer
   useEffect(() => {
@@ -89,77 +86,14 @@ const ContinueWithEmail = () => {
       toValue: (60 - timeLeft) / 60,
       duration: 1000,
       useNativeDriver: false,
-    }).start();
-  }, [timeLeft]);
+    }).start()
+  }, [timeLeft])
 
   useEffect(() => {
-    if (codeSent) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [codeSent]);
-
-  useEffect(() => {
-    if (!codeSent || timeLeft <= 0) return;
-
-    const timer = setTimeout(() => {
-      setTimeLeft(timeLeft - 1);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [timeLeft, codeSent]);
-
-  const handleContinue = async () => {
-    if (!email) {
-      triggerShake();
-      Alert.alert("Oops!", "Please enter your email address");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      triggerShake();
-      showAlert({
-        type: "error",
-        title: "Invalid Email",
-        message: "Please enter a valid email address",
-        primaryButtonText: "Got it",
-      });
-      // Alert.alert("Invalid Email", "Please enter a valid email address");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setCodeSent(true);
-      setTimeLeft(60);
-      // Focus first code input
-      setTimeout(() => inputRefs.current[0]?.focus(), 500);
-    } catch (error) {
-      showAlert({
-        type: "error",
-        title: "Error",
-        message: "Failed to send verification code. Please try again",
-        primaryButtonText: "Got it",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (!codeSent || timeLeft <= 0) return
+    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [timeLeft, codeSent])
 
   const triggerShake = () => {
     Animated.sequence([
@@ -183,180 +117,211 @@ const ContinueWithEmail = () => {
         duration: 50,
         useNativeDriver: true,
       }),
-    ]).start();
-  };
+    ]).start()
+  }
 
-  const handleCodeChange = (text: string, index: number) => {
-    const newCode = [...verificationCode];
-    newCode[index] = text;
-    setVerificationCode(newCode);
-
-    // Auto-advance to next input
-    if (text && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+  const handleContinue = async () => {
+    if (!email) {
+      triggerShake()
+      Alert.alert("Oops!", "Please enter your email address")
+      return
     }
 
-    // Auto-submit when all digits are entered
-    if (newCode.every((digit) => digit !== "") && index === 5) {
-      handleVerifyCode();
-    }
-  };
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      triggerShake()
+      showAlert({
+        type: "error",
+        title: "Invalid Email",
+        message: `Oops! It looks like the email address you entered isn’t valid. 
 
-  const handleCodeKeyPress = (e: any, index: number) => {
+Please check for typos or missing characters and try again. `,
+        primaryButtonText: "Got it",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setCodeSent(true)
+      setTimeLeft(60)
+      setTimeout(() => inputRefs.current[0]?.focus(), 500)
+    } catch (error) {
+      showAlert({
+        type: "error",
+        title: "Error",
+        message: "Failed to send verification code. Please try again",
+        primaryButtonText: "Got it",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCodeChange = (text, index) => {
+    const newCode = [...verificationCode]
+    newCode[index] = text
+    setVerificationCode(newCode)
+    if (text && index < 5) inputRefs.current[index + 1]?.focus()
+    if (newCode.every((d) => d !== "") && index === 5) handleVerifyCode()
+  }
+
+  const handleCodeKeyPress = (e, index) => {
     if (
       e.nativeEvent.key === "Backspace" &&
       !verificationCode[index] &&
       index > 0
     ) {
-      inputRefs.current[index - 1]?.focus();
+      inputRefs.current[index - 1]?.focus()
     }
-  };
+  }
 
   const handleVerifyCode = () => {
-    const code = verificationCode.join("");
+    const code = verificationCode.join("")
     if (code.length !== 6) {
-      triggerShake();
-
-      Alert.alert("Incomplete Code", "Please enter all 6 digits");
-      return;
+      triggerShake()
+      Alert.alert("Incomplete Code", "Please enter all 6 digits")
+      return
     }
-
-    Alert.alert("Success!", "Your email has been verified successfully! 🎉");
-  };
+    Alert.alert("Success!", "Your email has been verified successfully! 🎉")
+  }
 
   const handleResendCode = async () => {
-    if (timeLeft > 0) return;
-
-    setIsResending(true);
+    if (timeLeft > 0) return
+    setIsResending(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setTimeLeft(60);
-      setVerificationCode(["", "", "", "", "", ""]);
-      inputRefs.current[0]?.focus();
-      Alert.alert("Code Sent!", "New verification code has been sent!");
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      setTimeLeft(60)
+      setVerificationCode(Array(6).fill(""))
+      inputRefs.current[0]?.focus()
+      Alert.alert("Code Sent!", "New verification code has been sent!")
     } catch (error) {
-      Alert.alert("Error", "Failed to resend code. Please try again.");
+      Alert.alert("Error", "Failed to resend code. Please try again.")
     } finally {
-      setIsResending(false);
+      setIsResending(false)
     }
-  };
+  }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`
+  }
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0%", "100%"],
-  });
+  })
 
   return (
     <>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={dark ? "light-content" : "dark-content"}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900"
+        className="flex-1"
+        style={{ backgroundColor: orangeColors.background }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerClassName="flex-grow"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 px-6 justify-center bg-white">
-            {/* Animated Background Elements */}
-            <View className="absolute bottom-40 -right-20 w-60 h-60 bg-blue-500/10 rounded-full blur-2xl" />
-
+          <View
+            className="flex-1 px-6 justify-center"
+            style={{ backgroundColor: orangeColors.background }}
+          >
             {/* Header */}
             <View className="items-center mb-12">
               <Animated.View
-                className="w-28 h-28 bg-black/5 rounded-full items-center justify-center mb-6 shadow-2xl shadow-purple-500/30"
+                className="w-20 h-20 rounded-2xl items-center justify-center mb-6 border"
                 style={{
+                  backgroundColor: orangeColors.primary + "15",
+                  borderColor: orangeColors.primary + "30",
                   transform: [{ scale: pulseAnim }],
                 }}
               >
-                <Shield size={36} color="#A78BFA" />
+                <Shield size={32} color={orangeColors.primary} />
               </Animated.View>
 
-              <Text className="text-4xl font-groteskBold text-light-text-primary mb-3 text-center">
-                {codeSent ? "Verify Your Email" : "Continue With Email!"}
+              <Text
+                className="text-3xl font-groteskBold text-center mb-3"
+                style={{ color: orangeColors.text }}
+              >
+                {codeSent ? "Verify Your Email" : "Continue with Email"}
               </Text>
-              <Text className="text-lg text-light-text-secondary font-geist text-center leading-6 mb-2">
+              <Text
+                className="text-base text-center font-geist leading-6"
+                style={{ color: orangeColors.textSecondary }}
+              >
                 {codeSent
-                  ? `We've sent a magic code to`
-                  : "Enter your email to continue your journey"}
+                  ? `Please enter the 6-digit code we sent to ${email}. Make sure to enter the code exactly as received to verify your email.`
+                  : "Please provide your email address so we can send you a verification code to login to your account."}
               </Text>
-              {codeSent && (
-                <View className="flex-row items-center mt-2 bg-white/10 px-4 py-2 rounded-full">
-                  <Mail size={16} color="#222" />
-                  <Text className="text-lg font-semibold text-light-text-primary font-geist ml-2">
-                    {email}
-                  </Text>
-                </View>
-              )}
             </View>
 
-            <Animated.View
-              style={{
-                transform: [{ translateX: shakeAnim }],
-              }}
-            >
+            <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
               {/* Email Input */}
-              <View className="mb-8">
-                <View className="flex-row items-center mb-3">
-                  <Mail size={18} color="#222" />
-                  <Text className="text-sm font-semibold font-geist text-light-text-primary ml-2">
-                    EMAIL ADDRESS
+              {!codeSent && (
+                <View className="mb-8">
+                  <Text
+                    className="text-sm font-geist font-semibold mb-2"
+                    style={{ color: orangeColors.text }}
+                  >
+                    Email Adreses
                   </Text>
+                  <View className="relative">
+                    <TextInput
+                      className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-4 text-base font-geist"
+                      style={{ color: orangeColors.text }}
+                      placeholder="example@email.com"
+                      placeholderTextColor={orangeColors.textSecondary}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      editable={!isLoading}
+                    />
+                    {email && (
+                      <TouchableOpacity
+                        className="absolute right-4 top-4 w-5 h-5 rounded-full items-center justify-center bg-gray-200 dark:bg-gray-600"
+                        onPress={() => setEmail("")}
+                      >
+                        <Text className="text-gray-500 dark:text-gray-400 text-xs font-bold">
+                          ×
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
-                <View className="relative">
-                  <TextInput
-                    className="w-full bg-white/10 border-2 border-gray-200 rounded-lg px-6 py-3 text-lg font-medium text-gray-700 font-geist placeholder-purple-300"
-                    placeholder="your@email.com"
-                    placeholderTextColor="#777"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    editable={!isLoading && !codeSent}
-                  />
-                  {email && (
-                    <TouchableOpacity
-                      className="absolute right-4 top-5 bg-white/20 w-6 h-6 rounded-full items-center justify-center"
-                      onPress={() => setEmail("")}
-                    >
-                      <Text className="text-light-text-secondary text-sm font-bold">
-                        x
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+              )}
 
-              {/* Verification Code Input - Animated */}
-              <Animated.View
-                style={{
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }],
-                }}
-                className={codeSent ? "block" : "hidden"}
-              >
-                <View className="mb-6">
+              {/* Verification Code Input */}
+              {codeSent && (
+                <View className="mb-8">
                   <View className="flex-row items-center justify-between mb-4">
-                    <View className="flex-row items-center">
-                      <Lock size={18} color="#222" />
-                      <Text className="text-sm font-semibold font-geist text-light-text-primary ml-2">
-                        6-DIGIT VERIFICATION CODE
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center  bg-white/10 px-3 py-1 rounded-full">
+                    <Text
+                      className="text-sm font-geist font-semibold"
+                      style={{ color: orangeColors.text }}
+                    ></Text>
+                    <View className="flex-row items-center bg-white dark:bg-gray-900 px-3 py-2 rounded-2xl border border-gray-300 dark:border-gray-600">
                       <Clock
                         size={14}
-                        color={timeLeft > 10 ? "#139419" : "#EF4444"}
+                        color={
+                          timeLeft > 10
+                            ? orangeColors.success
+                            : orangeColors.error
+                        }
                       />
                       <Text
-                        className={`text-sm font-groteskBold ml-1 ${timeLeft > 10 ? "text-green-600" : "text-red-400"}`}
+                        className={`text-sm font-groteskBold ml-2 ${
+                          timeLeft > 10 ? "text-green-600" : "text-red-500"
+                        }`}
                       >
                         {formatTime(timeLeft)}
                       </Text>
@@ -364,10 +329,12 @@ const ContinueWithEmail = () => {
                   </View>
 
                   {/* Progress Bar */}
-                  <View className="w-full bg-white/10 rounded-full h-1 mb-6 overflow-hidden">
+                  <View className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1 mb-6 overflow-hidden">
                     <Animated.View
                       style={{ width: progressWidth }}
-                      className="h-full bg-gradient-to-r from-green-400 to-cyan-400 rounded-full"
+                      className={`h-full rounded-full ${
+                        timeLeft > 10 ? "bg-green-500" : "bg-red-500"
+                      }`}
                     />
                   </View>
 
@@ -377,17 +344,18 @@ const ContinueWithEmail = () => {
                       <TouchableOpacity
                         key={index}
                         onPress={() => inputRefs.current[index]?.focus()}
-                        className={`w-12 h-14 rounded-xl border-2 items-center justify-center ${
+                        className={`w-11 h-12 rounded-xl border-2 items-center justify-center bg-white dark:bg-gray-900 ${
                           activeInput === index
-                            ? "border-green-600 bg-green-400/20"
+                            ? "border-orange-500"
                             : digit
-                              ? "border-green-400 bg-green-400/20"
-                              : "border-black/25 bg-white/5"
+                              ? "border-green-500"
+                              : "border-gray-300 dark:border-gray-600"
                         }`}
                       >
                         <TextInput
                           ref={(ref) => (inputRefs.current[index] = ref)}
-                          className="w-full text-center text-light-text-primary font-groteskBold text-xl "
+                          className="w-full text-center font-groteskBold text-lg"
+                          style={{ color: orangeColors.text }}
                           value={digit}
                           onChangeText={(text) => handleCodeChange(text, index)}
                           onKeyPress={(e) => handleCodeKeyPress(e, index)}
@@ -401,26 +369,35 @@ const ContinueWithEmail = () => {
                   </View>
 
                   {/* Resend Code */}
-                  <View className="flex-row justify-center items-center space-x-3 mb-6">
-                    <Text className="text-light-text-primary text-sm">
+                  <View className="flex-row justify-center items-center">
+                    <Text
+                      className="text-sm mr-3"
+                      style={{ color: orangeColors.textSecondary }}
+                    >
                       Didn't receive the code?
                     </Text>
                     <TouchableOpacity
                       onPress={handleResendCode}
                       disabled={timeLeft > 0 || isResending}
-                      className="flex-row items-center space-x-4 bg-white/10 px-4 py-2 rounded-full"
+                      className={`flex-row items-center px-4 py-2 rounded-2xl ${
+                        timeLeft > 0 || isResending
+                          ? "bg-gray-100 dark:bg-gray-800"
+                          : "bg-orange-50 dark:bg-orange-900/20"
+                      }`}
                     >
                       <RotateCcw
                         size={16}
                         color={
-                          timeLeft > 0 || isResending ? "#6B7280" : "#A78BFA"
+                          timeLeft > 0 || isResending
+                            ? orangeColors.textSecondary
+                            : orangeColors.primary
                         }
                       />
                       <Text
-                        className={`text-sm font-semibold pl-2 ${
+                        className={`text-sm font-semibold ml-2 ${
                           timeLeft > 0 || isResending
                             ? "text-gray-400"
-                            : "text-red-500"
+                            : "text-orange-600 dark:text-orange-400"
                         }`}
                       >
                         {isResending ? "Sending..." : "Resend Code"}
@@ -428,15 +405,15 @@ const ContinueWithEmail = () => {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </Animated.View>
+              )}
             </Animated.View>
 
             {/* Action Buttons */}
-            <View className="space-y-4">
+            <View className="gap-4">
               {!codeSent ? (
                 <Animated.View>
                   <TouchableOpacity
-                    className={`w-full bg-green-500 rounded-lg py-4 flex-row items-center justify-center shadow-2xl shadow-purple-500/40 ${
+                    className={`w-full bg-orange-500 rounded-xl py-4 flex-row items-center justify-center ${
                       isLoading ? "opacity-80" : ""
                     }`}
                     onPress={handleContinue}
@@ -444,40 +421,41 @@ const ContinueWithEmail = () => {
                   >
                     {isLoading ? (
                       <View className="flex-row items-center">
-                        <Text className="text-light-text-inverse font-geist text-lg mr-3">
-                          Sending Magic Code...
+                        <Text className="text-white font-geist text-lg mr-3">
+                          Sending Code...
                         </Text>
                       </View>
                     ) : (
-                      <>
-                        <Text className="text-light-text-inverse font-geist text-lg">
-                          Send Verification Code
-                        </Text>
-                      </>
+                      <Text className="text-white font-geist text-lg font-semibold">
+                        Sigin In
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </Animated.View>
               ) : (
                 <TouchableOpacity
-                  className="w-full bg-green-500 rounded-lg py-4 flex-row items-center justify-center shadow-2xl shadow-green-400/30"
+                  className="w-full bg-orange-500 rounded-xl py-4 flex-row items-center justify-center"
                   onPress={handleVerifyCode}
                   disabled={verificationCode.join("").length !== 6}
                 >
-                  <Text className="text-white font-geist text-lg">
-                    Verify & Continue
+                  <Text className="text-white font-geist text-lg font-semibold">
+                    Verify
                   </Text>
                 </TouchableOpacity>
               )}
 
               {codeSent && (
                 <TouchableOpacity
-                  className="w-full border-2 border-white/20 rounded-2xl py-4 mt-2"
+                  className="w-full border-1 border-gray-300 dark:border-gray-900 rounded-xl py-4"
                   onPress={() => {
-                    setCodeSent(false);
-                    setVerificationCode(["", "", "", "", "", ""]);
+                    setCodeSent(false)
+                    setVerificationCode(Array(6).fill(""))
                   }}
                 >
-                  <Text className="text-light-text-primary font-geist font-semibold text-center text-base">
+                  <Text
+                    className="text-center font-geist font-semibold text-base"
+                    style={{ color: orangeColors.text }}
+                  >
                     Change Email Address
                   </Text>
                 </TouchableOpacity>
@@ -485,10 +463,13 @@ const ContinueWithEmail = () => {
             </View>
 
             {/* Security Footer */}
-            <View className="mt-12 px-4">
-              <View className="flex-row items-center justify-center mb-3">
-                <Shield size={14} color="#222" />
-                <Text className="text-sm text-light-text-secondary text-center ml-2">
+            <View className="mt-12">
+              <View className="flex-row items-center justify-center">
+                <Shield size={14} color={orangeColors.textSecondary} />
+                <Text
+                  className="text-sm text-center ml-2"
+                  style={{ color: orangeColors.textSecondary }}
+                >
                   Your data is securely encrypted and protected
                 </Text>
               </View>
@@ -497,14 +478,14 @@ const ContinueWithEmail = () => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Alert Modal - Add this at the end */}
+      {/* Alert Modal */}
       <AlertModal
         visible={alertVisible}
         onClose={() => setAlertVisible(false)}
         {...alertConfig}
       />
     </>
-  );
-};
+  )
+}
 
-export default ContinueWithEmail;
+export default ContinueWithEmail

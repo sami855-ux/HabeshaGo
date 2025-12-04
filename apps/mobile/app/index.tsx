@@ -1,14 +1,16 @@
 import Welcome from "@/components/welcome"
-import { StatusBar } from "react-native"
+import { StatusBar, useColorScheme } from "react-native"
 import "../global.css"
 
 export default function App() {
+  const colorScheme = useColorScheme()
+
   return (
     <>
       <StatusBar
         translucent={true}
         backgroundColor="transparent"
-        barStyle={"dark-content"}
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
       />
       <Welcome />
     </>

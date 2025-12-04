@@ -6,6 +6,7 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
+      // BetterAuth module resolver
       [
         "module-resolver",
         {
@@ -19,6 +20,18 @@ module.exports = function (api) {
           },
         },
       ],
+      // Tamagui plugin
+      [
+        "@tamagui/babel-plugin",
+        {
+          components: ["tamagui"],
+          config: "./tamagui.config.ts",
+          logTimings: true,
+          disableExtraction: process.env.NODE_ENV === "development",
+        },
+      ],
+      // Reanimated plugin
+      "react-native-reanimated/plugin",
     ],
   }
 }

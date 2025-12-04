@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.hi {
-    font-size: 32px;
-    font-weight: 900;
-    @apply text-blue-500
+* {
+  @apply font-geist;
 }

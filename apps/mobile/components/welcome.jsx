@@ -1,11 +1,10 @@
+import imageOne from "@/assets/images/welcome1.png"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "@react-navigation/native"
 import { useRouter } from "expo-router"
 import {
-  Clock,
   DollarSign,
   Mail,
-  MapPin,
   Navigation,
   Phone,
   Users,
@@ -64,27 +63,37 @@ const Slide1 = ({ isActive }) => {
 
   return (
     <ImageBackground
-      source={{
-        uri: "https://images.unsplash.com/photo-1508780709619-79562169bc64?auto=format&fit=crop&w=800&q=80",
-      }}
+      source={imageOne}
       className="flex-1"
-      imageStyle={{ resizeMode: "cover" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "absolute",
+        top: 0,
+        left: 0,
+      }}
+      imageStyle={{
+        resizeMode: "cover",
+        top: -50,
+        left: 0,
+        position: "absolute",
+      }}
     >
       <Animated.View
         style={{
           opacity: fadeAnim,
           transform: [{ translateY: slideAnim }],
         }}
-        className="flex-1 px-4 py-20 justify-between bg-black/30"
+        className="flex-1 px-4 py-20 justify-end bg-black/30"
       >
-        <View className="items-center mt-10">
+        <View className="items-center justify-items-end mt-10">
           <Animated.View style={{ transform: [{ scale: iconScale }] }}>
             <View className="w-28 h-28 rounded-2xl items-center justify-center mb-8 bg-white/15 shadow-lg">
               <Navigation size={56} color="white" />
             </View>
           </Animated.View>
 
-          <View className="items-center my-4">
+          <View className="items-center  my-4">
             <Text className="text-white text-4xl font-bold text-center">
               Smart{"\n"}Navigation
             </Text>
@@ -94,38 +103,6 @@ const Slide1 = ({ isActive }) => {
             </Text>
           </View>
         </View>
-
-        <Animated.View style={{ opacity: featuresOpacity }}>
-          <View className="my-2">
-            <Text className="text-white text-lg font-bold text-center mb-2">
-              Why choose our navigation?
-            </Text>
-
-            <View className="bg-white/10 border-l-4 border-blue-500 rounded-3xl p-4 my-1">
-              <View className="flex-row items-start gap-4">
-                <View className="w-10 h-10 rounded-full items-center justify-center bg-blue-500/30 mt-1">
-                  <MapPin size={20} color="#3B82F6" />
-                </View>
-                <Text className="flex-1 text-white/80 text-base leading-6">
-                  Real-time updates and alternative routes to avoid congestion
-                  and save time
-                </Text>
-              </View>
-            </View>
-
-            <View className="bg-white/10 border-l-4 border-blue-500 rounded-3xl p-4 my-1">
-              <View className="flex-row items-start gap-4">
-                <View className="w-10 h-10 rounded-full items-center justify-center bg-blue-500/30 mt-1">
-                  <Clock size={20} color="#3B82F6" />
-                </View>
-                <Text className="flex-1 text-white/80 text-base leading-6">
-                  Accurate arrival times using machine learning and historical
-                  data patterns
-                </Text>
-              </View>
-            </View>
-          </View>
-        </Animated.View>
       </Animated.View>
     </ImageBackground>
   )

@@ -1,8 +1,12 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+interface TestimonialsSectionProps {
+  id?: string; // allow navigation scrolling
+}
 
 const testimonials = [
   {
@@ -23,27 +27,31 @@ const testimonials = [
       "Finding a charging station used to be stressful, but now it's just one tap away. The app shows nearby EV stations, availability, and even lets me pay instantly. It's futuristic yet practical.",
     rating: 5,
   },
-]
+];
 
-export function TestimonialsSection() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+export function TestimonialsSection({ id }: TestimonialsSectionProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const goToPrevious = () => {
-    setCurrentIndex((prevIndex) => (prevIndex === 0 ? testimonials.length - 1 : prevIndex - 1))
-  }
+    setCurrentIndex((prevIndex) =>
+      prevIndex === 0 ? testimonials.length - 1 : prevIndex - 1
+    );
+  };
 
   const goToNext = () => {
-    setCurrentIndex((prevIndex) => (prevIndex === testimonials.length - 1 ? 0 : prevIndex + 1))
-  }
+    setCurrentIndex((prevIndex) =>
+      prevIndex === testimonials.length - 1 ? 0 : prevIndex + 1
+    );
+  };
 
   const getVisibleTestimonials = () => {
-    const first = testimonials[currentIndex]
-    const second = testimonials[(currentIndex + 1) % testimonials.length]
-    return [first, second]
-  }
+    const first = testimonials[currentIndex];
+    const second = testimonials[(currentIndex + 1) % testimonials.length];
+    return [first, second];
+  };
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section id={id} className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-12">
@@ -55,7 +63,7 @@ export function TestimonialsSection() {
           </div>
           <div className="flex items-center justify-between">
             <h2 className="text-4xl md:text-5xl font-bold text-black">
-              What Our Customer Say
+              What Our Customers Say
             </h2>
             {/* Navigation Buttons */}
             <div className="flex gap-3">
@@ -85,10 +93,12 @@ export function TestimonialsSection() {
             <div
               key={testimonial.id}
               className={`rounded-lg p-8 relative overflow-hidden transition-all duration-300 ${
-                index === 0 ? "bg-gray-400 text-black" : "bg-[#000033] text-white"
+                index === 0
+                  ? "bg-gray-400 text-black"
+                  : "bg-[#000033] text-white"
               }`}
             >
-              {/* Quote Icon - Yellow */}
+              {/* Quote Icon */}
               <div className="absolute top-6 right-6 text-yellow-400 text-4xl opacity-90">
                 ❝
               </div>
@@ -102,22 +112,16 @@ export function TestimonialsSection() {
                 />
                 <div>
                   <h3 className="font-bold text-lg">{testimonial.name}</h3>
-                  <p
-                    className={`text-sm ${index === 0 ? "opacity-75" : "opacity-75"}`}
-                  >
-                    {testimonial.role}
-                  </p>
+                  <p className="text-sm opacity-75">{testimonial.role}</p>
                 </div>
               </div>
 
               {/* Quote */}
-              <p
-                className={`mb-6 text-sm leading-relaxed ${index === 0 ? "opacity-90" : "opacity-90"}`}
-              >
+              <p className="mb-6 text-sm leading-relaxed">
                 {testimonial.quote}
               </p>
 
-              {/* Stars - Yellow */}
+              {/* Stars */}
               <div className="flex gap-1">
                 {Array.from({ length: testimonial.rating }).map((_, i) => (
                   <span key={i} className="text-yellow-400 text-lg">

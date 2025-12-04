@@ -23,12 +23,12 @@ export default function Home() {
   return (
     <div className="">
       <ThemeToggle />
-      <Navigation/>
+      <Navigation />
       <HeroSection />
-      <ServicesSection />
-      <HowWeWorks />
-      <TestimonialsSection />
-      <Footer/>
+      <ServicesSection id="services" />
+      <HowWeWorks id="how-we-work" />
+      <TestimonialsSection id="testimonial" />
+      <Footer />
     </div>
-  )
+  );
 }

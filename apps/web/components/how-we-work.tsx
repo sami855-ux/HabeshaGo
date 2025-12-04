@@ -1,13 +1,12 @@
 "use client";
 
-import {
-  Bus,
-  CarTaxiFront,
-  Zap,
-  ParkingCircle,
-} from "lucide-react";
+import { Bus, CarTaxiFront, Zap, ParkingCircle } from "lucide-react";
 
-export default function HowWeWorks() {
+interface HowWeWorksProps {
+  id?: string; // allow navigation scrolling
+}
+
+export default function HowWeWorks({ id }: HowWeWorksProps) {
   const services = [
     {
       title: "Smart Transport System",
@@ -36,7 +35,7 @@ export default function HowWeWorks() {
   ];
 
   return (
-    <section className="py-20 bg-[#F7F7F7] px-4">
+    <section id={id} className="py-20 bg-[#F7F7F7] px-4">
       <div className="max-w-7xl mx-auto">
         {/* Heading */}
         <div className="text-center mb-12">
@@ -44,15 +43,13 @@ export default function HowWeWorks() {
             Our Goods
           </p>
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900">
-            How We Works
+            How We Work
           </h2>
         </div>
 
-        {/* Two column layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-          {/* LEFT: stacked images with overlap */}
+          {/* LEFT: Images */}
           <div className="relative">
-            {/* Big image container */}
             <div className="rounded-xl overflow-hidden shadow-lg">
               <img
                 src="/big-im.png"
@@ -61,21 +58,12 @@ export default function HowWeWorks() {
               />
             </div>
 
-            {/* Overlapping framed image */}
+            {/* Overlapping framed image for large screens */}
             <div
-              className="
-                hidden md:block
-                absolute
-                left-[18%] top-[68%] translate-y-[-50%]
-                w-[320px] h-[220px]
-                md:left-[22%] md:w-[360px] md:h-[260px]
-                lg:left-[32%] lg:w-[420px] lg:h-[400px]
-                transform
-              "
+              className="hidden md:block absolute left-[22%] top-[68%] w-[360px] h-[260px] lg:left-[32%] lg:w-[420px] lg:h-[400px]"
               aria-hidden="true"
             >
-              {/* White frame */}
-              <div className="w-full h-full bg-white rounded-md shadow-2xl transform rotate-0">
+              <div className="w-full h-full bg-white rounded-md shadow-2xl">
                 <div className="w-full h-full overflow-hidden rounded-sm border-8 border-white">
                   <img
                     src="/small-im.png"
@@ -86,7 +74,7 @@ export default function HowWeWorks() {
               </div>
             </div>
 
-            {/* For small screens show smaller image below the big one instead of overlap */}
+            {/* Small screen image fallback */}
             <div className="md:hidden mt-6 rounded-lg overflow-hidden shadow-md">
               <img
                 src="/left-small.jpg"
@@ -96,14 +84,13 @@ export default function HowWeWorks() {
             </div>
           </div>
 
-          {/* RIGHT: service list */}
+          {/* RIGHT: Service list */}
           <div className="space-y-8">
             {services.map((item, idx) => (
               <div key={idx} className="flex gap-6 items-start">
                 <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-white shadow-md flex items-center justify-center text-orange-600">
                   {item.icon}
                 </div>
-
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     {item.title}

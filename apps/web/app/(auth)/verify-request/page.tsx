@@ -37,7 +37,7 @@ function VerifyPage() {
         fetchOptions: {
           onSuccess: () => {
             toast.success("Account Verified successfully")
-            router.push("/")
+            router.push("/user")
           },
           onError: () => {
             toast.error("Error while verifying Account")

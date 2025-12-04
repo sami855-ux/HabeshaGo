@@ -9,41 +9,38 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="text-2xl font-bold text-black">
+          <Link
+            href="/"
+            className="text-2xl font-bold text-black dark:text-white"
+          >
             HabeshaGo
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8 text-black">
+          <div className="hidden md:flex items-center gap-8 text-black dark:text-white">
             <Link
-              href="/"
+              href="#services"
               className="hover:text-orange-400 font-medium transition"
             >
-              Home
+              Services
             </Link>
             <Link
-              href="#ev-charging"
+              href="#how-we-work"
               className="hover:text-orange-400 font-medium transition"
             >
-              EV Charging
+              How We Work
             </Link>
             <Link
-              href="#minibus"
+              href="#testimonial"
               className="hover:text-orange-400 font-medium transition"
             >
-              Minibus Contract
+              Testimonials
             </Link>
             <Link
-              href="#parking"
+              href="#footer"
               className="hover:text-orange-400 font-medium transition"
             >
-              Smart Parking
-            </Link>
-            <Link
-              href="#ticketing"
-              className="hover:text-orange-400 font-medium transition"
-            >
-              Bus Ticketing
+              Footer
             </Link>
           </div>
 

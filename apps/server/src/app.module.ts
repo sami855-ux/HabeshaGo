@@ -9,6 +9,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AuthGuard } from '@thallesp/nestjs-better-auth';
+import { BusModule } from './bus/bus.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthGuard } from '@thallesp/nestjs-better-auth';
 
     AuthModule,
     UsersModule,
+    BusModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
   ],

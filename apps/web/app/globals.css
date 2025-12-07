@@ -156,3 +156,11 @@
 * {
   @apply font-geist;
 }
+@keyframes services-slide {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-services-slide {
+  animation: services-slide 18s linear infinite;
+}

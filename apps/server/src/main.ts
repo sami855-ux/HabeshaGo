@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
 import { auth } from '../lib/better-auth';
-import cors from 'cors';
+// import cors from 'cors';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {

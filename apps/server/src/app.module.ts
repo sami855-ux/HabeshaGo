@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AuthGuard } from '@thallesp/nestjs-better-auth';
 import { BusModule } from './bus/bus.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -18,18 +19,19 @@ import { BusModule } from './bus/bus.module';
     //   autoSchemaFile: join(process.cwd(), 'src/graphql/schema.gql'),
     // }),
 
-    AuthModule,
+    // AuthModule,
     UsersModule,
     BusModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    CloudinaryModule,
   ],
   controllers: [],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: AuthGuard,
+    // },
   ],
 })
 export class AppModule {}

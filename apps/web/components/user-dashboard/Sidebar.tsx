@@ -214,31 +214,6 @@ function Sidebar() {
           </button>
         </div>
       </div>
-
-      {/* User Profile Section - Fixed at bottom */}
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Samuel Tale</p>
-            <p className="text-xs text-muted-foreground truncate">
-              Premium User
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              // Handle logout
-              console.log("Logout")
-            }}
-            className="p-1.5 rounded-md hover:bg-accent transition-colors"
-            title="Logout"
-          >
-            <LogOut className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

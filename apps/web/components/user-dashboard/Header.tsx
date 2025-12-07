@@ -82,7 +82,7 @@ function Header({
           className
         )}
       >
-        <div className="container mx-auto px-4 h-full">
+        <div className="container mx-auto w-full  h-full">
           <div className="flex items-center justify-between h-full">
             {/* Left Section */}
             <div className="flex items-center gap-4">
@@ -98,12 +98,6 @@ function Header({
                   <Menu className="w-5 h-5" />
                 )}
               </Button>
-
-              <div className="hidden lg:flex items-center gap-2 text-sm">
-                <span className="font-medium text-foreground">Home</span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground rotate-270" />
-                <span className="text-muted-foreground">Overview</span>
-              </div>
             </div>
 
             <div className="flex gap-2">

@@ -18,8 +18,13 @@ import { Loader } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import React, { useState, useTransition } from "react"
 import { toast } from "sonner"
+import { useDispatch } from "react-redux"
+import { setUser } from "@/store/slices/userSlice"
+import { getUserById } from "@/services/user"
+import { AppDispatch } from "@/store"
 
 function VerifyPage() {
+  const dispatch = useDispatch<AppDispatch>()
   const params = useSearchParams()
   const router = useRouter()
 
@@ -31,19 +36,43 @@ function VerifyPage() {
 
   const verifyAccount = () => {
     startTransition(async () => {
-      await authClient.signIn.emailOtp({
+      const result = await authClient.signIn.emailOtp({
         email,
         otp,
         fetchOptions: {
           onSuccess: () => {
             toast.success("Account Verified successfully")
-            router.push("/user")
           },
           onError: () => {
             toast.error("Error while verifying Account")
           },
         },
       })
+
+      if (result?.data) {
+        const user = result.data.user
+        const token = result.data.token
+
+        try {
+          // Fetch full user data from backend
+          const response = await getUserById(user.id)
+          console.log(response)
+          if (response.success && response.data) {
+            dispatch(
+              setUser({
+                user: response.data,
+                token,
+              })
+            )
+          } else {
+            console.error("Failed to fetch full user:", response.message)
+          }
+
+          router.push("/user")
+        } catch (err) {
+          console.error("Error fetching full user:", err)
+        }
+      }
     })
   }
 

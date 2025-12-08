@@ -83,7 +83,10 @@ function Sidebar() {
   return (
     <div className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-background border-r">
       {/* Top Section with Logo and Company Name */}
-      <div className="flex items-center gap-3 p-6 ">
+      <div
+        className="flex items-center gap-3 p-6 "
+        onClick={() => router.push("/user")}
+      >
         <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-r from-primary to-primary/80 shadow-md">
           <Currency className="h-6 w-6 text-primary-foreground" />
         </div>

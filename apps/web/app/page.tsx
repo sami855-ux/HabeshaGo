@@ -7,18 +7,19 @@ import { Navigation } from "@/components/navigation"
 import { ServicesSection } from "@/components/services-section"
 import { TestimonialsSection } from "@/components/testimonials"
 import { ThemeToggle } from "@/components/themeToggle"
-import { authClient } from "@/lib/auth-client"
+// import { useAuth } from "@/hooks/useAuth"
+// import { authClient } from "@/lib/auth-client"
 
 export default function Home() {
-  const { data: session, isPending: isLoading } = authClient.useSession()
+  // const { user, loading } = useAuth()
 
-  if (isLoading) {
-    return <div className="">loading.....</div>
-  }
+  // if (loading) {
+  //   return <div className="">loading.....</div>
+  // }
 
-  if (session) {
-    return <div className="">There is session {session?.user.email}</div>
-  }
+  // if (user) {
+  //   return <div className="">There is session {user.email}</div>
+  // }
 
   return (
     <div className="">
@@ -30,5 +31,5 @@ export default function Home() {
       <TestimonialsSection id="testimonial" />
       <Footer />
     </div>
-  );
+  )
 }

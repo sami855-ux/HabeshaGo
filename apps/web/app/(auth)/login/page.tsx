@@ -7,33 +7,156 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
-import { Loader, Send } from "lucide-react"
+import { Loader, Send, Mail, Sparkles, ChevronRight, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
-import { FaApple } from "react-icons/fa"
+import { FaApple, FaGithub } from "react-icons/fa"
+
+// Common email domains for suggestions
+const COMMON_EMAIL_DOMAINS = [
+  "gmail.com",
+  "outlook.com",
+  "yahoo.com",
+  "hotmail.com",
+  "icloud.com",
+  "aol.com",
+  "protonmail.com",
+  "zoho.com",
+  "mail.com",
+  "yandex.com",
+]
 
 function LoginPage() {
   const router = useRouter()
 
   const [applePending, startAppleTransition] = useTransition()
   const [googlePending, startGoogleTransition] = useTransition()
+  const [githubPending, startGithubTransition] = useTransition()
   const [emailPending, startEmailTransition] = useTransition()
-  const [email, setEmail] = useState("")
 
-  async function signUnWithGithub() {
-    startAppleTransition(async () => {
+  const [email, setEmail] = useState("")
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false)
+  const [emailSuggestions, setEmailSuggestions] = useState<string[]>([])
+  const [emailError, setEmailError] = useState("")
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
+
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        emailInputRef.current &&
+        !emailInputRef.current.contains(event.target as Node)
+      ) {
+        setShowEmailSuggestions(false)
+        setSelectedSuggestionIndex(-1)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Generate email suggestions
+  useEffect(() => {
+    if (!email.includes("@") && email.length > 0) {
+      const suggestions = COMMON_EMAIL_DOMAINS.map(
+        (domain) => `${email}@${domain}`
+      )
+      setEmailSuggestions(suggestions)
+      setShowEmailSuggestions(true)
+      setSelectedSuggestionIndex(-1)
+    } else {
+      setShowEmailSuggestions(false)
+    }
+  }, [email])
+
+  // Validate email format
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  // Handle email suggestion click
+  const handleEmailSuggestionClick = (suggestedEmail: string) => {
+    setEmail(suggestedEmail)
+    setShowEmailSuggestions(false)
+    setSelectedSuggestionIndex(-1)
+    setEmailError("")
+  }
+
+  // Handle keyboard navigation for suggestions
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showEmailSuggestions || emailSuggestions.length === 0) return
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) =>
+          prev < emailSuggestions.length - 1 ? prev + 1 : 0
+        )
+        break
+
+      case "ArrowUp":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) =>
+          prev > 0 ? prev - 1 : emailSuggestions.length - 1
+        )
+        break
+
+      case "Enter":
+        e.preventDefault()
+        if (
+          selectedSuggestionIndex >= 0 &&
+          selectedSuggestionIndex < emailSuggestions.length
+        ) {
+          handleEmailSuggestionClick(emailSuggestions[selectedSuggestionIndex])
+        }
+        break
+
+      case "Escape":
+        e.preventDefault()
+        setShowEmailSuggestions(false)
+        setSelectedSuggestionIndex(-1)
+        break
+
+      case "Tab":
+        setShowEmailSuggestions(false)
+        setSelectedSuggestionIndex(-1)
+        break
+    }
+  }
+
+  // Handle email change
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setEmail(value)
+
+    if (value && !validateEmail(value) && value.includes("@")) {
+      setEmailError("Please enter a valid email address")
+    } else {
+      setEmailError("")
+    }
+  }
+
+  async function signInWithGithub() {
+    startGithubTransition(async () => {
       await authClient.signIn.social({
         provider: "github",
         callbackURL: "/",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Signed in with Github, you will be redircted....")
+            toast.success("Signed in with GitHub, you will be redirected...")
           },
           onError: (error) => {
             console.log(error)
@@ -44,13 +167,12 @@ function LoginPage() {
     })
   }
 
-  async function signUnWithGoogle() {
+  async function signInWithGoogle() {
     startGoogleTransition(async () => {
       try {
         await authClient.signIn.social({
           provider: "google",
           callbackURL: "/",
-
           fetchOptions: {
             onSuccess: () => {
               toast.success("Signed in with Google, you will be redirected...")
@@ -68,18 +190,47 @@ function LoginPage() {
     })
   }
 
-  function signinWithEmail() {
+  async function signInWithApple() {
+    startAppleTransition(async () => {
+      try {
+        await authClient.signIn.social({
+          provider: "apple",
+          callbackURL: "/",
+          fetchOptions: {
+            onSuccess: () => {
+              toast.success("Signed in with Apple, you will be redirected...")
+            },
+            onError: (error) => {
+              console.error("Apple sign-in error:", error)
+              toast.error("Internal server error")
+            },
+          },
+        })
+      } catch (err) {
+        console.error("Unexpected Apple login failure:", err)
+        toast.error("Failed to sign in. Please try again.")
+      }
+    })
+  }
+
+  function signInWithEmail() {
+    // Validate email
+    if (!validateEmail(email)) {
+      setEmailError("Please enter a valid email address")
+      return
+    }
+
     startEmailTransition(async () => {
       await authClient.emailOtp.sendVerificationOtp({
         email,
         type: "sign-in",
         fetchOptions: {
           onSuccess: () => {
-            toast.success("Email sent successfully")
+            toast.success("OTP sent to your email")
             router.push(`/verify-request?email=${email}`)
           },
           onError: () => {
-            toast.error("Error sending email")
+            toast.error("Error sending OTP")
           },
         },
       })
@@ -87,91 +238,178 @@ function LoginPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Welcome back!</CardTitle>
-        <CardDescription>
-          Login with your Google or Apple Account
-        </CardDescription>
-      </CardHeader>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-md mx-auto border shadow-lg">
+        <CardHeader className="space-y-2 pb-4">
+          <CardTitle className="text-2xl text-center font-semibold">
+            Sign in to your account
+          </CardTitle>
+          <CardDescription className="text-center">
+            Enter your email to receive a one-time passcode
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
-        <Button
-          onClick={signUnWithGoogle}
-          className="w-full font-geist cursor-pointer"
-          variant={"outline"}
-          disabled={googlePending}
-        >
-          {googlePending ? (
-            <>
-              <Loader className="animate-spin mr-2 size-4" />
-              Loading ....
-            </>
-          ) : (
-            <>
-              <FcGoogle className="w-4 h-4"></FcGoogle>
-              Sigin in with Google
-            </>
-          )}
-        </Button>
+        <CardContent className="space-y-6">
+          {/* Social Login Buttons */}
+          <div className="space-y-4">
+            <Button
+              onClick={signInWithGoogle}
+              className="w-full font-medium"
+              variant="outline"
+              disabled={googlePending}
+            >
+              {googlePending ? (
+                <Loader className="animate-spin size-4" />
+              ) : (
+                <div className="flex items-center justify-center w-full cursor-pointer">
+                  <FcGoogle className="w-5 h-5 mr-3" />
+                  <span>Continue with Google</span>
+                </div>
+              )}
+            </Button>
 
-        <Button
-          onClick={signUnWithGithub}
-          className="w-full font-geist cursor-pointer"
-          variant={"outline"}
-          disabled={applePending}
-        >
-          {applePending ? (
-            <>
-              <Loader className="animate-spin mr-2 size-4" />
-              Loading ....
-            </>
-          ) : (
-            <>
-              <FaApple className="w-4 h-4"></FaApple>
-              Sigin in with Apple
-            </>
-          )}
-        </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={signInWithApple}
+                className="w-full font-medium"
+                variant="outline"
+                disabled={applePending}
+              >
+                {applePending ? (
+                  <Loader className="animate-spin size-4" />
+                ) : (
+                  <div className="flex items-center justify-center w-full cursor-pointer">
+                    <FaApple className="w-5 h-5 mr-3" />
+                    <span>Apple</span>
+                  </div>
+                )}
+              </Button>
 
-        <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border pt-1">
-          <span className="relative z-10 bg-card px-2  text-muted-foreground ">
-            Or continue with
-          </span>
-        </div>
-
-        <div className="grid gap-3">
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              type="email"
-              placeholder="example@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+              <Button
+                onClick={signInWithGithub}
+                className="w-full font-medium"
+                variant="outline"
+                disabled={githubPending}
+              >
+                {githubPending ? (
+                  <Loader className="animate-spin size-4" />
+                ) : (
+                  <div className="flex items-center justify-center w-full cursor-pointer">
+                    <FaGithub className="w-5 h-5 mr-3" />
+                    <span>GitHub</span>
+                  </div>
+                )}
+              </Button>
+            </div>
           </div>
 
-          <Button
-            className="cursor-pointer"
-            onClick={signinWithEmail}
-            disabled={emailPending}
-          >
-            {emailPending ? (
-              <>
-                <Loader className="animate-spin mr-2 size-4" />
-                Loading ....
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4"></Send>
-                Continue with Email
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center z-10">
+              <div className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-sm z-50">
+              <span className="px-3  text-muted-foreground bg-card">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+
+          {/* Email Login */}
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email address
+              </Label>
+
+              <div className="relative" ref={suggestionsRef}>
+                <Input
+                  ref={emailInputRef}
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={handleEmailChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => {
+                    if (email && !email.includes("@")) {
+                      setShowEmailSuggestions(true)
+                    }
+                  }}
+                  className={`pr-10 ${emailError ? "border-destructive" : ""}`}
+                  required
+                />
+                {email && !email.includes("@") && (
+                  <Sparkles className="absolute right-3 top-3 h-4 w-4 text-primary" />
+                )}
+
+                {/* Email Suggestions Dropdown */}
+                {showEmailSuggestions && emailSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg">
+                    <div className="px-3 py-2 border-b bg-muted/50">
+                      <p className="text-xs text-muted-foreground">
+                        Press ↑↓ to navigate • Enter to select • Esc to close
+                      </p>
+                    </div>
+                    {emailSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                          index === selectedSuggestionIndex
+                            ? "bg-accent text-accent-foreground"
+                            : "hover:bg-accent hover:text-accent-foreground"
+                        }`}
+                        onClick={() => handleEmailSuggestionClick(suggestion)}
+                        onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3 h-3 text-muted-foreground" />
+                          <span>{suggestion}</span>
+                        </div>
+                        {index === selectedSuggestionIndex && (
+                          <Check className="w-3 h-3" />
+                        )}
+                      </button>
+                    ))}
+                    <div className="px-3 py-2 border-t bg-muted/50">
+                      <p className="text-xs text-muted-foreground">
+                        {emailSuggestions.length} email suggestions
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {emailError && (
+                <p className="text-sm text-destructive">{emailError}</p>
+              )}
+            </div>
+
+            <Button
+              className="w-full cursor-pointer"
+              onClick={signInWithEmail}
+              disabled={emailPending}
+            >
+              {emailPending ? (
+                <>
+                  <Loader className="animate-spin mr-2 size-4" />
+                  Sending OTP...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send OTP
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col space-y-4 border-t pt-6">
+          <div className="text-xs text-center text-muted-foreground space-y-1">
+            <p>By continuing, you agree to our Terms and Privacy Policy</p>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   )
 }
 

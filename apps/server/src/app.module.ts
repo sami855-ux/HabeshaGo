@@ -19,7 +19,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     //   autoSchemaFile: join(process.cwd(), 'src/graphql/schema.gql'),
     // }),
 
-    // AuthModule,
+    AuthModule,
     UsersModule,
     BusModule,
     ConfigModule.forRoot({ isGlobal: true }),

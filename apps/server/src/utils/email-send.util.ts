@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 export async function sendEmail(
   to: string,
@@ -8,24 +8,28 @@ export async function sendEmail(
 ) {
   try {
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true, // ✅ REQUIRED for Render
       auth: {
-        user: 'samitale86@gmail.com',
-        pass: 'qcit ckyk kvyi sxvx ', // Must be app password if 2FA enabled
+        user: "samitale86@gmail.com", // ✅ ENV ONLY
+        pass: "qcit ckyk kvyi sxvx ", // ✅ APP PASSWORD ONLY
       },
+      connectionTimeout: 10_000, // ✅ prevents infinite loading
     });
 
     const info = await transporter.sendMail({
-      from: '"Addis Pulse" <your-email@gmail.com>',
+      from: "Addis Pulse",
       to,
       subject,
       text,
       html,
     });
 
-    console.log('Email sent successfully!');
-    console.log('Message ID:', info.messageId);
+    console.log("✅ Email sent:", info.messageId);
+    return true;
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error("❌ Failed to send email:", error);
+    throw new Error("EMAIL_SEND_FAILED"); // ✅ VERY IMPORTANT
   }
 }

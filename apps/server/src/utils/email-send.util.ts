@@ -1,35 +1,26 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-  html?: string,
+  html?: string
 ) {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true, // ✅ REQUIRED for Render
-      auth: {
-        user: "samitale86@gmail.com", // ✅ ENV ONLY
-        pass: "qcit ckyk kvyi sxvx ", // ✅ APP PASSWORD ONLY
-      },
-      connectionTimeout: 10_000, // ✅ prevents infinite loading
-    });
-
-    const info = await transporter.sendMail({
-      from: "Addis Pulse",
+    const data = await resend.emails.send({
+      from: "Addis Pulse <onboarding@resend.dev>", // ✅ works instantly without domain setup
       to,
       subject,
+      html: html || `<p>${text}</p>`,
       text,
-      html,
     });
 
-    console.log("✅ Email sent:", info.messageId);
+    console.log("✅ Resend email sent:", data.id);
     return true;
   } catch (error) {
-    console.error("❌ Failed to send email:", error);
-    throw new Error("EMAIL_SEND_FAILED"); // ✅ VERY IMPORTANT
+    console.error("❌ Resend email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
   }
 }

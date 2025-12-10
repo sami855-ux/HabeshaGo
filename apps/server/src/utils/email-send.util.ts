@@ -1,4 +1,6 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+
+const resend = new Resend('re_JHze1bAf_J1AWeLDkPKrnf5i23umgieNK');
 
 export async function sendEmail(
   to: string,
@@ -7,25 +9,18 @@ export async function sendEmail(
   html?: string,
 ) {
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: 'samitale86@gmail.com',
-        pass: 'qcit ckyk kvyi sxvx ', // Must be app password if 2FA enabled
-      },
-    });
-
-    const info = await transporter.sendMail({
-      from: '"Addis Pulse" <your-email@gmail.com>',
+    const data = await resend.emails.send({
+      from: 'Addis Pulse <onboarding@resend.dev>', // ✅ works instantly without domain setup
       to,
       subject,
+      html: html || `<p>${text}</p>`,
       text,
-      html,
     });
 
-    console.log('Email sent successfully!');
-    console.log('Message ID:', info.messageId);
+    console.log('✅ Resend email sent:');
+    return true;
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error('❌ Resend email failed:', error);
+    throw new Error('EMAIL_SEND_FAILED');
   }
 }

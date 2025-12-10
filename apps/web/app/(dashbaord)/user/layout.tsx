@@ -3,9 +3,11 @@
 import React, { useState } from "react"
 import Sidebar from "@/components/user-dashboard/Sidebar"
 import Header from "@/components/user-dashboard/Header"
+import { useAuth } from "@/hooks/useAuth"
 
 function UserLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user, loading } = useAuth()
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -20,7 +22,7 @@ function UserLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <div
         className={`
-        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out
+        w-64 transform transition-transform duration-300 ease-in-out
         lg:relative lg:translate-x-0 lg:flex-shrink-0
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}

@@ -14,7 +14,7 @@ async function bootstrap() {
   app.use(bodyParser.json());
 
   app.enableCors({
-    origin: 'http://localhost:3000',
+   origin: true,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: [

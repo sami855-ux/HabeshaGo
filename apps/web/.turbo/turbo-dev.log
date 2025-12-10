@@ -5,6 +5,7 @@
  ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
  We detected multiple lockfiles and selected the directory of C:\Users\User\Desktop\Addis Pluse\addis-pulse\package-lock.json as the root directory.
  To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+<<<<<<< HEAD
    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
  Detected additional lockfiles: 
    * C:\Users\User\Desktop\Addis Pluse\addis-pulse\apps\web\package-lock.json
@@ -37,3 +38,5 @@
  GET /user/support 200 in 1168ms
  GET /user/support 200 in 355ms
  GET /user/settings 200 in 350ms
+=======
+>>>>>>> 181a757999f91a75c261b7ca2821dffd02db76b3

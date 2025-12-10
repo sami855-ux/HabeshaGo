@@ -10,6 +10,15 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AuthGuard } from '@thallesp/nestjs-better-auth';
 import { BusModule } from './bus/bus.module';
+import { SessionModule } from './session/session.module';
+import { WalletModule } from './wallet/wallet.module';
+import { ParkingModule } from './parking/parking.module';
+import { EvChargingModule } from './ev-charging/ev-charging.module';
+import { MinibusModule } from './minibus/minibus.module';
+import { BusPositionModule } from './bus-position/bus-position.module';
+import { BookingModule } from './booking/booking.module';
+import { RouteModule } from './route/route.module';
+import { DriverModule } from './driver/driver.module';
 
 @Module({
   imports: [
@@ -23,6 +32,15 @@ import { BusModule } from './bus/bus.module';
     BusModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    DriverModule,
+    RouteModule,
+    BookingModule,
+    BusPositionModule,
+    MinibusModule,
+    EvChargingModule,
+    ParkingModule,
+    WalletModule,
+    SessionModule,
   ],
   controllers: [],
   providers: [

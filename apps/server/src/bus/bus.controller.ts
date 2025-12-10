@@ -2,62 +2,95 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
-  Delete,
-  Param,
   Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
   ParseIntPipe,
 } from '@nestjs/common';
 import { BusService } from './bus.service';
-import { Prisma, Bus } from '@prisma/client';
-import { ListResponseDto, SingleResponseDto } from 'src/utils/api-response.dto';
 import { CreateBusDto } from './dto/create-bus.dto';
+import { UpdateBusDto } from './dto/update-bus.dto';
+import { AssignDriverDto } from './dto/assign-driver.dto';
+import { UpdateStatusDto } from './dto/update-status.dto';
+import { RecordPositionDto } from './dto/record-position.dto';
 
 @Controller('buses')
 export class BusController {
   constructor(private readonly busService: BusService) {}
 
+  @Post()
+  async create(@Body() dto: CreateBusDto) {
+    return this.busService.create(dto);
+  }
+
   @Get()
-  async getAllBuses(): Promise<ListResponseDto<Bus>> {
-    const buses = await this.busService.getAll();
-
-    const formatted = buses.map((bus) => ({
-      ...bus,
-      positions: undefined,
-    }));
-
-    return new ListResponseDto(formatted);
+  async findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('routeId') routeId?: number,
+    @Query('status') status?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    const parsedIsActive =
+      typeof isActive === 'string' ? isActive === 'true' : undefined;
+    return this.busService.findAll({
+      page,
+      limit,
+      routeId,
+      status: status as any,
+      isActive: parsedIsActive,
+    });
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Bus> {
+  async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.busService.findOne(id);
-  }
-
-  @Post()
-  async createBus(
-    @Body() createBusDto: CreateBusDto,
-  ): Promise<SingleResponseDto<Bus>> {
-    const bus = await this.busService.create(createBusDto);
-
-    const formatted = {
-      ...bus,
-      positions: undefined,
-    };
-
-    return new SingleResponseDto(formatted, 'Bus created successfully');
   }
 
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: Prisma.BusUpdateInput,
-  ): Promise<Bus> {
-    return this.busService.update(id, data);
+    @Body() dto: UpdateBusDto,
+  ) {
+    return this.busService.update(id, dto);
+  }
+
+  @Patch(':id/assign-driver')
+  async assignDriver(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignDriverDto,
+  ) {
+    return this.busService.assignDriver(id, dto);
+  }
+
+  @Patch(':id/status')
+  async updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStatusDto,
+  ) {
+    return this.busService.updateStatus(id, dto);
   }
 
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<Bus> {
+  async remove(@Param('id', ParseIntPipe) id: number) {
     return this.busService.remove(id);
+  }
+
+  @Get(':id/availability')
+  async availability(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('date') date: string,
+  ) {
+    return this.busService.getSeatAvailability(id, date);
+  }
+
+  @Post(':id/position')
+  async recordPosition(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RecordPositionDto,
+  ) {
+    return this.busService.recordPosition(id, dto);
   }
 }

@@ -3,171 +3,37 @@
 > next dev --turbopack
 
  ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
- We detected multiple lockfiles and selected the directory of C:\Users\danyi\Projects\HabeshaGO\addis-pulse\package-lock.json as the root directory.
+ We detected multiple lockfiles and selected the directory of C:\Users\User\Desktop\Addis Pluse\addis-pulse\package-lock.json as the root directory.
  To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
  Detected additional lockfiles: 
-   * C:\Users\danyi\Projects\HabeshaGO\addis-pulse\apps\web\package-lock.json
+   * C:\Users\User\Desktop\Addis Pluse\addis-pulse\apps\web\package-lock.json
 
    ▲ Next.js 15.5.6 (Turbopack)
    - Local:        http://localhost:3000
-   - Network:      http://192.168.137.40:3000
+   - Network:      http://172.31.144.1:3000
 
  ✓ Starting...
- ✓ Ready in 5.6s
+ ✓ Ready in 4.6s
  ○ Compiling / ...
- ✓ Compiled / in 16.2s
- GET / 200 in 18599ms
- ○ Compiling /_not-found/page ...
- ✓ Compiled /_not-found/page in 1476ms
- GET /left-small.jpg 404 in 2055ms
- GET / 200 in 425ms
- GET /left-small.jpg 404 in 1002ms
- GET /bus 404 in 1591ms
- GET / 200 in 821ms
- GET /left-small.jpg 404 in 762ms
- ✓ Compiled in 679ms
- ✓ Compiled in 305ms
- GET /left-small.jpg 404 in 588ms
- GET /bus 404 in 407ms
- GET /bus 404 in 574ms
- GET / 200 in 1438ms
- GET /left-small.jpg 404 in 934ms
- GET /left-small.jpg 404 in 467ms
- ○ Compiling /user ...
- ✓ Compiled /user in 3.4s
- GET /user 200 in 4441ms
- GET /user/parking 404 in 406ms
- GET /user/parking 404 in 475ms
- GET /user 200 in 721ms
- GET /user/charging 404 in 390ms
- GET /user/charging 404 in 582ms
- GET /user 200 in 703ms
- ○ Compiling /user/bus ...
- ✓ Compiled /user/bus in 5s
- GET /user/bus 200 in 5376ms
- GET /user 200 in 373ms
- GET /user/wallet 404 in 368ms
- GET /user/wallet 404 in 490ms
- GET /user 200 in 768ms
- GET /user/employment 404 in 405ms
- GET /user/employment 404 in 527ms
- GET /user 200 in 733ms
- GET /user/bus 200 in 446ms
- GET / 200 in 600ms
- GET /left-small.jpg 404 in 873ms
- GET / 200 in 486ms
- GET / 200 in 417ms
- GET / 200 in 363ms
- GET / 200 in 387ms
- GET /bus 404 in 396ms
- GET /bus 404 in 630ms
- GET / 200 in 513ms
- GET /left-small.jpg 404 in 545ms
- ✓ Compiled in 669ms
- GET /left-small.jpg 404 in 681ms
- ✓ Compiled in 827ms
- GET /left-small.jpg 404 in 927ms
- ✓ Compiled in 215ms
- GET /left-small.jpg 404 in 486ms
- ✓ Compiled in 208ms
- ✓ Compiled in 225ms
- GET /left-small.jpg 404 in 1440ms
- ✓ Compiled in 214ms
- ✓ Compiled in 293ms
- GET /left-small.jpg 404 in 589ms
- ✓ Compiled in 225ms
- ✓ Compiled in 713ms
- GET /left-small.jpg 404 in 593ms
- GET / 200 in 1884ms
+ ✓ Compiled / in 11.7s
+ GET / 200 in 13682ms
  ○ Compiling /favicon.ico ...
- GET /left-small.jpg 404 in 876ms
- ✓ Compiled /favicon.ico in 3s
- GET /favicon.ico?favicon.0b3bf435.ico 200 in 3957ms
- GET /left-small.jpg 404 in 395ms
- ✓ Compiled in 213ms
- ✓ Compiled in 189ms
- ✓ Compiled in 304ms
- GET /left-small.jpg 404 in 509ms
- GET / 200 in 11951ms
- ✓ Compiled in 263ms
- ✓ Compiled in 243ms
- ✓ Compiled in 177ms
- ✓ Compiled in 278ms
- ✓ Compiled in 179ms
- ✓ Compiled / in 298ms
- GET / 200 in 713ms
- GET /left-small.jpg 404 in 705ms
- GET / 200 in 407ms
- GET / 200 in 304ms
- GET / 200 in 363ms
- GET / 200 in 388ms
- GET / 200 in 408ms
- ✓ Compiled in 372ms
- ✓ Compiled in 222ms
- ✓ Compiled in 194ms
- ✓ Compiled in 2.3s
- GET /left-small.jpg 404 in 3109ms
- GET / 200 in 2118ms
- GET / 200 in 644ms
- GET / 200 in 436ms
- GET / 200 in 556ms
- ✓ Compiled in 434ms
- ✓ Compiled in 523ms
- ✓ Compiled in 368ms
- GET /left-small.jpg 404 in 514ms
- GET / 200 in 603ms
- ✓ Compiled in 1005ms
- ✓ Compiled in 368ms
- ✓ Compiled in 467ms
- ✓ Compiled in 237ms
- GET /left-small.jpg 404 in 1158ms
- GET / 200 in 1154ms
- ✓ Compiled in 433ms
- ✓ Compiled in 142ms
- ✓ Compiled in 416ms
- ✓ Compiled in 264ms
- GET /left-small.jpg 404 in 800ms
- GET / 200 in 824ms
- GET / 200 in 392ms
- GET / 200 in 403ms
- ✓ Compiled in 271ms
- ✓ Compiled in 260ms
- ✓ Compiled in 238ms
- ✓ Compiled in 264ms
- ✓ Compiled / in 291ms
- GET / 200 in 1441ms
- ✓ Compiled in 232ms
- ✓ Compiled in 290ms
- ✓ Compiled in 566ms
- ✓ Compiled / in 268ms
- GET / 200 in 600ms
- ✓ Compiled in 211ms
- ✓ Compiled in 221ms
- ✓ Compiled in 397ms
- ✓ Compiled in 245ms
- GET /left-small.jpg 404 in 875ms
- GET / 200 in 1382ms
- ✓ Compiled in 398ms
- GET /left-small.jpg 404 in 1585ms
- GET / 200 in 1045ms
- GET / 200 in 384ms
- GET / 200 in 397ms
- GET / 200 in 389ms
- ○ Compiling /login ...
- GET / 200 in 468ms
- ✓ Compiled /login in 6.7s
- GET /login 200 in 7130ms
- GET /login 200 in 869ms
- GET /left-small.jpg 404 in 475ms
- GET /login 200 in 334ms
- GET / 200 in 395ms
- GET /left-small.jpg 404 in 560ms
- GET /left-small.jpg 404 in 420ms
- GET /login 200 in 500ms
- ○ Compiling /verify-request ...
- ✓ Compiled /verify-request in 2.6s
- GET /verify-request?email=danikume27%40gmail.com 200 in 2948ms
- GET / 200 in 574ms
- ✓ Compiled in 689ms
- GET / 200 in 1588ms
+ ✓ Compiled /favicon.ico in 1139ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 2162ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 799ms
+ GET /left-small.jpg 404 in 1243ms
+ ○ Compiling /user ...
+ ✓ Compiled /user in 1435ms
+ GET /user 200 in 2235ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 504ms
+ ○ Compiling /user/settings ...
+ ✓ Compiled /user/settings in 1251ms
+ GET /user/settings 200 in 1502ms
+ GET /user/settings 200 in 335ms
+ ○ Compiling /user/support ...
+ ✓ Compiled /user/support in 921ms
+ GET /user/support 200 in 1168ms
+ GET /user/support 200 in 355ms
+ GET /user/settings 200 in 350ms

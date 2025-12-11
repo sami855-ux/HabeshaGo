@@ -1,24 +1,65 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import "../tamagui-web.css"
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native"
+import { useFonts } from "expo-font"
+import { Stack } from "expo-router"
+import * as SplashScreen from "expo-splash-screen"
+import { useEffect } from "react"
+import { TamaguiProvider } from "tamagui"
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { ThemeProviderCustom, useThemeContext } from "@/context/ThemeContext"
+import { store } from "@/store"
+import { Provider } from "react-redux"
+import tamaguiConfig from "../tamagui.config"
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <ThemeProviderCustom>
+      <AppWithTheme />
+    </ThemeProviderCustom>
+  )
+}
+
+function AppWithTheme() {
+  const { actualTheme } = useThemeContext()
+
+  const [fontsLoaded] = useFonts({
+    Geist: require("../assets/fonts/Geist-VariableFont_wght.ttf"),
+    grotesk: require("../assets/fonts/SpaceGrotesk-VariableFont_wght.ttf"),
+    groteskBold: require("../assets/fonts/SpaceGrotesk-Bold.ttf"),
+  })
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync()
+    }
+  }, [fontsLoaded])
+
+  if (!fontsLoaded) return null
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={actualTheme}>
+      <ThemeProvider value={actualTheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Provider store={store}>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="(auth)/email"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(auth)/phone"
+              options={{ headerShown: false }}
+            />
+
+            <Stack.Screen name="(passenger)" options={{ headerShown: false }} />
+          </Stack>
+        </Provider>
+      </ThemeProvider>
+    </TamaguiProvider>
+  )
 }

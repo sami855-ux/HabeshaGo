@@ -189,7 +189,7 @@ function Sidebar() {
         <div className="space-y-1">
           <button
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+              "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               "text-foreground hover:text-accent-foreground text-left"
             )}
@@ -203,7 +203,7 @@ function Sidebar() {
           </button>
           <button
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+              "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               "text-foreground hover:text-accent-foreground text-left"
             )}

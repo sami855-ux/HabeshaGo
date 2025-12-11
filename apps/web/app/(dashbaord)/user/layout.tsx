@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth"
 
 function UserLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, loading } = useAuth()
+  // const { user, loading } = useAuth()
 
   return (
     <div className="flex min-h-screen bg-background">

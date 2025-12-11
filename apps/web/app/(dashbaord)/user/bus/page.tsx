@@ -1,14 +1,11 @@
 "use client"
 
-import { SearchRoute } from "@/components/bus/SearchRoute"
-import { RouteMap } from "@/components/bus/RouteMap"
 import { BusList } from "@/components/bus/BusList"
-import { SeatSelection } from "@/components/bus/SeatSelection"
-import { BookingSummary } from "@/components/bus/BookingSummary"
+import { SearchRoute } from "@/components/bus/SearchRoute"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Bus, Zap, Shield } from "lucide-react"
+import { Bus, Shield, Zap } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true)

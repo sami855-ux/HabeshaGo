@@ -12,12 +12,26 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
-import { Loader, Send, Mail, Sparkles, ChevronRight, Check } from "lucide-react"
+import {
+  Loader,
+  Send,
+  Mail,
+  Sparkles,
+  Check,
+  Phone,
+  HelpCircle,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
 import { FaApple, FaGithub } from "react-icons/fa"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Common email domains for suggestions
 const COMMON_EMAIL_DOMAINS = [
@@ -46,9 +60,25 @@ function LoginPage() {
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>([])
   const [emailError, setEmailError] = useState("")
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
+  const [showPhoneTooltip, setShowPhoneTooltip] = useState(false)
+  const [activeHelp, setActiveHelp] = useState<"email" | "phone" | null>(null)
 
   const emailInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  const phoneButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Prevent body scroll when suggestions are shown
+  useEffect(() => {
+    if (showEmailSuggestions) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = "unset"
+    }
+
+    return () => {
+      document.body.style.overflow = "unset"
+    }
+  }, [showEmailSuggestions])
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -62,10 +92,19 @@ function LoginPage() {
         setShowEmailSuggestions(false)
         setSelectedSuggestionIndex(-1)
       }
+
+      // Close phone tooltip if clicking outside
+      if (
+        phoneButtonRef.current &&
+        !phoneButtonRef.current.contains(event.target as Node) &&
+        showPhoneTooltip
+      ) {
+        setShowPhoneTooltip(false)
+      }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  }, [showPhoneTooltip])
 
   // Generate email suggestions
   useEffect(() => {
@@ -93,6 +132,7 @@ function LoginPage() {
     setShowEmailSuggestions(false)
     setSelectedSuggestionIndex(-1)
     setEmailError("")
+    emailInputRef.current?.focus()
   }
 
   // Handle keyboard navigation for suggestions
@@ -147,6 +187,14 @@ function LoginPage() {
     } else {
       setEmailError("")
     }
+  }
+
+  // Handle phone login
+  const handlePhoneLogin = () => {
+    setShowPhoneTooltip(true)
+    setTimeout(() => {
+      router.push("/phone")
+    }, 1000)
   }
 
   async function signInWithGithub() {
@@ -250,11 +298,12 @@ function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Social Login Buttons */}
-          <div className="space-y-4">
+          {/* Social Login Buttons - Grid Layout */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Google Button - Full width */}
             <Button
               onClick={signInWithGoogle}
-              className="w-full font-medium"
+              className="w-full font-medium h-11 col-span-2"
               variant="outline"
               disabled={googlePending}
             >
@@ -263,44 +312,40 @@ function LoginPage() {
               ) : (
                 <div className="flex items-center justify-center w-full cursor-pointer">
                   <FcGoogle className="w-5 h-5 mr-3" />
-                  <span>Continue with Google</span>
+                  <span>Google</span>
                 </div>
               )}
             </Button>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={signInWithApple}
-                className="w-full font-medium"
-                variant="outline"
-                disabled={applePending}
-              >
-                {applePending ? (
-                  <Loader className="animate-spin size-4" />
-                ) : (
-                  <div className="flex items-center justify-center w-full cursor-pointer">
-                    <FaApple className="w-5 h-5 mr-3" />
-                    <span>Apple</span>
-                  </div>
-                )}
-              </Button>
+            {/* Apple Button - Primary Style */}
+            <Button
+              onClick={signInWithApple}
+              className="w-full font-medium h-11"
+              variant="default"
+              disabled={applePending}
+            >
+              {applePending ? (
+                <Loader className="animate-spin size-4" />
+              ) : (
+                <div className="flex items-center justify-center w-full cursor-pointer">
+                  <FaApple className="w-5 h-5 mr-3" />
+                  <span>Apple</span>
+                </div>
+              )}
+            </Button>
 
-              <Button
-                onClick={signInWithGithub}
-                className="w-full font-medium"
-                variant="outline"
-                disabled={githubPending}
-              >
-                {githubPending ? (
-                  <Loader className="animate-spin size-4" />
-                ) : (
-                  <div className="flex items-center justify-center w-full cursor-pointer">
-                    <FaGithub className="w-5 h-5 mr-3" />
-                    <span>GitHub</span>
-                  </div>
-                )}
-              </Button>
-            </div>
+            {/* Phone Button - Secondary Style */}
+            <Button
+              ref={phoneButtonRef}
+              onClick={handlePhoneLogin}
+              className="w-full font-medium h-11"
+              variant="secondary"
+            >
+              <div className="flex items-center justify-center w-full cursor-pointer">
+                <Phone className="w-5 h-5 mr-3" />
+                <span>Phone</span>
+              </div>
+            </Button>
           </div>
 
           <div className="relative">
@@ -308,7 +353,7 @@ function LoginPage() {
               <div className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-sm z-50">
-              <span className="px-3  text-muted-foreground bg-card">
+              <span className="px-3 text-muted-foreground bg-card">
                 Or continue with email
               </span>
             </div>
@@ -317,9 +362,30 @@ function LoginPage() {
           {/* Email Login */}
           <div className="space-y-4">
             <div className="space-y-3">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email address
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email address
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() =>
+                          setActiveHelp(activeHelp === "email" ? null : "email")
+                        }
+                      >
+                        <HelpCircle className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Enter your email to receive a one-time passcode</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
 
               <div className="relative" ref={suggestionsRef}>
                 <Input
@@ -343,39 +409,47 @@ function LoginPage() {
 
                 {/* Email Suggestions Dropdown */}
                 {showEmailSuggestions && emailSuggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg">
-                    <div className="px-3 py-2 border-b bg-muted/50">
-                      <p className="text-xs text-muted-foreground">
-                        Press ↑↓ to navigate • Enter to select • Esc to close
-                      </p>
+                  <>
+                    {/* Overlay to prevent background scrolling */}
+                    <div
+                      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                      onClick={() => setShowEmailSuggestions(false)}
+                    />
+
+                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-80 overflow-y-auto">
+                      <div className="px-3 py-2 border-b bg-muted/50 sticky top-0">
+                        <p className="text-xs text-muted-foreground">
+                          Press ↑↓ to navigate • Enter to select • Esc to close
+                        </p>
+                      </div>
+                      {emailSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                            index === selectedSuggestionIndex
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-accent hover:text-accent-foreground"
+                          }`}
+                          onClick={() => handleEmailSuggestionClick(suggestion)}
+                          onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3 h-3 text-muted-foreground" />
+                            <span>{suggestion}</span>
+                          </div>
+                          {index === selectedSuggestionIndex && (
+                            <Check className="w-3 h-3" />
+                          )}
+                        </button>
+                      ))}
+                      <div className="px-3 py-2 border-t bg-muted/50 sticky bottom-0">
+                        <p className="text-xs text-muted-foreground">
+                          {emailSuggestions.length} email suggestions
+                        </p>
+                      </div>
                     </div>
-                    {emailSuggestions.map((suggestion, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                          index === selectedSuggestionIndex
-                            ? "bg-accent text-accent-foreground"
-                            : "hover:bg-accent hover:text-accent-foreground"
-                        }`}
-                        onClick={() => handleEmailSuggestionClick(suggestion)}
-                        onMouseEnter={() => setSelectedSuggestionIndex(index)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3 h-3 text-muted-foreground" />
-                          <span>{suggestion}</span>
-                        </div>
-                        {index === selectedSuggestionIndex && (
-                          <Check className="w-3 h-3" />
-                        )}
-                      </button>
-                    ))}
-                    <div className="px-3 py-2 border-t bg-muted/50">
-                      <p className="text-xs text-muted-foreground">
-                        {emailSuggestions.length} email suggestions
-                      </p>
-                    </div>
-                  </div>
+                  </>
                 )}
               </div>
               {emailError && (
@@ -384,7 +458,7 @@ function LoginPage() {
             </div>
 
             <Button
-              className="w-full cursor-pointer"
+              className="w-full cursor-pointer h-11"
               onClick={signInWithEmail}
               disabled={emailPending}
             >
@@ -402,12 +476,6 @@ function LoginPage() {
             </Button>
           </div>
         </CardContent>
-
-        <CardFooter className="flex flex-col space-y-4 border-t pt-6">
-          <div className="text-xs text-center text-muted-foreground space-y-1">
-            <p>By continuing, you agree to our Terms and Privacy Policy</p>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   )

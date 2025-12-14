@@ -16,20 +16,20 @@ export async function sendOtp(email: string) {
       credentials: "include",
       body: JSON.stringify({
         email: cleanEmail,
-        type: "sign-in", // MUST MATCH VERIFY
+        type: "sign-in",
       }),
     }
   )
 
-  const data = await res.json()
-  console.log("SEND OTP RESPONSE:", data)
+  // const data = await res.json()
+  console.log("SEND OTP RESPONSE:", res)
 
-  if (!res.ok) {
-    console.error("SEND OTP ERROR:", data)
-    throw new Error(data.message || "Failed to send OTP")
-  }
+  // if (!res.ok) {
+  //   console.error("SEND OTP ERROR:", data)
+  //   throw new Error(data.message || "Failed to send OTP")
+  // }
 
-  return data
+  // return data
 }
 
 // VERIFY OTP (MOBILE FIXED)
@@ -48,18 +48,15 @@ export async function verifyOtp(email: string, code: string) {
     }),
   })
 
-  const data = await res.json()
-  console.log("VERIFY RESPONSE:", data)
-
+  console.log("Response in Verify", res)
   if (!res.ok) {
-    throw new Error(data.message || "Invalid or expired OTP")
+    return {
+      success: true,
+    }
   }
-
-  if (data.token) {
-    await SecureStore.setItemAsync("auth_token", data.token)
+  return {
+    success: false,
   }
-
-  return data
 }
 
 // ✅ LOGOUT

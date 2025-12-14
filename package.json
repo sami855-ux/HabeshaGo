@@ -21,6 +21,8 @@
     "@tamagui/babel-plugin": "^1.138.5",
     "@tamagui/config": "^1.138.5",
     "@tamagui/metro-plugin": "^1.138.5",
+    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-query-devtools": "^5.91.1",
     "axios": "^1.13.2",
     "better-auth": "^1.4.6",
     "expo": "~54.0.25",

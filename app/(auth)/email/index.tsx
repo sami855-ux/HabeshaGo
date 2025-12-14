@@ -124,7 +124,6 @@ const ContinueWithEmail = () => {
   }
 
   const handleContinue = async () => {
-    router.push("/(passenger)/(tabs)")
     if (!email) {
       triggerShake()
       showAlert({
@@ -220,19 +219,29 @@ const ContinueWithEmail = () => {
     setIsLoading(true)
 
     try {
-      const data = await verifyOtp(email, code) // ✅ REAL BACKEND VERIFY
+      const data = await verifyOtp(email, code)
 
-      showAlert({
-        type: "success",
-        title: "Verified Successfully",
-        message: "Your email has been verified and you are now signed in.",
-        primaryButtonText: "Continue",
-      })
+      if (data.success) {
+        showAlert({
+          type: "success",
+          title: "Verified Successfully",
+          message: "Your email has been verified and you are now signed in.",
+          primaryButtonText: "Continue",
+        })
 
-      console.log("✅ Login Success:", data)
+        console.log("✅ Login Success:", data)
 
-      // ✅ OPTIONAL: navigate to home/dashboard
-      // router.replace("/(tabs)")
+        // ✅ OPTIONAL: navigate to home/dashboard
+        // router.replace("/(tabs)")
+        router.push("/(passenger)/(tabs)")
+      } else {
+        showAlert({
+          type: "error",
+          title: "Verifaction Error",
+          message: "Your email has been verified and you are now signed in.",
+          primaryButtonText: "Continue",
+        })
+      }
     } catch (error: any) {
       triggerShake()
 

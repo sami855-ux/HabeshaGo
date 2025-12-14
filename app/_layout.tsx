@@ -11,6 +11,7 @@ import * as SplashScreen from "expo-splash-screen"
 import { useEffect } from "react"
 import { TamaguiProvider } from "tamagui"
 
+import QueryProvider from "@/components/utils/queryProvider"
 import { ThemeProviderCustom, useThemeContext } from "@/context/ThemeContext"
 import { store } from "@/store"
 import { Provider } from "react-redux"
@@ -44,21 +45,26 @@ function AppWithTheme() {
   return (
     <TamaguiProvider config={tamaguiConfig} defaultTheme={actualTheme}>
       <ThemeProvider value={actualTheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Provider store={store}>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="(auth)/email"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="(auth)/phone"
-              options={{ headerShown: false }}
-            />
+        <QueryProvider>
+          <Provider store={store}>
+            <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="(auth)/email"
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="(auth)/phone"
+                options={{ headerShown: false }}
+              />
 
-            <Stack.Screen name="(passenger)" options={{ headerShown: false }} />
-          </Stack>
-        </Provider>
+              <Stack.Screen
+                name="(passenger)"
+                options={{ headerShown: false }}
+              />
+            </Stack>
+          </Provider>
+        </QueryProvider>
       </ThemeProvider>
     </TamaguiProvider>
   )

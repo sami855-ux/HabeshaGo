@@ -62,6 +62,7 @@ function AppWithTheme() {
                 name="(passenger)"
                 options={{ headerShown: false }}
               />
+              <Stack.Screen name="(driver)" options={{ headerShown: false }} />
             </Stack>
           </Provider>
         </QueryProvider>

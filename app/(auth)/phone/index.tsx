@@ -68,6 +68,7 @@ const PhoneNumberScreen = () => {
   }
 
   const handleContinue = () => {
+    router.push("/(driver)/tabs")
     const clean = phoneNumber.replace(/\D/g, "")
 
     if (!validatePhoneNumber(clean)) {

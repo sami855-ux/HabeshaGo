@@ -1,4 +1,3 @@
-// SettingsScreen.tsx
 import { useThemeContext } from "@/context/ThemeContext"
 import {
   Bell,
@@ -101,8 +100,8 @@ const IOSToggle = ({
     >
       <Animated.View
         style={{
-          width: 51,
-          height: 31,
+          width: 47,
+          height: 27,
           borderRadius: 16,
           backgroundColor,
           justifyContent: "center",
@@ -110,8 +109,8 @@ const IOSToggle = ({
       >
         <Animated.View
           style={{
-            width: 27,
-            height: 27,
+            width: 24,
+            height: 24,
             borderRadius: 13.5,
             backgroundColor: "#FFFFFF",
             transform: [{ translateX }],

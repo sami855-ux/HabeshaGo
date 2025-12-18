@@ -1,0 +1,42 @@
+
+> web@0.1.0 dev
+> next dev --turbopack
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\User\Desktop\Addis Pluse\addis-pulse\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+<<<<<<< HEAD
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\User\Desktop\Addis Pluse\addis-pulse\apps\web\package-lock.json
+
+   ▲ Next.js 15.5.6 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://172.31.144.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 4.6s
+ ○ Compiling / ...
+ ✓ Compiled / in 11.7s
+ GET / 200 in 13682ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 1139ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 2162ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 799ms
+ GET /left-small.jpg 404 in 1243ms
+ ○ Compiling /user ...
+ ✓ Compiled /user in 1435ms
+ GET /user 200 in 2235ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 504ms
+ ○ Compiling /user/settings ...
+ ✓ Compiled /user/settings in 1251ms
+ GET /user/settings 200 in 1502ms
+ GET /user/settings 200 in 335ms
+ ○ Compiling /user/support ...
+ ✓ Compiled /user/support in 921ms
+ GET /user/support 200 in 1168ms
+ GET /user/support 200 in 355ms
+ GET /user/settings 200 in 350ms
+=======
+>>>>>>> 181a757999f91a75c261b7ca2821dffd02db76b3

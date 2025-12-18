@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String               @id @default(cuid())
+  name          String?
+  email         String?              @unique
+  password      String?
+  phone         String?              @unique
+  role          UserRole             @default(PASSENGER)
+  provider      String?
+  emailVerified Boolean              @default(false)
+  phoneVerified Boolean              @default(false)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  image         String?
+  bookings      Booking[]
+  chargings     ChargingSession[]
+  driverInfo    Driver?
+  minibuses     MinibusReservation[]
+  otpCodes      OtpCode[]
+  parkings      ParkingReservation[]
+  payments      Payment[]
+  refreshTokens RefreshToken[]
+  wallet        Wallet?
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("user")
+}
+
+model Wallet {
+  id        Int                 @id @default(autoincrement())
+  userId    String              @unique
+  balance   Float               @default(0)
+  currency  String              @default("ETB")
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  payments  Payment[]
+  user      User                @relation(fields: [userId], references: [id])
+  txns      WalletTransaction[]
+}
+
+model WalletTransaction {
+  id        Int             @id @default(autoincrement())
+  walletId  Int
+  amount    Float
+  type      TransactionType
+  reference String?
+  meta      Json?
+  createdAt DateTime        @default(now())
+  wallet    Wallet          @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  provider              String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  accountId             String
+  password              String?
+  user                  User      @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("account")
+}
+
+model OtpCode {
+  id        Int      @id @default(autoincrement())
+  userId    String?
+  email     String?
+  phone     String?
+  codeHash  String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Bus {
+  id              Int           @id @default(autoincrement())
+  busNumber       String        @unique
+  capacity        Int
+  status          BusStatus     @default(ACTIVE)
+  driverId        Int?          @unique
+  routeId         Int?
+  currentStop     String?
+  nextDestination String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  bookings        Booking[]
+  driver          Driver?       @relation(fields: [driverId], references: [id])
+  route           Route?        @relation(fields: [routeId], references: [id])
+  positions       BusPosition[]
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  userId        String
+  busId         Int
+  seatNumber    Int
+  date          DateTime
+  status        BookingStatus @default(CONFIRMED)
+  boardingStop  String?
+  alightingStop String?
+  bookingCode   String        @unique @default(uuid())
+  cancelledAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  paymentId     Int?          @unique
+  bus           Bus           @relation(fields: [busId], references: [id])
+  payment       Payment?      @relation(fields: [paymentId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  payNow       Boolean   @default(false)
+}
+
+model BusPosition {
+  id        Int      @id @default(autoincrement())
+  busId     Int
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+  bus       Bus      @relation(fields: [busId], references: [id])
+
+  @@index([busId, timestamp])
+}
+
+model Route {
+  id               Int       @id @default(autoincrement())
+  name             String
+  origin           String
+  destination      String
+  distanceKm       Float?
+  estimatedTimeMin Int?
+  midPoints        Json?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  buses            Bus[]
+  minibuses        Minibus[]
+}
+
+model EVStation {
+  id        Int            @id @default(autoincrement())
+  name      String
+  location  String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  slots     ChargingSlot[]
+}
+
+model ChargingSlot {
+  id         Int               @id @default(autoincrement())
+  slotNumber String
+  status     SlotStatus        @default(AVAILABLE)
+  stationId  Int
+  sessions   ChargingSession[]
+  station    EVStation         @relation(fields: [stationId], references: [id])
+}
+
+model ChargingSession {
+  id         Int          @id @default(autoincrement())
+  userId     String
+  slotId     Int
+  startTime  DateTime
+  endTime    DateTime?
+  energyUsed Float?
+  cost       Float?
+  createdAt  DateTime     @default(now())
+  slot       ChargingSlot @relation(fields: [slotId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
+}
+
+model Driver {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  licenseNo       String
+  experience      Int?
+  assignedBus     Bus?
+  user            User     @relation(fields: [userId], references: [id])
+  assignedMinibus Minibus?
+}
+
+model Minibus {
+  id           Int                  @id @default(autoincrement())
+  plateNumber  String               @unique
+  capacity     Int
+  driverId     Int?                 @unique
+  routeId      Int?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  driver       Driver?              @relation(fields: [driverId], references: [id])
+  route        Route?               @relation(fields: [routeId], references: [id])
+  reservations MinibusReservation[]
+}
+
+model MinibusReservation {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  minibusId Int
+  seat      Int
+  date      DateTime
+  status    ReservationStatus @default(PENDING)
+
+  paymentId Int?
+  payment   Payment[]
+
+  createdAt DateTime @default(now())
+
+  minibus   Minibus  @relation(fields: [minibusId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([minibusId, seat, date])
+}
+
+model ParkingLot {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  location     String
+  totalSlots   Int
+  occupied     Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  reservations ParkingReservation[]
+}
+
+model ParkingReservation {
+  id         Int        @id @default(autoincrement())
+  userId     String
+  lotId      Int
+  slotNumber Int
+  startTime  DateTime
+  endTime    DateTime
+  createdAt  DateTime   @default(now())
+  lot        ParkingLot @relation(fields: [lotId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+}
+
+model Payment {
+  id          Int           @id @default(autoincrement())
+  userId      String
+  amount      Float
+  currency    String        @default("ETB")
+  method      String
+  gatewayRef  String?
+  referenceId String?
+  status      PaymentStatus @default(PENDING)
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  bookingId   Int?
+  walletId    Int?
+  minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
+  minibusReservationId Int?  
+  booking     Booking?
+  user        User          @relation(fields: [userId], references: [id])
+  wallet      Wallet?       @relation(fields: [walletId], references: [id])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+  REFUND
+  ADJUSTMENT
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+enum PaymentMethod {
+  WALLET
+  CHAPA
+  TELEBIRR
+  CARD
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum BusStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+}

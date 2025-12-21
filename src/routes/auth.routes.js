@@ -13,7 +13,9 @@ import {
   getSessions,
   revokeSession,
   resendOTP,
+  getMe,
 } from "../controllers/auth.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
@@ -25,6 +27,9 @@ router.post("/resend-otp", resendOTP) // passed
 router.post("/refresh", refreshToken)
 router.post("/logout", logout)
 router.post("/logout-all", logoutAll)
+
+// Get authenticated user data
+router.get("/me", authenticate, getMe)
 
 // 2FA
 router.post("/2fa/verify", verify2FA)

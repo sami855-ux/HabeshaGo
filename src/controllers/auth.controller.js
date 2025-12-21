@@ -122,6 +122,43 @@ export const resendOTP = async (req, res) => {
   }
 }
 
+export const getMe = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        wallet: {
+          include: {
+            txns: true,
+            payments: true,
+          },
+        },
+        bookings: true,
+        minibusReservations: true,
+        parkingReservations: true,
+        sessions: true,
+        accounts: true,
+        otpCodes: true,
+      },
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    // Remove sensitive fields
+    delete user.password
+    delete user.twoFactorSecret
+
+    res.json({ user })
+  } catch (err) {
+    console.error("Get /me error:", err)
+    res.status(500).json({ message: "Failed to fetch user data" })
+  }
+}
+
 export const socialLogin = async (req, res) => {
   const { email, provider, providerId } = req.body
 

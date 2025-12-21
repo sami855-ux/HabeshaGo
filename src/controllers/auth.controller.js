@@ -1,62 +1,332 @@
-import prisma from "../prisma/client.js";
-import { sendOTP } from "../services/otp.service.js";
-import { generateToken } from "../services/token.service.js";
+import prisma from "../prisma/client.js"
+import { sendOTP } from "../services/otp.service.js"
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  hashToken,
+  issueTokens,
+} from "../services/token.service.js"
+import { hashPassword, verifyPassword } from "../services/password.service.js"
+import { verifyTOTP, generate2FASecret } from "../services/2fa.service.js"
 
 export const register = async (req, res) => {
-  const { email } = req.body;
+  try {
+    const { email } = req.body
 
-  let user = await prisma.user.findUnique({
-    where: { email },
-  });
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email is required", success: false })
+    }
 
-  if (!user) {
-    user = await prisma.user.create({
-      data: { email },
-    });
+    let user = await prisma.user.findUnique({ where: { email } })
+
+    if (!user) {
+      user = await prisma.user.create({ data: { email } })
+    }
+
+    await sendOTP(user)
+
+    res.json({ message: "OTP sent to email", success: true })
+  } catch (error) {
+    res.status(429).json({ message: error.message })
   }
-
-  await sendOTP(user);
-
-  res.json({ message: "OTP sent to email" });
-};
+}
 
 export const verifyOTP = async (req, res) => {
-  const { email, code } = req.body;
+  try {
+    const { email, code } = req.body
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
+    if (!email || !code) {
+      return res
+        .status(400)
+        .json({ message: "Email and code are required", success: false })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false })
+    }
+
+    const otp = await prisma.otpCode.findFirst({
+      where: {
+        userId: user.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
+    if (!otp) {
+      return res
+        .status(400)
+        .json({ message: "OTP expired or not found", success: false })
+    }
+
+    if (otp.attempts >= otp.maxAttempts) {
+      return res.status(429).json({
+        message: "Too many incorrect attempts. OTP locked.",
+        success: false,
+      })
+    }
+
+    // Always increment attempts
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    })
+
+    if (code !== otp.code) {
+      return res.status(400).json({ message: "Invalid OTP", success: false })
+    }
+
+    // Mark OTP as used
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { used: true },
+    })
+
+    // Verify email
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    })
+
+    // Issue tokens and send to client
+    return issueTokens(user, req, res)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "OTP verification failed", success: false })
+  }
+}
+
+export const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } })
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    await sendOTP(user)
+
+    res.json({ message: "OTP resent successfully" })
+  } catch (error) {
+    res.status(429).json({ message: error.message })
+  }
+}
+
+export const socialLogin = async (req, res) => {
+  const { email, provider, providerId } = req.body
+
+  let user = await prisma.user.findUnique({ where: { email } })
 
   if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    user = await prisma.user.create({ data: { email } })
   }
 
-  const otp = await prisma.otpCode.findFirst({
-    where: {
+  // Optional: store provider info in Account
+  await prisma.account.upsert({
+    where: { provider_providerId: { provider, providerId } },
+    update: { userId: user.id },
+    create: { provider, providerId, userId: user.id },
+  })
+
+  const refreshToken = generateRefreshToken()
+  const session = await prisma.session.create({
+    data: {
       userId: user.id,
-      codeHash: code,
-      used: false,
-      expiresAt: { gt: new Date() },
+      refreshTokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     },
-  });
+  })
 
-  if (!otp) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
+  const accessToken = generateAccessToken({
+    sub: user.id,
+    role: user.role,
+    sessionId: session.id,
+  })
+
+  res.json({ accessToken, refreshToken })
+}
+
+export const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken: incomingToken } = req.body
+    if (!incomingToken) {
+      return res
+        .status(400)
+        .json({ message: "Refresh token is required", success: false })
+    }
+
+    const hashedToken = hashPassword(incomingToken)
+
+    // Find session associated with this refresh token
+    const session = await prisma.session.findFirst({
+      where: {
+        refreshTokenHash: hashedToken,
+        revoked: false,
+        expiresAt: { gt: new Date() },
+      },
+      include: { user: true },
+    })
+
+    if (!session) {
+      return res
+        .status(401)
+        .json({ message: "Invalid or expired refresh token", success: false })
+    }
+
+    if (session.user.isSuspended) {
+      return res
+        .status(403)
+        .json({ message: "Account suspended", success: false })
+    }
+
+    // Generate a new access token
+    const accessToken = generateAccessToken({
+      id: session.user.id,
+      role: session.user.role,
+      sessionId: session.id,
+    })
+
+    return res.json({ accessToken, success: true })
+  } catch (err) {
+    console.error("Refresh token error:", err)
+    return res
+      .status(500)
+      .json({ message: "Failed to refresh token", success: false })
   }
+}
 
-  // mark OTP as used
-  await prisma.otpCode.update({
-    where: { id: otp.id },
-    data: { used: true },
-  });
+export const logout = async (req, res) => {
+  try {
+    const { sessionId } = req.user
 
-  // verify user
+    // Revoke the session in DB
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { revoked: true },
+    })
+
+    // Clear the refresh token cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+    })
+
+    return res.json({ message: "Logged out successfully", success: true })
+  } catch (err) {
+    console.error("Logout error:", err)
+    return res.status(500).json({ message: "Failed to logout" })
+  }
+}
+
+export const logoutAll = async (req, res) => {
+  await prisma.session.updateMany({
+    where: { userId: req.user.id },
+    data: { revoked: true },
+  })
+  res.json({ message: "All sessions revoked" })
+}
+
+export const enable2FA = async (req, res) => {
+  const { id } = req.user
+  const { base32, qrCode } = await generate2FASecret(req.user.email)
+
   await prisma.user.update({
-    where: { id: user.id },
-    data: { emailVerified: true },
-  });
+    where: { id },
+    data: { twoFactorSecret: base32, twoFactorEnabled: false },
+  })
 
-  const token = generateToken(user);
+  res.json({ qrCode, secret: base32 })
+}
 
-  res.json({ email,token });
-};
+export const confirm2FA = async (req, res) => {
+  const { code } = req.body
+  const { id } = req.user
+  const user = await prisma.user.findUnique({ where: { id } })
+
+  if (!verifyTOTP(code, user.twoFactorSecret))
+    return res.status(401).json({ message: "Invalid 2FA code" })
+
+  await prisma.user.update({ where: { id }, data: { twoFactorEnabled: true } })
+
+  res.json({ message: "2FA enabled successfully" })
+}
+
+export const disable2FA = async (req, res) => {
+  const { id } = req.user
+  await prisma.user.update({
+    where: { id },
+    data: { twoFactorEnabled: false, twoFactorSecret: null },
+  })
+  res.json({ message: "2FA disabled successfully" })
+}
+
+export const verify2FA = async (req, res) => {
+  const { userId, code } = req.body
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+
+  if (!user || !user.twoFactorEnabled)
+    return res.status(400).json({ message: "Invalid request" })
+  if (!verifyTOTP(code, user.twoFactorSecret))
+    return res.status(401).json({ message: "Invalid 2FA code" })
+
+  const refreshToken = generateRefreshToken()
+  const session = await prisma.session.create({
+    data: {
+      userId: user.id,
+      refreshTokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  })
+
+  const accessToken = generateAccessToken({
+    sub: user.id,
+    role: user.role,
+    sessionId: session.id,
+  })
+
+  res.json({ accessToken, refreshToken })
+}
+
+export const suspendUser = async (req, res) => {
+  const { userId, reason } = req.body
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isSuspended: true,
+      suspendedAt: new Date(),
+      suspensionReason: reason,
+    },
+  })
+  await prisma.session.updateMany({
+    where: { userId },
+    data: { revoked: true },
+  })
+  res.json({ message: "User suspended successfully" })
+}
+
+export const getSessions = async (req, res) => {
+  const sessions = await prisma.session.findMany({
+    where: { userId: req.user.id },
+  })
+  res.json(sessions)
+}
+
+export const revokeSession = async (req, res) => {
+  const { sessionId } = req.params
+  await prisma.session.update({
+    where: { id: sessionId },
+    data: { revoked: true },
+  })
+  res.json({ message: "Session revoked" })
+}

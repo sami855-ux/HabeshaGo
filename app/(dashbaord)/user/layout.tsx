@@ -1,11 +1,20 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import Sidebar from "@/components/user-dashboard/Sidebar"
 import Header from "@/components/user-dashboard/Header"
+import { useDispatch, useSelector } from "react-redux"
+import { AppDispatch } from "@/store"
+import { fetchCurrentUser } from "@/store/slices/userSlice"
 
 function UserLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const dispatch = useDispatch<AppDispatch>()
+
+  useEffect(() => {
+    dispatch(fetchCurrentUser())
+  }, [dispatch])
 
   return (
     <div className="flex min-h-screen bg-background">

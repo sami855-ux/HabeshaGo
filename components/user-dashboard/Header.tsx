@@ -43,14 +43,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
 import { RootState } from "@/store"
-import { useSelector } from "react-redux"
-import { authClient } from "@/lib/auth-client"
+import { useDispatch, useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
+import { LogoutModal } from "../logout-modal"
+import { clearUser } from "@/store/slices/userSlice"
+import { logoutUser } from "@/services/auth.user.api"
 
 function Header({
   onMenuClick,
@@ -62,9 +63,11 @@ function Header({
   className?: string
 }) {
   const router = useRouter()
+  const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.user.user)
 
-  console.log(user)
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -76,14 +79,23 @@ function Header({
     setSearchQuery("")
   }
 
-  const logout = async () => {
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          router.push("/login") // redirect to login page
-        },
-      },
-    })
+  const handleLogout = async () => {
+    setIsLoading(true)
+
+    try {
+      // Call backend to remove refresh token
+      await logoutUser()
+
+      // Clear Redux state
+      dispatch(clearUser())
+
+      // Redirect
+      router.push("/")
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -256,7 +268,7 @@ function Header({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={logout}
+                      onClick={() => setIsLogoutModalOpen(true)}
                     >
                       <LogOut className="w-4 h-4 mr-2" />
                       <span>Log out</span>
@@ -375,6 +387,13 @@ function Header({
           </div>
         </DialogContent>
       </Dialog>
+
+      <LogoutModal
+        isOpen={isLogoutModalOpen}
+        onOpenChange={setIsLogoutModalOpen}
+        onConfirm={handleLogout}
+        isLoading={isLoading}
+      />
     </>
   )
 }

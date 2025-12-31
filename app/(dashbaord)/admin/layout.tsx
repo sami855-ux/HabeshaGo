@@ -3,8 +3,11 @@
 import React, { useState } from "react"
 import Sidebar from "@/components/admin-dashboard/Sidebar"
 import Header from "@/components/admin-dashboard/Header"
+import { useRequireRole } from "@/hooks/useRequireRole"
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
+  useRequireRole(["ADMIN"])
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (

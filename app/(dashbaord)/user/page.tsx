@@ -1,5 +1,6 @@
 "use client"
 
+import { RootState } from "@/store"
 import {
   Bus,
   ParkingCircle,
@@ -11,8 +12,14 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
 
 function Page() {
+  const { user, isAuthenticated, loading } = useSelector(
+    (state: RootState) => state.user
+  )
+
+  console.log(user, isAuthenticated, loading)
   const router = useRouter()
   const quickActions = [
     {

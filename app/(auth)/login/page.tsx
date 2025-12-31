@@ -31,6 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { register } from "@/services/auth.user.api"
 
 // Common email domains for suggestions
 const COMMON_EMAIL_DOMAINS = [
@@ -202,12 +203,22 @@ function LoginPage() {
 
   async function signInWithApple() {}
 
-  function signInWithEmail() {
+  const signInWithEmail = () => {
     // Validate email
     if (!validateEmail(email)) {
       setEmailError("Please enter a valid email address")
       return
     }
+
+    startEmailTransition(async () => {
+      const response = await register({ email })
+
+      if (!response.success) return
+
+      toast.success("OTP is send to your email")
+      // Optional: move to OTP screen
+      router.push(`/verify-request?email=${email}`)
+    })
   }
 
   return (

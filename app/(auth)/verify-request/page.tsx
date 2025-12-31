@@ -14,15 +14,15 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp"
-import { authClient } from "@/lib/auth-client"
 import { Loader, Mail, Shield, Timer, CheckCircle, XCircle } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import React, { useState, useTransition, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { useDispatch } from "react-redux"
-import { setUser } from "@/store/slices/userSlice"
+import { setAccessToken, setUser } from "@/store/slices/userSlice"
 import { getUserById } from "@/services/user"
 import { AppDispatch } from "@/store"
+import { getMe, verifyOTP } from "@/services/auth.user.api"
 
 function VerifyPage() {
   const dispatch = useDispatch<AppDispatch>()
@@ -89,28 +89,6 @@ function VerifyPage() {
     if (!canResend) return
 
     try {
-      await authClient.emailOtp.sendVerificationOtp({
-        email,
-        type: "sign-in",
-        fetchOptions: {
-          onSuccess: () => {
-            toast.success("New OTP sent to your email")
-            setResendCooldown(60)
-            setCanResend(false)
-            setOtp("")
-            setAttempts((prev) => prev + 1)
-            setVerificationStatus("idle")
-
-            // Focus back to first slot
-            if (firstSlotRef.current) {
-              firstSlotRef.current.focus()
-            }
-          },
-          onError: () => {
-            toast.error("Failed to resend OTP")
-          },
-        },
-      })
     } catch (error) {
       toast.error("Error resending OTP")
     }
@@ -132,71 +110,39 @@ function VerifyPage() {
     setVerificationStatus("verifying")
     startTransition(async () => {
       try {
-        const result = await authClient.signIn.emailOtp({
-          email,
-          otp,
-          fetchOptions: {
-            onSuccess: () => {
-              setVerificationStatus("success")
-              toast.success("Account verified successfully")
-            },
-            onError: (error) => {
-              setVerificationStatus("error")
-              setAttempts((prev) => prev + 1)
+        const res = await verifyOTP({ email, code: otp })
 
-              if (attempts >= 2) {
-                toast.error(
-                  "Too many failed attempts. Please request a new OTP."
-                )
-                setCanResend(true)
-                setResendCooldown(0)
-              } else {
-                toast.error("Invalid OTP. Please try again.")
-              }
+        if (res.success) {
+          toast.success("Otp verifyed successfully")
+          setVerificationStatus("success")
 
-              // Clear OTP on error (except last attempt)
-              if (attempts < 2) {
-                setTimeout(() => {
-                  setOtp("")
-                  if (firstSlotRef.current) {
-                    firstSlotRef.current.focus()
-                  }
-                }, 500)
-              }
-            },
-          },
-        })
+          dispatch(setAccessToken(res.data?.accessToken))
 
-        if (result?.data) {
-          const user = result.data.user
-          const token = result.data.token
+          const userRes = await getMe()
 
-          try {
-            // Fetch full user data from backend
-            const response = await getUserById(user.id)
+          console.log(userRes)
 
-            if (response.success && response.data) {
-              dispatch(
-                setUser({
-                  user: response.data,
-                  token,
-                })
-              )
+          if (userRes.success) {
+            dispatch(setUser(userRes.user))
 
-              // Small delay before redirect for better UX
-              setTimeout(() => {
-                router.push("/user")
-              }, 1000)
-            } else {
-              console.error("Failed to fetch full user:", response.message)
-              toast.error("Failed to load user profile")
+            //Dynamic route based on the role
+            if (userRes.user.role === "PASSENGER") {
+              router.push("/user")
             }
-          } catch (err) {
-            console.error("Error fetching full user:", err)
-            toast.error("Error loading user data")
           }
         }
+
+        // Clear OTP on error (except last attempt)
+        if (attempts < 2) {
+          setTimeout(() => {
+            setOtp("")
+            if (firstSlotRef.current) {
+              firstSlotRef.current.focus()
+            }
+          }, 500)
+        }
       } catch (error) {
+        console.log(error?.reponse.data.message || "dhgsjhakj")
         setVerificationStatus("error")
         toast.error("Verification failed. Please try again.")
       }
@@ -213,7 +159,7 @@ function VerifyPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-md mx-auto border shadow-lg">
+      <Card className="w-full max-w-md mx-auto border-none shadow-none">
         <CardHeader className="space-y-4 text-center">
           <div className="flex flex-col items-center space-y-3">
             <div className="p-3 rounded-full bg-primary/10">
@@ -303,28 +249,6 @@ function VerifyPage() {
                   />
                 </InputOTPGroup>
               </InputOTP>
-
-              {/* Status Indicators */}
-              <div className="flex items-center justify-center space-x-4 h-6">
-                {verificationStatus === "verifying" && (
-                  <div className="flex items-center space-x-2 text-primary">
-                    <Loader className="animate-spin h-4 w-4" />
-                    <span className="text-sm">Verifying...</span>
-                  </div>
-                )}
-                {verificationStatus === "success" && (
-                  <div className="flex items-center space-x-2 text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="text-sm">Verified! Redirecting...</span>
-                  </div>
-                )}
-                {verificationStatus === "error" && (
-                  <div className="flex items-center space-x-2 text-destructive">
-                    <XCircle className="h-4 w-4" />
-                    <span className="text-sm">Invalid code</span>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Auto-verify notice */}
@@ -388,32 +312,13 @@ function VerifyPage() {
                 variant="outline"
                 onClick={resendOtp}
                 disabled={!canResend || verificationStatus === "verifying"}
-                className="w-full"
+                className="w-full border-none bg-transparent"
               >
                 Resend OTP
               </Button>
             </div>
           </div>
         </CardContent>
-
-        <CardFooter className="flex flex-col space-y-4 border-t pt-6">
-          <div className="text-center text-sm text-muted-foreground space-y-2">
-            <p className="flex items-center justify-center space-x-2">
-              <Shield className="h-3 w-3" />
-              <span>Your verification code expires in 10 minutes</span>
-            </p>
-          </div>
-
-          <div className="text-center">
-            <Button
-              variant="link"
-              className="h-auto p-0"
-              onClick={() => router.push("/login")}
-            >
-              ← Back to login
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   )

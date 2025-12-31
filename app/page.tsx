@@ -7,20 +7,8 @@ import { Navigation } from "@/components/navigation"
 import { ServicesSection } from "@/components/services-section"
 import { TestimonialsSection } from "@/components/testimonials"
 import { ThemeToggle } from "@/components/themeToggle"
-// import { useAuth } from "@/hooks/useAuth"
-// import { authClient } from "@/lib/auth-client"
 
 export default function Home() {
-  // const { user, loading } = useAuth()
-
-  // if (loading) {
-  //   return <div className="">loading.....</div>
-  // }
-
-  // if (user) {
-  //   return <div className="">There is session {user.email}</div>
-  // }
-
   return (
     <div className="">
       <ThemeToggle />

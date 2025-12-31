@@ -5,6 +5,7 @@ import { Provider as ReduxProvider } from "react-redux"
 import { store } from "@/store"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/ui/themeProvider"
+import SessionProvider from "@/lib/accessTokenProvider"
 
 interface AppProviderProps {
   children: ReactNode
@@ -20,7 +21,7 @@ const AppProvider: FC<AppProviderProps> = ({ children }) => {
         disableTransitionOnChange
       >
         <Toaster />
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </ThemeProvider>
     </ReduxProvider>
   )

@@ -25,8 +25,8 @@ router.post("/verify-otp", verifyOTP) // passed
 router.post("/resend-otp", resendOTP) // passed
 
 router.post("/refresh", refreshToken)
-router.post("/logout", logout)
-router.post("/logout-all", logoutAll)
+router.post("/logout", authenticate, logout)
+router.post("/logout-all", authenticate, logoutAll)
 
 // Get authenticated user data
 router.get("/me", authenticate, getMe)

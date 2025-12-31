@@ -52,6 +52,7 @@ export const issueTokens = async (user, req, res) => {
 
     // Return access token in response body
     return res.json({
+      userId: user.id,
       accessToken,
       message: "Email Verfied Successfuly",
       success: true,

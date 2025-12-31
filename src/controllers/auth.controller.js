@@ -145,16 +145,16 @@ export const getMe = async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "User not found", success: false })
     }
 
     // Remove sensitive fields
     delete user.password
     delete user.twoFactorSecret
 
-    res.json({ user })
+    res.json({ user, success: true })
   } catch (err) {
-    console.error("Get /me error:", err)
+    console.error("Get current user error:", err)
     res.status(500).json({ message: "Failed to fetch user data" })
   }
 }
@@ -195,16 +195,13 @@ export const socialLogin = async (req, res) => {
 
 export const refreshToken = async (req, res) => {
   try {
-    const { refreshToken: incomingToken } = req.body
+    const incomingToken = req.cookies?.refreshToken
     if (!incomingToken) {
-      return res
-        .status(400)
-        .json({ message: "Refresh token is required", success: false })
+      return res.status(401).json({ message: "No refresh token" })
     }
 
     const hashedToken = hashPassword(incomingToken)
 
-    // Find session associated with this refresh token
     const session = await prisma.session.findFirst({
       where: {
         refreshTokenHash: hashedToken,
@@ -214,31 +211,46 @@ export const refreshToken = async (req, res) => {
       include: { user: true },
     })
 
-    if (!session) {
-      return res
-        .status(401)
-        .json({ message: "Invalid or expired refresh token", success: false })
+    if (!session || session.user.isSuspended) {
+      return res.status(403).json({ message: "Invalid session" })
     }
 
-    if (session.user.isSuspended) {
-      return res
-        .status(403)
-        .json({ message: "Account suspended", success: false })
-    }
+    // 🔁 Rotate refresh token
+    const newRefreshToken = generateRefreshToken({ sub: session.user.id })
+    const newHashedToken = await hashPassword(newRefreshToken)
 
-    // Generate a new access token
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        refreshTokenHash: newHashedToken,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    })
+
+    // New access token
     const accessToken = generateAccessToken({
       id: session.user.id,
       role: session.user.role,
       sessionId: session.id,
     })
 
-    return res.json({ accessToken, success: true })
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+    })
+
+    return res.json({
+      accessToken,
+      user: {
+        id: session.user.id,
+        role: session.user.role,
+        email: session.user.email,
+      },
+    })
   } catch (err) {
     console.error("Refresh token error:", err)
-    return res
-      .status(500)
-      .json({ message: "Failed to refresh token", success: false })
+    res.status(500).json({ message: "Failed to refresh token" })
   }
 }
 
@@ -262,7 +274,7 @@ export const logout = async (req, res) => {
     return res.json({ message: "Logged out successfully", success: true })
   } catch (err) {
     console.error("Logout error:", err)
-    return res.status(500).json({ message: "Failed to logout" })
+    return res.status(500).json({ message: "Failed to logout", success: false })
   }
 }
 

@@ -3,23 +3,26 @@ import prisma from "../prisma/client.js"
 
 export const authenticate = async (req, res, next) => {
   try {
+    // Get token from Authorization header
     const authHeader = req.headers.authorization
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Authorization token missing" })
+    if (!token) {
+      return res.status(401).json({ message: "Access token missing" })
     }
 
-    const token = authHeader.split(" ")[1]
-
-    // Verify JWT
     let decoded
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET)
     } catch (err) {
-      return res.status(401).json({ message: "Invalid or expired token" })
+      return res
+        .status(401)
+        .json({ message: "Invalid or expired access token" })
     }
 
-    // Check if the session exists and is not revoked
+    // Check if session exists in DB
     const session = await prisma.session.findUnique({
       where: { id: decoded.sessionId },
       include: { user: true },

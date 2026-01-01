@@ -25,7 +25,7 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: ["http://localhost:3000"],
+    origin: ["http://localhost:3000", "exp://10.18.95.32:8081"],
     credentials: true,
   })
 )

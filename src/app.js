@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors"
+import session from "express-session"
 
 import authRoutes from "./routes/auth.routes.js"
 import driverRoutes from "./routes/driver.routes.js"
@@ -11,8 +12,11 @@ import walletRoutes from "./routes/wallet.routes.js"
 import minibusReservationRoutes from "./routes/minibusReservation.routes.js"
 import minibusRoute from "./routes/minibus.route.js"
 
+import "./config/passport.js"
+
 import "dotenv/config"
 import cookieParser from "cookie-parser"
+import passport from "passport"
 
 const PORT = process.env.PORT || 5000
 
@@ -26,6 +30,11 @@ app.use(
   })
 )
 app.use(express.json())
+app.use(
+  session({ secret: "secretkey", resave: false, saveUninitialized: false })
+)
+app.use(passport.initialize())
+app.use(passport.session())
 
 app.use("/api/auth", authRoutes)
 app.use("/api/drivers", driverRoutes)

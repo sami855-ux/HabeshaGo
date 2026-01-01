@@ -14,8 +14,12 @@ import {
   revokeSession,
   resendOTP,
   getMe,
+  googleCallback,
+  verifyOTPApp,
+  refreshTokenApp,
 } from "../controllers/auth.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
+import passport from "passport"
 
 const router = express.Router()
 
@@ -23,6 +27,10 @@ const router = express.Router()
 router.post("/register", register) // passed
 router.post("/verify-otp", verifyOTP) // passed
 router.post("/resend-otp", resendOTP) // passed
+
+//App
+router.post("/app/verify-otp", verifyOTPApp)
+router.post("/app/refresh", refreshTokenApp)
 
 router.post("/refresh", refreshToken)
 router.post("/logout", authenticate, logout)
@@ -39,6 +47,17 @@ router.post("/2fa/disable", disable2FA)
 
 // Social login
 router.post("/social/:provider", socialLogin)
+
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+)
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  googleCallback
+)
 
 // Sessions
 router.get("/sessions", getSessions)

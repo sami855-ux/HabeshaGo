@@ -4,6 +4,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   hashToken,
+  issueMobileTokens,
   issueTokens,
 } from "../services/token.service.js"
 import { hashPassword, verifyPassword } from "../services/password.service.js"
@@ -94,6 +95,72 @@ export const verifyOTP = async (req, res) => {
 
     // Issue tokens and send to client
     return issueTokens(user, req, res)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "OTP verification failed", success: false })
+  }
+}
+export const verifyOTPApp = async (req, res) => {
+  try {
+    const { email, code } = req.body
+
+    if (!email || !code) {
+      return res
+        .status(400)
+        .json({ message: "Email and code are required", success: false })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false })
+    }
+
+    const otp = await prisma.otpCode.findFirst({
+      where: {
+        userId: user.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
+    if (!otp) {
+      return res
+        .status(400)
+        .json({ message: "OTP expired or not found", success: false })
+    }
+
+    if (otp.attempts >= otp.maxAttempts) {
+      return res.status(429).json({
+        message: "Too many incorrect attempts. OTP locked.",
+        success: false,
+      })
+    }
+
+    // Always increment attempts
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    })
+
+    if (code !== otp.code) {
+      return res.status(400).json({ message: "Invalid OTP", success: false })
+    }
+
+    // Mark OTP as used
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { used: true },
+    })
+
+    // Verify email
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    })
+
+    // Issue tokens and send to client
+    return issueMobileTokens(user, req, res)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: "OTP verification failed", success: false })
@@ -193,6 +260,17 @@ export const socialLogin = async (req, res) => {
   res.json({ accessToken, refreshToken })
 }
 
+export const googleCallback = async (req, res) => {
+  try {
+    const user = req.user
+
+    return issueTokens(user, req, res)
+  } catch (err) {
+    console.error("Google login failed:", err)
+    return res.status(500).json({ message: "Google login failed" })
+  }
+}
+
 export const refreshToken = async (req, res) => {
   try {
     const incomingToken = req.cookies?.refreshToken
@@ -251,6 +329,66 @@ export const refreshToken = async (req, res) => {
   } catch (err) {
     console.error("Refresh token error:", err)
     res.status(500).json({ message: "Failed to refresh token" })
+  }
+}
+export const refreshTokenApp = async (req, res) => {
+  try {
+    // 🔐 Get refresh token from request body (mobile-safe)
+    const { refreshToken } = req.body
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token required" })
+    }
+
+    // Hash incoming token to match DB
+    const hashedToken = await hashPassword(refreshToken)
+
+    // Find valid session
+    const session = await prisma.session.findFirst({
+      where: {
+        refreshTokenHash: hashedToken,
+        revoked: false,
+        expiresAt: { gt: new Date() },
+      },
+      include: { user: true },
+    })
+
+    if (!session || session.user.isSuspended) {
+      return res.status(403).json({ message: "Invalid or expired session" })
+    }
+
+    // 🔁 Rotate refresh token
+    const newRefreshToken = generateRefreshToken({ sub: session.user.id })
+    const newHashedToken = await hashPassword(newRefreshToken)
+
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        refreshTokenHash: newHashedToken,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    })
+
+    // Generate new access token
+    const accessToken = generateAccessToken({
+      id: session.user.id,
+      role: session.user.role,
+      sessionId: session.id,
+    })
+
+    // ✅ Return tokens (NO COOKIES)
+    return res.status(200).json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        role: session.user.role,
+      },
+    })
+  } catch (err) {
+    console.error("Refresh token error:", err)
+    return res.status(500).json({ message: "Failed to refresh token" })
   }
 }
 

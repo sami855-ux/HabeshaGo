@@ -62,6 +62,50 @@ export const issueTokens = async (user, req, res) => {
     return res.status(500).json({ message: "Failed to issue tokens" })
   }
 }
+export const issueMobileTokens = async (user, req, res) => {
+  try {
+    if (user.isSuspended) {
+      return res.status(403).json({ message: "Account suspended" })
+    }
+
+    // Generate refresh token
+    const refreshToken = generateRefreshToken({ sub: user.id })
+
+    // Store hashed refresh token for session tracking
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshTokenHash: await hashPassword(refreshToken),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      },
+    })
+
+    // Generate access token
+    const accessToken = generateAccessToken({
+      id: user.id,
+      role: user.role,
+      sessionId: session.id,
+    })
+
+    // ✅ MOBILE-FRIENDLY RESPONSE (NO COOKIES)
+    return res.status(200).json({
+      success: true,
+      message: "Authentication successful",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    })
+  } catch (err) {
+    console.error("Token issuance failed:", err)
+    return res.status(500).json({ message: "Failed to issue tokens" })
+  }
+}
 
 // ACCESS TOKEN
 export const generateAccessToken = (payload) => {

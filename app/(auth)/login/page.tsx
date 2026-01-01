@@ -199,11 +199,15 @@ function LoginPage() {
 
   async function signInWithGithub() {}
 
-  async function signInWithGoogle() {}
+  const signInWithGoogle = () => {
+    // Redirect the entire page to backend Google login
+    window.location.href = "http://localhost:5000/api/auth/google"
+  }
 
   async function signInWithApple() {}
 
-  const signInWithEmail = () => {
+  const signInWithEmail = (e) => {
+    e.preventDefault()
     // Validate email
     if (!validateEmail(email)) {
       setEmailError("Please enter a valid email address")
@@ -296,7 +300,7 @@ function LoginPage() {
           </div>
 
           {/* Email Login */}
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={signInWithEmail}>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="email" className="text-sm font-medium">
@@ -395,7 +399,7 @@ function LoginPage() {
 
             <Button
               className="w-full cursor-pointer h-11"
-              onClick={signInWithEmail}
+              type="submit"
               disabled={emailPending}
             >
               {emailPending ? (
@@ -410,7 +414,7 @@ function LoginPage() {
                 </>
               )}
             </Button>
-          </div>
+          </form>
         </CardContent>
       </Card>
     </div>

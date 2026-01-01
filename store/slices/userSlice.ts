@@ -1,54 +1,56 @@
 import { User } from "@/types/user"
-import AsyncStorage from "@react-native-async-storage/async-storage"
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit"
+import * as SecureStore from "expo-secure-store"
 
 interface UserState {
   user: User | null
-  token: string | null
+  accessToken: string | null
   isAuthenticated: boolean
   loading: boolean
 }
 
 const initialState: UserState = {
   user: null,
-  token: null,
+  accessToken: null,
   isAuthenticated: false,
   loading: false,
 }
 
-//  Load user + token from AsyncStorage on app startup
 export const loadUserFromStorage = createAsyncThunk(
   "user/loadFromStorage",
   async () => {
-    const storedUser = await AsyncStorage.getItem("user")
-    const storedToken = await AsyncStorage.getItem("token")
-
-    if (!storedUser || !storedToken) {
-      return { user: null, token: null }
-    }
+    const user = await SecureStore.getItemAsync("user")
+    const accessToken = await SecureStore.getItemAsync("accessToken")
 
     return {
-      user: JSON.parse(storedUser) as User,
-      token: storedToken,
+      user: user ? JSON.parse(user) : null,
+      accessToken,
     }
   }
 )
-
-//  Save token + user to AsyncStorage when logging in
 export const saveUserToStorage = createAsyncThunk(
   "user/saveToStorage",
-  async (payload: { user: User; token: string }) => {
-    await AsyncStorage.setItem("user", JSON.stringify(payload.user))
-    await AsyncStorage.setItem("token", payload.token)
+  async ({
+    user,
+    accessToken,
+    refreshToken,
+  }: {
+    user: User
+    accessToken: string
+    refreshToken: string
+  }) => {
+    await SecureStore.setItemAsync("user", JSON.stringify(user))
+    await SecureStore.setItemAsync("accessToken", accessToken)
+    await SecureStore.setItemAsync("refreshToken", refreshToken)
 
-    return payload
+    return { user, accessToken }
   }
 )
 
-//    Clear everything on logout
 export const clearStorage = createAsyncThunk("user/clearStorage", async () => {
-  await AsyncStorage.removeItem("user")
-  await AsyncStorage.removeItem("token")
+  await SecureStore.deleteItemAsync("user")
+  await SecureStore.deleteItemAsync("accessToken")
+  await SecureStore.deleteItemAsync("refreshToken")
 })
 
 const userSlice = createSlice({
@@ -60,35 +62,34 @@ const userSlice = createSlice({
         state.user = { ...state.user, ...action.payload }
       }
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.loading = action.payload
+
+    setAccessToken: (state, action: PayloadAction<string>) => {
+      state.accessToken = action.payload
+      state.isAuthenticated = true
     },
   },
 
   extraReducers: (builder) => {
-    /* Load from storage */
-    builder.addCase(loadUserFromStorage.fulfilled, (state, action) => {
-      const { user, token } = action.payload
-      state.user = user
-      state.token = token
-      state.isAuthenticated = !!token
-    })
+    builder
+      .addCase(loadUserFromStorage.fulfilled, (state, action) => {
+        state.user = action.payload.user
+        state.accessToken = action.payload.accessToken
+        state.isAuthenticated = !!action.payload.accessToken
+      })
 
-    /* Save to storage */
-    builder.addCase(saveUserToStorage.fulfilled, (state, action) => {
-      state.user = action.payload.user
-      state.token = action.payload.token
-      state.isAuthenticated = true
-    })
+      .addCase(saveUserToStorage.fulfilled, (state, action) => {
+        state.user = action.payload.user
+        state.accessToken = action.payload.accessToken
+        state.isAuthenticated = true
+      })
 
-    /* Logout */
-    builder.addCase(clearStorage.fulfilled, (state) => {
-      state.user = null
-      state.token = null
-      state.isAuthenticated = false
-    })
+      .addCase(clearStorage.fulfilled, (state) => {
+        state.user = null
+        state.accessToken = null
+        state.isAuthenticated = false
+      })
   },
 })
 
-export const { updateUser, setLoading } = userSlice.actions
+export const { updateUser, setAccessToken } = userSlice.actions
 export default userSlice.reducer

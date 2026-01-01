@@ -1,10 +1,11 @@
 import AlertModal from "@/components/utils/AlertModal"
-import { sendOtp, verifyOtp } from "@/lib/auth-client"
+import { continueWithEmail } from "@/service/auth"
 import { useTheme } from "@react-navigation/native"
 import { useRouter } from "expo-router"
 import { Clock, RotateCcw, Shield } from "lucide-react-native"
 import React, { useEffect, useRef, useState } from "react"
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -124,7 +125,7 @@ const ContinueWithEmail = () => {
   }
 
   const handleContinue = async () => {
-    router.push("/(passenger)/(tabs)")
+    // router.push("/(passenger)/(tabs)")
     if (!email) {
       triggerShake()
       showAlert({
@@ -155,20 +156,30 @@ const ContinueWithEmail = () => {
     try {
       console.log(email)
       // ✅ REAL API CALL (no better-auth)
-      await sendOtp(email)
+      const res = await continueWithEmail(email)
 
-      setCodeSent(true)
-      setTimeLeft(60)
-      setVerificationCode(Array(6).fill(""))
+      console.log(res)
+      if (res.success) {
+        setCodeSent(true)
+        setTimeLeft(60)
+        setVerificationCode(Array(6).fill(""))
 
-      showAlert({
-        type: "success",
-        title: "OTP Sent",
-        message: "We’ve sent a 6-digit verification code to your email.",
-        primaryButtonText: "Continue",
-      })
+        showAlert({
+          type: "success",
+          title: "OTP Sent",
+          message: "We’ve sent a 6-digit verification code to your email.",
+          primaryButtonText: "Continue",
+        })
 
-      setTimeout(() => inputRefs.current[0]?.focus(), 500)
+        setTimeout(() => inputRefs.current[0]?.focus(), 500)
+      } else {
+        showAlert({
+          type: "error",
+          title: "OTP not Sent",
+          message: "We’ve sent a 6-digit verification code to your email.",
+          primaryButtonText: "Continue",
+        })
+      }
     } catch (error) {
       showAlert({
         type: "error",
@@ -220,7 +231,7 @@ const ContinueWithEmail = () => {
     setIsLoading(true)
 
     try {
-      const data = await verifyOtp(email, code)
+      // const data = await verifyOtp(email, code)
 
       if (data.success) {
         showAlert({
@@ -494,14 +505,19 @@ const ContinueWithEmail = () => {
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <View className="flex-row items-center">
-                        <Text className="text-white font-geist text-lg mr-3">
-                          Sending Code...
+                      <View className="flex-row items-center justify-center">
+                        <ActivityIndicator
+                          size="small"
+                          color="#FFFFFF"
+                          className="mr-3"
+                        />
+                        <Text className="text-white font-geist text-lg">
+                          sending code...
                         </Text>
                       </View>
                     ) : (
                       <Text className="text-white font-geist text-lg font-semibold">
-                        Sigin In
+                        Sign In
                       </Text>
                     )}
                   </TouchableOpacity>

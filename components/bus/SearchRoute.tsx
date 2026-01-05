@@ -1,4 +1,3 @@
-// components/bus/SearchRoute.tsx
 // import DateTimePicker from "@react-native-community/datetimepicker"
 import { useThemeContext } from "@/context/ThemeContext"
 import { LinearGradient } from "expo-linear-gradient"
@@ -6,6 +5,7 @@ import {
   ArrowRight,
   CalendarIcon,
   Check,
+  ChevronRight,
   MapPin,
   Search,
   Target,
@@ -16,6 +16,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -229,7 +230,6 @@ export function SearchRoute() {
             </TouchableOpacity>
           </View>
 
-          {/* Quick Date Selector */}
           <View className="mb-6">
             <View className="flex-row items-center justify-between mb-3">
               <Text
@@ -244,45 +244,77 @@ export function SearchRoute() {
             </View>
 
             <View className="flex-row gap-2">
-              {dates.map((dateItem) => (
-                <TouchableOpacity
-                  key={dateItem.id}
-                  className={`flex-1 py-3 rounded-xl items-center`}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                  onPress={() => {
-                    setActiveDate(dateItem.id)
-                    setDate(dateItem.date)
-                  }}
-                >
-                  <Text
-                    className={`text-sm font-semibold ${activeDate === dateItem.id ? "text-white" : ""}`}
-                    style={
-                      activeDate !== dateItem.id ? { color: colors.text } : {}
-                    }
-                  >
-                    {dateItem.label}
-                  </Text>
-                  <Text
-                    className={`text-xs mt-1 ${activeDate === dateItem.id ? "text-white/80" : ""}`}
-                    style={
-                      activeDate !== dateItem.id
-                        ? { color: colors.mutedText }
-                        : {}
-                    }
-                  >
-                    {dateItem.date.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+              {dates.map((dateItem) => {
+                const isActive = activeDate === dateItem.id
 
+                return (
+                  <TouchableOpacity
+                    key={dateItem.id}
+                    className="flex-1 py-3 rounded-xl items-center"
+                    style={{
+                      borderWidth: 1,
+                      borderColor: isActive ? colors.primary : colors.border,
+                      backgroundColor: isActive
+                        ? colors.primary
+                        : colors.background,
+                    }}
+                    onPress={() => {
+                      setActiveDate(dateItem.id)
+                      setDate(dateItem.date)
+                    }}
+                  >
+                    <Text
+                      className="font-semibold font-geist"
+                      style={{ color: isActive ? "#fff" : colors.text }}
+                    >
+                      {dateItem.label}
+                    </Text>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{
+                        color: isActive
+                          ? "rgba(255,255,255,0.8)"
+                          : colors.mutedText,
+                      }}
+                    >
+                      {dateItem.date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+
+              {/* Add Date Button */}
+              <TouchableOpacity
+                className="flex-1 py-3 rounded-xl items-center justify-center"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.primary + "15",
+                  backgroundColor: colors.background,
+                }}
+                // onPress={() => setShowPicker(true)} // you'll need a showPicker state
+              >
+                <Text
+                  className="text-lg font-geist"
+                  style={{ color: colors.primary }}
+                >
+                  Custom
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Date Picker */}
+            {/* {showPicker && (
+    <DateTimePicker
+      value={new Date()}
+      mode="date"
+      display="default"
+      onChange={handleAddCustomDate} // you'll need this function
+    />
+  )} */}
+          </View>
           {/* Passengers & Search */}
           <View className="flex-row items-center gap-4">
             {/* Passengers */}
@@ -291,14 +323,15 @@ export function SearchRoute() {
                 className="text-sm font-medium uppercase tracking-wider pb-2"
                 style={{ color: colors.mutedText }}
               >
-                passengers
+                Passengers
               </Text>
               <View
                 className="flex-row items-center h-14 px-4 rounded-xl border"
                 style={{ borderColor: colors.border }}
               >
+                {/* Minus Button */}
                 <TouchableOpacity
-                  className="w-8 h-8 rounded-full items-center justify-center"
+                  className="w-10 h-10 rounded-full items-center justify-center"
                   style={{ backgroundColor: colors.border }}
                   onPress={() => setPassengers(Math.max(1, passengers - 1))}
                 >
@@ -306,22 +339,31 @@ export function SearchRoute() {
                     -
                   </Text>
                 </TouchableOpacity>
-                <View className="flex-1 items-center">
-                  <Text
-                    className="font-semibold text-lg font-groteskBold"
-                    style={{ color: colors.text }}
-                  >
-                    {passengers}
-                  </Text>
-                  <Text
-                    className="text-xs font-geist"
-                    style={{ color: colors.mutedText }}
-                  >
-                    {passengers === 1 ? "Passenger" : "Passengers"}
-                  </Text>
-                </View>
+
+                {/* Input Field */}
+                <TextInput
+                  className="flex-1 text-center text-lg font-groteskBold mx-2"
+                  style={{ color: colors.text }}
+                  keyboardType="number-pad"
+                  value={passengers.toString()}
+                  onChangeText={(text) => {
+                    // Allow empty string so user can delete
+                    if (text === "") {
+                      setPassengers(0)
+                      return
+                    }
+
+                    // Only numbers
+                    const num = parseInt(text, 10)
+                    if (!isNaN(num) && num >= 0) setPassengers(num)
+                  }}
+                  placeholder="1"
+                  placeholderTextColor={colors.mutedText}
+                />
+
+                {/* Plus Button */}
                 <TouchableOpacity
-                  className="w-8 h-8 rounded-full items-center justify-center"
+                  className="w-10 h-10 rounded-full items-center justify-center"
                   style={{ backgroundColor: colors.primary }}
                   onPress={() => setPassengers(passengers + 1)}
                 >
@@ -341,7 +383,7 @@ export function SearchRoute() {
                 }}
               >
                 <Search size={20} color="#FFFFFF" />
-                <Text className="font-geist text-white text-base ml-2 ">
+                <Text className="font-geist text-white text-base ml-2">
                   Search
                 </Text>
               </TouchableOpacity>
@@ -350,158 +392,290 @@ export function SearchRoute() {
         </LinearGradient>
       </View>
 
-      {/* Modals */}
+      {/* Modern Scrollable Modal */}
       <Modal
         visible={fromModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setFromModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50">
-          <View
-            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85%]"
-            style={{ backgroundColor: colors.background }}
-          >
-            <View className="p-5 pb-8">
-              {/* Header */}
-              <View className="flex-row items-center justify-between mb-5">
-                <View>
-                  <Text
-                    className="text-xl font-groteskBold"
-                    style={{ color: colors.text }}
-                  >
-                    Select Departure
-                  </Text>
-                  <Text
-                    className="text-sm mt-1 font-geist"
-                    style={{ color: colors.mutedText }}
-                  >
-                    Choose your starting point
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  className="w-10 h-10 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.border }}
-                  onPress={() => setFromModalVisible(false)}
-                >
-                  <X size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
+        <View className="flex-1 bg-black/70 ">
+          {/* Backdrop Touch */}
+          <TouchableOpacity
+            className="flex-1"
+            activeOpacity={1}
+            onPress={() => setFromModalVisible(false)}
+          />
 
-              {/* Search Input */}
-              <View
-                className="relative mb-4 flex flex-row items-center px-4 rounded-xl gap-4"
-                style={{
-                  borderColor: colors.border,
-                  backgroundColor:
-                    actualTheme === "dark" ? colors.card : "#FFFFFF",
-                }}
-              >
-                <Search size={18} color={colors.mutedText} className="" />
-                <TextInput
-                  className="h-12  text-base font-geist"
-                  placeholder="Search departure..."
-                  placeholderTextColor={colors.mutedText}
-                  value={toSearch}
-                  onChangeText={setToSearch}
-                  autoFocus
-                  style={{
-                    color: colors.text,
-                  }}
+          <View
+            className=" rounded-t-4xl bg-card w-full h-[70vh]"
+            style={{
+              backgroundColor: colors.background,
+              shadowColor: colors.text,
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 20,
+              elevation: 20,
+              maxHeight: "75%", // Reduced from 90%
+            }}
+          >
+            {/* Scrollable Content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              className="flex-1"
+            >
+              {/* Drag Handle */}
+              <View className="items-center pt-3">
+                <View
+                  className="w-12 h-1.5 rounded-full mb-1"
+                  style={{ backgroundColor: colors.border }}
                 />
               </View>
 
-              {/* Current Location Option */}
-              <TouchableOpacity
-                className="flex-row items-center py-4 border-b"
-                style={{ borderBottomColor: colors.border }}
-              >
-                <View
-                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                  style={{ backgroundColor: colors.primary + "15" }}
-                >
-                  <MapPin size={18} color={colors.primary} />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className="font-semibold font-geist"
-                    style={{ color: colors.text }}
-                  >
-                    Use current location
-                  </Text>
-                  <Text
-                    className="text-sm font-geist"
-                    style={{ color: colors.mutedText }}
-                  >
-                    Detect automatically
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Cities List */}
-              <FlatList
-                data={filteredFromCities}
-                keyExtractor={(item) => item.value}
-                showsVerticalScrollIndicator={false}
-                className="mt-4"
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    className="flex-row items-center py-4 border-b"
-                    style={{ borderBottomColor: colors.border }}
-                    onPress={() => {
-                      setFromValue(item.value)
-                      setFromModalVisible(false)
-                    }}
-                  >
-                    <View
-                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                      style={{ backgroundColor: colors.border }}
-                    >
-                      <MapPin size={18} color={colors.mutedText} />
-                    </View>
-                    <View className="flex-1">
+              <View className="p-5 pb-6">
+                {/* Header */}
+                <View className="flex-row items-start justify-between mb-5">
+                  <View className="flex-1 pr-3">
+                    <View className="flex-row items-center gap-2 mb-1">
+                      <MapPin size={18} color={colors.primary} />
                       <Text
-                        className="font-medium font-geist"
+                        className="text-xl font-groteskBold tracking-tight"
                         style={{ color: colors.text }}
                       >
-                        {item.label}
-                      </Text>
-                      <Text
-                        className="text-sm font-geist"
-                        style={{ color: colors.mutedText }}
-                      >
-                        {item.state} • Ethiopia
+                        Select Departure
                       </Text>
                     </View>
-                    {fromValue === item.value && (
-                      <View
-                        className="w-6 h-6 rounded-full items-center justify-center"
-                        style={{ backgroundColor: colors.primary }}
-                      >
-                        <Check size={14} color="#FFFFFF" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <View className="py-10 items-center">
-                    <MapPin size={48} color={colors.mutedText} />
                     <Text
-                      className="text-lg font-medium mt-4"
-                      style={{ color: colors.text }}
-                    >
-                      No cities found
-                    </Text>
-                    <Text
-                      className="text-sm text-center mt-2"
+                      className="text-sm font-geist"
                       style={{ color: colors.mutedText }}
                     >
-                      Try searching with different keywords
+                      Choose your starting point
                     </Text>
                   </View>
-                }
-              />
-            </View>
+                  <TouchableOpacity
+                    className="w-10 h-10 rounded-xl items-center justify-center active:scale-95"
+                    style={{
+                      backgroundColor:
+                        actualTheme === "dark" ? "#2A2A2A" : "#F5F5F5",
+                    }}
+                    onPress={() => setFromModalVisible(false)}
+                    activeOpacity={0.7}
+                  >
+                    <X size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Input - Enhanced */}
+                <View
+                  className="relative mb-4 flex flex-row items-center px-4 h-12 rounded-xl"
+                  style={{
+                    borderWidth: 1.5,
+                    borderColor: colors.border + "10",
+                    backgroundColor:
+                      actualTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
+                  }}
+                >
+                  <Search size={18} color={colors.mutedText} />
+                  <TextInput
+                    className="flex-1 h-full px-3 text-base font-geist"
+                    placeholder="Search city or airport..."
+                    placeholderTextColor={colors.mutedText + "80"}
+                    value={toSearch}
+                    onChangeText={setToSearch}
+                    autoFocus
+                    style={{
+                      color: colors.text,
+                    }}
+                  />
+                  {toSearch.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setToSearch("")}
+                      className="p-1"
+                      activeOpacity={0.6}
+                    >
+                      <X size={14} color={colors.mutedText} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Current Location Card */}
+                <TouchableOpacity
+                  className="flex-row items-center p-3 rounded-xl mb-4 active:scale-[0.98]"
+                  style={{
+                    backgroundColor:
+                      actualTheme === "dark" ? "#1A1A1A" : "#F8F8F8",
+                    borderWidth: 1.5,
+                    borderColor: colors.primary + "10",
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    className="w-10 h-10 rounded-lg items-center justify-center mr-3"
+                    style={{
+                      backgroundColor: colors.primary + "15",
+                      borderWidth: 1.5,
+                      borderColor: colors.primary + "30",
+                    }}
+                  >
+                    <MapPin size={18} color={colors.primary} />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="font-semibold font-geist mb-0.5"
+                      style={{ color: colors.text }}
+                    >
+                      Use current location
+                    </Text>
+                    <Text
+                      className="text-xs font-geist"
+                      style={{ color: colors.mutedText }}
+                    >
+                      GPS detection • Fastest option
+                    </Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.mutedText} />
+                </TouchableOpacity>
+
+                {/* Cities List Header */}
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text
+                    className="text-xs font-groteskBold uppercase tracking-wider"
+                    style={{ color: colors.mutedText }}
+                  >
+                    Popular Cities
+                  </Text>
+                  <Text
+                    className="text-xs font-geist"
+                    style={{ color: colors.mutedText }}
+                  >
+                    {filteredFromCities.length} options
+                  </Text>
+                </View>
+
+                {/* Cities List - Enhanced */}
+                <View className="mb-2">
+                  {filteredFromCities.map((item, index) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      className="flex-row items-center p-3 rounded-xl mb-2 active:scale-[0.98]"
+                      style={{
+                        backgroundColor:
+                          fromValue === item.value
+                            ? colors.primary + "10"
+                            : "transparent",
+                        borderWidth: 1.5,
+                        borderColor:
+                          fromValue === item.value
+                            ? colors.primary + "30"
+                            : "transparent",
+                      }}
+                      onPress={() => {
+                        setFromValue(item.value)
+                        setFromModalVisible(false)
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        className="w-10 h-10 rounded-lg items-center justify-center mr-3"
+                        style={{
+                          backgroundColor:
+                            fromValue === item.value
+                              ? colors.primary
+                              : colors.border,
+                        }}
+                      >
+                        <MapPin
+                          size={18}
+                          color={
+                            fromValue === item.value
+                              ? "#FFFFFF"
+                              : colors.mutedText
+                          }
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className="font-medium  font-geist mb-0.5"
+                          style={{ color: colors.text }}
+                        >
+                          {item.label}
+                        </Text>
+                        <View className="flex-row items-center gap-1.5">
+                          <Text
+                            className="text-xs font-geist"
+                            style={{ color: colors.mutedText }}
+                          >
+                            {item.state}
+                          </Text>
+                          <View
+                            className="w-1 h-1 rounded-full"
+                            style={{ backgroundColor: colors.mutedText }}
+                          />
+                          <Text
+                            className="text-xs font-geist"
+                            style={{ color: colors.mutedText }}
+                          >
+                            Ethiopia
+                          </Text>
+                        </View>
+                      </View>
+                      {fromValue === item.value ? (
+                        <View
+                          className="w-6 h-6 rounded-full items-center justify-center"
+                          style={{
+                            backgroundColor: colors.primary,
+                            shadowColor: colors.primary,
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 2,
+                            elevation: 2,
+                          }}
+                        >
+                          <Check size={12} color="#FFFFFF" />
+                        </View>
+                      ) : (
+                        <ChevronRight size={18} color={colors.mutedText} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Empty State */}
+                {filteredFromCities.length === 0 && (
+                  <View className="py-8 items-center">
+                    <View
+                      className="w-16 h-16 rounded-xl items-center justify-center mb-3"
+                      style={{
+                        backgroundColor:
+                          actualTheme === "dark" ? "#2A2A2A" : "#F5F5F5",
+                      }}
+                    >
+                      <MapPin size={28} color={colors.mutedText} />
+                    </View>
+                    <Text
+                      className="text-lg font-groteskBold mb-1.5"
+                      style={{ color: colors.text }}
+                    >
+                      No results found
+                    </Text>
+                    <Text
+                      className="text-sm text-center font-geist px-6"
+                      style={{ color: colors.mutedText }}
+                    >
+                      Try searching with a different name or browse popular
+                      cities
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            {/* Safe Area Bottom */}
+            <View
+              className="h-4"
+              style={{ backgroundColor: colors.background }}
+            />
           </View>
         </View>
       </Modal>
@@ -512,7 +686,7 @@ export function SearchRoute() {
         animationType="slide"
         onRequestClose={() => setToModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50">
+        <View className="flex-1 bg-black/50 py-2">
           <View
             className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85%] "
             style={{ backgroundColor: colors.background }}

@@ -7,7 +7,7 @@ import {
   LucideIcon,
   XCircle,
 } from "lucide-react-native"
-import React, { useEffect, useMemo, useRef } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   Dimensions,
@@ -89,8 +89,13 @@ const AlertModal: React.FC<AlertModalProps> = ({
   const themeMode = themeProp === "system" ? contextTheme : themeProp
   const isDark = themeMode === "dark"
 
+  // Use separate refs for animation values
   const scaleValue = useRef(new Animated.Value(0)).current
   const opacityValue = useRef(new Animated.Value(0)).current
+  const isAnimating = useRef(false)
+
+  // Track modal visibility state
+  const [internalVisible, setInternalVisible] = useState(visible)
 
   // Calculate responsive width
   const modalWidth = useMemo(() => {
@@ -100,22 +105,36 @@ const AlertModal: React.FC<AlertModalProps> = ({
   }, [SCREEN_WIDTH, maxWidth, minWidth])
 
   useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(scaleValue, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityValue, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.ease,
-          useNativeDriver: true,
-        }),
-      ]).start()
-    } else {
+    if (visible && !internalVisible) {
+      // Modal is opening
+      setInternalVisible(true)
+
+      // Reset animation values for fresh start
+      scaleValue.setValue(0)
+      opacityValue.setValue(0)
+
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.spring(scaleValue, {
+            toValue: 1,
+            tension: 50,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityValue, {
+            toValue: 1,
+            duration: 200,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          isAnimating.current = false
+        })
+      }, 10)
+    } else if (!visible && internalVisible) {
+      // Modal is closing
+      isAnimating.current = true
       Animated.parallel([
         Animated.spring(scaleValue, {
           toValue: 0,
@@ -129,7 +148,57 @@ const AlertModal: React.FC<AlertModalProps> = ({
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ]).start()
+      ]).start(() => {
+        isAnimating.current = false
+        setInternalVisible(false)
+      })
+    }
+  }, [visible, internalVisible])
+
+  // Alternative solution using useEffect with proper cleanup
+  useEffect(() => {
+    if (visible) {
+      // Reset to initial state
+      scaleValue.setValue(0)
+      opacityValue.setValue(0)
+
+      const showAnimation = Animated.parallel([
+        Animated.spring(scaleValue, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityValue, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+
+      showAnimation.start()
+
+      return () => {
+        showAnimation.stop()
+      }
+    } else {
+      const hideAnimation = Animated.parallel([
+        Animated.spring(scaleValue, {
+          toValue: 0,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityValue, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+
+      hideAnimation.start()
     }
   }, [visible])
 
@@ -229,10 +298,11 @@ const AlertModal: React.FC<AlertModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      visible={internalVisible || visible}
       transparent
       animationType="none"
       statusBarTranslucent
+      onRequestClose={onClose}
     >
       <View className="flex-1 justify-center items-center px-6">
         {/* Overlay */}

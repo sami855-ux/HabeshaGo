@@ -7,7 +7,7 @@ export const continueWithEmail = async (email) => {
     const response = await axiosInstance.post("/auth/register", {
       email,
     })
-
+    console.log(response)
     if (response.data.success) {
       return response.data
     } else {
@@ -24,7 +24,7 @@ export const continueWithEmail = async (email) => {
 
 export const verifyOtp = async (email, code) => {
   try {
-    const response = await axiosInstance.post("/auth/verify-otp", {
+    const response = await axiosInstance.post("/auth/app/verify-otp", {
       email,
       code,
     })

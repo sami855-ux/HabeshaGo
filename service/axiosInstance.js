@@ -1,66 +1,55 @@
-import { logout, setAccessToken } from "@/store/slices/userSlice"
+import { store } from "@/store"
 import axios from "axios"
-import * as SecureStore from "expo-secure-store"
-import { store } from "../store"
 
-// Create Axios instance
 export const axiosInstance = axios.create({
-  baseURL: "https://addis-pulse-3.onrender.com/api",
+  baseURL: "https://addis-pulse-2.onrender.com/api",
+  withCredentials: true,
 })
 
-// Attach access token to every request
+// Attach access token from Redux to every request
 axiosInstance.interceptors.request.use(
-  async (config) => {
-    const state = store.getState()
-    const token = state.user.accessToken
-
+  (config) => {
+    const token = store.getState().user.accessToken
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// Handle token refresh
-axiosInstance.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config
+// axiosInstance.interceptors.response.use(
+//   (response) => response,
+//   async (error) => {
+//     const originalRequest = error.config
 
-    // Prevent infinite loop
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
+//     if (
+//       error.response?.status === 401 &&
+//       !originalRequest._retry &&
+//       !originalRequest.url.includes("/app/auth/refresh")
+//     ) {
+//       originalRequest._retry = true
 
-      try {
-        const refreshToken = await SecureStore.getItemAsync("refreshToken")
+//       try {
+//         const res = await axiosInstance.post(
+//           "/app/auth/refresh",
+//           {},
+//           { withCredentials: true }
+//         )
 
-        if (!refreshToken) {
-          store.dispatch(logout())
-          return Promise.reject(error)
-        }
+//         // ✅ SAVE NEW ACCESS TOKEN
+//         store.dispatch(setAccessToken({ accessToken: res.data.accessToken }))
 
-        const res = await axios.post(
-          "https://addis-pulse-3.onrender.com/api/auth/refresh",
-          { refreshToken }
-        )
+//         // Retry original request with new token
+//         originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`
 
-        const newAccessToken = res.data.accessToken
+//         return axiosInstance(originalRequest)
+//       } catch (err) {
+//         store.dispatch(clearUser())
+//         return Promise.reject(err)
+//       }
+//     }
 
-        // Save new access token
-        store.dispatch(setAccessToken(newAccessToken))
-
-        // Retry original request
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-        return axiosInstance(originalRequest)
-      } catch (refreshError) {
-        await SecureStore.deleteItemAsync("refreshToken")
-        store.dispatch(logout())
-        return Promise.reject(refreshError)
-      }
-    }
-
-    return Promise.reject(error)
-  }
-)
+//     return Promise.reject(error)
+//   }
+// )

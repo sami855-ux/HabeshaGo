@@ -57,7 +57,11 @@ const userSlice = createSlice({
   name: "user",
   initialState,
   reducers: {
-    updateUser: (state, action: PayloadAction<Partial<User>>) => {
+    setUser: (state, action: PayloadAction<{ user: UserState["user"] }>) => {
+      state.user = action.payload.user
+      state.isAuthenticated = true
+    },
+    updateUser: (state, action: PayloadAction<Partial<UserState["user"]>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload }
       }
@@ -66,6 +70,12 @@ const userSlice = createSlice({
     setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload
       state.isAuthenticated = true
+    },
+
+    clearUser: (state) => {
+      state.user = null
+      state.accessToken = null
+      state.isAuthenticated = false
     },
   },
 
@@ -91,5 +101,6 @@ const userSlice = createSlice({
   },
 })
 
-export const { updateUser, setAccessToken } = userSlice.actions
+export const { setUser, updateUser, setAccessToken, clearUser } =
+  userSlice.actions
 export default userSlice.reducer

@@ -3,7 +3,7 @@ import { SearchRoute } from "@/components/bus/SearchRoute"
 import { useThemeContext } from "@/context/ThemeContext"
 import { useRouter } from "expo-router"
 import { ChevronLeft } from "lucide-react-native"
-import React, { useEffect, useState } from "react"
+import React, { useState } from "react"
 import {
   ScrollView,
   StatusBar,
@@ -15,12 +15,7 @@ import {
 export default function BusBookingPage() {
   const router = useRouter()
   const { colors, actualTheme } = useThemeContext()
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 100)
-    return () => clearTimeout(timer)
-  }, [])
+  const [loading, setLoading] = useState(false)
 
   if (loading) {
     return (

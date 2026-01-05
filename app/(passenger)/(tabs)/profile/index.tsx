@@ -1,4 +1,6 @@
+import AlertModal from "@/components/utils/AlertModal"
 import { useThemeContext } from "@/context/ThemeContext"
+import { useRouter } from "expo-router"
 import {
   Bell,
   Check,
@@ -129,7 +131,17 @@ const IOSToggle = ({
 export default function SettingsScreen() {
   const { colors, setTheme, theme: themeMode, actualTheme } = useThemeContext()
   const isDark = actualTheme === "dark"
+
+  const router = useRouter()
   const [showThemeModal, setShowThemeModal] = useState(false)
+
+  const [alertVisible, setAlertVisible] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({})
+
+  const showAlert = (config) => {
+    setAlertConfig(config)
+    setAlertVisible(true)
+  }
 
   const [settings, setSettings] = useState({
     // Security
@@ -168,6 +180,19 @@ export default function SettingsScreen() {
     { value: "dark", label: "Dark", icon: Moon },
     { value: "system", label: "System", icon: SettingsIcon },
   ]
+  const handleLogout = () => {
+    showAlert({
+      type: "warning",
+      title: "Log Out",
+      message: "Are you sure you want to log out?",
+      primaryButtonText: "Log Out",
+      secondaryButtonText: "Cancel",
+      onPrimaryPress: () => {
+        // Perform logout logic here
+        // router.replace("/(auth)/login")
+      },
+    })
+  }
 
   const renderSection = (
     title: string,
@@ -215,12 +240,13 @@ export default function SettingsScreen() {
                 index !== items.length - 1 ? colors.border : "transparent",
               borderBottomWidth: index !== items.length - 1 ? 1 : 0,
             }}
-            onPress={
-              item.onPress ||
-              (item.toggleKey
-                ? () => toggleSetting(item.toggleKey!)
-                : undefined)
-            }
+            onPress={() => {
+              if (item.onPress) {
+                item.onPress()
+              } else if (item.toggleKey) {
+                toggleSetting(item.toggleKey)
+              }
+            }}
             activeOpacity={item.onPress || item.toggleKey ? 0.7 : 1}
           >
             <View className="flex-row items-center flex-1">
@@ -384,354 +410,318 @@ export default function SettingsScreen() {
   )
 
   return (
-    <SafeAreaView
-      className="flex-1"
-      style={{ backgroundColor: colors.background }}
-    >
-      <ScrollView
+    <>
+      <SafeAreaView
         className="flex-1"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingVertical: 8 }}
+        style={{ backgroundColor: colors.background }}
       >
-        {/* Profile Header */}
-        <View className="pt-6 pb-6 ">
-          <View
-            className=" p-6"
-            style={{
-              backgroundColor: isDark
-                ? "rgba(255, 255, 255, 0.05)"
-                : "rgba(255, 255, 255, 0.8)",
-              // borderWidth: 1,
-              // borderColor: isDark
-              //   ? "rgba(255, 255, 255, 0.1)"
-              //   : "rgba(0, 0, 0, 0.05)",
-              // backdropFilter: "blur(10px)",
-              // shadowColor: "#000",
-              // shadowOffset: { width: 0, height: 4 },
-              // shadowOpacity: 0.1,
-              // shadowRadius: 12,
-              // elevation: 5,
-            }}
-          >
-            <View className="flex-row items-center">
-              <View className="relative">
-                <Image
-                  source={{ uri: userData.avatar }}
-                  className="w-24 h-24 rounded-2xl"
-                />
-                <View
-                  className="absolute -top-1 -right-1 w-8 h-8 rounded-full justify-center items-center border-2"
-                  style={{
-                    backgroundColor: colors.primary,
-                    borderColor: colors.card,
-                  }}
-                >
-                  <Edit2 size={12} color="#FFFFFF" />
-                </View>
-              </View>
-              <View className="ml-5 flex-1">
-                <View className="flex-row items-center justify-between mb-1">
-                  <Text
-                    className="text-2xl font-geist"
-                    style={{ color: colors.text }}
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingVertical: 8 }}
+        >
+          {/* Profile Header */}
+          <View className="pt-6 pb-6 ">
+            <View
+              className=" p-6"
+              style={{
+                backgroundColor: isDark
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "rgba(255, 255, 255, 0.8)",
+              }}
+            >
+              <View className="flex-row items-center">
+                <View className="relative">
+                  <Image
+                    source={{ uri: userData.avatar }}
+                    className="w-24 h-24 rounded-[34px]"
+                  />
+                  <View
+                    className="absolute -top-1 -right-1 w-8 h-8 rounded-full justify-center items-center border-2"
+                    style={{
+                      backgroundColor: colors.primary,
+                      borderColor: colors.card,
+                    }}
                   >
-                    {userData.name}
-                  </Text>
-                  <TouchableOpacity className="p-2">
-                    <ChevronRight size={20} color={colors.mutedText} />
-                  </TouchableOpacity>
+                    <Edit2 size={12} color="#FFFFFF" />
+                  </View>
                 </View>
-                <Text
-                  className="text-sm font-medium mb-3 font-jakarta"
-                  style={{ color: colors.primary }}
-                >
-                  {userData.type}
-                </Text>
-                <View className="flex-row items-center space-x-3">
-                  <View className="flex-1">
+                <View className="ml-5 flex-1">
+                  <View className="flex-row items-center justify-between mb-1">
                     <Text
-                      className="text-xs font-medium mb-1"
-                      style={{ color: colors.mutedText }}
-                    >
-                      Account ID
-                    </Text>
-                    <Text
-                      className="text-sm font-semibold font-geist italic"
+                      className="text-2xl font-geist"
                       style={{ color: colors.text }}
                     >
-                      {userData.id}
+                      {userData.name}
                     </Text>
+                    <TouchableOpacity className="p-2">
+                      <ChevronRight size={20} color={colors.mutedText} />
+                    </TouchableOpacity>
                   </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-xs font-medium mb-1"
-                      style={{ color: colors.mutedText }}
-                    >
-                      Wallet Balance
-                    </Text>
-                    <View className="flex-row items-center">
-                      <Wallet
-                        size={12}
-                        color={colors.primary}
-                        className="mr-1"
-                      />
+                  <Text
+                    className="text-sm font-medium mb-3 font-jakarta"
+                    style={{ color: colors.primary }}
+                  >
+                    {userData.type}
+                  </Text>
+                  <View className="flex-row items-center space-x-3">
+                    <View className="flex-1">
                       <Text
-                        className="text-sm font-groteskBold pl-2"
-                        style={{ color: colors.primary }}
+                        className="text-xs font-medium mb-1"
+                        style={{ color: colors.mutedText }}
                       >
-                        {userData.walletBalance}
+                        Account ID
                       </Text>
+                      <Text
+                        className="text-sm font-semibold font-geist italic"
+                        style={{ color: colors.text }}
+                      >
+                        {userData.id}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        className="text-xs font-medium mb-1"
+                        style={{ color: colors.mutedText }}
+                      >
+                        Wallet Balance
+                      </Text>
+                      <View className="flex-row items-center">
+                        <Wallet
+                          size={12}
+                          color={colors.primary}
+                          className="mr-1"
+                        />
+                        <Text
+                          className="text-sm font-groteskBold pl-2"
+                          style={{ color: colors.primary }}
+                        >
+                          {userData.walletBalance}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* Account */}
-        {renderSection("ACCOUNT", [
-          {
-            icon: User,
-            label: "Edit Profile",
-            description: "Personal information",
-            showArrow: true,
-            onPress: () => Alert.alert("Edit Profile", "Coming soon"),
-          },
-          {
-            icon: CreditCard,
-            label: "Payment Methods",
-            description: "Cards & accounts",
-            showArrow: true,
-            onPress: () => Alert.alert("Payments", "Manage payment methods"),
-          },
-        ])}
-
-        {/* Security */}
-        {renderSection("SECURITY", [
-          {
-            icon: Shield,
-            label: "Privacy & Security",
-            description: "Account protection",
-            showArrow: true,
-            onPress: () => Alert.alert("Security", "Security settings"),
-          },
-          {
-            icon: Fingerprint,
-            label: "Biometric Authentication",
-            description: "Face ID & Touch ID",
-            isToggle: true,
-            toggleValue: settings.biometricAuth,
-            toggleKey: "biometricAuth",
-          },
-          {
-            icon: Lock,
-            label: "App Lock",
-            description: "PIN or biometric lock",
-            isToggle: true,
-            toggleValue: settings.appLock,
-            toggleKey: "appLock",
-          },
-        ])}
-
-        {/* Notifications */}
-        {renderSection("NOTIFICATIONS", [
-          {
-            icon: Bell,
-            label: "Push Notifications",
-            description: "Enable notifications",
-            isToggle: true,
-            toggleValue: settings.pushNotifications,
-            toggleKey: "pushNotifications",
-          },
-          {
-            icon: Bell,
-            label: "Sounds",
-            description: "Notification sounds",
-            isToggle: true,
-            toggleValue: settings.sound,
-            toggleKey: "sound",
-            toggleColor: {
-              false: isDark ? "#3A3A3C" : "#E5E5EA", // inactive/off state
-              true: isDark ? "#FF9F0A" : "#FF7A00",
+          {/* Account */}
+          {renderSection("ACCOUNT", [
+            {
+              icon: User,
+              label: "Edit Profile",
+              description: "Personal information",
+              showArrow: true,
+              onPress: () => router.push("/edit-profile"),
             },
-          },
-          {
-            icon: Bell,
-            label: "Vibration",
-            description: "Haptic feedback",
-            isToggle: true,
-            toggleValue: settings.vibration,
-            toggleKey: "vibration",
-          },
-        ])}
-
-        {/* Privacy */}
-        {renderSection("PRIVACY", [
-          {
-            icon: MapPin,
-            label: "Location Services",
-            description: "Share trip location",
-            isToggle: true,
-            toggleValue: settings.locationSharing,
-            toggleKey: "locationSharing",
-          },
-          {
-            icon: History,
-            label: "Clear Trip History",
-            description: "Delete travel data",
-            showArrow: true,
-            onPress: () => Alert.alert("History", "Clear trip history"),
-          },
-        ])}
-
-        {/* Payments */}
-        {renderSection("PAYMENTS", [
-          {
-            icon: Fingerprint,
-            label: "Biometric Payments",
-            description: "Fast checkout",
-            isToggle: true,
-            toggleValue: settings.biometricPayments,
-            toggleKey: "biometricPayments",
-          },
-          {
-            icon: Wallet,
-            label: "Auto Top-Up",
-            description: "Automatic recharge",
-            isToggle: true,
-            toggleValue: settings.autoTopUp,
-            toggleKey: "autoTopUp",
-            toggleColor: {
-              false: isDark ? "#3A3A3C" : "#E5E5EA",
-              true: "#FF9500", // Orange for payment-related toggle
+            {
+              icon: CreditCard,
+              label: "Payment Methods",
+              description: "Cards & accounts",
+              showArrow: true,
+              onPress: () => Alert.alert("Payments", "Manage payment methods"),
             },
-          },
-        ])}
+          ])}
 
-        {/* App Settings */}
-        {renderSection("APP SETTINGS", [
-          {
-            icon: isDark ? Moon : Sun,
-            label: "Appearance",
-            description:
-              themeMode === "system"
-                ? "System"
-                : actualTheme.charAt(0).toUpperCase() + actualTheme.slice(1),
-            showArrow: true,
-            onPress: () => setShowThemeModal(true),
-          },
-          {
-            icon: Type,
-            label: "Text Size",
-            description: "Medium",
-            showArrow: true,
-            onPress: () => Alert.alert("Text Size", "Adjust text scaling"),
-          },
-          {
-            icon: Smartphone,
-            label: "Haptic Feedback",
-            description: "Touch vibrations",
-            isToggle: true,
-            toggleValue: settings.hapticFeedback,
-            toggleKey: "hapticFeedback",
-          },
-        ])}
+          {/* Security */}
+          {renderSection("SECURITY", [
+            {
+              icon: Shield,
+              label: "Privacy & Security",
+              description: "Account protection",
+              showArrow: true,
+              onPress: () => Alert.alert("Security", "Security settings"),
+            },
+            {
+              icon: Lock,
+              label: "Logged In Devices",
+              description: "Manage devices",
+              showArrow: true,
+              onPress: () => router.push("/loggedDevice"),
+            },
+            {
+              icon: Fingerprint,
+              label: "Biometric Authentication",
+              description: "Face ID & Touch ID",
+              showArrow: true,
+              onPress: () => router.push("/biometric"),
+            },
+          ])}
 
-        {/* Advanced */}
-        {renderSection("ADVANCED", [
-          {
-            icon: Zap,
-            label: "Smart Routes",
-            description: "AI suggestions",
-            isToggle: true,
-            toggleValue: settings.smartRoutes,
-            toggleKey: "smartRoutes",
-          },
-          {
-            icon: WifiOff,
-            label: "Offline Mode",
-            description: "Work without internet",
-            isToggle: true,
-            toggleValue: settings.offlineMode,
-            toggleKey: "offlineMode",
-          },
-          {
-            icon: Smartphone,
-            label: "Gesture Controls",
-            description: "Swipe gestures",
-            isToggle: true,
-            toggleValue: settings.gestureControls,
-            toggleKey: "gestureControls",
-          },
-        ])}
+          {/* Notifications */}
+          {renderSection("NOTIFICATIONS", [
+            {
+              icon: Bell,
+              label: "Push Notifications",
+              description: "Enable notifications",
+              isToggle: true,
+              toggleValue: settings.pushNotifications,
+              toggleKey: "pushNotifications",
+            },
+            {
+              icon: Bell,
+              label: "Sounds",
+              description: "Notification sounds",
+              isToggle: true,
+              toggleValue: settings.sound,
+              toggleKey: "sound",
+              toggleColor: {
+                false: isDark ? "#3A3A3C" : "#E5E5EA", // inactive/off state
+                true: isDark ? "#FF9F0A" : "#FF7A00",
+              },
+            },
+            {
+              icon: Bell,
+              label: "Vibration",
+              description: "Haptic feedback",
+              isToggle: true,
+              toggleValue: settings.vibration,
+              toggleKey: "vibration",
+            },
+          ])}
 
-        {/* Support */}
-        {renderSection("SUPPORT", [
-          {
-            icon: HelpCircle,
-            label: "Help Center",
-            description: "Get help",
-            showArrow: true,
-            onPress: () => Alert.alert("Help", "Help center"),
-          },
-          {
-            icon: ShieldCheck,
-            label: "Privacy Policy",
-            description: "Read policy",
-            showArrow: true,
-            onPress: () => Alert.alert("Privacy", "Privacy policy"),
-          },
-          {
-            icon: Globe,
-            label: "Terms of Service",
-            description: "View terms",
-            showArrow: true,
-            onPress: () => Alert.alert("Terms", "Terms of service"),
-          },
-        ])}
+          {/* Privacy */}
+          {renderSection("PRIVACY", [
+            {
+              icon: MapPin,
+              label: "Location Services",
+              description: "Share trip location",
+              isToggle: true,
+              toggleValue: settings.locationSharing,
+              toggleKey: "locationSharing",
+            },
+            {
+              icon: History,
+              label: "Clear Trip History",
+              description: "Delete travel data",
+              showArrow: true,
+              onPress: () => Alert.alert("History", "Clear trip history"),
+            },
+          ])}
 
-        {/* Logout Button */}
-        <View className="mx-4 mt-8 mb-8">
-          <TouchableOpacity
-            className="py-4 rounded-xl flex-row justify-center items-center"
-            style={{
-              backgroundColor: colors.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-            onPress={() =>
-              Alert.alert("Logout", "Are you sure you want to logout?", [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Logout",
-                  style: "destructive",
-                  onPress: () => console.log("Logout"),
-                },
-              ])
-            }
-            activeOpacity={0.7}
-          >
-            <LogOut size={20} color="#FF3B30" />
-            <Text className="ml-2 font-semibold" style={{ color: "#FF3B30" }}>
-              Log Out
+          {/* App Settings */}
+          {renderSection("APP SETTINGS", [
+            {
+              icon: isDark ? Moon : Sun,
+              label: "Appearance",
+              description:
+                themeMode === "system"
+                  ? "System"
+                  : actualTheme.charAt(0).toUpperCase() + actualTheme.slice(1),
+              showArrow: true,
+              onPress: () => setShowThemeModal(true),
+            },
+            {
+              icon: Type,
+              label: "Text Size",
+              description: "Medium",
+              showArrow: true,
+              onPress: () => Alert.alert("Text Size", "Adjust text scaling"),
+            },
+            {
+              icon: Smartphone,
+              label: "Haptic Feedback",
+              description: "Touch vibrations",
+              isToggle: true,
+              toggleValue: settings.hapticFeedback,
+              toggleKey: "hapticFeedback",
+            },
+          ])}
+
+          {/* Advanced */}
+          {renderSection("ADVANCED", [
+            {
+              icon: Zap,
+              label: "Smart Routes",
+              description: "AI suggestions",
+              isToggle: true,
+              toggleValue: settings.smartRoutes,
+              toggleKey: "smartRoutes",
+            },
+            {
+              icon: WifiOff,
+              label: "Offline Mode",
+              description: "Work without internet",
+              isToggle: true,
+              toggleValue: settings.offlineMode,
+              toggleKey: "offlineMode",
+            },
+            {
+              icon: Smartphone,
+              label: "Gesture Controls",
+              description: "Swipe gestures",
+              isToggle: true,
+              toggleValue: settings.gestureControls,
+              toggleKey: "gestureControls",
+            },
+          ])}
+
+          {/* Support */}
+          {renderSection("SUPPORT", [
+            {
+              icon: HelpCircle,
+              label: "Help Center",
+              description: "Get help",
+              showArrow: true,
+              onPress: () => Alert.alert("Help", "Help center"),
+            },
+            {
+              icon: ShieldCheck,
+              label: "Privacy Policy",
+              description: "Read policy",
+              showArrow: true,
+              onPress: () => Alert.alert("Privacy", "Privacy policy"),
+            },
+            {
+              icon: Globe,
+              label: "Terms of Service",
+              description: "View terms",
+              showArrow: true,
+              onPress: () => Alert.alert("Terms", "Terms of service"),
+            },
+          ])}
+
+          {/* Logout Button */}
+          <View className="mx-4 mt-8 mb-8">
+            <TouchableOpacity
+              className="py-4 rounded-xl flex-row justify-center items-center"
+              style={{
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
+              <LogOut size={20} color="#FF3B30" />
+              <Text className="ml-2 font-geist" style={{ color: "#FF3B30" }}>
+                Log Out
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Version Info */}
+          <View className="items-center mb-6">
+            <Text className="text-sm mb-1" style={{ color: colors.mutedText }}>
+              Addis Pulse
             </Text>
-          </TouchableOpacity>
-        </View>
+            <Text className="text-xs" style={{ color: colors.mutedText }}>
+              Version 1.4.2
+            </Text>
+          </View>
+        </ScrollView>
 
-        {/* Version Info */}
-        <View className="items-center mb-6">
-          <Text className="text-sm mb-1" style={{ color: colors.mutedText }}>
-            Addis Pulse
-          </Text>
-          <Text className="text-xs" style={{ color: colors.mutedText }}>
-            Version 1.4.2
-          </Text>
-        </View>
-      </ScrollView>
+        {/* Theme Selection Modal */}
+        {renderThemeModal()}
+      </SafeAreaView>
 
-      {/* Theme Selection Modal */}
-      {renderThemeModal()}
-    </SafeAreaView>
+      {/* Alert Modal */}
+      <AlertModal
+        visible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        {...alertConfig}
+      />
+    </>
   )
 }

@@ -125,7 +125,7 @@ const ContinueWithEmail = () => {
   }
 
   const handleContinue = async () => {
-    // router.push("/(passenger)/(tabs)")
+    router.push("/(passenger)/(tabs)")
     if (!email) {
       triggerShake()
       showAlert({

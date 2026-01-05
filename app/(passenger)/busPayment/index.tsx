@@ -1,6 +1,7 @@
 import { useThemeContext } from "@/context/ThemeContext"
 import { useRouter } from "expo-router"
 import {
+  ArrowRight,
   BadgeCheck,
   CheckCircle2,
   ChevronRight,
@@ -162,97 +163,219 @@ export default function PaymentPage() {
             <View className="flex-1 space-y-4">
               {/* Wallet Payment Card */}
               <View
-                className="rounded-2xl border"
+                className="rounded-2xl"
                 style={{
                   backgroundColor: colors.card,
                   borderColor: colors.border,
                 }}
               >
-                <View className="p-5">
-                  {/* Card Header */}
-                  <View className="flex-row justify-between items-center ">
-                    <View className="flex-row items-center gap-2 mb-2">
-                      <Wallet size={20} color={colors.primary} />
-                      <Text
-                        className="text-lg font-geist"
-                        style={{ color: colors.text }}
+                <View className="p-6">
+                  {/* Modern Card Header with subtle gradient effect */}
+                  <View className="flex-row justify-between items-center mb-4">
+                    <View className="flex-row items-center gap-3">
+                      <View
+                        className="p-3 rounded-xl"
+                        style={{
+                          backgroundColor: colors.primary + "15",
+                          transform: [{ rotate: "-5deg" }],
+                        }}
                       >
-                        Wallet Payment
-                      </Text>
+                        <Wallet size={24} color={colors.primary} />
+                      </View>
+                      <View>
+                        <Text
+                          className="text-xl font-geist font-bold"
+                          style={{ color: colors.text }}
+                        >
+                          Wallet Payment
+                        </Text>
+                        <Text
+                          className="text-xs font-geist mt-1"
+                          style={{ color: colors.mutedText }}
+                        >
+                          Secure transaction
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
+                  {/* Instruction with modern typography */}
                   <Text
-                    className="text-sm mb-6 font-geist"
+                    className="text-base mb-8 font-geist leading-relaxed"
                     style={{ color: colors.mutedText }}
                   >
-                    Enter your secure PIN to complete payment
+                    Enter your{" "}
+                    <Text
+                      style={{
+                        color: colors.primary,
+                        fontFamily: "Geist-Bold",
+                      }}
+                    >
+                      secure PIN
+                    </Text>{" "}
+                    to complete payment
                   </Text>
 
-                  {/* PIN Input */}
-                  <View className="space-y-4">
+                  {/* PIN Input Section */}
+                  <View className="space-y-6">
                     <View>
-                      <Text
-                        className="text-base font-medium mb-2 font-geist"
-                        style={{ color: colors.text }}
-                      >
-                        Wallet PIN
-                      </Text>
-                      <View className="flex-row justify-center mb-2">
+                      <View className="flex-row justify-between items-center mb-4">
+                        <Text
+                          className="text-base font-geist font-semibold"
+                          style={{ color: colors.text }}
+                        >
+                          Wallet PIN
+                        </Text>
+                        <Text
+                          className="text-sm font-geist"
+                          style={{ color: colors.mutedText }}
+                        >
+                          {walletPin.length}/6
+                        </Text>
+                      </View>
+
+                      {/* Modern PIN Digits with subtle animation */}
+                      <View className="flex-row justify-center gap-3 mb-4">
                         {[0, 1, 2, 3, 4, 5].map((index) => (
-                          <PinDigit
-                            key={index}
-                            digit={walletPin[index]}
-                            index={index}
-                          />
+                          <View key={index}>
+                            <View
+                              className="w-14 h-16 rounded-2xl items-center justify-center border-2"
+                              style={{
+                                backgroundColor: colors.background,
+                                borderColor: walletPin[index]
+                                  ? colors.primary
+                                  : colors.border + "20",
+                                shadowColor: walletPin[index]
+                                  ? colors.primary
+                                  : colors.border,
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: walletPin[index] ? 0.2 : 0.1,
+                                shadowRadius: 4,
+                                elevation: walletPin[index] ? 3 : 1,
+                              }}
+                            >
+                              {walletPin[index] ? (
+                                <View
+                                  className="w-4 h-4 rounded-full"
+                                  style={{ backgroundColor: colors.primary }}
+                                />
+                              ) : (
+                                <Text
+                                  className="text-xl font-geist font-bold"
+                                  style={{ color: colors.mutedText + "10" }}
+                                >
+                                  •
+                                </Text>
+                              )}
+                            </View>
+                            {index === 2 && (
+                              <View className="absolute -bottom-6 left-1/2 transform -translate-x-1/2">
+                                <Text
+                                  className="text-xs text-center font-geist"
+                                  style={{ color: colors.mutedText + "60" }}
+                                >
+                                  —
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                         ))}
                       </View>
+
+                      {/* Hidden TextInput - Enhanced with better accessibility */}
                       <TextInput
-                        className="absolute opacity-0"
+                        className="absolute opacity-0 w-full h-16"
                         value={walletPin}
                         onChangeText={(text) => {
                           const numericText = text.replace(/[^0-9]/g, "")
-                          if (numericText.length <= 6) {
-                            setWalletPin(numericText)
-                          }
+                          if (numericText.length <= 6) setWalletPin(numericText)
                         }}
-                        keyboardType="numeric"
+                        keyboardType="number-pad"
                         maxLength={6}
                         secureTextEntry
                         autoFocus
+                        autoComplete="off"
+                        autoCorrect={false}
                       />
+
                       <Text
-                        className="text-sm text-center mt-2 font-geist py-1"
+                        className="text-sm text-center mt-6 font-geist"
                         style={{ color: colors.mutedText }}
                       >
                         Enter the 6-digit PIN you set for your wallet
                       </Text>
                     </View>
 
-                    {/* Security Info Banner */}
+                    {/* Modern Security Banner */}
                     <View
-                      className="flex-row items-center gap-3 p-3 rounded-xl"
-                      style={{ backgroundColor: "#10B98120" }}
+                      className="flex-row items-center gap-4 p-4 rounded-2xl border my-2"
+                      style={{
+                        backgroundColor: "#10B98108",
+                        borderColor: "#10B98130",
+                        borderWidth: 1,
+                      }}
                     >
-                      <Lock size={16} color="#10B981" />
-                      <Text
-                        className="text-sm flex-1 font-geist"
-                        style={{ color: "#10B981" }}
+                      <View
+                        className="p-2 rounded-lg"
+                        style={{ backgroundColor: "#10B98115" }}
                       >
-                        Your PIN is encrypted for maximum security
-                      </Text>
+                        <Lock size={18} color="#10B981" />
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className="text-sm font-geist font-semibold mb-1"
+                          style={{ color: "#10B981" }}
+                        >
+                          Bank-level encryption
+                        </Text>
+                        <Text
+                          className="text-xs font-geist"
+                          style={{ color: "#10B981" + "CC" }}
+                        >
+                          Your PIN is end-to-end encrypted for maximum security
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
-                  {/* Forgot PIN */}
-                  <TouchableOpacity className="mt-6">
+                  {/* Modern Forgot PIN Button */}
+                  <TouchableOpacity
+                    className="mt-8 p-4 rounded-xl active:opacity-80"
+                    style={{ backgroundColor: colors.primary + "0A" }}
+                    activeOpacity={0.7}
+                  >
+                    <View className="flex-row items-center justify-center gap-2">
+                      <Text
+                        className="text-sm font-geist font-semibold text-center"
+                        style={{ color: colors.primary }}
+                      >
+                        Forgot wallet PIN?
+                      </Text>
+                      <ArrowRight size={14} color={colors.primary} />
+                    </View>
                     <Text
-                      className="text-center text-sm font-medium font-geist"
-                      style={{ color: colors.primary }}
+                      className="text-xs text-center mt-1 font-geist"
+                      style={{ color: colors.primary + "99" }}
                     >
-                      Forgot wallet PIN? Reset it here
+                      Reset it securely here
                     </Text>
                   </TouchableOpacity>
+
+                  {/* Decorative Elements */}
+                  <View
+                    className="absolute top-0 right-0 w-32 h-32 rounded-full"
+                    style={{
+                      backgroundColor: colors.primary + "05",
+                      transform: [{ translateX: 60 }, { translateY: -60 }],
+                    }}
+                  />
+                  <View
+                    className="absolute bottom-10 left-0 w-24 h-24 rounded-full"
+                    style={{
+                      backgroundColor: colors.primary + "03",
+                      transform: [{ translateX: -40 }, { translateY: 20 }],
+                    }}
+                  />
                 </View>
               </View>
 

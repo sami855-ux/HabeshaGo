@@ -1,10 +1,5 @@
 import "../tamagui-web.css"
 
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native"
 import { useFonts } from "expo-font"
 import { Stack } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
@@ -44,30 +39,36 @@ function AppWithTheme() {
 
   return (
     <TamaguiProvider config={tamaguiConfig} defaultTheme={actualTheme}>
-      <ThemeProvider value={actualTheme === "dark" ? DarkTheme : DefaultTheme}>
-        <QueryProvider>
-          <Provider store={store}>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="(auth)/email"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="(auth)/phone"
-                options={{ headerShown: false }}
-              />
-
-              <Stack.Screen
-                name="(passenger)"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen name="(driver)" options={{ headerShown: false }} />
-              
-            </Stack>
-          </Provider>
-        </QueryProvider>
-      </ThemeProvider>
+      {/* REMOVED: ThemeProvider from @react-navigation/native */}
+      <QueryProvider>
+        <Provider store={store}>
+          <Stack
+            screenOptions={{
+              contentStyle: {
+                backgroundColor: actualTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
+              },
+            }}
+          >
+            <Stack.Screen
+              name="index"
+              options={{ headerShown: false, animation: "fade" }}
+            />
+            <Stack.Screen
+              name="(auth)/email"
+              options={{ headerShown: false, animation: "slide_from_right" }}
+            />
+            <Stack.Screen
+              name="(auth)/phone"
+              options={{ headerShown: false, animation: "slide_from_right" }}
+            />
+            <Stack.Screen
+              name="(passenger)"
+              options={{ headerShown: false, animation: "fade" }}
+            />
+            <Stack.Screen name="(driver)" options={{ headerShown: false }} />
+          </Stack>
+        </Provider>
+      </QueryProvider>
     </TamaguiProvider>
   )
 }

@@ -38,13 +38,7 @@ const COMMON_EMAIL_DOMAINS = [
   "gmail.com",
   "outlook.com",
   "yahoo.com",
-  "hotmail.com",
-  "icloud.com",
-  "aol.com",
-  "protonmail.com",
-  "zoho.com",
   "mail.com",
-  "yandex.com",
 ]
 
 function LoginPage() {
@@ -201,7 +195,8 @@ function LoginPage() {
 
   const signInWithGoogle = () => {
     // Redirect the entire page to backend Google login
-    window.location.href = "http://localhost:5000/api/auth/google"
+    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
+    // "http://localhost:5000/api/auth/google"
   }
 
   async function signInWithApple() {}

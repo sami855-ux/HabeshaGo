@@ -61,9 +61,17 @@ function Sidebar() {
       label: "Payments",
       icon: <Currency className="h-5 w-5" />,
       subItems: [
-        { id: "send-money", label: "Send Money" },
-        { id: "receive-money", label: "Receive Money" },
-        { id: "top-up-mobile-wallet", label: "Top-up Mobile Wallet" },
+        { id: "send-money", label: "Send Money", path: "payments/send-money" },
+        {
+          id: "receive-money",
+          label: "Receive Money",
+          path: "payments/receive-money",
+        },
+        {
+          id: "top-up-mobile-wallet",
+          label: "Top-up Mobile Wallet",
+          path: "payments/top-up-mobile-wallet",
+        },
       ],
       path: "/payments",
     },
@@ -72,9 +80,21 @@ function Sidebar() {
       label: "Transactions",
       icon: <ArrowUpDown className="h-5 w-5" />,
       subItems: [
-        { id: "transaction-history", label: "Transaction History" },
-        { id: "pending-transactions", label: "Pending Transactions" },
-        { id: "failed-transactions", label: "Failed Transactions" },
+        {
+          id: "transaction-history",
+          label: "Transaction History",
+          path: "/transactions/history",
+        },
+        {
+          id: "pending-transactions",
+          label: "Pending Transactions",
+          path: "/transactions/pending",
+        },
+        {
+          id: "failed-transactions",
+          label: "Failed Transactions",
+          path: "/transactions/failed",
+        },
       ],
       path: "/transactions",
     },
@@ -167,8 +187,7 @@ function Sidebar() {
                         )}
                         onClick={(e) => {
                           e.preventDefault()
-                          // Handle subitem navigation here
-                          console.log(`Navigating to ${subItem.id}`)
+                          router.push(`/user${subItem.path}`)
                         }}
                       >
                         <ChevronRight className="h-3 w-3 text-muted-foreground" />

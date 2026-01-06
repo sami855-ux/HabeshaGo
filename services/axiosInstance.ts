@@ -3,7 +3,7 @@ import { setAccessToken, clearUser } from "@/store/slices/userSlice"
 import { store } from "@/store"
 
 export const axiosInstance = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
   withCredentials: true,
 })
 

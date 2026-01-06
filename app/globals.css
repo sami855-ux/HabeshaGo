@@ -1,17 +1,14 @@
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Fira+Code:wght@300..700&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Mozilla+Headline:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap");
 
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
-@utility font-grotesk {
-  font-family: var(--font-grotesk);
-}
 @theme inline {
   /* font families */
   --font-geist: "Geist", sans-serif;
-  --font-grotesk: "Bricolage Grotesque", sans-serif;
+  --font-mozilla: "Mozilla Headline", sans-serif;
   --font-jakarta: "Plus Jakarta Sans", sans-serif;
 
   --color-background: var(--background);
@@ -122,12 +119,27 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+* {
+  @apply font-geist;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+@layer utilities {
+  .font-geist {
+    font-family: var(--font-geist);
+  }
+  .font-mozilla {
+    font-family: var(--font-mozilla);
+  }
+  .font-jakarta {
+    font-family: var(--font-jakarta);
   }
 }
 
@@ -153,12 +165,13 @@
   background-color: #9ca3af;
 }
 
-* {
-  @apply font-geist;
-}
 @keyframes services-slide {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .animate-services-slide {
@@ -172,13 +185,23 @@ html {
 
 /* Custom animations */
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5); }
-  50% { box-shadow: 0 0 40px rgba(249, 115, 22, 0.8); }
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(249, 115, 22, 0.8);
+  }
 }
 
 .float-animation {
@@ -202,21 +225,31 @@ html {
 }
 
 @keyframes gradient {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 
 /* Add to your global.css file */
 .bg-grid-pattern {
-  background-image: 
-    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+  background-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.05) 1px,
+      transparent 1px
+    ),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .dark .bg-grid-pattern {
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    ),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
@@ -227,4 +260,220 @@ html {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/*Toaster styles */
+@layer components {
+  .glass-toast {
+    @apply border border-border/50 bg-background/80 backdrop-blur-xl shadow-xl;
+
+    /* Glass morphism effect */
+    background: linear-gradient(
+      135deg,
+      hsl(var(--background) / 0.9) 0%,
+      hsl(var(--background) / 0.7) 100%
+    );
+
+    /* Border gradient for depth */
+    border-image: linear-gradient(
+        135deg,
+        hsl(var(--border) / 0.3),
+        hsl(var(--border) / 0.1)
+      )
+      1;
+
+    /* Inner shadow for depth */
+    box-shadow: inset 0 1px 0 0 hsl(var(--background) / 0.8),
+      inset 0 -1px 0 0 hsl(var(--border) / 0.2),
+      0 4px 24px -1px hsl(var(--foreground) / 0.05),
+      0 20px 40px -8px hsl(var(--foreground) / 0.1);
+  }
+
+  /* Light theme specific glass adjustments */
+  .light .glass-toast {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--background) / 0.95) 0%,
+      hsl(var(--background) / 0.85) 100%
+    );
+    border-image: linear-gradient(
+        135deg,
+        hsl(var(--border) / 0.4),
+        hsl(var(--border) / 0.2)
+      )
+      1;
+  }
+
+  /* Dark theme specific glass adjustments */
+  .dark .glass-toast {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--background) / 0.6) 0%,
+      hsl(var(--background) / 0.4) 100%
+    );
+    border-image: linear-gradient(
+        135deg,
+        hsl(var(--border) / 0.3),
+        hsl(var(--border) / 0.1)
+      )
+      1;
+    box-shadow: inset 0 1px 0 0 hsl(var(--background) / 0.6),
+      inset 0 -1px 0 0 hsl(var(--border) / 0.2),
+      0 4px 24px -1px hsl(var(--foreground) / 0.05),
+      0 20px 40px -8px hsl(var(--foreground) / 0.15);
+  }
+
+  /* Success toast - with colored glass accent */
+  .glass-toast[data-type="success"] {
+    border-left: 3px solid hsl(var(--success) / 0.6);
+    background: linear-gradient(
+      135deg,
+      hsl(var(--success) / 0.05) 0%,
+      hsl(var(--background) / 0.8) 100%
+    );
+  }
+
+  .dark .glass-toast[data-type="success"] {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--success) / 0.08) 0%,
+      hsl(var(--background) / 0.5) 100%
+    );
+  }
+
+  /* Error toast */
+  .glass-toast[data-type="error"] {
+    border-left: 3px solid hsl(var(--destructive) / 0.6);
+    background: linear-gradient(
+      135deg,
+      hsl(var(--destructive) / 0.05) 0%,
+      hsl(var(--background) / 0.8) 100%
+    );
+  }
+
+  .dark .glass-toast[data-type="error"] {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--destructive) / 0.08) 0%,
+      hsl(var(--background) / 0.5) 100%
+    );
+  }
+
+  /* Warning toast */
+  .glass-toast[data-type="warning"] {
+    border-left: 3px solid hsl(38 92% 50% / 0.6);
+    background: linear-gradient(
+      135deg,
+      hsl(38 92% 50% / 0.05) 0%,
+      hsl(var(--background) / 0.8) 100%
+    );
+  }
+
+  .dark .glass-toast[data-type="warning"] {
+    background: linear-gradient(
+      135deg,
+      hsl(38 92% 50% / 0.08) 0%,
+      hsl(var(--background) / 0.5) 100%
+    );
+  }
+
+  /* Info toast */
+  .glass-toast[data-type="info"] {
+    border-left: 3px solid hsl(221 83% 53% / 0.6);
+    background: linear-gradient(
+      135deg,
+      hsl(221 83% 53% / 0.05) 0%,
+      hsl(var(--background) / 0.8) 100%
+    );
+  }
+
+  .dark .glass-toast[data-type="info"] {
+    background: linear-gradient(
+      135deg,
+      hsl(221 83% 53% / 0.08) 0%,
+      hsl(var(--background) / 0.5) 100%
+    );
+  }
+
+  /* Loading toast */
+  .glass-toast[data-type="loading"] {
+    border-left: 3px solid hsl(var(--muted-foreground) / 0.6);
+    background: linear-gradient(
+      135deg,
+      hsl(var(--muted-foreground) / 0.05) 0%,
+      hsl(var(--background) / 0.8) 100%
+    );
+  }
+
+  /* Toast content styling */
+  .glass-toast .toast-title {
+    @apply font-medium text-foreground;
+  }
+
+  .glass-toast .toast-description {
+    @apply text-sm text-muted-foreground/90;
+  }
+
+  /* Close button styling */
+  .glass-toast .toast-close {
+    @apply h-7 w-7 rounded-md border border-border/50 bg-background/50 backdrop-blur-sm transition-all hover:bg-accent hover:text-accent-foreground hover:border-border;
+  }
+
+  /* Progress bar (if using duration) */
+  .glass-toast .toast-progress {
+    @apply bg-primary/20;
+  }
+
+  .glass-toast .toast-progress-fill {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--primary) / 0.4),
+      hsl(var(--primary) / 0.8)
+    );
+  }
+
+  /* Hover effects */
+  .glass-toast:hover {
+    @apply border-border/60 bg-background/90 transition-all duration-200;
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 0 hsl(var(--background) / 0.9),
+      inset 0 -1px 0 0 hsl(var(--border) / 0.3),
+      0 8px 32px -2px hsl(var(--foreground) / 0.08),
+      0 24px 48px -12px hsl(var(--foreground) / 0.15);
+  }
+
+  /* Animations */
+  @keyframes glassSlideIn {
+    from {
+      transform: translateX(calc(100% + 16px));
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes glassSlideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(calc(100% + 16px));
+      opacity: 0;
+    }
+  }
+
+  .toaster-group [data-sonner-toast] {
+    animation: glassSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .toaster-group [data-sonner-toast][data-swiping="true"] {
+    transform: translateX(var(--radix-toast-swipe-move-x));
+  }
+
+  .toaster-group [data-sonner-toast][data-swipe="end"] {
+    animation: glassSlideOut 0.2s ease-out forwards;
+  }
 }

@@ -1,35 +1,30 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  motion,
-  useScroll,
-  useTransform,
-  AnimatePresence,
-} from "framer-motion";
-import { ArrowRight, Sparkles, Zap, Shield, Battery } from "lucide-react";
-import { useEffect, useState } from "react";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
+import { ArrowRight, Sparkles, Zap, Shield, Battery } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export function HeroSection() {
-  const { scrollY } = useScroll();
-  const y = useTransform(scrollY, [0, 500], [0, 100]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const { scrollY } = useScroll()
+  const y = useTransform(scrollY, [0, 500], [0, 100])
+  const opacity = useTransform(scrollY, [0, 300], [1, 0])
 
-  const [textIndex, setTextIndex] = useState(0);
+  const [textIndex, setTextIndex] = useState(0)
   const texts = [
     "Drive. Park. Charge. Ride — All in One",
     "Seamless Urban Mobility Solutions",
     "Your Smart City Journey Starts Here",
     "Redefining Urban Transportation",
-  ];
+  ]
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTextIndex((prev) => (prev + 1) % texts.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [texts.length]);
+      setTextIndex((prev) => (prev + 1) % texts.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [texts.length])
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -40,7 +35,7 @@ export function HeroSection() {
         delayChildren: 0.3,
       },
     },
-  };
+  }
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -49,7 +44,7 @@ export function HeroSection() {
       y: 0,
       transition: { duration: 0.6, ease: "easeOut" },
     },
-  };
+  }
 
   const featureVariants = {
     hidden: { opacity: 0, scale: 0.8 },
@@ -61,17 +56,17 @@ export function HeroSection() {
         duration: 0.5,
       },
     }),
-  };
+  }
 
   const features = [
     { icon: Zap, text: "Fast Charging", color: "text-yellow-500" },
     { icon: Shield, text: "Secure Parking", color: "text-blue-500" },
     { icon: Battery, text: "EV Ready", color: "text-green-500" },
     { icon: Sparkles, text: "Smart Routes", color: "text-purple-500" },
-  ];
+  ]
 
   return (
-    <section className="relative w-full min-h-screen overflow-hidden">
+    <section className="relative w-full min-h-screen overflow-hidden pt-16">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-yellow-500/10" />
 
@@ -120,7 +115,7 @@ export function HeroSection() {
         <motion.div variants={itemVariants} className="mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
             <Sparkles className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm font-medium text-white/90">
+            <span className="text-sm font-medium text-white/90 font-geist">
               Revolutionizing Urban Mobility
             </span>
           </div>
@@ -129,9 +124,9 @@ export function HeroSection() {
         {/* Heading */}
         <motion.h1
           variants={itemVariants}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-tight mb-6"
+          className="text-5xl md:text-7xl lg:text-8xl font-bold font-mozilla text-white leading-normal mb-4"
         >
-          <span className="bg-gradient-to-r from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r  font-mozilla from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent">
             Smart Moves for a
           </span>
           <br />
@@ -217,5 +212,5 @@ export function HeroSection() {
         </motion.div>
       </motion.div>
     </section>
-  );
+  )
 }

@@ -7,6 +7,7 @@ export type MenuItem = {
     id: string
     label: string
     icon?: React.ReactNode
+    path: string
   }[]
 }
 export interface Bus {
@@ -52,4 +53,25 @@ export interface Booking {
   totalPrice: number
   status: "pending" | "confirmed" | "cancelled"
   date: Date
+}
+
+export type TransactionType = "Tax" | "Transfer" | "Payment"
+export type PaymentMethod = "Wallet" | "Telebirr" | "Bank" | "Card" | "Manual"
+export type TransactionStatus = "SUCCESS" | "PENDING" | "FAILED"
+
+export interface Transaction {
+  id: string
+  date: Date
+  referenceId: string
+  type: TransactionType
+  amount: number
+  paymentMethod: PaymentMethod
+  status: TransactionStatus
+  description: string
+  hasReceipt: boolean
+}
+
+export interface TransactionTableProps {
+  transactions: Transaction[]
+  isLoading?: boolean
 }

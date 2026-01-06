@@ -3,37 +3,23 @@ import { generateOTP } from "../utils/otp.js"
 import { transporter } from "../config/mail.js"
 
 const OTP_EXPIRY_MINUTES = 5
-const RESEND_COOLDOWN_SECONDS = 60
 
 export const sendOTP = async (user) => {
-  // Check cooldown
-  const lastOtp = await prisma.otpCode.findFirst({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-  })
-
-  if (lastOtp) {
-    const secondsSinceLast =
-      (Date.now() - new Date(lastOtp.createdAt).getTime()) / 1000
-    if (secondsSinceLast < RESEND_COOLDOWN_SECONDS) {
-      throw new Error(
-        `Please wait ${Math.ceil(
-          RESEND_COOLDOWN_SECONDS - secondsSinceLast
-        )} seconds before requesting another OTP`
-      )
-    }
-  }
-
-  // Invalidate previous OTPs
+  // Invalidate all previous unused OTPs
   await prisma.otpCode.updateMany({
-    where: { userId: user.id, used: false },
-    data: { used: true },
+    where: {
+      userId: user.id,
+      used: false,
+    },
+    data: {
+      used: true,
+    },
   })
 
   // Generate new OTP
-  const code = generateOTP() // e.g., "123456"
+  const code = generateOTP() // e.g. "123456"
 
-  // Save to DB
+  // Save OTP to DB
   await prisma.otpCode.create({
     data: {
       userId: user.id,
@@ -43,6 +29,7 @@ export const sendOTP = async (user) => {
     },
   })
 
+  // Send email
   await transporter.sendMail({
     from: `"Addis Pulse" <no-reply@addispulse.com>`,
     to: user.email,
@@ -53,10 +40,16 @@ export const sendOTP = async (user) => {
         <p>Hi ${user.name || "there"},</p>
         <p>Your verification code is:</p>
         <h1 style="text-align: center; color: #FFB300; letter-spacing: 4px; font-size: 2em;">${code}</h1>
-        <p style="text-align: center;">This code will expire in <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+        <p style="text-align: center;">
+          This code will expire in <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.
+        </p>
         <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
-        <p style="font-size: 0.9em; color: #555;">If you didn't request this OTP, you can safely ignore this email.</p>
-        <p style="text-align: center; font-size: 0.8em; color: #999;">&copy; 2025 Addis Pulse. All rights reserved.</p>
+        <p style="font-size: 0.9em; color: #555;">
+          If you didn't request this OTP, you can safely ignore this email.
+        </p>
+        <p style="text-align: center; font-size: 0.8em; color: #999;">
+          &copy; 2025 Addis Pulse. All rights reserved.
+        </p>
       </div>
     `,
   })

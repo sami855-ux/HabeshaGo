@@ -1,45 +1,18 @@
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  IsBoolean,
-  IsEnum,
-  Min,
-} from 'class-validator';
-import { BusStatus } from '@prisma/client';
+import { IsString, IsOptional, IsInt, Min } from 'class-validator';
 
 export class CreateBusDto {
-  @IsString({ message: 'Bus number must be a string' })
-  busNumber!: string;
-
-  @IsInt()
-  @Min(1, { message: 'Capacity must be at least 1' })
-  capacity!: number;
-
-  // Optional: override default status (default is ACTIVE)
-  @IsOptional()
-  @IsEnum(BusStatus, { message: 'Invalid bus status' })
-  status?: BusStatus;
-
-  // Optional relations
-  @IsOptional()
-  @IsInt()
-  driverId!: number;
-
-  @IsOptional()
-  @IsInt()
-  routeId!: number;
-
-  @IsOptional()
   @IsString()
-  currentStop?: string;
+  busNumber!: string; // required
+
+  @IsInt()
+  @Min(1)
+  capacity!: number; // required
 
   @IsOptional()
-  @IsString()
-  nextDestination?: string;
+  @IsInt()
+  routeId?: number;
 
-  // Default is true → only allow explicit false
   @IsOptional()
-  @IsBoolean()
-  isActive!: boolean;
+  @IsInt()
+  driverId?: number | null; // nullable
 }

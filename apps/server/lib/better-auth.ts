@@ -3,7 +3,6 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from '../src/prisma/index';
 import { emailOTP } from 'better-auth/plugins';
 import { sendEmail } from 'src/utils/email-send.util';
-import { expo } from '@better-auth/expo';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -18,8 +17,6 @@ export const auth = betterAuth({
   apiPrefix: '/api/auth',
 
   plugins: [
-    expo(),
-
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
         let subject = '';
@@ -36,7 +33,6 @@ export const auth = betterAuth({
           message = `Your password reset code is: ${otp}. Expires in 5 minutes.`;
         }
 
-        // DEV: Send via Nodemailer + Ethereal
         try {
           const info = await sendEmail(
             email,
@@ -76,16 +72,5 @@ export const auth = betterAuth({
     'http://localhost:3000',
     'http://localhost:3001',
     'mobile://',
-
-    // Development mode
-    ...(process.env.NODE_ENV === 'development'
-      ? [
-          'exp://*/*', // Trust all Expo development URL
-          'exp://10.0.0.*:*/*', // Trust 10.0.0.x IP range
-          'exp://192.168.*.*:*/*', // Trust 192.168.x.x IP range
-          'exp://172.*.*.*:*/*', // Trust 172.x.x.x IP range
-          'exp://localhost:*/*',
-        ]
-      : []),
   ],
 });

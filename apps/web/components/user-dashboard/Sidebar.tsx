@@ -83,7 +83,10 @@ function Sidebar() {
   return (
     <div className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-background border-r">
       {/* Top Section with Logo and Company Name */}
-      <div className="flex items-center gap-3 p-6 ">
+      <div
+        className="flex items-center gap-3 p-6 "
+        onClick={() => router.push("/user")}
+      >
         <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-r from-primary to-primary/80 shadow-md">
           <Currency className="h-6 w-6 text-primary-foreground" />
         </div>
@@ -186,7 +189,7 @@ function Sidebar() {
         <div className="space-y-1">
           <button
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+              "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               "text-foreground hover:text-accent-foreground text-left"
             )}
@@ -200,7 +203,7 @@ function Sidebar() {
           </button>
           <button
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+              "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               "text-foreground hover:text-accent-foreground text-left"
             )}

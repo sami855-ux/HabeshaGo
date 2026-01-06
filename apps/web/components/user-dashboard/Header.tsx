@@ -47,6 +47,10 @@ import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
+import { RootState } from "@/store"
+import { useSelector } from "react-redux"
+import { authClient } from "@/lib/auth-client"
+import { useRouter } from "next/navigation"
 
 function Header({
   onMenuClick,
@@ -57,20 +61,29 @@ function Header({
   isSidebarOpen: boolean
   className?: string
 }) {
+  const router = useRouter()
+  const user = useSelector((state: RootState) => state.user.user)
+
+  console.log(user)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const { theme, setTheme } = useTheme()
-
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded)
-  }
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     console.log("Searching for:", searchQuery)
     setShowSearchModal(false)
     setSearchQuery("")
+  }
+
+  const logout = async () => {
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/login") // redirect to login page
+        },
+      },
+    })
   }
 
   return (
@@ -206,8 +219,14 @@ function Header({
                         </AvatarFallback>
                       </Avatar>
                       <div className="hidden md:block text-left">
-                        <p className="text-sm font-medium">Samuel Tale</p>
-                        <p className="text-xs text-muted-foreground">Premium</p>
+                        <p className="text-sm font-medium">
+                          {user?.name
+                            ? user.name || user.email.slice(0, 9) // show name if exists, else first 9 chars of email
+                            : "Guest"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {user?.email}
+                        </p>
                       </div>
                       <ChevronDown className="hidden md:block w-4 h-4" />
                     </Button>
@@ -235,7 +254,10 @@ function Header({
                       <ThemeToggle />
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={logout}
+                    >
                       <LogOut className="w-4 h-4 mr-2" />
                       <span>Log out</span>
                     </DropdownMenuItem>

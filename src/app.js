@@ -25,10 +25,24 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "exp://10.18.95.32:8081"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "https://your-web-domain.com",
+      ]
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error("Not allowed by CORS"))
+    },
     credentials: true,
   })
 )
+
 app.use(express.json())
 app.use(
   session({ secret: "secretkey", resave: false, saveUninitialized: false })

@@ -23,23 +23,29 @@ const PORT = process.env.PORT || 5000
 const app = express()
 app.use(cookieParser())
 
+// app.use(
+//   cors({
+//     origin: (origin, callback) => {
+//       if (!origin) return callback(null, true)
+
+//       const allowedOrigins = [
+//         "http://localhost:3000",
+//         "https://your-web-domain.com",
+//         "expo://10.18.95.32:8081",
+//       ]
+
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true)
+//       }
+
+//       return callback(new Error("Not allowed by CORS"))
+//     },
+//     credentials: true,
+//   })
+// )
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true)
-
-      const allowedOrigins = [
-        "http://localhost:3000",
-        "https://your-web-domain.com",
-      ]
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
-
-      return callback(new Error("Not allowed by CORS"))
-    },
-    credentials: true,
+    origin: "*",
   })
 )
 
@@ -60,6 +66,6 @@ app.use("/api/wallet", walletRoutes)
 app.use("/api/minibus-reservation", minibusReservationRoutes)
 app.use("/api/minibus", minibusRoute)
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port https://localhost:${PORT}`)
 })

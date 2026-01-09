@@ -1,12 +1,15 @@
 import AlertModal from "@/components/utils/AlertModal"
 import { useThemeContext } from "@/context/ThemeContext"
+import { removeRefreshToken } from "@/lib/refreshToken"
+import { showToast } from "@/lib/showToast"
+import { AppDispatch, useAppSelector } from "@/store"
+import { logout } from "@/store/slices/userSlice"
 import { useRouter } from "expo-router"
 import {
   Bell,
   Check,
   ChevronRight,
   CreditCard,
-  Edit2,
   Fingerprint,
   Globe,
   HelpCircle,
@@ -35,9 +38,11 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from "react-native"
+import { useDispatch } from "react-redux"
 
 // Mock user data
 const userData = {
@@ -48,6 +53,8 @@ const userData = {
   walletBalance: "ETB 1,250.00",
   avatar: "https://randomuser.me/api/portraits/men/32.jpg",
 }
+
+const defaultAvatar = require("@/assets/images/defaultAvater.jpg")
 
 // Custom iOS-style Toggle Component
 const IOSToggle = ({
@@ -131,6 +138,8 @@ const IOSToggle = ({
 export default function SettingsScreen() {
   const { colors, setTheme, theme: themeMode, actualTheme } = useThemeContext()
   const isDark = actualTheme === "dark"
+  const dispatch = useDispatch<AppDispatch>()
+  const { user } = useAppSelector((state) => state.user)
 
   const router = useRouter()
   const [showThemeModal, setShowThemeModal] = useState(false)
@@ -187,9 +196,13 @@ export default function SettingsScreen() {
       message: "Are you sure you want to log out?",
       primaryButtonText: "Log Out",
       secondaryButtonText: "Cancel",
-      onPrimaryPress: () => {
+      onPrimaryPress: async () => {
         // Perform logout logic here
-        // router.replace("/(auth)/login")
+        dispatch(logout())
+        router.replace("/(auth)/email")
+
+        showToast("Logged out successfully", ToastAndroid.SHORT)
+        await removeRefreshToken()
       },
     })
   }
@@ -433,18 +446,9 @@ export default function SettingsScreen() {
               <View className="flex-row items-center">
                 <View className="relative">
                   <Image
-                    source={{ uri: userData.avatar }}
+                    source={user?.image ? { uri: user.image } : defaultAvatar} // note difference
                     className="w-24 h-24 rounded-[34px]"
                   />
-                  <View
-                    className="absolute -top-1 -right-1 w-8 h-8 rounded-full justify-center items-center border-2"
-                    style={{
-                      backgroundColor: colors.primary,
-                      borderColor: colors.card,
-                    }}
-                  >
-                    <Edit2 size={12} color="#FFFFFF" />
-                  </View>
                 </View>
                 <View className="ml-5 flex-1">
                   <View className="flex-row items-center justify-between mb-1">
@@ -452,11 +456,8 @@ export default function SettingsScreen() {
                       className="text-2xl font-geist"
                       style={{ color: colors.text }}
                     >
-                      {userData.name}
+                      {user?.name ? user.name : "No username"}
                     </Text>
-                    <TouchableOpacity className="p-2">
-                      <ChevronRight size={20} color={colors.mutedText} />
-                    </TouchableOpacity>
                   </View>
                   <Text
                     className="text-sm font-medium mb-3 font-jakarta"

@@ -3,6 +3,7 @@ import SmartSuggestions from "@/components/passenger/SmartSuggestion"
 import SystemInfoCarousel from "@/components/passenger/SystemInfo"
 import AccountCard from "@/components/utils/AccountCard"
 import { useThemeContext } from "@/context/ThemeContext"
+import { useAppSelector } from "@/store"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
@@ -16,8 +17,12 @@ import {
   View,
 } from "react-native"
 
+const defaultAvatar = require("@/assets/images/defaultAvater.jpg")
+
 const PassengerHome = () => {
   const router = useRouter()
+  const { user } = useAppSelector((state) => state.user)
+
   const { colors, actualTheme } = useThemeContext()
 
   // Define gradient colors based on theme
@@ -47,9 +52,7 @@ const PassengerHome = () => {
             {/* Left: Profile + Greeting */}
             <View className="flex-row items-center">
               <Image
-                source={{
-                  uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRCIyTZVXyb90oYHRiiX6YkNUc0CnzGwWjI3Q&s",
-                }}
+                source={user?.image ? { uri: user.image } : defaultAvatar} // note difference
                 className="w-14 h-14 rounded-full border-2 border-white mr-3"
               />
               <View>
@@ -57,7 +60,7 @@ const PassengerHome = () => {
                   {getGreeting()}
                 </Text>
                 <Text className="text-xl font-groteskBold text-white">
-                  Samuel Tale
+                  {user?.name ? user.name : "No username"}
                 </Text>
               </View>
             </View>

@@ -1,12 +1,19 @@
+import { getRefreshToken } from "@/lib/refreshToken"
 import { store } from "@/store"
+import { clearUser, setAccessToken } from "@/store/slices/userSlice"
 import axios from "axios"
+import * as SecureStore from "expo-secure-store"
+
+const API_URL = "http://10.18.95.32:5000/api"
 
 export const axiosInstance = axios.create({
-  baseURL: "https://addis-pulse-2.onrender.com/api",
-  withCredentials: true,
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
 })
 
-// Attach access token from Redux to every request
+//  Attach access token (Redux)
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = store.getState().user.accessToken
@@ -18,38 +25,49 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// axiosInstance.interceptors.response.use(
-//   (response) => response,
-//   async (error) => {
-//     const originalRequest = error.config
+// Refresh token handling
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
 
-//     if (
-//       error.response?.status === 401 &&
-//       !originalRequest._retry &&
-//       !originalRequest.url.includes("/app/auth/refresh")
-//     ) {
-//       originalRequest._retry = true
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/app/auth/refresh")
+    ) {
+      originalRequest._retry = true
 
-//       try {
-//         const res = await axiosInstance.post(
-//           "/app/auth/refresh",
-//           {},
-//           { withCredentials: true }
-//         )
+      try {
+        // Get refresh token from secure storage
+        const refreshToken = await getRefreshToken()
 
-//         // ✅ SAVE NEW ACCESS TOKEN
-//         store.dispatch(setAccessToken({ accessToken: res.data.accessToken }))
+        if (!refreshToken) {
+          throw new Error("No refresh token found")
+        }
 
-//         // Retry original request with new token
-//         originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`
+        // 🔄 Request new access token
+        const res = await axios.post(`${API_URL}/app/auth/refresh`, {
+          refreshToken,
+        })
 
-//         return axiosInstance(originalRequest)
-//       } catch (err) {
-//         store.dispatch(clearUser())
-//         return Promise.reject(err)
-//       }
-//     }
+        const newAccessToken = res.data.accessToken
 
-//     return Promise.reject(error)
-//   }
-// )
+        // ✅ Save access token in Redux
+        store.dispatch(setAccessToken({ newAccessToken }))
+
+        // Retry original request
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+
+        return axiosInstance(originalRequest)
+      } catch (err) {
+        // ❌ Refresh failed → logout completely
+        await SecureStore.deleteItemAsync("refreshToken")
+        store.dispatch(clearUser())
+        return Promise.reject(err)
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)

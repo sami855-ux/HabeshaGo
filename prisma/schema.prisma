@@ -164,7 +164,7 @@ model Bus {
   busNumber       String        @unique
   capacity        Int
   status          BusStatus     @default(ACTIVE)
-  driverId        Int?          @unique
+  driverId        String?          @unique
   routeId         Int?
   currentStop     String?
   nextDestination String?
@@ -209,19 +209,31 @@ model BusPosition {
 }
 
 model Route {
-  id               Int       @id @default(autoincrement())
-  name             String
+  id               Int            @id @default(autoincrement())
+  name             String         @unique
   origin           String
   destination      String
   distanceKm       Float?
   estimatedTimeMin Int?
-  midPoints        Json?
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   buses            Bus[]
   minibuses        Minibus[]
+  midPoints        RouteMidPoint[] // relation to new model
 }
+
+model RouteMidPoint {
+  id       Int    @id @default(autoincrement())
+  route    Route  @relation(fields: [routeId], references: [id])
+  routeId  Int
+  name     String
+  lat      Float
+  lng      Float
+
+  @@index([routeId]) // optional index for faster searches
+}
+
 
 model EVStation {
   id        Int            @id @default(autoincrement())
@@ -255,7 +267,7 @@ model ChargingSession {
 }
 
 model Driver {
-  id              Int      @id @default(autoincrement())
+  id              String   @id @default(cuid())
   userId          String   @unique
   licenseNo       String
   experience      Int?
@@ -268,7 +280,7 @@ model Minibus {
   id           Int                  @id @default(autoincrement())
   plateNumber  String               @unique
   capacity     Int
-  driverId     Int?                 @unique
+  driverId     String?                 @unique
   routeId      Int?
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt

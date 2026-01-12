@@ -22,48 +22,47 @@ import minibusRoute from "./routes/minibus.route.js";
 // Passport config
 import "./config/passport.js";
 
-const PORT = process.env.PORT || 5000;
-const app = express();
+const PORT = process.env.PORT || 5000
 
-// Middleware
-app.use(cookieParser());
+const app = express()
+app.use(cookieParser())
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true)
+
       const allowedOrigins = [
         "http://localhost:3000",
         "https://your-web-domain.com",
-      ];
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
+      ]
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error("Not allowed by CORS"))
     },
     credentials: true,
   })
 );
 app.use(express.json());
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "secretkey",
-    resave: false,
-    saveUninitialized: false,
-  })
-);
-app.use(passport.initialize());
-app.use(passport.session());
+  session({ secret: "secretkey", resave: false, saveUninitialized: false })
+)
+app.use(passport.initialize())
+app.use(passport.session())
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/drivers", driverRoutes);
-app.use("/api/bus", busRoutes);
-app.use("/api/route", routeRoutes);
-app.use("/api/booking", bookingRoutes);
-app.use("/api/payment", paymentRoutes);
-app.use("/api/wallet", walletRoutes);
-app.use("/api/minibus-reservation", minibusReservationRoutes);
-app.use("/api/minibus", minibusRoute);
+app.use("/api/auth", authRoutes)
+app.use("/api/drivers", driverRoutes)
+app.use("/api/bus", busRoutes)
+app.use("/api/route", routeRoutes)
+app.use("/api/booking", bookingRoutes)
+app.use("/api/payment", paymentRoutes)
+app.use("/api/wallet", walletRoutes)
+app.use("/api/minibus-reservation", minibusReservationRoutes)
+app.use("/api/minibus", minibusRoute)
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port https://localhost:${PORT}`);
-});
+  console.log(`🚀 Server running on port https://localhost:${PORT}`)
+})

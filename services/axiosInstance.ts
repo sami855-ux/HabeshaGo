@@ -3,9 +3,9 @@ import { setAccessToken, clearUser } from "@/store/slices/userSlice"
 import { store } from "@/store"
 
 export const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
+  baseURL: "http://localhost:5000/api",
   withCredentials: true,
-})
+});
 
 // Attach access token from Redux to every request
 axiosInstance.interceptors.request.use(

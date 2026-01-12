@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Search,
   Bell,
@@ -16,17 +16,16 @@ import {
   Settings,
   CreditCard,
   LogOut,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
-import { Card, CardContent } from "@/components/ui/card"
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,69 +33,62 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-
-import { cn } from "@/lib/utils"
-import { ThemeToggle } from "../themeToggle"
-import { RootState } from "@/store"
-import { useDispatch, useSelector } from "react-redux"
-import { useRouter } from "next/navigation"
-import { LogoutModal } from "../logout-modal"
-import { clearUser } from "@/store/slices/userSlice"
-import { logoutUser } from "@/services/auth.user.api"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { ThemeToggle } from "../themeToggle";
+import { RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import { LogoutModal } from "../logout-modal";
+import { clearUser } from "@/store/slices/userSlice";
+import { logoutUser } from "@/services/auth.user.api";
 
 function Header({
   onMenuClick,
   isSidebarOpen,
   className,
 }: {
-  onMenuClick: () => void
-  isSidebarOpen: boolean
-  className?: string
+  onMenuClick: () => void;
+  isSidebarOpen: boolean;
+  className?: string;
 }) {
-  const router = useRouter()
-  const dispatch = useDispatch()
-  const user = useSelector((state: RootState) => state.user.user)
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.user.user);
 
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [showSearchModal, setShowSearchModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Searching for:", searchQuery)
-    setShowSearchModal(false)
-    setSearchQuery("")
-  }
+    e.preventDefault();
+    console.log("Searching for:", searchQuery);
+    setShowSearchModal(false);
+    setSearchQuery("");
+  };
 
   const handleLogout = async () => {
-    setIsLoading(true)
-
+    setIsLoading(true);
     try {
-      // Call backend to remove refresh token
-      await logoutUser()
-
-      // Clear Redux state
-      dispatch(clearUser())
-
-      // Redirect
-      router.push("/")
+      await logoutUser();
+      dispatch(clearUser());
+      router.push("/");
     } catch (error) {
-      console.error("Logout failed:", error)
+      console.error("Logout failed:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <>
@@ -107,7 +99,7 @@ function Header({
           className
         )}
       >
-        <div className="container mx-auto w-full  h-full">
+        <div className="container mx-auto w-full h-full">
           <div className="flex items-center justify-between h-full">
             {/* Left Section */}
             <div className="flex items-center gap-4">
@@ -125,17 +117,18 @@ function Header({
               </Button>
             </div>
 
+            {/* Center & Right Section */}
             <div className="flex gap-2">
-              {/* Deposit Button - Orange Accent with Wallet Icon */}
+              {/* Deposit Button - Desktop */}
               <Button
                 className="hidden md:flex gap-2 bg-gradient-to-r cursor-pointer from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md"
-                onClick={() => console.log("Deposit clicked")}
+                onClick={() => router.push("/user/wallet")}
               >
                 <Wallet className="w-4 h-4" />
                 <span>Deposit</span>
               </Button>
 
-              {/* Center Section */}
+              {/* Search Input (Desktop) */}
               <div className="hidden md:flex items-center max-w-lg">
                 <TooltipProvider>
                   <Tooltip>
@@ -160,12 +153,12 @@ function Header({
 
               {/* Right Section */}
               <div className="flex items-center gap-2">
-                {/* Mobile Deposit Button */}
+                {/* Deposit Button - Mobile */}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="md:hidden bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"
-                  onClick={() => console.log("Mobile deposit clicked")}
+                  onClick={() => router.push("/user/wallet")}
                 >
                   <Wallet className="w-5 h-5" />
                 </Button>
@@ -180,7 +173,7 @@ function Header({
                   <Search className="w-5 h-5" />
                 </Button>
 
-                {/* Notifications */}
+                {/* Notifications Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
@@ -204,23 +197,10 @@ function Header({
                         </div>
                       </div>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            Transfer Successful
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            To Jane Smith
-                          </p>
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Profile */}
+                {/* Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2">
@@ -233,8 +213,8 @@ function Header({
                       <div className="hidden md:block text-left">
                         <p className="text-sm font-medium">
                           {user?.name
-                            ? user.name || user.email.slice(0, 9) // show name if exists, else first 9 chars of email
-                            : "Guest"}
+                            ? user.name
+                            : user?.email?.slice(0, 9) || "Guest"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {user?.email}
@@ -317,74 +297,6 @@ function Header({
               </div>
             </form>
           </div>
-
-          <div className="px-6 pb-6 max-h-[400px] overflow-y-auto">
-            <div className="space-y-6">
-              {/* Recent Searches */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-                  Recent Searches
-                </h3>
-                <div className="space-y-2">
-                  {["Transaction #1234", "John Smith", "Payment received"].map(
-                    (item) => (
-                      <Button
-                        key={item}
-                        variant="ghost"
-                        className="w-full justify-start h-auto py-3 px-4 hover:bg-secondary"
-                        onClick={() => {
-                          setSearchQuery(item)
-                          setShowSearchModal(false)
-                        }}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-3">
-                            <Search className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-foreground">{item}</span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            Just now
-                          </span>
-                        </div>
-                      </Button>
-                    )
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-                  Quick Actions
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-auto py-3 justify-start"
-                    onClick={() => setShowSearchModal(false)}
-                  >
-                    <Currency className="w-4 h-4 mr-2 text-primary" />
-                    <span>Send Money</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-3 justify-start"
-                    onClick={() => setShowSearchModal(false)}
-                  >
-                    <Receipt className="w-4 h-4 mr-2 text-primary" />
-                    <span>View Reports</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t bg-secondary rounded-b-lg">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Press ESC to close</span>
-              <span>↑↓ to navigate, Enter to select</span>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
 
@@ -395,7 +307,7 @@ function Header({
         isLoading={isLoading}
       />
     </>
-  )
+  );
 }
 
-export default Header
+export default Header;

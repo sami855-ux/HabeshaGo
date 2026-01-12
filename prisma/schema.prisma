@@ -104,7 +104,8 @@ model OtpCode {
   userId      String
   email       String?
   phone       String?
-  code    String
+  code        String?   // optional if using hashed code only
+  codeHash    String    // store hashed OTP here
   attempts    Int      @default(0)
   maxAttempts Int      @default(3)
   expiresAt   DateTime
@@ -116,6 +117,7 @@ model OtpCode {
   @@index([userId])
   @@map("otp_code")
 }
+
 
 
 model Verification {

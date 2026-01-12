@@ -1,11 +1,15 @@
-import prisma from "../prisma/client.js"
-import { generateOTP } from "../utils/otp.js"
-import { transporter } from "../config/mail.js"
+import prisma from "../prisma/client.js";
+import { generateOTP } from "../utils/otp.js";
+import { transporter } from "../config/mail.js";
+import { hashPassword } from "./password.service.js";
+import dotenv from "dotenv";
+dotenv.config();
 
-const OTP_EXPIRY_MINUTES = 5
+const OTP_EXPIRY_MINUTES = 5;
+const MAX_ATTEMPTS = 5;
 
 export const sendOTP = async (user) => {
-  // Invalidate all previous unused OTPs
+  // Invalidate previous unused OTPs
   await prisma.otpCode.updateMany({
     where: {
       userId: user.id,
@@ -14,24 +18,28 @@ export const sendOTP = async (user) => {
     data: {
       used: true,
     },
-  })
+  });
 
   // Generate new OTP
-  const code = generateOTP() // e.g. "123456"
+  const code = generateOTP(); // e.g., "123456"
+  const codeHash = await hashPassword(code);
 
   // Save OTP to DB
   await prisma.otpCode.create({
     data: {
       userId: user.id,
-      code,
+      email: user.email,
+      codeHash,
       attempts: 0,
+      maxAttempts: MAX_ATTEMPTS,
       expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+      used: false,
     },
-  })
+  });
 
   // Send email
   await transporter.sendMail({
-    from: `"Addis Pulse" <no-reply@addispulse.com>`,
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to: user.email,
     subject: "Your OTP Code",
     html: `
@@ -48,9 +56,11 @@ export const sendOTP = async (user) => {
           If you didn't request this OTP, you can safely ignore this email.
         </p>
         <p style="text-align: center; font-size: 0.8em; color: #999;">
-          &copy; 2025 Addis Pulse. All rights reserved.
+          &copy; 2026 Addis Pulse. All rights reserved.
         </p>
       </div>
     `,
-  })
-}
+  });
+
+  return code; // optional: for logging in dev
+};

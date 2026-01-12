@@ -10,184 +10,157 @@ import {
 import { hashPassword, verifyPassword } from "../services/password.service.js"
 import { verifyTOTP, generate2FASecret } from "../services/2fa.service.js"
 
+
+import dotenv from "dotenv";
+dotenv.config();
+
+// Registration
 export const register = async (req, res) => {
   try {
-    const { email } = req.body
-
-    if (!email) {
+    const { email, name } = req.body;
+    if (!email)
       return res
         .status(400)
-        .json({ message: "Email is required", success: false })
-    }
+        .json({ message: "Email is required", success: false });
 
-    let user = await prisma.user.findUnique({ where: { email } })
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (!user) user = await prisma.user.create({ data: { email, name } });
 
-    if (!user) {
-      user = await prisma.user.create({ data: { email } })
-    }
-
-    await sendOTP(user)
-
-    res.json({ message: "OTP sent to email", success: true })
+    await sendOTP(user);
+    res.json({ message: "OTP sent to email", success: true });
   } catch (error) {
-    res.status(429).json({ message: error.message })
+    console.error("Register error:", error);
+    res.status(500).json({ message: "Registration failed", success: false });
   }
-}
+};
 
+// Verify OTP
 export const verifyOTP = async (req, res) => {
   try {
-    const { email, code } = req.body
-
-    if (!email || !code) {
+    const { email, code } = req.body;
+    if (!email || !code)
       return res
         .status(400)
-        .json({ message: "Email and code are required", success: false })
-    }
+        .json({ message: "Email and OTP code are required", success: false });
 
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) {
-      return res.status(404).json({ message: "User not found", success: false })
-    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user)
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
 
     const otp = await prisma.otpCode.findFirst({
-      where: {
-        userId: user.id,
-        used: false,
-        expiresAt: { gt: new Date() },
-      },
+      where: { userId: user.id, used: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-    })
+    });
 
-    if (!otp) {
+    if (!otp)
       return res
         .status(400)
-        .json({ message: "OTP expired or not found", success: false })
+        .json({ message: "OTP expired or not found", success: false });
+    if (otp.attempts >= otp.maxAttempts)
+      return res
+        .status(429)
+        .json({ message: "Too many incorrect attempts", success: false });
+
+    const isValid = await verifyPassword(code, otp.codeHash);
+    if (!isValid) {
+      await prisma.otpCode.update({
+        where: { id: otp.id },
+        data: { attempts: { increment: 1 } },
+      });
+      return res.status(400).json({ message: "Invalid OTP", success: false });
     }
 
-    if (otp.attempts >= otp.maxAttempts) {
-      return res.status(429).json({
-        message: "Too many incorrect attempts. OTP locked.",
-        success: false,
-      })
-    }
-
-    // Always increment attempts
-    await prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { attempts: { increment: 1 } },
-    })
-
-    if (code !== otp.code) {
-      return res.status(400).json({ message: "Invalid OTP", success: false })
-    }
-
-    // Mark OTP as used
     await prisma.otpCode.update({
       where: { id: otp.id },
       data: { used: true },
-    })
-
-    // Verify email
+    });
     await prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true },
-    })
+    });
 
-    // Issue tokens and send to client
-    return issueTokens(user, req, res)
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: "OTP verification failed", success: false })
+    return issueTokens(user, req, res); // ✅ issue web tokens
+  } catch (err) {
+    console.error("Verify OTP error:", err);
+    return res
+      .status(500)
+      .json({ message: "OTP verification failed", success: false });
   }
-}
+};
+
+// Verify OTP for app
 export const verifyOTPApp = async (req, res) => {
   try {
-    const { email, code } = req.body
-
-    if (!email || !code) {
+    const { email, code } = req.body;
+    if (!email || !code)
       return res
         .status(400)
-        .json({ message: "Email and code are required", success: false })
-    }
+        .json({ message: "Email and OTP code are required", success: false });
 
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) {
-      return res.status(404).json({ message: "User not found", success: false })
-    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user)
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
 
     const otp = await prisma.otpCode.findFirst({
-      where: {
-        userId: user.id,
-        used: false,
-        expiresAt: { gt: new Date() },
-      },
+      where: { userId: user.id, used: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-    })
+    });
 
-    if (!otp) {
+    if (!otp)
       return res
         .status(400)
-        .json({ message: "OTP expired or not found", success: false })
+        .json({ message: "OTP expired or not found", success: false });
+    if (otp.attempts >= otp.maxAttempts)
+      return res
+        .status(429)
+        .json({ message: "Too many incorrect attempts", success: false });
+
+    const isValid = await verifyPassword(code, otp.codeHash);
+    if (!isValid) {
+      await prisma.otpCode.update({
+        where: { id: otp.id },
+        data: { attempts: { increment: 1 } },
+      });
+      return res.status(400).json({ message: "Invalid OTP", success: false });
     }
 
-    if (otp.attempts >= otp.maxAttempts) {
-      return res.status(429).json({
-        message: "Too many incorrect attempts. OTP locked.",
-        success: false,
-      })
-    }
-
-    // Always increment attempts
-    await prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { attempts: { increment: 1 } },
-    })
-
-    if (code !== otp.code) {
-      return res.status(400).json({ message: "Invalid OTP", success: false })
-    }
-
-    // Mark OTP as used
     await prisma.otpCode.update({
       where: { id: otp.id },
       data: { used: true },
-    })
-
-    // Verify email
+    });
     await prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true },
-    })
+    });
 
-    // Issue tokens and send to client
-    return issueMobileTokens(user, req, res)
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: "OTP verification failed", success: false })
+    return issueMobileTokens(user, req, res); // ✅ issue mobile tokens
+  } catch (err) {
+    console.error("Verify OTP App error:", err);
+    return res
+      .status(500)
+      .json({ message: "OTP verification failed", success: false });
   }
-}
+};
 
 export const resendOTP = async (req, res) => {
   try {
-    const { email } = req.body
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" })
-    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    const user = await prisma.user.findUnique({ where: { email } })
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" })
-    }
-
-    await sendOTP(user)
-
-    res.json({ message: "OTP resent successfully" })
+    await sendOTP(user);
+    res.json({ message: "OTP resent successfully", success: true });
   } catch (error) {
-    res.status(429).json({ message: error.message })
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ message: "Failed to resend OTP", success: false });
   }
-}
+};
 
 export const getMe = async (req, res) => {
   try {

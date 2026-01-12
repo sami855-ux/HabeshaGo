@@ -1,71 +1,71 @@
-import prisma from "../prisma/client.js"; // your Prisma client
+import prisma from "../prisma/client.js";
 
 export const walletService = {
   async getOrCreateWallet(userId) {
-    let wallet = await prisma.wallet.findUnique({ where: { userId } });
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId },
+    });
+
     if (!wallet) {
-      wallet = await prisma.wallet.create({ data: { userId, balance: 0 } });
+      wallet = await prisma.wallet.create({
+        data: {
+          userId,
+          balance: 0,
+          currency: "ETB",
+        },
+      });
     }
+
     return wallet;
   },
 
+  // ✅ MVP: Deposit immediately
   async depositViaExternal(userId, amount, reference) {
-    const wallet = await walletService.getOrCreateWallet(userId);
-    const payment = await prisma.payment.create({
-      data: {
-        userId,
-        walletId: wallet.id,
-        amount,
-        method: "CHAPA",
-        status: "PENDING",
-        gatewayRef: reference,
-      },
-    });
+    if (!amount || amount <= 0) {
+      throw new Error("Deposit amount must be greater than zero");
+    }
 
-    return { message: "External deposit initiated", paymentId: payment.id };
-  },
-
-  async deduct(userId, amount, reference, meta) {
-    const wallet = await walletService.getOrCreateWallet(userId);
-    if (wallet.balance < amount) throw new Error("Insufficient wallet balance");
+    const wallet = await this.getOrCreateWallet(userId);
 
     return prisma.$transaction(async (tx) => {
-      const updated = await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { decrement: amount } },
-      });
-
-      await tx.walletTransaction.create({
+      // 1️⃣ Create payment record (optional for MVP)
+      await tx.payment.create({
         data: {
+          userId,
           walletId: wallet.id,
-          amount: -amount,
-          type: "WITHDRAW",
-          reference,
-          meta,
+          amount,
+          method: "MANUAL",
+          status: "SUCCESS",
+          gatewayRef: reference,
         },
       });
 
-      return updated;
-    });
-  },
-
-  async depositInternal(walletId, amount, reference, meta) {
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
-        data: { balance: { increment: amount } },
+      // 2️⃣ Update wallet balance
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { increment: amount },
+        },
       });
 
+      // 3️⃣ Log transaction
       await tx.walletTransaction.create({
-        data: { walletId, amount, type: "DEPOSIT", reference, meta },
+        data: {
+          walletId: wallet.id,
+          amount,
+          type: "DEPOSIT",
+          reference,
+          meta: { source: "MANUAL_TOPUP" },
+        },
       });
 
-      return updated;
+      return updatedWallet;
     });
   },
 
   async getTransactions(userId) {
-    const wallet = await walletService.getOrCreateWallet(userId);
+    const wallet = await this.getOrCreateWallet(userId);
+
     return prisma.walletTransaction.findMany({
       where: { walletId: wallet.id },
       orderBy: { createdAt: "desc" },

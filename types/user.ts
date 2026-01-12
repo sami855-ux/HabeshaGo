@@ -65,3 +65,16 @@ export interface ParkingReservation {
   startTime: string
   endTime: string
 }
+
+// For table display
+export type UserStatus = "active" | "suspended" | "inactive"
+export type UserTableData = User & {
+  tableStatus: UserStatus
+  lastLogin?: string
+}
+
+export type UserRole = "PASSENGER" | "DRIVER" | "ADMIN"
+
+// Theme types
+export type Theme = "light" | "dark" | "system"
+export type BadgeTheme = "default" | "light" | "dark" | "colorful"

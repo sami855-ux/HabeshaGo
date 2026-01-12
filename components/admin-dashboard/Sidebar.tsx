@@ -13,11 +13,7 @@ import {
   HelpCircle,
   Currency,
   Receipt,
-  LogOut,
-  User,
-  ArrowUpDown,
   MapPin,
-  Plug,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
@@ -60,19 +56,7 @@ function Sidebar() {
       id: "users",
       label: "Users",
       icon: <Users className="h-5 w-5" />,
-      subItems: [
-        { id: "all-users", label: "All Users", path: "/admin/users/all" },
-        {
-          id: "active-users",
-          label: "Active Users",
-          path: "/admin/users/active",
-        },
-        {
-          id: "pending-users",
-          label: "Pending Users",
-          path: "/admin/users/pending",
-        },
-      ],
+      path: "/admin/users/all",
     },
     {
       id: "payments",

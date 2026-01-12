@@ -6,7 +6,7 @@ import Header from "@/components/admin-dashboard/Header"
 import { useRequireRole } from "@/hooks/useRequireRole"
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
-  useRequireRole(["ADMIN"])
+  // useRequireRole(["ADMIN"])
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 

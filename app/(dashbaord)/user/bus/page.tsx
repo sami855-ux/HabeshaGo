@@ -54,7 +54,7 @@ export default function HomePage() {
           <SearchRoute />
         </motion.div>
 
-        {/* Bus List Section */}
+        {/* Bus List  */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

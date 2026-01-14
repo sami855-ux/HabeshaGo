@@ -6,10 +6,19 @@ import { store } from "@/store"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/ui/themeProvider"
 import SessionProvider from "@/lib/accessTokenProvider"
+import { QueryProvider } from "@/lib/QueryProvider"
 
 interface AppProviderProps {
   children: ReactNode
 }
+
+const ToastIcon = ({ color }: { color: string }) => (
+  <div
+    className={`flex h-5 w-5 items-center justify-center rounded-full bg-[${color}]/10`}
+  >
+    <div className={`h-2.5 w-2.5 rounded-full bg-[${color}]`} />
+  </div>
+)
 
 const AppProvider: FC<AppProviderProps> = ({ children }) => {
   return (
@@ -20,7 +29,6 @@ const AppProvider: FC<AppProviderProps> = ({ children }) => {
         enableSystem
         disableTransitionOnChange
       >
-        {/* Glass Morphism Toaster */}
         <Toaster
           position="top-right"
           expand={false}
@@ -29,37 +37,23 @@ const AppProvider: FC<AppProviderProps> = ({ children }) => {
           gap={10}
           theme="system"
           className="toaster-group"
+          closeButton
+          richColors
           toastOptions={{
             className: "glass-toast group",
             descriptionClassName: "text-sm text-muted-foreground/90",
           }}
           icons={{
-            success: (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/10">
-                <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-              </div>
-            ),
-            error: (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/10">
-                <div className="h-2.5 w-2.5 rounded-full bg-destructive" />
-              </div>
-            ),
-            warning: (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/10">
-                <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              </div>
-            ),
-            info: (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10">
-                <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-              </div>
-            ),
+            success: <ToastIcon color="green-500" />,
+            error: <ToastIcon color="destructive" />,
+            warning: <ToastIcon color="amber-500" />,
+            info: <ToastIcon color="blue-500" />,
           }}
-          closeButton
-          richColors
         />
 
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </SessionProvider>
       </ThemeProvider>
     </ReduxProvider>
   )

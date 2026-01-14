@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Breadcrumb,
@@ -29,37 +29,27 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Home,
   Users,
   Plus,
   Download,
-  UserCheck,
-  UserX,
-  AlertTriangle,
-  Wallet,
   Car,
-  Bus,
-  ParkingSquare,
-  Filter,
   UserCog,
+  RefreshCw,
 } from "lucide-react"
 import { UserTable } from "@/components/admin-dashboard/UserTable"
-import type {
-  User,
-  UserTableData,
-  UserStatus,
-  Theme,
-  BadgeTheme,
-} from "@/types/user"
-import { mockUsers } from "@/lib/mock-data"
+import type { UserTableData, UserStatus, Theme, BadgeTheme } from "@/types/user"
+import { useUsers } from "@/hooks/useAllUsers"
+import { useDeleteUser } from "@/hooks/deleteUser"
+import { set } from "date-fns"
 
 export default function UserManagementPage() {
+  const { data: users, isLoading, error, refetch } = useUsers()
+  const deleteUserMutation = useDeleteUser()
+
   const [theme, setTheme] = useState<Theme>("light")
   const [badgeTheme, setBadgeTheme] = useState<BadgeTheme>("colorful")
-  const [data, setData] = useState<UserTableData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false)
   const [userToAction, setUserToAction] = useState<string | null>(null)
@@ -68,37 +58,45 @@ export default function UserManagementPage() {
   )
   const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
+  const [isRefetching, setIsRefetching] = useState(false)
 
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const tableData = mockUsers.map((user) => ({
+  // Local table data derived from fetched users
+  const [tableData, setTableData] = useState<UserTableData[]>([])
+
+  // Update tableData whenever users change
+  useMemo(() => {
+    if (users) {
+      const mappedData = users.map((user) => ({
         ...user,
         tableStatus: user.isSuspended
           ? "suspended"
           : user.emailVerified && user.phoneVerified
           ? "active"
           : "inactive",
+        lastLogin: user.sessions?.[0]?.createdAt ?? null,
       }))
-      setData(tableData)
-      setIsLoading(false)
-    }, 1000)
-  }, [])
+      setTableData(mappedData)
+    }
+  }, [users])
 
   // Calculate stats
   const stats = useMemo(() => {
-    const total = data.length
-    const active = data.filter((u) => u.tableStatus === "active").length
-    const suspended = data.filter((u) => u.tableStatus === "suspended").length
-    const inactive = data.filter((u) => u.tableStatus === "inactive").length
-    const admins = data.filter((u) => u.role === "ADMIN").length
-    const drivers = data.filter((u) => u.role === "DRIVER").length
-    const passengers = data.filter((u) => u.role === "PASSENGER").length
-    const totalBalance = data.reduce(
+    const total = tableData.length
+    const active = tableData.filter((u) => u.tableStatus === "active").length
+    const suspended = tableData.filter(
+      (u) => u.tableStatus === "suspended"
+    ).length
+    const inactive = tableData.filter(
+      (u) => u.tableStatus === "inactive"
+    ).length
+    const admins = tableData.filter((u) => u.role === "ADMIN").length
+    const drivers = tableData.filter((u) => u.role === "DRIVER").length
+    const passengers = tableData.filter((u) => u.role === "PASSENGER").length
+    const totalBalance = tableData.reduce(
       (sum, user) => sum + (user.wallet?.balance || 0),
       0
     )
-    const totalBookings = data.reduce(
+    const totalBookings = tableData.reduce(
       (sum, user) => sum + (user.bookings?.length || 0),
       0
     )
@@ -114,22 +112,33 @@ export default function UserManagementPage() {
       totalBalance,
       totalBookings,
     }
-  }, [data])
+  }, [tableData])
 
   // Filter data
   const filteredData = useMemo(() => {
-    return data.filter((user) => {
+    return tableData.filter((user) => {
       if (statusFilter !== "all" && user.tableStatus !== statusFilter)
         return false
       if (roleFilter !== "all" && user.role !== roleFilter) return false
       return true
     })
-  }, [data, statusFilter, roleFilter])
+  }, [tableData, statusFilter, roleFilter])
 
   const handleDeleteUser = (userId: string) => {
     setUserToAction(userId)
     setActionType("delete")
     setDeleteDialogOpen(true)
+  }
+
+  const handleRefresh = () => {
+    try {
+      setIsRefetching(true)
+      refetch()
+    } catch (error) {
+      console.error("Error during refetch:", error)
+    } finally {
+      setIsRefetching(false)
+    }
   }
 
   const handleSuspendUser = (userId: string) => {
@@ -139,7 +148,7 @@ export default function UserManagementPage() {
   }
 
   const handleUnsuspendUser = (userId: string) => {
-    setData((prev) =>
+    setTableData((prev) =>
       prev.map((user) =>
         user.id === userId
           ? { ...user, isSuspended: false, tableStatus: "active" }
@@ -150,9 +159,9 @@ export default function UserManagementPage() {
 
   const handleBulkAction = (action: string, userIds: string[]) => {
     if (action === "delete") {
-      setData((prev) => prev.filter((user) => !userIds.includes(user.id)))
+      setTableData((prev) => prev.filter((user) => !userIds.includes(user.id)))
     } else if (action === "suspend") {
-      setData((prev) =>
+      setTableData((prev) =>
         prev.map((user) =>
           userIds.includes(user.id)
             ? { ...user, isSuspended: true, tableStatus: "suspended" }
@@ -166,9 +175,9 @@ export default function UserManagementPage() {
     if (!userToAction || !actionType) return
 
     if (actionType === "delete") {
-      setData((prev) => prev.filter((user) => user.id !== userToAction))
+      deleteUserMutation.mutate(userToAction)
     } else if (actionType === "suspend") {
-      setData((prev) =>
+      setTableData((prev) =>
         prev.map((user) =>
           user.id === userToAction
             ? { ...user, isSuspended: true, tableStatus: "suspended" }
@@ -204,7 +213,6 @@ export default function UserManagementPage() {
       user.wallet?.balance || 0,
       new Date(user.createdAt).toLocaleDateString(),
     ])
-
     const csvContent = [
       headers.join(","),
       ...csvData.map((row) => row.join(",")),
@@ -217,9 +225,11 @@ export default function UserManagementPage() {
     a.click()
   }
 
-  if (isLoading) {
-    return <LoadingSkeleton />
-  }
+  if (isLoading) return <LoadingSkeleton />
+  if (error)
+    return (
+      <div className="text-red-600">Failed to load users: {error.message}</div>
+    )
 
   return (
     <div
@@ -233,15 +243,13 @@ export default function UserManagementPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href="/admin" className="flex items-center gap-2">
-                <Home className="h-4 w-4" />
-                Dashboard
+                <Home className="h-4 w-4" /> Dashboard
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                User Management
+                <Users className="h-4 w-4" /> User Management
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -256,16 +264,26 @@ export default function UserManagementPage() {
               Manage all users, drivers, and administrators in the system
             </p>
           </div>
-
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={exportToCSV} className="gap-2">
-              <Download className="h-4 w-4" />
-              Export
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isRefetching}
+              className="gap-2 cursor-pointer"
+            >
+              <RefreshCw
+                className={`h-4 w-4 transition-transform ${
+                  isRefetching ? "animate-spin" : ""
+                }`}
+              />
+              Refresh
             </Button>
 
+            <Button variant="outline" onClick={exportToCSV} className="gap-2">
+              <Download className="h-4 w-4" /> Export
+            </Button>
             <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add User
+              <Plus className="h-4 w-4" /> Add User
             </Button>
           </div>
         </div>
@@ -275,50 +293,27 @@ export default function UserManagementPage() {
       <Card className="border-none">
         <CardContent className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-4 rounded-lg bg-primary/5">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <UserCog className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="font-medium">Admins</p>
-                  <p className="text-2xl font-bold">{stats.admins}</p>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {((stats.admins / stats.total) * 100).toFixed(1)}%
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/5">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Car className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-medium">Drivers</p>
-                  <p className="text-2xl font-bold">{stats.drivers}</p>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {((stats.drivers / stats.total) * 100).toFixed(1)}%
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-lg bg-green-500/5">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-medium">Passengers</p>
-                  <p className="text-2xl font-bold">{stats.passengers}</p>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {((stats.passengers / stats.total) * 100).toFixed(1)}%
-              </div>
-            </div>
+            <RoleCard
+              icon={<UserCog className="h-5 w-5 text-purple-600" />}
+              label="Admins"
+              count={stats.admins}
+              total={stats.total}
+              color="purple"
+            />
+            <RoleCard
+              icon={<Car className="h-5 w-5 text-blue-600" />}
+              label="Drivers"
+              count={stats.drivers}
+              total={stats.total}
+              color="blue"
+            />
+            <RoleCard
+              icon={<Users className="h-5 w-5 text-green-600" />}
+              label="Passengers"
+              count={stats.passengers}
+              total={stats.total}
+              color="green"
+            />
           </div>
         </CardContent>
       </Card>
@@ -345,7 +340,6 @@ export default function UserManagementPage() {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Filter by role" />
@@ -418,6 +412,41 @@ export default function UserManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+function RoleCard({
+  icon,
+  label,
+  count,
+  total,
+  color,
+}: {
+  icon: React.ReactNode
+  label: string
+  count: number
+  total: number
+  color: string
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between p-4 rounded-lg bg-${color}-500/5`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`h-10 w-10 rounded-full bg-${color}-100 flex items-center justify-center`}
+        >
+          {icon}
+        </div>
+        <div>
+          <p className="font-medium">{label}</p>
+          <p className="text-2xl font-bold">{count}</p>
+        </div>
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {((count / total) * 100).toFixed(1)}%
+      </div>
     </div>
   )
 }

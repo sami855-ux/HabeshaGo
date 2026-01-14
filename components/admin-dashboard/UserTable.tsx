@@ -168,7 +168,7 @@ export function UserTable({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [globalFilter, setGlobalFilter] = useState("")
   const [showFilters, setShowFilters] = useState(false)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [bulkActionDialog, setBulkActionDialog] = useState<{
     open: boolean
     action: "suspend" | "delete" | null

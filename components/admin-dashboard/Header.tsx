@@ -5,13 +5,12 @@ import {
   Search,
   Bell,
   ChevronDown,
-  Menu,
-  X,
   User,
   Sun,
   Settings,
   CreditCard,
   LogOut,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,13 +45,10 @@ import { useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
 
 function Header({
-  onMenuClick,
-  isSidebarOpen,
   className,
 }: {
-  onMenuClick: () => void
-  isSidebarOpen: boolean
   className?: string
+  // Removed: onMenuClick, isSidebarOpen props
 }) {
   const router = useRouter()
   const user = useSelector((state: RootState) => state.user.user)
@@ -71,24 +67,16 @@ function Header({
     <>
       {/* HEADER */}
       <header
-        className={cn("sticky top-0 z-40 h-16 bg-background ", className)}
+        className={cn(
+          "sticky top-0 z-30 h-16 bg-background border-b",
+          className
+        )}
       >
-        <div className="container mx-auto h-full">
+        <div className="container mx-auto h-full px-4">
           <div className="flex items-center justify-between h-full">
-            {/* LEFT */}
+            {/* LEFT - Removed sidebar toggle since Sidebar handles it */}
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onMenuClick}
-                className="lg:hidden"
-              >
-                {isSidebarOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
-              </Button>
+              {/* Optional: Add back button or other left-side elements if needed */}
             </div>
 
             {/* CENTER (Search – Desktop) */}

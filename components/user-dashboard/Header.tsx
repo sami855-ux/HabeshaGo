@@ -226,17 +226,13 @@ function Header({
                   <DropdownMenuContent align="end" className="w-72">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        router.push("/user/Profile");
+                      }}
+                    >
                       <User className="w-4 h-4 mr-2" />
                       <span>Profile</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Settings className="w-4 h-4 mr-2" />
-                      <span>Settings</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      <span>Billing</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="flex items-center justify-between w-full cursor-default">
                       <div className="flex items-center">

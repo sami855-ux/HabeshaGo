@@ -55,7 +55,7 @@ app.use(passport.session())
 
 app.use("/api/auth", authRoutes)
 app.use("/api/drivers", driverRoutes)
-app.use("/api/bus", busRoutes)
+app.use("/api/buses", busRoutes)
 app.use("/api/route", routeRoutes)
 app.use("/api/booking", bookingRoutes)
 app.use("/api/payment", paymentRoutes)

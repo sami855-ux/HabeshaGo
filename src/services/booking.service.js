@@ -1,18 +1,22 @@
-import prisma from "../prisma/client.js"; // prisma client
-import { walletService } from "./wallet.service.js"; // assume wallet service exists
-import { paymentService } from "./payment.service.js";
-
 export const bookingService = {
   async createBooking(dto) {
-    const farePerSeat = 50; // you can replace with dynamic logic
-    const total = farePerSeat * dto.seatNumber;
+    const farePerSeat = 50;
+    const total = farePerSeat * dto.seatNumbers.length;
 
-    if (dto.payNow) {
-      return await prisma.$transaction(async (tx) => {
-        const booking = await tx.booking.create({
-          data: { ...dto, date: new Date(), status: "PENDING" },
-        });
+    return prisma.$transaction(async (tx) => {
+      // 1️⃣ Create booking
+      const booking = await tx.booking.create({
+        data: {
+          userId: dto.userId,
+          busId: dto.busId,
+          seatNumbers: dto.seatNumbers, // Prisma must support Json or Int[]
+          date: new Date(),
+          status: "PENDING",
+        },
+      });
 
+      // 2️⃣ Pay now (wallet)
+      if (dto.payNow) {
         const wallet = await walletService.getOrCreateWallet(dto.userId);
 
         if (wallet.balance < total)
@@ -29,7 +33,6 @@ export const bookingService = {
             amount: -total,
             type: "WITHDRAW",
             reference: `booking-${booking.id}`,
-            meta: { bookingId: booking.id },
           },
         });
 
@@ -44,25 +47,16 @@ export const bookingService = {
           },
         });
 
-        const finalized = await tx.booking.update({
+        return tx.booking.update({
           where: { id: booking.id },
-          data: { paymentId: payment.id, status: "CONFIRMED" },
+          data: {
+            status: "CONFIRMED",
+            paymentId: payment.id,
+          },
         });
+      }
 
-        return finalized;
-      });
-    } else {
-      return prisma.booking.create({
-        data: { ...dto, date: new Date(), status: "PENDING" },
-      });
-    }
-  },
-
-  async getUserBookings(userId) {
-    return prisma.booking.findMany({
-      where: { userId },
-      include: { payment: true, bus: true },
-      orderBy: { createdAt: "desc" },
+      return booking;
     });
   },
 };

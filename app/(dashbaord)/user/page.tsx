@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { RootState } from "@/store";
+import { RootState } from "@/store"
 import {
   Bus,
   ParkingCircle,
@@ -43,10 +43,10 @@ import {
   RefreshCw,
   Maximize2,
   Navigation as NavIcon,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
-import { useState, useEffect } from "react";
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
+import { useState, useEffect } from "react"
 import {
   AreaChart,
   Area,
@@ -63,36 +63,36 @@ import {
   PieChart,
   Pie,
   Cell,
-} from "recharts";
+} from "recharts"
 
 // Weather interface
 interface WeatherData {
-  temp: number;
-  condition: string;
-  humidity: number;
-  windSpeed: number;
-  icon: string;
+  temp: number
+  condition: string
+  humidity: number
+  windSpeed: number
+  icon: string
 }
 
 // Map location interface
 interface MapLocation {
-  id: string;
-  name: string;
-  type: "bus" | "parking" | "charging" | "shuttle";
-  coordinates: { lat: number; lng: number };
-  distance: string;
-  status: "available" | "busy" | "maintenance";
+  id: string
+  name: string
+  type: "bus" | "parking" | "charging" | "shuttle"
+  coordinates: { lat: number; lng: number }
+  distance: string
+  status: "available" | "busy" | "maintenance"
 }
 
 // Favorite destination interface
 interface FavoriteDestination {
-  id: string;
-  name: string;
-  type: "home" | "work" | "school" | "other";
-  address: string;
-  travelTime: string;
-  distance: string;
-  isFavorite: boolean;
+  id: string
+  name: string
+  type: "home" | "work" | "school" | "other"
+  address: string
+  travelTime: string
+  distance: string
+  isFavorite: boolean
 }
 
 // Recharts data
@@ -104,7 +104,7 @@ const weeklyUsageData = [
   { day: "Fri", bus: 72, parking: 55, charging: 45, shuttle: 28 },
   { day: "Sat", bus: 45, parking: 38, charging: 30, shuttle: 20 },
   { day: "Sun", bus: 32, parking: 25, charging: 20, shuttle: 10 },
-];
+]
 
 const monthlyStatsData = [
   { month: "Jan", trips: 210, savings: 85, co2: 32 },
@@ -113,7 +113,7 @@ const monthlyStatsData = [
   { month: "Apr", trips: 248, savings: 124, co2: 42 },
   { month: "May", trips: 265, savings: 142, co2: 48 },
   { month: "Jun", trips: 280, savings: 168, co2: 52 },
-];
+]
 
 const serviceDistributionData = [
   { name: "Bus", value: 45, color: "#f97316" },
@@ -121,14 +121,14 @@ const serviceDistributionData = [
   { name: "EV Charging", value: 15, color: "#84cc16" },
   { name: "Shuttle", value: 10, color: "#3b82f6" },
   { name: "Other", value: 5, color: "#8b5cf6" },
-];
+]
 
 const progressData = [
   { label: "Bus Usage", value: 75 },
   { label: "Parking Occupancy", value: 45 },
   { label: "EV Charging", value: 60 },
   { label: "Shuttle Service", value: 30 },
-];
+]
 
 // Custom Tooltip component
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -142,15 +142,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           </p>
         ))}
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 function Page() {
   const { user, isAuthenticated, loading } = useSelector(
     (state: RootState) => state.user
-  );
+  )
 
   const [weather, setWeather] = useState<WeatherData>({
     temp: 22,
@@ -158,7 +158,7 @@ function Page() {
     humidity: 65,
     windSpeed: 12,
     icon: "cloud",
-  });
+  })
 
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([
     {
@@ -201,7 +201,7 @@ function Page() {
       distance: "2.3 mi",
       status: "maintenance",
     },
-  ]);
+  ])
 
   const [favorites, setFavorites] = useState<FavoriteDestination[]>([
     {
@@ -249,7 +249,7 @@ function Page() {
       distance: "2.7 mi",
       isFavorite: false,
     },
-  ]);
+  ])
 
   const [notifications] = useState([
     {
@@ -276,7 +276,7 @@ function Page() {
       time: "1 day ago",
       read: false,
     },
-  ]);
+  ])
 
   const [recentActivity] = useState([
     {
@@ -307,19 +307,19 @@ function Page() {
       time: "3 days ago",
       type: "subscription",
     },
-  ]);
+  ])
 
   const [activeTab, setActiveTab] = useState<
     "all" | "bus" | "parking" | "charging" | "shuttle"
-  >("all");
-  const [mapView, setMapView] = useState<"map" | "list">("map");
+  >("all")
+  const [mapView, setMapView] = useState<"map" | "list">("map")
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(
     null
-  );
-  const [showFullMap, setShowFullMap] = useState(false);
+  )
+  const [showFullMap, setShowFullMap] = useState(false)
 
-  console.log(user, isAuthenticated, loading);
-  const router = useRouter();
+  console.log(user, isAuthenticated, loading)
+  const router = useRouter()
 
   const quickActions = [
     {
@@ -364,81 +364,81 @@ function Page() {
       icon: History,
       color: "bg-gradient-to-br from-orange-600 to-red-500",
     },
-  ];
+  ]
 
   const handleAction = (actionId: string) => {
-    router.push(`/user/${actionId}`);
-  };
+    router.push(`/user/${actionId}`)
+  }
 
   const toggleFavorite = (id: string) => {
     setFavorites(
       favorites.map((fav) =>
         fav.id === id ? { ...fav, isFavorite: !fav.isFavorite } : fav
       )
-    );
-  };
+    )
+  }
 
   const getWeatherIcon = () => {
     switch (weather.icon) {
       case "sun":
-        return <Sun className="size-8 text-yellow-500" />;
+        return <Sun className="size-8 text-yellow-500" />
       case "cloud":
-        return <Cloud className="size-8 text-gray-500" />;
+        return <Cloud className="size-8 text-gray-500" />
       case "rain":
-        return <Droplets className="size-8 text-blue-500" />;
+        return <Droplets className="size-8 text-blue-500" />
       default:
-        return <Cloud className="size-8 text-gray-500" />;
+        return <Cloud className="size-8 text-gray-500" />
     }
-  };
+  }
 
   const getLocationIcon = (type: string) => {
     switch (type) {
       case "bus":
-        return <Bus className="size-5" />;
+        return <Bus className="size-5" />
       case "parking":
-        return <ParkingCircle className="size-5" />;
+        return <ParkingCircle className="size-5" />
       case "charging":
-        return <Zap className="size-5" />;
+        return <Zap className="size-5" />
       case "shuttle":
-        return <Navigation className="size-5" />;
+        return <Navigation className="size-5" />
       default:
-        return <MapPin className="size-5" />;
+        return <MapPin className="size-5" />
     }
-  };
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "available":
-        return "bg-green-500";
+        return "bg-green-500"
       case "busy":
-        return "bg-yellow-500";
+        return "bg-yellow-500"
       case "maintenance":
-        return "bg-red-500";
+        return "bg-red-500"
       default:
-        return "bg-gray-500";
+        return "bg-gray-500"
     }
-  };
+  }
 
   const getFavoriteIcon = (type: string) => {
     switch (type) {
       case "home":
-        return <Home className="size-5" />;
+        return <Home className="size-5" />
       case "work":
-        return <Building className="size-5" />;
+        return <Building className="size-5" />
       case "school":
-        return <School className="size-5" />;
+        return <School className="size-5" />
       default:
-        return <ShoppingBag className="size-5" />;
+        return <ShoppingBag className="size-5" />
     }
-  };
+  }
 
   // Simulate weather data fetch
   useEffect(() => {
     const fetchWeather = () => {
       // In real app, fetch from weather API
-      const conditions = ["sun", "cloud", "rain"];
+      const conditions = ["sun", "cloud", "rain"]
       const randomCondition =
-        conditions[Math.floor(Math.random() * conditions.length)];
+        conditions[Math.floor(Math.random() * conditions.length)]
       setWeather({
         temp: Math.floor(Math.random() * 15) + 15, // 15-30°C
         condition:
@@ -450,13 +450,13 @@ function Page() {
         humidity: Math.floor(Math.random() * 30) + 50, // 50-80%
         windSpeed: Math.floor(Math.random() * 15) + 5, // 5-20 km/h
         icon: randomCondition,
-      });
-    };
+      })
+    }
 
-    fetchWeather();
-    const interval = setInterval(fetchWeather, 300000); // Update every 5 minutes
-    return () => clearInterval(interval);
-  }, []);
+    fetchWeather()
+    const interval = setInterval(fetchWeather, 300000) // Update every 5 minutes
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -469,37 +469,6 @@ function Page() {
           <p className="text-muted-foreground">
             Here's what's happening with your transportation services today
           </p>
-        </div>
-
-        {/* Weather Widget */}
-        <div className="flex items-center gap-4 bg-card border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            {getWeatherIcon()}
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold">{weather.temp}°</span>
-                <span className="text-sm text-muted-foreground">C</span>
-              </div>
-              <p className="text-sm">{weather.condition}</p>
-            </div>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="flex items-center gap-1 text-sm">
-                <Droplets className="size-4 text-blue-500" />
-                <span>{weather.humidity}%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Humidity</p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center gap-1 text-sm">
-                <Wind className="size-4 text-gray-500" />
-                <span>{weather.windSpeed} km/h</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Wind</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -988,8 +957,8 @@ function Page() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(destination.id);
+                        e.stopPropagation()
+                        toggleFavorite(destination.id)
                       }}
                       className="p-1.5 rounded-md hover:bg-accent"
                     >
@@ -1177,10 +1146,10 @@ function Page() {
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default Page;
+export default Page
 
 // List icon component
 function List(props: React.SVGProps<SVGSVGElement>) {
@@ -1204,5 +1173,5 @@ function List(props: React.SVGProps<SVGSVGElement>) {
       <line x1="3" x2="3.01" y1="12" y2="12" />
       <line x1="3" x2="3.01" y1="18" y2="18" />
     </svg>
-  );
+  )
 }

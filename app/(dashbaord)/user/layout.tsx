@@ -1,55 +1,44 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React from "react"
 import Sidebar from "@/components/user-dashboard/Sidebar"
 import Header from "@/components/user-dashboard/Header"
-import { useDispatch, useSelector } from "react-redux"
-import { AppDispatch } from "@/store"
-import { fetchCurrentUser } from "@/store/slices/userSlice"
+import { useRequireRole } from "@/hooks/useRequireRole"
+import { SidebarProvider, useSidebar } from "@/context/sidebar-context"
+import { cn } from "@/lib/utils"
 
-function UserLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  const dispatch = useDispatch<AppDispatch>()
-
-  useEffect(() => {
-    dispatch(fetchCurrentUser())
-  }, [dispatch])
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+  const { isCollapsed } = useSidebar()
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 lg:hidden bg-black/50"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <Sidebar />
 
-      {/* Sidebar */}
+      {/* Dynamic margin based on sidebar state */}
       <div
-        className={`
-        w-64 transform transition-transform duration-300 ease-in-out
-        lg:relative lg:translate-x-0 lg:flex-shrink-0
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-      `}
+        className={cn(
+          "flex-1 flex flex-col min-w-0 transition-all duration-300",
+          isCollapsed ? "lg:ml-20" : "lg:ml-64"
+        )}
       >
-        <Sidebar />
-      </div>
+        <Header />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-          isSidebarOpen={sidebarOpen}
-        />
-
-        <main className="flex-1 overflow-auto p-2 md:p-4 bg-card">
-          <div className="bg-card">{children}</div>
+        <main className="flex-1 overflow-auto p-1 md:p-3 bg-card">
+          <div className="bg-card p-2">{children}</div>
         </main>
       </div>
     </div>
   )
 }
 
-export default UserLayout
+function AdminLayout({ children }: { children: React.ReactNode }) {
+  // useRequireRole(["ADMIN"])
+
+  return (
+    <SidebarProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </SidebarProvider>
+  )
+}
+
+export default AdminLayout

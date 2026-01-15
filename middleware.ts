@@ -1,16 +1,16 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get("refreshToken")?.value
+  const token = req.cookies.get("refreshToken")?.value;
 
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url))
-  }
+  // if (!token) {
+  //   return NextResponse.redirect(new URL("/login", req.url));
+  // }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: ["/user/:path*", "/profile/:path*", "/settings/:path*"],
-}
+};

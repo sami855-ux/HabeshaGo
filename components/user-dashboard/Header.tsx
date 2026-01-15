@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { useState } from "react";
+import { useState } from "react"
 import {
   Search,
   Bell,
@@ -16,16 +16,16 @@ import {
   Settings,
   CreditCard,
   LogOut,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,89 +33,67 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { ThemeToggle } from "../themeToggle";
-import { RootState } from "@/store";
-import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
-import { LogoutModal } from "../logout-modal";
-import { clearUser } from "@/store/slices/userSlice";
-import { logoutUser } from "@/services/auth.user.api";
+} from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
+import { ThemeToggle } from "../themeToggle"
+import { RootState } from "@/store"
+import { useDispatch, useSelector } from "react-redux"
+import { useRouter } from "next/navigation"
+import { LogoutModal } from "../logout-modal"
+import { clearUser } from "@/store/slices/userSlice"
+import { logoutUser } from "@/services/auth.user.api"
 
-function Header({
-  onMenuClick,
-  isSidebarOpen,
-  className,
-}: {
-  onMenuClick: () => void;
-  isSidebarOpen: boolean;
-  className?: string;
-}) {
-  const router = useRouter();
-  const dispatch = useDispatch();
-  const user = useSelector((state: RootState) => state.user.user);
+function Header({ className }: { className?: string }) {
+  const router = useRouter()
+  const dispatch = useDispatch()
+  const user = useSelector((state: RootState) => state.user.user)
 
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showSearchModal, setShowSearchModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Searching for:", searchQuery);
-    setShowSearchModal(false);
-    setSearchQuery("");
-  };
+    e.preventDefault()
+    console.log("Searching for:", searchQuery)
+    setShowSearchModal(false)
+    setSearchQuery("")
+  }
 
   const handleLogout = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      await logoutUser();
-      dispatch(clearUser());
-      router.push("/");
+      await logoutUser()
+      dispatch(clearUser())
+      router.push("/")
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("Logout failed:", error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <>
       <header
         className={cn(
-          "sticky top-0 z-40 bg-background border-b",
+          "sticky top-0 z-10 bg-background border-b w-full",
           isExpanded ? "h-32" : "h-16",
           className
         )}
       >
         <div className="container mx-auto w-full h-full">
-          <div className="flex items-center justify-between h-full">
+          <div className="flex items-center justify-end h-full">
             {/* Left Section */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onMenuClick}
-                className="lg:hidden"
-              >
-                {isSidebarOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
-              </Button>
-            </div>
 
             {/* Center & Right Section */}
             <div className="flex gap-2">
@@ -226,17 +204,13 @@ function Header({
                   <DropdownMenuContent align="end" className="w-72">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        router.push("/user/Profile")
+                      }}
+                    >
                       <User className="w-4 h-4 mr-2" />
                       <span>Profile</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Settings className="w-4 h-4 mr-2" />
-                      <span>Settings</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      <span>Billing</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="flex items-center justify-between w-full cursor-default">
                       <div className="flex items-center">
@@ -307,7 +281,7 @@ function Header({
         isLoading={isLoading}
       />
     </>
-  );
+  )
 }
 
-export default Header;
+export default Header

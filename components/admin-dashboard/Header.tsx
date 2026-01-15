@@ -5,13 +5,12 @@ import {
   Search,
   Bell,
   ChevronDown,
-  Menu,
-  X,
   User,
   Sun,
   Settings,
   CreditCard,
   LogOut,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,53 +41,55 @@ import {
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
 import { RootState } from "@/store"
-import { useSelector } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
+import { LogoutModal } from "../logout-modal"
+import { logoutUser } from "@/services/auth.user.api"
+import { clearUser } from "@/store/slices/userSlice"
 
-function Header({
-  onMenuClick,
-  isSidebarOpen,
-  className,
-}: {
-  onMenuClick: () => void
-  isSidebarOpen: boolean
-  className?: string
-}) {
+function Header({ className }: { className?: string }) {
   const router = useRouter()
+  const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.user.user)
 
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Searching for:", searchQuery)
     setShowSearchModal(false)
     setSearchQuery("")
+  }
+
+  const handleLogout = async () => {
+    setIsLoading(true)
+    try {
+      await logoutUser()
+      dispatch(clearUser())
+      router.push("/")
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <>
       {/* HEADER */}
       <header
-        className={cn("sticky top-0 z-40 h-16 bg-background ", className)}
+        className={cn(
+          "sticky top-0 z-30 h-16 bg-background border-b",
+          className
+        )}
       >
-        <div className="container mx-auto h-full">
+        <div className="container mx-auto h-full px-4">
           <div className="flex items-center justify-between h-full">
-            {/* LEFT */}
+            {/* LEFT - Removed sidebar toggle since Sidebar handles it */}
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onMenuClick}
-                className="lg:hidden"
-              >
-                {isSidebarOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
-              </Button>
+              {/* Optional: Add back button or other left-side elements if needed */}
             </div>
 
             {/* CENTER (Search – Desktop) */}
@@ -190,7 +191,10 @@ function Header({
                     <ThemeToggle />
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => setIsLogoutModalOpen(true)}
+                  >
                     <LogOut className="w-4 h-4 mr-2" />
                     Log out
                   </DropdownMenuItem>
@@ -246,6 +250,13 @@ function Header({
           </div>
         </DialogContent>
       </Dialog>
+
+      <LogoutModal
+        isOpen={isLogoutModalOpen}
+        onOpenChange={setIsLogoutModalOpen}
+        onConfirm={handleLogout}
+        isLoading={isLoading}
+      />
     </>
   )
 }

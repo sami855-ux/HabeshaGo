@@ -80,6 +80,7 @@ import {
   MoreHorizontal,
   ChevronRight,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 // Chart data
 const ticketSalesData = [
@@ -227,9 +228,10 @@ const quickAccessPanels = [
     icon: Bus,
     description: "Fleet management & scheduling",
     color: "bg-blue-500",
-    count: 142,
+    count: 2,
     colSpan: 2,
     rowSpan: 1,
+    path: "/admin/manage-bus",
   },
   {
     title: "Manage Routes",
@@ -239,6 +241,7 @@ const quickAccessPanels = [
     count: 23,
     colSpan: 1,
     rowSpan: 1,
+    path: "/admin/manage-route",
   },
   {
     title: "Manage Parking Stations",
@@ -248,6 +251,7 @@ const quickAccessPanels = [
     count: 18,
     colSpan: 1,
     rowSpan: 2,
+    path: "/admin/manage-parking",
   },
   {
     title: "Manage EV Stations",
@@ -266,6 +270,7 @@ const quickAccessPanels = [
     count: 89,
     colSpan: 1,
     rowSpan: 1,
+    path: "/admin/manage-staff",
   },
   {
     title: "View Tickets",
@@ -275,11 +280,13 @@ const quickAccessPanels = [
     count: "2.8K",
     colSpan: 2,
     rowSpan: 1,
+    path: "/admin/view-ticket",
   },
 ]
 
 export default function DashboardWithCharts() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const router = useRouter()
 
   // KPI Data
   const kpis = [
@@ -379,7 +386,9 @@ export default function DashboardWithCharts() {
 
   return (
     <div
-      className={`min-h-screen rounded-2xl ${theme === "dark" ? "dark bg-background" : "bg-background"} `}
+      className={`min-h-screen rounded-2xl ${
+        theme === "dark" ? "dark bg-background" : "bg-background"
+      } `}
     >
       <main className="container mx-auto px-4 py-6 rounded-xl">
         {/* Header with Actions */}
@@ -416,7 +425,9 @@ export default function DashboardWithCharts() {
                       <TrendingDown className="h-4 w-4 text-red-500" />
                     )}
                     <span
-                      className={`text-sm font-medium ${kpi.trend === "up" ? "text-green-600" : "text-red-600"}`}
+                      className={`text-sm font-medium ${
+                        kpi.trend === "up" ? "text-green-600" : "text-red-600"
+                      }`}
                     >
                       {kpi.change}
                     </span>
@@ -444,6 +455,11 @@ export default function DashboardWithCharts() {
             {quickAccessPanels.map((panel, index) => (
               <Card
                 key={index}
+                onClick={() => {
+                  if (panel.path) {
+                    router.push(panel.path)
+                  }
+                }}
                 className="relative border-background transition-shadow cursor-pointer h-38 hover:border-card hover:shadow-lg"
               >
                 <CardContent className="p-2 px-4">
@@ -865,7 +881,13 @@ export default function DashboardWithCharts() {
                         >
                           <div className="flex items-center gap-2">
                             <div
-                              className={`h-2 w-2 rounded-full ${i === 1 ? "bg-green-500" : i === 2 ? "bg-yellow-500" : "bg-red-500"}`}
+                              className={`h-2 w-2 rounded-full ${
+                                i === 1
+                                  ? "bg-green-500"
+                                  : i === 2
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                              }`}
                             ></div>
                             <span>Bus #{100 + i}</span>
                           </div>

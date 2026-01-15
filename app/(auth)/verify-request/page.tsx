@@ -20,7 +20,7 @@ import React, { useState, useTransition, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { useDispatch } from "react-redux"
 import { setAccessToken, setUser } from "@/store/slices/userSlice"
-import { getUserById } from "@/services/user"
+import { getUserById } from "@/services/user.api"
 import { AppDispatch } from "@/store"
 import { getMe, verifyOTP } from "@/services/auth.user.api"
 

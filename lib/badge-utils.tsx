@@ -100,7 +100,7 @@ const getThemeClass = (
 
 export const getStatusBadge = (
   status: UserStatus,
-  theme: BadgeTheme = "default"
+  theme: BadgeTheme = "colorful"
 ) => {
   const baseClasses = "flex items-center gap-1 px-2 py-1 text-xs font-medium"
 

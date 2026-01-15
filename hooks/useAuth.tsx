@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useDispatch } from "react-redux"
 import { authClient } from "@/lib/auth-client"
 import { setUser } from "@/store/slices/userSlice"
-import { getUserById } from "@/services/user"
+import { getUserById } from "@/services/user.api"
 
 export const useAuth = () => {
   const dispatch = useDispatch()

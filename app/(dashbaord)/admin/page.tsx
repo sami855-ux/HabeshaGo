@@ -228,7 +228,7 @@ const quickAccessPanels = [
     icon: Bus,
     description: "Fleet management & scheduling",
     color: "bg-blue-500",
-    count: 142,
+    count: 2,
     colSpan: 2,
     rowSpan: 1,
     path: "/admin/manage-bus",

@@ -1,17 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Card,
   CardContent,
@@ -28,53 +21,80 @@ import {
   User,
   Route as RouteIcon,
   MapPin,
-  Navigation,
   CheckCircle,
   AlertCircle,
   Hash,
+  ChevronDown,
+  Search,
+  Clock,
+  Award,
+  Car,
+  Fuel,
+  Gauge,
+  Calendar,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { axiosInstance } from "@/services/axiosInstance"
+import { toast } from "sonner"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // Types matching your Prisma schema
 interface BusFormData {
   busNumber: string
   capacity: number
   status: "ACTIVE" | "INACTIVE" | "MAINTENANCE"
+  vehicleId?: number
   driverId?: string
   routeId?: number
   currentStop?: string
   nextDestination?: string
 }
 
+interface Driver {
+  id: string
+  name: string
+  licenseNumber: string
+  experience?: number
+  status?: string
+}
+
+interface Route {
+  id: number
+  name: string
+  origin: string
+  destination: string
+  distanceKm?: number
+  estimatedTimeMin?: number
+}
+
+interface Vehicle {
+  id: number
+  plateNumber: string
+  type: string
+  model: string
+  year?: number
+  status?: string
+}
+
 interface BusFormProps {
   onSuccess: (busNumber: string) => void
   onError: (errorMessage: string) => void
   existingBusNumbers?: string[]
-  availableDrivers?: Array<{
-    id: string
-    name: string
-    licenseNumber: string
-  }>
-  availableRoutes?: Array<{
-    id: number
-    name: string
-    code: string
-  }>
 }
-
-// Default mock data
-const defaultDrivers = [
-  { id: "1", name: "John Smith", licenseNumber: "DL12345" },
-  { id: "2", name: "Sarah Johnson", licenseNumber: "DL67890" },
-  { id: "3", name: "Michael Chen", licenseNumber: "DL54321" },
-]
-
-const defaultRoutes = [
-  { id: 1, name: "Downtown Express", code: "DX101" },
-  { id: 2, name: "University Shuttle", code: "US202" },
-  { id: 3, name: "Airport Express", code: "AE303" },
-]
 
 const busStatuses = [
   {
@@ -103,17 +123,156 @@ const busStatuses = [
   },
 ] as const
 
-// Special value for empty selection
-const UNSELECTED = "unselected"
+// API Functions
+export const getAllSimpleVehicles = async (): Promise<Vehicle[]> => {
+  try {
+    const response = await axiosInstance.get("/vehicles")
+    console.log("Vehicles response:", response.data)
+    const data = response.data.map((vehicle: any) => ({
+      id: vehicle.id,
+      plateNumber: vehicle.plateNumber,
+      type: vehicle.type,
+      model: vehicle.model,
+      year: vehicle.year ?? null,
+      status: vehicle.status ?? "AVAILABLE",
+    }))
+
+    return data
+  } catch (error: any) {
+    console.error(
+      "Error fetching vehicles:",
+      error.response?.data || error.message
+    )
+    return []
+  }
+}
+
+export const fetchAllDriversSimple = async (): Promise<Driver[]> => {
+  try {
+    const response = await axiosInstance.get("/drivers")
+    return response.data.data.map((driver: any) => ({
+      id: driver.id,
+      name: driver.user?.name ?? "",
+      licenseNumber: driver.licenseNo,
+      experience: driver.experience ?? 0,
+      status: driver.status,
+    }))
+  } catch (error: any) {
+    console.error("Error fetching drivers:", error)
+    return []
+  }
+}
+
+export const fetchAllRoutesSimple = async (): Promise<Route[]> => {
+  try {
+    const response = await axiosInstance.get("/route")
+    return response.data.data.map((route: any) => ({
+      id: route.id,
+      name: route.name,
+      origin: route.origin,
+      destination: route.destination,
+      distanceKm: route.distanceKm ?? 0,
+      estimatedTimeMin: route.estimatedTimeMin ?? 0,
+    }))
+  } catch (error: any) {
+    console.error("Error fetching routes:", error)
+    return []
+  }
+}
+
+const FormSkeleton = () => {
+  return (
+    <div className={cn("space-y-6 p-4 bg-background rounded-xl")}>
+      {/* Header Skeleton */}
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+      </div>
+
+      {/* Bus Information Card Skeleton */}
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-40" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-11 w-full" />
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Vehicle Assignment Card Skeleton */}
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-40" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      </div>
+
+      {/* Additional Assignments Card Skeleton */}
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-40" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-11 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form Actions Skeleton */}
+      <div className="flex justify-between items-center">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-48" />
+        </div>
+
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-24 rounded-md" />
+          <Skeleton className="h-10 w-32 rounded-md" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ComboboxSkeleton = () => (
+  <div className="w-full h-11 bg-gray-200 rounded-md animate-pulse"></div>
+)
 
 export default function BusForm({
   onSuccess,
   onError,
   existingBusNumbers = [],
-  availableDrivers = defaultDrivers,
-  availableRoutes = defaultRoutes,
 }: BusFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([])
+  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([])
+  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([])
+  const [driverOpen, setDriverOpen] = useState(false)
+  const [routeOpen, setRouteOpen] = useState(false)
+  const [vehicleOpen, setVehicleOpen] = useState(false)
+  const [driverSearch, setDriverSearch] = useState("")
+  const [routeSearch, setRouteSearch] = useState("")
+  const [vehicleSearch, setVehicleSearch] = useState("")
   const router = useRouter()
 
   const {
@@ -129,6 +288,7 @@ export default function BusForm({
       busNumber: "",
       capacity: 40,
       status: "ACTIVE",
+      vehicleId: undefined,
       driverId: undefined,
       routeId: undefined,
       currentStop: "",
@@ -136,6 +296,31 @@ export default function BusForm({
     },
     mode: "onChange",
   })
+
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const [drivers, routes, vehicles] = await Promise.all([
+          fetchAllDriversSimple(),
+          fetchAllRoutesSimple(),
+          getAllSimpleVehicles(),
+        ])
+
+        setAvailableDrivers(drivers)
+        setAvailableRoutes(routes)
+        setAvailableVehicles(vehicles)
+      } catch (error) {
+        console.error("Error fetching form data:", error)
+        onError("Failed to load form data. Please refresh the page.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [onError])
 
   const validateBusNumber = (value: string) => {
     if (!value.trim()) return "Bus number is required"
@@ -158,38 +343,51 @@ export default function BusForm({
     setIsSubmitting(true)
 
     try {
-      // Prepare data for submission - convert special values back to undefined
+      // Prepare data for submission
       const submitData = {
-        ...data,
-        driverId: data.driverId === UNSELECTED ? undefined : data.driverId,
-        routeId:
-          data.routeId?.toString() === UNSELECTED ? undefined : data.routeId,
+        busNumber: data.busNumber,
+        capacity: data.capacity,
+        driverId: data.driverId,
+        routeId: data.routeId,
+        vehicleId: data.vehicleId,
+        status: data.status,
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Make API call to create bus
+      const response = await axiosInstance.post("/bus", submitData)
 
-      console.log("Submitting bus data:", submitData)
+      if (response.data.success) {
+        // Success callback
+        onSuccess(data.busNumber)
 
-      // Success callback
-      onSuccess(data.busNumber)
-
-      // Reset form
-      reset({
-        busNumber: "",
-        capacity: 40,
-        status: "ACTIVE",
-        driverId: undefined,
-        routeId: undefined,
-        currentStop: "",
-        nextDestination: "",
-      })
-    } catch (error) {
+        // Reset form
+        reset({
+          busNumber: "",
+          capacity: 40,
+          status: "ACTIVE",
+          vehicleId: undefined,
+          driverId: undefined,
+          routeId: undefined,
+          currentStop: "",
+          nextDestination: "",
+        })
+        setDriverSearch("")
+        setRouteSearch("")
+        setVehicleSearch("")
+      } else {
+        toast.error(response.data.message || "Failed to create bus")
+        // throw new Error(response.data.message || "Failed to create bus")
+      }
+    } catch (error: any) {
       console.error("Error creating bus:", error)
-      onError(
-        error instanceof Error
-          ? error.message
-          : "Failed to create bus. Please try again."
+      // onError(
+      //   error.response?.data?.message ||
+      //     error.message ||
+      //     "Failed to create bus. Please try again."
+      // )
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to create bus. Please try again."
       )
     } finally {
       setIsSubmitting(false)
@@ -201,12 +399,56 @@ export default function BusForm({
       busNumber: "",
       capacity: 40,
       status: "ACTIVE",
+      vehicleId: undefined,
       driverId: undefined,
       routeId: undefined,
       currentStop: "",
       nextDestination: "",
     })
+    setDriverSearch("")
+    setRouteSearch("")
+    setVehicleSearch("")
   }
+
+  const selectedDriver = watch("driverId")
+    ? availableDrivers.find((d) => d.id === watch("driverId"))
+    : null
+
+  const selectedRoute = watch("routeId")
+    ? availableRoutes.find((r) => r.id === watch("routeId"))
+    : null
+
+  const selectedVehicle = watch("vehicleId")
+    ? availableVehicles.find((v) => v.id === watch("vehicleId"))
+    : null
+
+  // Filter drivers based on search
+  const filteredDrivers = availableDrivers.filter(
+    (driver) =>
+      driver.name.toLowerCase().includes(driverSearch.toLowerCase()) ||
+      driver.licenseNumber.toLowerCase().includes(driverSearch.toLowerCase()) ||
+      driver.experience?.toString().includes(driverSearch) ||
+      driver.status?.toLowerCase().includes(driverSearch.toLowerCase())
+  )
+
+  // Filter routes based on search
+  const filteredRoutes = availableRoutes.filter(
+    (route) =>
+      route.name.toLowerCase().includes(routeSearch.toLowerCase()) ||
+      route.origin.toLowerCase().includes(routeSearch.toLowerCase()) ||
+      route.destination.toLowerCase().includes(routeSearch.toLowerCase()) ||
+      route.distanceKm?.toString().includes(routeSearch) ||
+      route.estimatedTimeMin?.toString().includes(routeSearch)
+  )
+
+  // Filter vehicles based on search
+  const filteredVehicles = availableVehicles.filter(
+    (vehicle) =>
+      vehicle.plateNumber.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+      vehicle.model.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+      vehicle.type.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+      vehicle.year?.toString().includes(vehicleSearch)
+  )
 
   const isFormValid =
     !errors.busNumber &&
@@ -214,8 +456,12 @@ export default function BusForm({
     watch("busNumber")?.trim() !== "" &&
     watch("capacity") > 0
 
+  if (isLoading) {
+    return <FormSkeleton />
+  }
+
   return (
-    <div className="space-y-6 p-2">
+    <div className="space-y-6 p-2 bg-background rounded-xl">
       {/* Form Header */}
       <div className="relative">
         <div className="flex items-center gap-4">
@@ -286,7 +532,7 @@ export default function BusForm({
                   </div>
                   <Input
                     id="busNumber"
-                    placeholder="e.g., BUS-101"
+                    placeholder="e.g., BUS-1234"
                     className={cn(
                       "pl-10 h-11",
                       errors.busNumber && "border-destructive"
@@ -326,6 +572,8 @@ export default function BusForm({
                     id="capacity"
                     type="number"
                     placeholder="e.g., 40"
+                    min="1"
+                    max="200"
                     className={cn(
                       "pl-10 h-11",
                       errors.capacity && "border-destructive"
@@ -346,7 +594,7 @@ export default function BusForm({
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Maximum number of passengers
+                    Maximum number of passengers (1-200)
                   </p>
                 )}
               </div>
@@ -425,14 +673,218 @@ export default function BusForm({
           </CardContent>
         </Card>
 
-        {/* Assignments */}
+        {/* Vehicle Assignment */}
+        <Card className="border-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <Car className="h-5 w-5 text-purple-500" />
+              </div>
+              Vehicle Assignment
+            </CardTitle>
+            <CardDescription>
+              Select a vehicle to assign to this bus
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="vehicleId" className="font-medium">
+                Assign Vehicle (Optional)
+              </Label>
+              {isLoading ? (
+                <ComboboxSkeleton />
+              ) : (
+                <Popover open={vehicleOpen} onOpenChange={setVehicleOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={vehicleOpen}
+                      className="w-full justify-between h-11"
+                    >
+                      {selectedVehicle ? (
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4 text-purple-500" />
+                          <div className="text-left">
+                            <div className="font-medium">
+                              {selectedVehicle.plateNumber}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {selectedVehicle.model} • {selectedVehicle.type}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Car className="h-4 w-4" />
+                          <span>Select a vehicle...</span>
+                        </div>
+                      )}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search vehicles by plate, model, type..."
+                        value={vehicleSearch}
+                        onValueChange={setVehicleSearch}
+                        className="h-12 border-0 focus:ring-0"
+                      />
+                      <CommandList>
+                        <CommandEmpty className="py-6 text-center text-sm">
+                          No vehicle found for "{vehicleSearch}"
+                        </CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value=""
+                            onSelect={() => {
+                              setValue("vehicleId", undefined)
+                              setVehicleOpen(false)
+                              setVehicleSearch("")
+                            }}
+                            className="cursor-pointer py-3"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Car className="h-4 w-4 text-muted-foreground" />
+                              <span>No vehicle assigned</span>
+                            </div>
+                          </CommandItem>
+                          {filteredVehicles.map((vehicle) => (
+                            <CommandItem
+                              key={vehicle.id}
+                              value={vehicle.id.toString()}
+                              onSelect={(currentValue) => {
+                                setValue(
+                                  "vehicleId",
+                                  currentValue === vehicle.id.toString()
+                                    ? vehicle.id
+                                    : undefined
+                                )
+                                setVehicleOpen(false)
+                                setVehicleSearch("")
+                              }}
+                              className="cursor-pointer py-3"
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                                    <Car className="h-4 w-4 text-purple-600" />
+                                  </div>
+                                  <div>
+                                    <div className="font-medium">
+                                      {vehicle.plateNumber}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {vehicle.model}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {vehicle.type}
+                                      </Badge>
+                                      {vehicle.year && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {vehicle.year}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  {vehicle.status &&
+                                    vehicle.status !== "AVAILABLE" && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {vehicle.status}
+                                      </Badge>
+                                    )}
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+              <p className="text-sm text-muted-foreground">
+                Search by plate number, model, vehicle type, or fuel type
+              </p>
+              <input type="hidden" {...register("vehicleId")} />
+            </div>
+
+            {/* Selected Vehicle Preview */}
+            {selectedVehicle && (
+              <div className="mt-4 p-4 border rounded-lg bg-muted/50">
+                <h4 className="font-medium mb-3">Selected Vehicle</h4>
+                <div className="p-3 bg-card rounded-lg border">
+                  <div className="flex items-start gap-3">
+                    <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                      <Car className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-lg">
+                            {selectedVehicle.plateNumber}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {selectedVehicle.model}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {selectedVehicle.type}
+                          </Badge>
+                          {selectedVehicle.status === "AVAILABLE" ? (
+                            <Badge className="bg-green-100 text-green-800 text-xs">
+                              Available
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {selectedVehicle.status}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        {selectedVehicle.year && (
+                          <div className="space-y-1">
+                            <div className="text-xs text-muted-foreground">
+                              Year
+                            </div>
+                            <div className="font-medium">
+                              {selectedVehicle.year}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Other Assignments */}
         <Card className="border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="p-2 bg-blue-500/10 rounded-lg">
                 <User className="h-5 w-5 text-blue-500" />
               </div>
-              Assignments
+              Additional Assignments
             </CardTitle>
             <CardDescription>
               Optional: Assign a driver and route to this bus
@@ -440,94 +892,330 @@ export default function BusForm({
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Driver Assignment */}
+              {/* Driver Assignment - ComboBox */}
               <div className="space-y-3">
                 <Label htmlFor="driverId" className="font-medium">
-                  Assign Driver
+                  Assign Driver (Optional)
                 </Label>
-                <Select
-                  value={watch("driverId") || UNSELECTED}
-                  onValueChange={(value) =>
-                    setValue(
-                      "driverId",
-                      value === UNSELECTED ? undefined : value
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select a driver (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNSELECTED}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span>No driver assigned</span>
-                      </div>
-                    </SelectItem>
-                    {availableDrivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-500" />
-                          <span>{driver.name}</span>
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            {driver.licenseNumber}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isLoading ? (
+                  <ComboboxSkeleton />
+                ) : (
+                  <Popover open={driverOpen} onOpenChange={setDriverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={driverOpen}
+                        className="w-full justify-between h-11"
+                      >
+                        {selectedDriver ? (
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-blue-500" />
+                            <div className="text-left">
+                              <div className="font-medium">
+                                {selectedDriver.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {selectedDriver.licenseNumber} •{" "}
+                                {selectedDriver.experience} yrs
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <User className="h-4 w-4" />
+                            <span>Select a driver...</span>
+                          </div>
+                        )}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search drivers by name, license, or experience..."
+                          value={driverSearch}
+                          onValueChange={setDriverSearch}
+                          className="h-12 border-0 focus:ring-0"
+                        />
+                        <CommandList>
+                          <CommandEmpty className="py-6 text-center text-sm">
+                            No driver found for "{driverSearch}"
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value=""
+                              onSelect={() => {
+                                setValue("driverId", undefined)
+                                setDriverOpen(false)
+                                setDriverSearch("")
+                              }}
+                              className="cursor-pointer py-3"
+                            >
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <span>No driver assigned</span>
+                              </div>
+                            </CommandItem>
+                            {filteredDrivers.map((driver) => (
+                              <CommandItem
+                                key={driver.id}
+                                value={driver.id}
+                                onSelect={(currentValue) => {
+                                  setValue(
+                                    "driverId",
+                                    currentValue === driver.id
+                                      ? driver.id
+                                      : undefined
+                                  )
+                                  setDriverOpen(false)
+                                  setDriverSearch("")
+                                }}
+                                className="cursor-pointer py-3"
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                                      <User className="h-4 w-4 text-blue-600" />
+                                    </div>
+                                    <div>
+                                      <div className="font-medium">
+                                        {driver.name}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {driver.licenseNumber}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {driver.experience && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        <Clock className="mr-1 h-3 w-3" />
+                                        {driver.experience} yrs
+                                      </Badge>
+                                    )}
+                                    {driver.status === "ACTIVE" ? (
+                                      <Badge className="bg-green-100 text-green-800 text-xs">
+                                        Active
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        Inactive
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  Leave empty to assign later
+                  Search by name, license number, or experience
                 </p>
+                <input type="hidden" {...register("driverId")} />
               </div>
 
-              {/* Route Assignment */}
+              {/* Route Assignment - ComboBox */}
               <div className="space-y-3">
                 <Label htmlFor="routeId" className="font-medium">
-                  Assign Route
+                  Assign Route (Optional)
                 </Label>
-                <Select
-                  value={watch("routeId")?.toString() || UNSELECTED}
-                  onValueChange={(value) =>
-                    setValue(
-                      "routeId",
-                      value === UNSELECTED ? undefined : parseInt(value)
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select a route (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNSELECTED}>
-                      <div className="flex items-center gap-2">
-                        <RouteIcon className="h-4 w-4 text-muted-foreground" />
-                        <span>No route assigned</span>
-                      </div>
-                    </SelectItem>
-                    {availableRoutes.map((route) => (
-                      <SelectItem key={route.id} value={route.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <RouteIcon className="h-4 w-4 text-green-500" />
-                          <span>{route.name}</span>
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            {route.code}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isLoading ? (
+                  <ComboboxSkeleton />
+                ) : (
+                  <Popover open={routeOpen} onOpenChange={setRouteOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={routeOpen}
+                        className="w-full justify-between h-11"
+                      >
+                        {selectedRoute ? (
+                          <div className="flex items-center gap-2">
+                            <RouteIcon className="h-4 w-4 text-green-500" />
+                            <div className="text-left">
+                              <div className="font-medium">
+                                {selectedRoute.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {selectedRoute.origin} →{" "}
+                                {selectedRoute.destination}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <RouteIcon className="h-4 w-4" />
+                            <span>Select a route...</span>
+                          </div>
+                        )}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search routes by name, origin, destination, or distance..."
+                          value={routeSearch}
+                          onValueChange={setRouteSearch}
+                          className="h-12 border-0 focus:ring-0"
+                        />
+                        <CommandList>
+                          <CommandEmpty className="py-6 text-center text-sm">
+                            No route found for "{routeSearch}"
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value=""
+                              onSelect={() => {
+                                setValue("routeId", undefined)
+                                setRouteOpen(false)
+                                setRouteSearch("")
+                              }}
+                              className="cursor-pointer py-3"
+                            >
+                              <div className="flex items-center gap-2">
+                                <RouteIcon className="h-4 w-4 text-muted-foreground" />
+                                <span>No route assigned</span>
+                              </div>
+                            </CommandItem>
+                            {filteredRoutes.map((route) => (
+                              <CommandItem
+                                key={route.id}
+                                value={route.id.toString()}
+                                onSelect={(currentValue) => {
+                                  setValue(
+                                    "routeId",
+                                    currentValue === route.id.toString()
+                                      ? route.id
+                                      : undefined
+                                  )
+                                  setRouteOpen(false)
+                                  setRouteSearch("")
+                                }}
+                                className="cursor-pointer py-3"
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                                      <RouteIcon className="h-4 w-4 text-green-600" />
+                                    </div>
+                                    <div>
+                                      <div className="font-medium">
+                                        {route.name}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {route.origin} → {route.destination}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1">
+                                    {route.distanceKm && (
+                                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        {route.distanceKm} km
+                                      </div>
+                                    )}
+                                    {route.estimatedTimeMin && (
+                                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {route.estimatedTimeMin} min
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  Leave empty to assign later
+                  Search by route name, origin, destination, or distance
                 </p>
+                <input type="hidden" {...register("routeId")} />
               </div>
             </div>
+
+            {/* Selected Assignments Preview */}
+            {(selectedDriver || selectedRoute) && (
+              <div className="mt-6 p-4 border rounded-lg bg-muted/50">
+                <h4 className="font-medium mb-3">Selected Assignments</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedDriver && (
+                    <div className="p-3 bg-card rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                          <User className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">
+                            {selectedDriver.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            License: {selectedDriver.licenseNumber}
+                          </div>
+                          {selectedDriver.experience && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Award className="h-3 w-3 text-amber-500" />
+                              <span className="text-xs">
+                                {selectedDriver.experience} years experience
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {selectedRoute && (
+                    <div className="p-3 bg-card rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                          <RouteIcon className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">
+                            {selectedRoute.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {selectedRoute.origin} → {selectedRoute.destination}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs">
+                            {selectedRoute.distanceKm && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {selectedRoute.distanceKm} km
+                              </span>
+                            )}
+                            {selectedRoute.estimatedTimeMin && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {selectedRoute.estimatedTimeMin} min
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Location Information */}
 
         {/* Form Actions */}
         <div className="sticky bottom-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-none rounded-xl p-6 shadow-lg">
@@ -556,7 +1244,7 @@ export default function BusForm({
                 type="button"
                 variant="outline"
                 onClick={handleReset}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoading}
                 className="gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -564,7 +1252,7 @@ export default function BusForm({
               </Button>
               <Button
                 type="submit"
-                disabled={!isFormValid || isSubmitting}
+                disabled={!isFormValid || isSubmitting || isLoading}
                 className="gap-2 min-w-[140px]"
               >
                 {isSubmitting ? (

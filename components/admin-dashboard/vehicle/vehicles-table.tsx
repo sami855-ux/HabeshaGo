@@ -48,7 +48,6 @@ import {
   Wrench,
   Clock,
   Download,
-  Mail,
   UserCheck,
   UserX,
   Filter,
@@ -56,7 +55,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Select,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Vehicle, VehicleType, VehicleStatus } from "@/types/vehicle"
@@ -66,30 +64,18 @@ import { Input } from "@/components/ui/input"
 interface VehiclesTableProps {
   vehicles: Vehicle[]
   isLoading: boolean
-  totalCount: number
-  page: number
-  limit: number
-  totalPages: number
   onEdit: (vehicle: Vehicle) => void
   onDelete: (vehicle: Vehicle) => void
   onView: (vehicle: Vehicle) => void
-  onPageChange: (page: number) => void
-  onLimitChange: (limit: number) => void
   onBulkAction: (action: string, vehicleIds: string[]) => void
 }
 
 export default function VehiclesTable({
   vehicles,
   isLoading,
-  totalCount,
-  page,
-  limit,
-  totalPages,
   onEdit,
   onDelete,
   onView,
-  onPageChange,
-  onLimitChange,
   onBulkAction,
 }: VehiclesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
@@ -190,7 +176,7 @@ export default function VehiclesTable({
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="p-0 hover:bg-transparent"
+            className="p-0 hover:bg-transparent font-medium"
           >
             Plate Number
             {column.getIsSorted() === "asc"
@@ -215,10 +201,6 @@ export default function VehiclesTable({
         )
       },
       enableSorting: true,
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId) as string
-        return value.toLowerCase().includes(filterValue.toLowerCase())
-      },
     },
     {
       accessorKey: "type",
@@ -233,19 +215,13 @@ export default function VehiclesTable({
           </div>
         )
       },
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId) as string
-        return filterValue.includes(value)
-      },
     },
     {
       accessorKey: "model",
       header: "Model",
-      cell: ({ row }) => row.getValue("model"),
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId) as string
-        return value.toLowerCase().includes(filterValue.toLowerCase())
-      },
+      cell: ({ row }) => (
+        <span className="font-medium">{row.getValue("model")}</span>
+      ),
     },
     {
       accessorKey: "capacity",
@@ -254,7 +230,7 @@ export default function VehiclesTable({
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="p-0 hover:bg-transparent"
+            className="p-0 hover:bg-transparent font-medium"
           >
             Capacity
             {column.getIsSorted() === "asc"
@@ -268,7 +244,7 @@ export default function VehiclesTable({
       cell: ({ row }) => {
         const capacity = row.getValue("capacity") as number
         return (
-          <div className="text-right">
+          <div className="text-right font-medium">
             {capacity} <span className="text-muted-foreground">seats</span>
           </div>
         )
@@ -278,7 +254,9 @@ export default function VehiclesTable({
     {
       accessorKey: "manufacturer",
       header: "Manufacturer",
-      cell: ({ row }) => row.getValue("manufacturer"),
+      cell: ({ row }) => (
+        <span className="font-medium">{row.getValue("manufacturer")}</span>
+      ),
     },
     {
       accessorKey: "year",
@@ -287,7 +265,7 @@ export default function VehiclesTable({
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="p-0 hover:bg-transparent"
+            className="p-0 hover:bg-transparent font-medium"
           >
             Year
             {column.getIsSorted() === "asc"
@@ -298,7 +276,9 @@ export default function VehiclesTable({
           </Button>
         )
       },
-      cell: ({ row }) => row.getValue("year"),
+      cell: ({ row }) => (
+        <span className="font-medium">{row.getValue("year")}</span>
+      ),
       enableSorting: true,
     },
     {
@@ -308,7 +288,7 @@ export default function VehiclesTable({
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="p-0 hover:bg-transparent"
+            className="p-0 hover:bg-transparent font-medium"
           >
             Status
             {column.getIsSorted() === "asc"
@@ -324,17 +304,16 @@ export default function VehiclesTable({
         const config = getStatusConfig(vehicle.status, vehicle.isActive)
         const Icon = config.icon
         return (
-          <Badge variant="secondary" className={cn("gap-1.5", config.color)}>
+          <Badge
+            variant="secondary"
+            className={cn("gap-1.5 font-medium", config.color)}
+          >
             <Icon className="h-3 w-3" />
             {config.label}
           </Badge>
         )
       },
       enableSorting: true,
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId) as string
-        return filterValue.includes(value)
-      },
     },
     {
       accessorKey: "isActive",
@@ -345,6 +324,7 @@ export default function VehiclesTable({
           <Badge
             variant={isActive ? "default" : "secondary"}
             className={cn(
+              "font-medium",
               !isActive &&
                 "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
             )}
@@ -353,43 +333,41 @@ export default function VehiclesTable({
           </Badge>
         )
       },
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId) as boolean
-        return filterValue === "" || String(value) === filterValue
-      },
     },
     {
       id: "actions",
       cell: ({ row }) => {
         const vehicle = row.original
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onView(vehicle)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(vehicle)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete(vehicle)}
-                className="text-red-600 dark:text-red-400"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {vehicle.isActive ? "Deactivate" : "Delete"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onView(vehicle)}
+              className="h-8 w-8"
+              title="View Details"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(vehicle)}
+              className="h-8 w-8"
+              title="Edit"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(vehicle)}
+              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              title={vehicle.isActive ? "Deactivate" : "Delete"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )
       },
       enableHiding: false,
@@ -458,7 +436,7 @@ export default function VehiclesTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: limit }).map((_, index) => (
+              {Array.from({ length: 10 }).map((_, index) => (
                 <TableRow key={index}>
                   {columns.map((column) => (
                     <TableCell key={column.id || Math.random()}>
@@ -546,7 +524,7 @@ export default function VehiclesTable({
           )}
 
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search vehicles..."
               className="pl-9 w-full sm:w-64"
@@ -570,16 +548,23 @@ export default function VehiclesTable({
                 .filter((column) => column.getCanHide())
                 .map((column) => {
                   return (
-                    <DropdownMenuCheckboxItem
+                    <DropdownMenuItem
                       key={column.id}
                       className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        column.toggleVisibility(!column.getIsVisible())
+                      }}
                     >
+                      <Checkbox
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                        className="mr-2"
+                      />
                       {column.id}
-                    </DropdownMenuCheckboxItem>
+                    </DropdownMenuItem>
                   )
                 })}
             </DropdownMenuContent>
@@ -629,72 +614,51 @@ export default function VehiclesTable({
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - Now using TanStack Table's built-in pagination */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-sm text-muted-foreground">
-          Showing {page * limit - limit + 1} to{" "}
-          {Math.min(page * limit, totalCount)} of {totalCount} vehicles
+          Showing {table.getRowModel().rows.length} of {vehicles.length}{" "}
+          vehicles
         </div>
 
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onPageChange(1)}
-            disabled={page === 1 || isLoading}
+            onClick={() => table.setPageIndex(0)}
+            disabled={!table.getCanPreviousPage()}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1 || isLoading}
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
 
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum: number
-              if (totalPages <= 5) {
-                pageNum = i + 1
-              } else if (page <= 3) {
-                pageNum = i + 1
-              } else if (page >= totalPages - 2) {
-                pageNum = totalPages - 4 + i
-              } else {
-                pageNum = page - 2 + i
-              }
-
-              return (
-                <Button
-                  key={pageNum}
-                  variant={page === pageNum ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onPageChange(pageNum)}
-                  disabled={isLoading}
-                  className="w-8"
-                >
-                  {pageNum}
-                </Button>
-              )
-            })}
+            <span className="text-sm font-medium">
+              Page {table.getState().pagination.pageIndex + 1} of{" "}
+              {table.getPageCount()}
+            </span>
           </div>
 
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === totalPages || isLoading}
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onPageChange(totalPages)}
-            disabled={page === totalPages || isLoading}
+            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+            disabled={!table.getCanNextPage()}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>
@@ -703,15 +667,17 @@ export default function VehiclesTable({
         <div className="flex items-center gap-2">
           <span className="text-sm">Rows per page:</span>
           <select
-            className="border rounded px-2 py-1 text-sm"
-            value={limit}
-            onChange={(e) => onLimitChange(Number(e.target.value))}
-            disabled={isLoading}
+            className="border rounded px-2 py-1 text-sm bg-background"
+            value={table.getState().pagination.pageSize}
+            onChange={(e) => {
+              table.setPageSize(Number(e.target.value))
+            }}
           >
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="20">20</option>
-            <option value="50">50</option>
+            {[5, 10, 20, 50].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                {pageSize}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -719,31 +685,8 @@ export default function VehiclesTable({
   )
 }
 
-// Helper component for dropdown checkboxes
-function DropdownMenuCheckboxItem({
-  className,
-  checked,
-  onCheckedChange,
-  children,
-  ...props
-}: any) {
-  return (
-    <DropdownMenuItem
-      className={cn("flex items-center gap-2", className)}
-      onSelect={(event) => {
-        event.preventDefault()
-        onCheckedChange(!checked)
-      }}
-      {...props}
-    >
-      <Checkbox checked={checked} onCheckedChange={onCheckedChange} />
-      {children}
-    </DropdownMenuItem>
-  )
-}
-
 // Search icon component
-function Search(props: any) {
+function SearchIcon(props: any) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

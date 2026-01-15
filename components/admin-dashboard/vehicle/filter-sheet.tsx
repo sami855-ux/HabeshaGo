@@ -54,7 +54,7 @@ export default function FilterSheet({
           Filters
         </Button>
       </SheetTrigger>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="sm:max-w-md px-5 py-3">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
@@ -70,16 +70,18 @@ export default function FilterSheet({
           <div className="space-y-3">
             <Label>Vehicle Type</Label>
             <Select
-              value={filters.type || ""}
+              value={filters.type || "all"}
               onValueChange={(value) =>
-                onFiltersChange({ type: (value as VehicleType) || undefined })
+                onFiltersChange({
+                  type: value === "all" ? undefined : (value as VehicleType),
+                })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="BUS">Bus</SelectItem>
                 <SelectItem value="MINIBUS">Minibus</SelectItem>
                 <SelectItem value="VAN">Van</SelectItem>
@@ -93,18 +95,19 @@ export default function FilterSheet({
           <div className="space-y-3">
             <Label>Status</Label>
             <Select
-              value={filters.status || ""}
+              value={filters.status || "all"}
               onValueChange={(value) =>
                 onFiltersChange({
-                  status: (value as VehicleStatus) || undefined,
+                  status:
+                    value === "all" ? undefined : (value as VehicleStatus),
                 })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="ACTIVE">Active</SelectItem>
                 <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
                 <SelectItem value="OUT_OF_SERVICE">Out of Service</SelectItem>
@@ -121,26 +124,26 @@ export default function FilterSheet({
             <Select
               value={
                 filters.isActive === undefined
-                  ? ""
+                  ? "all"
                   : filters.isActive
-                  ? "true"
-                  : "false"
+                  ? "active"
+                  : "inactive"
               }
               onValueChange={(value) => {
-                if (value === "") {
+                if (value === "all") {
                   onFiltersChange({ isActive: undefined })
                 } else {
-                  onFiltersChange({ isActive: value === "true" })
+                  onFiltersChange({ isActive: value === "active" })
                 }
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
-                <SelectItem value="true">Active Only</SelectItem>
-                <SelectItem value="false">Inactive Only</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="active">Active Only</SelectItem>
+                <SelectItem value="inactive">Inactive Only</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -159,7 +162,7 @@ export default function FilterSheet({
                   value={filters.sortBy || "plateNumber"}
                   onValueChange={(value) => onFiltersChange({ sortBy: value })}
                 >
-                  <SelectTrigger id="sort-by">
+                  <SelectTrigger id="sort-by" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

@@ -1,4 +1,3 @@
-// app/vehicles/components/vehicle-form-dialog.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -31,6 +30,8 @@ import {
   VehicleType,
   VehicleStatus,
 } from "@/types/vehicle"
+import { useCreateVehicle } from "@/hooks/useCreateVehicle"
+import { toast } from "sonner"
 
 interface VehicleFormDialogProps {
   open: boolean
@@ -72,6 +73,22 @@ export default function VehicleFormDialog({
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // React Query mutation for creating a vehicle
+  const createVehicleMutation = useCreateVehicle({
+    onSuccess: (data) => {
+      console.log("Vehicle created:", data)
+      onSuccess()
+      // onOpenChange(false)
+    },
+    onError: (error: any) => {
+      console.error("Failed to save vehicle:", error)
+      toast.error(
+        error?.response.data.error ||
+          "An error occurred while saving the vehicle."
+      )
+    },
+  })
 
   useEffect(() => {
     if (vehicle) {
@@ -129,26 +146,23 @@ export default function VehicleFormDialog({
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     setIsSubmitting(true)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      console.log(vehicle ? "Updating vehicle:" : "Creating vehicle:", formData)
-
-      // Success
-      onSuccess()
-      onOpenChange(false)
+      if (vehicle) {
+        // TODO: Implement updateVehicle mutation here
+        console.log("Updating vehicle:", formData)
+      } else {
+        // Create new vehicle
+        createVehicleMutation.mutate(formData)
+      }
     } catch (error) {
-      console.error("Failed to save vehicle:", error)
+      console.error("Unexpected error:", error)
     } finally {
       setIsSubmitting(false)
     }
@@ -159,7 +173,7 @@ export default function VehicleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Car className="h-5 w-5" />
@@ -189,7 +203,7 @@ export default function VehicleFormDialog({
                       setFormData({ ...formData, type: value })
                     }
                   >
-                    <SelectTrigger id="type">
+                    <SelectTrigger id="type" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -311,7 +325,7 @@ export default function VehicleFormDialog({
                       setFormData({ ...formData, year: parseInt(value) })
                     }
                   >
-                    <SelectTrigger id="year">
+                    <SelectTrigger id="year" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -347,7 +361,7 @@ export default function VehicleFormDialog({
                       setFormData({ ...formData, status: value })
                     }
                   >
-                    <SelectTrigger id="status">
+                    <SelectTrigger id="status" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -401,7 +415,7 @@ export default function VehicleFormDialog({
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+          <DialogFooter className="space-x-2 sm:gap-0 pt-4">
             <Button
               type="button"
               variant="outline"
@@ -410,8 +424,11 @@ export default function VehicleFormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
+            <Button
+              type="submit"
+              disabled={isSubmitting || createVehicleMutation.isLoading}
+            >
+              {isSubmitting || createVehicleMutation.isLoading ? (
                 <>
                   <span className="animate-spin mr-2">⟳</span>
                   {vehicle ? "Updating..." : "Creating..."}

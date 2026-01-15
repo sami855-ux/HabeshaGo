@@ -1,4 +1,3 @@
-// app/operators-management/operators-management.tsx
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,9 +23,11 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { type Role } from "@/types/operator"
 import { useRouter } from "next/navigation"
+import { useDriversQuery } from "@/hooks/fetchAllDriver"
 
 export default function OperatorsManagement() {
   const router = useRouter()
+  const { data, isLoading, error, refetch } = useDriversQuery()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
@@ -122,7 +123,7 @@ export default function OperatorsManagement() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">142</div>
+              <div className="text-2xl font-bold">1</div>
               <p className="text-xs text-muted-foreground">
                 +12 from last month
               </p>
@@ -135,7 +136,7 @@ export default function OperatorsManagement() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">98</div>
+              <div className="text-2xl font-bold">1</div>
               <p className="text-xs text-muted-foreground">68.9% of total</p>
             </CardContent>
           </Card>
@@ -146,7 +147,7 @@ export default function OperatorsManagement() {
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">67</div>
+              <div className="text-2xl font-bold">1</div>
               <p className="text-xs text-muted-foreground">Currently working</p>
             </CardContent>
           </Card>
@@ -159,7 +160,7 @@ export default function OperatorsManagement() {
               <Bell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">8</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-xs text-muted-foreground">Require attention</p>
             </CardContent>
           </Card>

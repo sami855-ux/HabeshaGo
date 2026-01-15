@@ -41,26 +41,39 @@ import {
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
 import { RootState } from "@/store"
-import { useSelector } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
+import { LogoutModal } from "../logout-modal"
+import { logoutUser } from "@/services/auth.user.api"
+import { clearUser } from "@/store/slices/userSlice"
 
-function Header({
-  className,
-}: {
-  className?: string
-  // Removed: onMenuClick, isSidebarOpen props
-}) {
+function Header({ className }: { className?: string }) {
   const router = useRouter()
+  const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.user.user)
 
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Searching for:", searchQuery)
     setShowSearchModal(false)
     setSearchQuery("")
+  }
+
+  const handleLogout = async () => {
+    setIsLoading(true)
+    try {
+      await logoutUser()
+      dispatch(clearUser())
+      router.push("/")
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -178,7 +191,10 @@ function Header({
                     <ThemeToggle />
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => setIsLogoutModalOpen(true)}
+                  >
                     <LogOut className="w-4 h-4 mr-2" />
                     Log out
                   </DropdownMenuItem>
@@ -234,6 +250,13 @@ function Header({
           </div>
         </DialogContent>
       </Dialog>
+
+      <LogoutModal
+        isOpen={isLogoutModalOpen}
+        onOpenChange={setIsLogoutModalOpen}
+        onConfirm={handleLogout}
+        isLoading={isLoading}
+      />
     </>
   )
 }

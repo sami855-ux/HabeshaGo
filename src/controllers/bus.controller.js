@@ -29,6 +29,7 @@ export const createBus = async (req, res) => {
 export const searchBuses = async (req, res) => {
   const { start, end } = req.query
 
+  console.log(start, end)
   const result = await searchBusesService(start, end)
 
   return res.status(result.statusCode).json(result)

@@ -1,4 +1,4 @@
-import express from "express";
+import express from "express"
 import {
   createRouteHandler,
   getRoutesHandler,
@@ -6,15 +6,19 @@ import {
   updateRouteHandler,
   deleteRouteHandler,
   routeValidators,
-} from "../controllers/route.controller.js";
+  getRouteStats,
+  getAllMidPointNamesService,
+} from "../controllers/route.controller.js"
 
-const router = express.Router();
-const { validate, createRouteSchema, updateRouteSchema } = routeValidators;
+const router = express.Router()
+const { validate, createRouteSchema, updateRouteSchema } = routeValidators
 
-router.post("/", validate(createRouteSchema), createRouteHandler);
-router.get("/", getRoutesHandler);
-router.get("/:id", getRouteHandler);
-router.patch("/:id", validate(updateRouteSchema), updateRouteHandler);
-router.delete("/:id", deleteRouteHandler);
+router.post("/", validate(createRouteSchema), createRouteHandler)
+router.get("/get", getAllMidPointNamesService)
+router.get("/", getRoutesHandler)
+router.get("/stats", getRouteStats)
+router.get("/:id", getRouteHandler)
+router.patch("/:id", validate(updateRouteSchema), updateRouteHandler)
+router.delete("/:id", deleteRouteHandler)
 
-export default router;
+export default router

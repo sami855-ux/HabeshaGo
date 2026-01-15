@@ -426,6 +426,8 @@ const columns: ColumnDef<Operator>[] = [
     header: "Assignment",
     cell: ({ row }) => {
       const operator = row.original
+
+      console.log(operator)
       const getAssignmentIcon = () => {
         switch (operator.role) {
           case "DRIVER":
@@ -443,10 +445,7 @@ const columns: ColumnDef<Operator>[] = [
       if (operator.role === "DRIVER") {
         return (
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              {getAssignmentIcon()}
-              <span className="font-medium">{operator.assignment}</span>
-            </div>
+            <div className="flex items-center gap-2">{getAssignmentIcon()}</div>
             {operator.licenseNumber && (
               <span className="text-xs text-muted-foreground">
                 License: {operator.licenseNumber}
@@ -606,6 +605,8 @@ const columns: ColumnDef<Operator>[] = [
 export default function OperatorsTable() {
   const router = useRouter()
   const { data: apiResponse, isLoading, error, refetch } = useDriversQuery()
+
+  console.log(apiResponse)
   const [sorting, setSorting] = useState<SortingState>([
     { id: "createdAt", desc: true },
   ])

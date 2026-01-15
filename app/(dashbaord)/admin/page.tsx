@@ -43,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useDispatch, useSelector } from "react-redux"
 import {
   Bus,
   Car,
@@ -81,6 +82,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { RootState } from "@/store"
 
 // Chart data
 const ticketSalesData = [
@@ -287,6 +289,7 @@ const quickAccessPanels = [
 export default function DashboardWithCharts() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const router = useRouter()
+  const { user } = useSelector((state: RootState) => state.user)
 
   // KPI Data
   const kpis = [

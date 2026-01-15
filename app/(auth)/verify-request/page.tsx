@@ -129,6 +129,9 @@ function VerifyPage() {
             if (userRes.user.role === "PASSENGER") {
               router.push("/user")
             }
+            if (userRes.user.role === "ADMIN") {
+              router.push("/admin")
+            }
           }
         }
 

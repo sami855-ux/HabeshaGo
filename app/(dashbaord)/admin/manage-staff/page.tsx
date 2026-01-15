@@ -23,11 +23,9 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { type Role } from "@/types/operator"
 import { useRouter } from "next/navigation"
-import { useDriversQuery } from "@/hooks/fetchAllDriver"
 
 export default function OperatorsManagement() {
   const router = useRouter()
-  const { data, isLoading, error, refetch } = useDriversQuery()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)

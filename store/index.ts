@@ -1,11 +1,19 @@
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
 import walletReducer from "./slices/walletSlice";
+import busReducer from "./slices/bus.Slice"
+import bookingReducer from "./slices/booking.Slice"
+import paymentReducer from "./slices/paymentSlice"
+import routeReducer from "./slices/routeslice"
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
     wallet: walletReducer,
+    bus: busReducer,
+    booking: bookingReducer,
+    payment: paymentReducer,
+    route: routeReducer
   },
 });
 

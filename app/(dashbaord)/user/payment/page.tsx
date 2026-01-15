@@ -1,152 +1,141 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowUpRight, PlusCircle, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import axios from "axios";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Users, Armchair, Crown, CheckCircle } from "lucide-react";
 
-export default function PaymentsPage({ userId }) {
-  const [balance, setBalance] = useState(null);
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+interface Seat {
+  id: string;
+  number: string;
+  type: "standard" | "premium" | "disabled";
+  price: number;
+}
 
-  const [depositAmount, setDepositAmount] = useState("");
+interface BookingData {
+  seats: Seat[];
+  totalPrice: number;
+}
 
-  // Fetch wallet and transactions
-  const fetchWalletData = async () => {
-    try {
-      setLoading(true);
-      const [balanceRes, transactionsRes] = await Promise.all([
-        axios.get(`/api/wallet/${userId}`),
-        axios.get(`/api/wallet/${userId}/transactions`),
-      ]);
-      setBalance(balanceRes.data);
-      setTransactions(transactionsRes.data);
-      setLoading(false);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load wallet data.");
-      setLoading(false);
-    }
-  };
+export default function PaymentsPage() {
+  const router = useRouter();
+  const [booking, setBooking] = useState<BookingData | null>(null);
+  const [serviceFee, setServiceFee] = useState(49);
+  const [discountPerSeat, setDiscountPerSeat] = useState(20);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   useEffect(() => {
-    fetchWalletData();
-  }, [userId]);
-
-  // Deposit money
-  const handleDeposit = async () => {
-    if (!depositAmount) return;
-    setActionLoading(true);
-    try {
-      const res = await axios.post("/api/wallet/deposit", {
-        userId,
-        amount: Number(depositAmount),
-      });
-      setBalance(res.data);
-      await fetchWalletData();
-      setSuccessMessage(`Successfully deposited ${depositAmount} ETB`);
-      setDepositAmount("");
-    } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Failed to deposit");
-    } finally {
-      setActionLoading(false);
+    const tempBooking = localStorage.getItem("tempBooking");
+    if (tempBooking) {
+      setBooking(JSON.parse(tempBooking));
+    } else {
+      // If no booking data, redirect back to bus selection
+      router.push("/user/bus");
     }
+  }, [router]);
+
+  if (!booking) {
+    return <p className="text-center mt-10">Loading booking data...</p>;
+  }
+
+  const { seats, totalPrice } = booking;
+  const discount = seats.length * discountPerSeat;
+  const finalPrice = totalPrice + serviceFee - discount;
+
+  const handleConfirmPayment = () => {
+    // Here you can push the data to your backend
+    // For now, just simulate success
+    setPaymentConfirmed(true);
+
+    // Optional: Clear temporary booking
+    localStorage.removeItem("tempBooking");
   };
 
   return (
-    <div className="min-h-screen bg-background pb-12 rounded-2xl">
-      <div className="container mx-auto px-4 pt-6">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Payments</h1>
-        <p className="text-muted-foreground mb-6">
-          Deposit money and track your wallet
-        </p>
+    <div className="container mx-auto px-4 py-6">
+      <h1 className="text-2xl font-bold mb-6">Payment Summary</h1>
 
-        {loading && (
-          <p className="text-center text-muted-foreground">Loading...</p>
-        )}
-        {error && <p className="text-center text-red-500 mb-4">{error}</p>}
-        {successMessage && (
-          <p className="text-center text-green-500 mb-4 flex items-center justify-center gap-2">
-            <CheckCircle /> {successMessage}
-          </p>
-        )}
+      {paymentConfirmed && (
+        <Card className="mb-6 border-green-500 border-2">
+          <CardContent className="flex items-center gap-3 text-green-600">
+            <CheckCircle className="size-6" />
+            <span>Payment Successful!</span>
+          </CardContent>
+        </Card>
+      )}
 
-        {!loading && balance && (
-          <>
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Wallet Balance</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-bold">
-                ETB {balance.balance}
-              </CardContent>
-            </Card>
-
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PlusCircle /> Deposit Money
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  placeholder="Amount"
-                  type="number"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                />
-                <Button
-                  onClick={handleDeposit}
-                  disabled={actionLoading || !depositAmount}
-                >
-                  Deposit
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {transactions.length === 0 ? (
-                  <p className="text-muted-foreground text-center">
-                    No transactions yet.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {transactions.map((txn) => (
-                      <Card key={txn.id} className="p-3">
-                        <div className="flex justify-between">
-                          <span>{txn.description}</span>
-                          <span
-                            className={`font-bold ${
-                              txn.type === "credit"
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }`}
-                          >
-                            {txn.type === "credit" ? "+" : "-"} {txn.amount} ETB
-                          </span>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(txn.date).toLocaleString()}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+      {/* Selected Seats */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="size-5" />
+            Selected Seats ({seats.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {seats.map((seat) => (
+            <div
+              key={seat.id}
+              className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+            >
+              <div className="flex items-center gap-2">
+                <Armchair className="size-5" />
+                <span>Seat {seat.number}</span>
+                {seat.type === "premium" && (
+                  <Crown className="size-4 text-yellow-500" />
                 )}
-              </CardContent>
-            </Card>
-          </>
-        )}
+              </div>
+              <span className="font-bold">ETB {seat.price}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Fare Breakdown */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Fare Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between">
+            <span>Base Fare</span>
+            <span>ETB {totalPrice}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Service Fee</span>
+            <span>ETB {serviceFee}</span>
+          </div>
+          <div className="flex justify-between text-green-600">
+            <span>Discount</span>
+            <span>-ETB {discount}</span>
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-800 pt-3 mt-3">
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total Amount</span>
+              <span>ETB {finalPrice}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Actions */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <Button
+          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 flex-1"
+          onClick={handleConfirmPayment}
+          disabled={paymentConfirmed}
+        >
+          {paymentConfirmed ? "Paid" : "Confirm Payment"}
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => router.push("/user/bus")}
+          disabled={paymentConfirmed}
+        >
+          Cancel
+        </Button>
       </div>
     </div>
   );

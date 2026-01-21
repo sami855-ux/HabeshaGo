@@ -1,23 +1,24 @@
-import express from "express";
-import { WalletController } from "../controllers/wallet.controller.js";
-import { authenticate } from "../middlewares/authenticate.js";
-import { zodValidate } from "../middlewares/zodValidate.js";
-import { depositWalletSchema } from "../schemas/wallet.schema.js";
+import express from "express"
+import {
+  getMyWallet,
+  getWalletTransactions,
+  createWallet,
+  enableWalletBiometric,
+} from "../controllers/wallet.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
-const router = express.Router();
+const router = express.Router()
 
-// Get my wallet
-router.get("/me", authenticate, WalletController.getMyWallet);
+// Wallet info
+router.get("/me", authenticate, getMyWallet)
 
-// Deposit (external)
-router.post(
-  "/deposit",
-  authenticate,
-  zodValidate(depositWalletSchema),
-  WalletController.deposit
-);
+// Wallet transactions
+router.get("/transactions", authenticate, getWalletTransactions)
 
-// Get transactions
-router.get("/transactions", authenticate, WalletController.transactions);
+// Create wallet + PIN
+router.post("/create", authenticate, createWallet)
 
-export default router;
+// Enable biometric
+router.post("/biometric", authenticate, enableWalletBiometric)
+
+export default router

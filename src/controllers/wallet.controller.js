@@ -1,37 +1,78 @@
-import { walletService } from "../services/wallet.service.js";
+import {
+  createWalletService,
+  enableWalletBiometricService,
+  getMyWalletService,
+  getWalletTransactionsService,
+} from "../services/wallet.service.js"
 
-export const WalletController = {
-  async getMyWallet(req, res) {
-    try {
-      const wallet = await walletService.getOrCreateWallet(req.user.id);
-      res.json(wallet);
-    } catch (err) {
-      res.status(400).json({ message: err.message });
-    }
-  },
+/**
+ * Get the logged-in user's wallet
+ */
+export const getMyWallet = async (req, res) => {
+  try {
+    const result = await getMyWalletService(req.user.id)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get wallet controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching wallet",
+      data: null,
+    })
+  }
+}
 
-  async deposit(req, res) {
-    try {
-      const { amount } = req.body;
+/**
+ * Get wallet transactions for the logged-in user
+ */
+export const getWalletTransactions = async (req, res) => {
+  try {
+    const result = await getWalletTransactionsService(req.user.id)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get wallet transactions controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching wallet transactions",
+      data: null,
+    })
+  }
+}
 
-      const result = await walletService.depositViaExternal(
-        req.user.id,
-        amount,
-        "MANUAL_TOPUP"
-      );
+/**
+ * Create wallet for logged-in user (with PIN)
+ */
+export const createWallet = async (req, res) => {
+  try {
+    const result = await createWalletService(req.user.id, req.body)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Wallet creation controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while creating wallet",
+      data: null,
+    })
+  }
+}
 
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ message: err.message });
-    }
-  },
-
-  async transactions(req, res) {
-    try {
-      const txs = await walletService.getTransactions(req.user.id);
-      res.json(txs);
-    } catch (err) {
-      res.status(400).json({ message: err.message });
-    }
-  },
-};
+/**
+ * Enable biometric authentication for wallet
+ */
+export const enableWalletBiometric = async (req, res) => {
+  try {
+    const result = await enableWalletBiometricService(req.user.id, req.body)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Wallet biometric controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while enabling biometric",
+      data: null,
+    })
+  }
+}

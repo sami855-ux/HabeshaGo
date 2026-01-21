@@ -14,7 +14,7 @@ model User {
   password          String?
   phone             String?  @unique
   role              UserRole @default(PASSENGER)
-  image             String?
+  avaterUrl         String?
 
   emailVerified     Boolean  @default(false)
   phoneVerified     Boolean  @default(false)
@@ -35,7 +35,6 @@ model User {
   // AUTH RELATIONS
   sessions          Session[]
   otpCodes          OtpCode[]
-  accounts          Account[]
 
   // RELATIONS 
   wallet                 Wallet?
@@ -50,32 +49,6 @@ model User {
   @@map("user")
 }
 
-
-model Account {
-  id                    String   @id @default(cuid())
-  userId                String
-
-  // OAuth provider info
-  provider              String
-  providerAccountId     String
-
-  // Provider tokens (NOT your API tokens)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("account")
-}
 
 model Session {
   id               String   @id @default(cuid())
@@ -99,7 +72,6 @@ model Session {
   @@index([userId])
   @@map("session")
 }
-
 model OtpCode {
   id          Int      @id @default(autoincrement())
   userId      String
@@ -119,45 +91,78 @@ model OtpCode {
   @@map("otp_code")
 }
 
-
-
-
-model Verification {
-  id         String   @id
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([identifier])
-  @@map("verification")
-}
-
-
+//Digital ticketing
 model Wallet {
-  id        Int                 @id @default(autoincrement())
-  userId    String              @unique
-  balance   Float               @default(0)
-  currency  String              @default("ETB")
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  payments  Payment[]
-  user      User                @relation(fields: [userId], references: [id])
-  txns      WalletTransaction[]
-}
+  id             Int       @id @default(autoincrement())
+  userId         String    @unique
 
+  balance        Decimal   @default(0)
+  currency       String    @default("ETB")
+
+  pinHash        String?   // hashed wallet PIN
+  pinAttempts    Int       @default(0)
+  isLocked       Boolean   @default(false)
+
+  biometricToken String?   // device-specific biometric token or identifier
+  biometricEnabled Boolean @default(false) // has user enabled biometrics?
+
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User                @relation(fields: [userId], references: [id])
+  transactions   WalletTransaction[]
+  payments       Payment[]
+}
+//WalletTransaction = internal money movement
 model WalletTransaction {
-  id        Int             @id @default(autoincrement())
-  walletId  Int
-  amount    Float
-  type      TransactionType
-  reference String?
-  meta      Json?
-  createdAt DateTime        @default(now())
-  wallet    Wallet          @relation(fields: [walletId], references: [id])
+  id          Int              @id @default(autoincrement())
+  walletId    Int
+  amount      Decimal
+  type        TransactionType
+  balanceAfter Decimal
+
+  reference   String           @unique
+  description String?
+  metadata    Json?
+
+  createdAt   DateTime         @default(now())
+
+  wallet      Wallet           @relation(fields: [walletId], references: [id])
 
   @@index([walletId])
+}
+//Payment = interaction with external gateways (Chapa, Telebirr, CBE)
+//User tops up wallet → Payment (SUCCESS) → WalletTransaction (CREDIT)
+// User pays directly with Telebirr → Payment (SUCCESS) → no wallet transaction
+// User pays from wallet → WalletTransaction (DEBIT) → Payment (optional record)
+model Payment {
+  id            Int            @id @default(autoincrement())
+  userId        String
+  amount        Decimal
+  currency      String         @default("ETB")
+
+  method        PaymentMethod
+  gateway       PaymentGateway @default(CHAPA)
+  flow          PaymentFlow
+
+  status        PaymentStatus  @default(PENDING)
+
+  gatewayRef    String?        // From Chapa / Telebirr
+  reference     String         @unique
+  metadata      Json?
+
+  walletId      Int?
+  bookingId     Int?
+  minibusReservationId Int?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id])
+  wallet        Wallet?        @relation(fields: [walletId], references: [id])
+  booking       Booking?
+  minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
 }
 
 model Notification {
@@ -184,7 +189,6 @@ model Notification {
   @@index([userId])
   @@index([isRead])
 }
-
 
 
 model Bus {
@@ -286,7 +290,6 @@ model RouteMidPoint {
 
   @@index([routeId]) // optional index for faster searches
 }
-
 
 model EVStation {
   id        Int            @id @default(autoincrement())
@@ -407,26 +410,7 @@ model ParkingReservation {
   user       User       @relation(fields: [userId], references: [id])
 }
 
-model Payment {
-  id          Int           @id @default(autoincrement())
-  userId      String
-  amount      Float
-  currency    String        @default("ETB")
-  method      String
-  gatewayRef  String?
-  referenceId String?
-  status      PaymentStatus @default(PENDING)
-  metadata    Json?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  bookingId   Int?
-  walletId    Int?
-  minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
-  minibusReservationId Int?  
-  booking     Booking?
-  user        User          @relation(fields: [userId], references: [id])
-  wallet      Wallet?       @relation(fields: [walletId], references: [id])
-}
+
 
 enum UserRole {
   PASSENGER
@@ -434,18 +418,50 @@ enum UserRole {
   ADMIN
 }
 
-enum ReservationStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-}
-
+//Digital ticketing enums
 enum TransactionType {
   DEPOSIT
   WITHDRAW
   REFUND
   ADJUSTMENT
 }
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  WALLET
+  TELEBIRR
+  CBE
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentGateway {
+  CHAPA
+  INTERNAL
+}
+
+enum PaymentFlow {
+  WALLET_TOPUP
+  WALLET_PAYMENT
+  DIRECT_PAYMENT
+}
+
+
+
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
 
 enum BookingStatus {
   PENDING
@@ -460,20 +476,6 @@ enum SlotStatus {
   OUT_OF_SERVICE
 }
 
-enum PaymentMethod {
-  WALLET
-  CHAPA
-  TELEBIRR
-  CARD
-  CASH
-}
-
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  REFUNDED
-}
 
 enum BusStatus {
   ACTIVE

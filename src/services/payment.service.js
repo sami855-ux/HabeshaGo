@@ -1,151 +1,135 @@
-import prisma from "../prisma/client.js";
-import { walletService } from "./wallet.service.js";
+import prisma from "../prisma/client.js"
+import { successResponse, errorResponse } from "../utils/apiResponse.js"
 
-export const paymentService = {
-  async pay(dto) {
-    if (dto.method === "WALLET") {
-      const wallet = await walletService.getOrCreateWallet(dto.userId);
-      return await prisma.$transaction(async (tx) => {
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: { decrement: dto.amount } },
-        });
+//  Initiate Payment
+export const initiatePaymentService = async (
+  userId,
+  { amount, gateway, type }
+) => {
+  try {
+    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
+    if (!gateway) return errorResponse("Payment gateway is required", 400)
 
-        await tx.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            amount: -dto.amount,
-            type: "WITHDRAW",
-            reference: dto.referenceId ?? null,
-            meta: {},
-          },
-        });
-
-        const payment = await tx.payment.create({
-          data: {
-            userId: dto.userId,
-            walletId: wallet.id,
-            bookingId: dto.bookingId ?? null,
-            amount: dto.amount,
-            method: "WALLET",
-            status: "SUCCESS",
-          },
-        });
-
-        if (dto.bookingId) {
-          await tx.booking.update({
-            where: { id: dto.bookingId },
-            data: { paymentId: payment.id, status: "CONFIRMED" },
-          });
-        }
-
-        return payment;
-      });
-    }
-
-    // External payments: create PENDING
+    // Create payment record as PENDING
     const payment = await prisma.payment.create({
       data: {
-        ...dto,
+        userId,
+        amount,
+        method: gateway,
         status: "PENDING",
-        gatewayRef: dto.referenceId ?? null,
+        metadata: { type }, // e.g., wallet top-up or direct payment
       },
-    });
+    })
 
-    return {
-      payment,
-      gateway: { nextAction: "OPEN_GATEWAY", gatewayRef: payment.gatewayRef },
-    };
-  },
-
-  async verifyExternalPayment(gatewayRef, payload) {
-    const providerResult = {
-      status: "success",
-      amount: 100,
-      userId: "someUserId",
-    }; // placeholder
-    if (providerResult.status !== "success") {
-      const failed = await prisma.payment.updateMany({
-        where: { gatewayRef },
-        data: { status: "FAILED" },
-      });
-      return { status: "failed", updated: failed.count };
+    // Generate external gateway request (mock example)
+    let paymentUrl
+    switch (gateway.toLowerCase()) {
+      case "chapa":
+        paymentUrl = await createChapaPayment(payment)
+        break
+      case "telebirr":
+        paymentUrl = await createTelebirrPayment(payment)
+        break
+      case "cbe":
+        paymentUrl = await createCBEPayment(payment)
+        break
+      default:
+        return errorResponse("Unsupported gateway", 400)
     }
 
-    const payment = await prisma.payment.findFirst({ where: { gatewayRef } });
-    if (!payment) throw new Error("Payment record not found");
+    return successResponse("Payment initiated", { payment, paymentUrl })
+  } catch (error) {
+    console.error("Initiate payment service error:", error)
+    return errorResponse("Failed to initiate payment", 500)
+  }
+}
 
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.payment.update({
+//  Payment Callback
+export const paymentCallbackService = async (data) => {
+  try {
+    const { reference, status, gatewayMetadata } = data
+
+    const payment = await prisma.payment.findUnique({ where: { reference } })
+    if (!payment) return errorResponse("Payment not found", 404)
+
+    if (status === "SUCCESS") {
+      await prisma.$transaction(async (tx) => {
+        // Mark payment success
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: "SUCCESS",
+            metadata: { ...payment.metadata, gatewayMetadata },
+          },
+        })
+
+        // If top-up to wallet, credit wallet
+        if (payment.metadata.type === "WALLET_TOPUP") {
+          const wallet = await tx.wallet.findUnique({
+            where: { userId: payment.userId },
+          })
+          if (wallet) {
+            await tx.wallet.update({
+              where: { id: wallet.id },
+              data: { balance: { increment: payment.amount } },
+            })
+
+            await tx.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                amount: payment.amount,
+                type: "DEPOSIT",
+                reference: payment.reference,
+                meta: { gateway: payment.method },
+              },
+            })
+          }
+        }
+      })
+
+      return successResponse("Payment successful")
+    } else {
+      await prisma.payment.update({
         where: { id: payment.id },
-        data: { status: "SUCCESS", metadata: payload },
-      });
+        data: {
+          status: "FAILED",
+          metadata: { ...payment.metadata, gatewayMetadata },
+        },
+      })
 
-      if (payment.walletId) {
-        await tx.wallet.update({
-          where: { id: payment.walletId },
-          data: { balance: { increment: payment.amount } },
-        });
-        await tx.walletTransaction.create({
-          data: {
-            walletId: payment.walletId,
-            amount: payment.amount,
-            type: "DEPOSIT",
-            reference: gatewayRef,
-            meta: payload,
-          },
-        });
-      }
+      return errorResponse("Payment failed", 400)
+    }
+  } catch (error) {
+    console.error("Payment callback service error:", error)
+    return errorResponse("Failed to process payment callback", 500)
+  }
+}
 
-      if (payment.bookingId) {
-        await tx.booking.update({
-          where: { id: payment.bookingId },
-          data: { status: "CONFIRMED", paymentId: payment.id },
-        });
-      }
+//  Payment History
+export const getPaymentHistoryService = async (userId) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    })
+    return successResponse("Payment history retrieved", payments)
+  } catch (error) {
+    console.error("Get payment history service error:", error)
+    return errorResponse("Failed to fetch payment history", 500)
+  }
+}
 
-      return updated;
-    });
-  },
+// == Mock Gateway Integration ==
+const createChapaPayment = async (payment) => {
+  // Here you call Chapa API with payment.amount, payment.reference, callback URL, etc.
+  // Return the checkout/payment URL
+  return `https://checkout.chapa.com/pay/${payment.reference}`
+}
 
-  async refundPayment(paymentId, refundToWallet = true) {
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-    if (!payment) throw new Error("Payment not found");
-    if (payment.status !== "SUCCESS")
-      throw new Error("Only successful payments can be refunded");
+const createTelebirrPayment = async (payment) => {
+  return `https://pay.telebirr.com/${payment.reference}`
+}
 
-    return prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: paymentId },
-        data: { status: "REFUNDED" },
-      });
-
-      if (refundToWallet && payment.walletId) {
-        await tx.wallet.update({
-          where: { id: payment.walletId },
-          data: { balance: { increment: payment.amount } },
-        });
-        await tx.walletTransaction.create({
-          data: {
-            walletId: payment.walletId,
-            amount: payment.amount,
-            type: "REFUND",
-            reference: `refund-${paymentId}`,
-            meta: {},
-          },
-        });
-      }
-
-      if (payment.bookingId) {
-        await tx.booking.update({
-          where: { id: payment.bookingId },
-          data: { status: "CANCELLED", cancelledAt: new Date() },
-        });
-      }
-
-      return { refunded: true };
-    });
-  },
-};
+const createCBEPayment = async (payment) => {
+  return `https://cbe.com/pay/${payment.reference}`
+}

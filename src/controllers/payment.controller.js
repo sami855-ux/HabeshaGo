@@ -1,36 +1,59 @@
-import { paymentService } from "../services/payment.service.js";
+import {
+  initiatePaymentService,
+  paymentCallbackService,
+  getPaymentHistoryService,
+} from "../services/payment.service.js"
 
-export const PaymentController = {
-  async create(req, res) {
-    try {
-      const payment = await paymentService.pay(req.body);
-      res.json(payment);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
+/**
+ * Initiate payment with Chapa, Telebirr, or bank
+ */
+export const initiatePayment = async (req, res) => {
+  try {
+    const result = await initiatePaymentService(req.user.id, req.body)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Initiate payment controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while initiating payment",
+      data: null,
+    })
+  }
+}
 
-  async verify(req, res) {
-    try {
-      const result = await paymentService.verifyExternalPayment(
-        req.body.gatewayRef,
-        req.body
-      );
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
+/**
+ * Payment gateway webhook callback
+ */
+export const paymentCallback = async (req, res) => {
+  try {
+    const result = await paymentCallbackService(req.body)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Payment callback controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error during payment callback",
+      data: null,
+    })
+  }
+}
 
-  async refund(req, res) {
-    try {
-      const result = await paymentService.refundPayment(
-        req.body.paymentId,
-        req.body.refundToWallet
-      );
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
-};
+/**
+ * Get all external payments for logged-in user
+ */
+export const getPaymentHistory = async (req, res) => {
+  try {
+    const result = await getPaymentHistoryService(req.user.id)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get payment history controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching payment history",
+      data: null,
+    })
+  }
+}

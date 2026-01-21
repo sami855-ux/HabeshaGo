@@ -1,24 +1,20 @@
-import express from "express";
-import { PaymentController } from "../controllers/payment.controller.js";
+import express from "express"
 import {
-  createPaymentSchema,
-  verifyPaymentSchema,
-  refundPaymentSchema,
-} from "../schemas/payment.schema.js";
-import { zodValidate } from "../middlewares/zodValidate.js";
+  initiatePayment,
+  paymentCallback,
+  getPaymentHistory,
+} from "../controllers/payment.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
-const router = express.Router();
+const router = express.Router()
 
-router.post("/", zodValidate(createPaymentSchema), PaymentController.create);
-router.post(
-  "/verify",
-  zodValidate(verifyPaymentSchema),
-  PaymentController.verify
-);
-router.post(
-  "/refund",
-  zodValidate(refundPaymentSchema),
-  PaymentController.refund
-);
+// Initiate a new payment (top-up wallet or direct)
+router.post("/initiate", authenticate, initiatePayment)
 
-export default router;
+// Callback from payment gateway (webhook)
+router.post("/callback", paymentCallback)
+
+// Get user payment history
+router.get("/history", authenticate, getPaymentHistory)
+
+export default router

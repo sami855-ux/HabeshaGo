@@ -5,7 +5,6 @@ import {
   refreshToken,
   logout,
   logoutAll,
-  socialLogin,
   verify2FA,
   enable2FA,
   confirm2FA,
@@ -46,8 +45,6 @@ router.post("/2fa/confirm", confirm2FA)
 router.post("/2fa/disable", disable2FA)
 
 // Social login
-router.post("/social/:provider", socialLogin)
-
 router.get(
   "/google",
   passport.authenticate("google", { scope: ["profile", "email"] })

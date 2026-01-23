@@ -14,6 +14,7 @@ import {
   resendOTP,
   getMe,
   googleCallback,
+  appleCallback,
   verifyOTPApp,
   refreshTokenApp,
 } from "../controllers/auth.controller.js"
@@ -47,13 +48,23 @@ router.post("/2fa/disable", disable2FA)
 // Social login
 router.get(
   "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
+  passport.authenticate("google", { scope: ["profile", "email"] }),
 )
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  googleCallback
+  passport.authenticate("google", {
+    failureRedirect: "http://localhost:3000/login",
+  }),
+  googleCallback,
+)
+
+router.get("/apple", passport.authenticate("apple"))
+
+router.post(
+  "/apple/callback",
+  passport.authenticate("apple", { failureRedirect: "/login" }),
+  appleCallback,
 )
 
 // Sessions

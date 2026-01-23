@@ -10,7 +10,7 @@ export const verifyWalletAuth = async (wallet, { pin, biometricToken }) => {
   if (wallet.isLocked) {
     return errorResponse(
       "Wallet is locked due to multiple failed attempts",
-      423
+      423,
     )
   }
 
@@ -82,7 +82,7 @@ export const getWalletTransactionsService = async (userId) => {
     return successResponse(
       "Wallet transactions retrieved successfully",
       transactions,
-      200
+      200,
     )
   } catch (error) {
     console.error("Error fetching wallet transactions:", error)
@@ -96,8 +96,8 @@ export const createWalletService = async (userId, { pin }) => {
     const existingWallet = await prisma.wallet.findUnique({ where: { userId } })
     if (existingWallet) return errorResponse("Wallet already exists", 409)
 
-    if (!pin || pin.length < 4) {
-      return errorResponse("PIN is required and must be at least 4 digits", 400)
+    if (!pin || pin.length < 6) {
+      return errorResponse("PIN is required and must be at least 6 digits", 400)
     }
 
     // Hash PIN
@@ -126,7 +126,7 @@ export const createWalletService = async (userId, { pin }) => {
 
 export const enableWalletBiometricService = async (
   userId,
-  { biometricToken }
+  { biometricToken },
 ) => {
   try {
     // Find wallet

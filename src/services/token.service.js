@@ -107,6 +107,61 @@ export const issueMobileTokens = async (user, req, res) => {
   }
 }
 
+//Socal IssueToken
+export const issueTokensSocial = async (user, req, res) => {
+  try {
+    if (user.isSuspended) {
+      return res.status(403).json({ message: "Account suspended" })
+    }
+
+    // Generate refresh token
+    const refreshToken = generateRefreshToken({ sub: user.id })
+
+    // Store hashed refresh token in DB
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshTokenHash: await hashPassword(refreshToken),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      },
+    })
+
+    // Generate access token
+    const accessToken = generateAccessToken({
+      id: user.id,
+      role: user.role,
+      sessionId: session.id,
+    })
+
+    // Set refresh token cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+    })
+
+    // Decide role-based redirect URL
+    let redirectUrl = "http://localhost:3000"
+    switch (user.role) {
+      case "ADMIN":
+        redirectUrl = "http://localhost:3000/admin"
+        break
+      case "DRIVER":
+        redirectUrl = "http://localhost:3000/driver"
+        break
+      case "PASSENGER":
+        redirectUrl = "http://localhost:3000/user"
+        break
+    }
+    return res.redirect(redirectUrl)
+  } catch (err) {
+    console.error("Token issuance failed:", err)
+    return res.status(500).json({ message: "Failed to issue tokens" })
+  }
+}
+
 // ACCESS TOKEN
 export const generateAccessToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")

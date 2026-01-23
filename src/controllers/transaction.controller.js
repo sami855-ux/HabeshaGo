@@ -45,7 +45,7 @@ export const payFromWallet = async (req, res) => {
  */
 export const getTransactionHistory = async (req, res) => {
   try {
-    const result = await getTransactionHistoryService(req.user.id)
+    const result = await getTransactionHistoryService()
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get transaction history controller error:", error)

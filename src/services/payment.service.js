@@ -1,50 +1,88 @@
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import chapa from "../config/chapa.js"
 
-//  Initiate Payment
+// Utility to generate unique transaction references
+const generateReference = () =>
+  `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+
+// ---------------------------
+// Initiate Payment
+// ---------------------------
 export const initiatePaymentService = async (
   userId,
-  { amount, gateway, type }
+  { amount, gateway, type, flow },
 ) => {
   try {
-    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
-    if (!gateway) return errorResponse("Payment gateway is required", 400)
+    if (!amount || amount <= 0)
+      return { success: false, message: "Invalid amount", status: 400 }
 
-    // Create payment record as PENDING
+    if (!gateway)
+      return {
+        success: false,
+        message: "Payment gateway is required",
+        status: 400,
+      }
+
+    if (!flow)
+      return {
+        success: false,
+        message: "Payment flow is required",
+        status: 400,
+      }
+
+    const reference = generateReference()
+
+    // Create payment record
     const payment = await prisma.payment.create({
       data: {
         userId,
         amount,
-        method: gateway,
+        currency: "ETB",
+        method: "WALLET", // WALLET, TELEBIRR, CBE
+        gateway: gateway.toLowerCase() === "chapa" ? "CHAPA" : "INTERNAL",
         status: "PENDING",
-        metadata: { type }, // e.g., wallet top-up or direct payment
+        flow, // WALLET_TOPUP, WALLET_PAYMENT, DIRECT_PAYMENT
+        reference,
+        metadata: { type }, // e.g., WALLET_TOPUP
       },
     })
 
-    // Generate external gateway request (mock example)
+    // Generate external gateway URL
     let paymentUrl
     switch (gateway.toLowerCase()) {
       case "chapa":
         paymentUrl = await createChapaPayment(payment)
         break
       case "telebirr":
-        paymentUrl = await createTelebirrPayment(payment)
+        paymentUrl = createTelebirrPayment(payment)
         break
       case "cbe":
-        paymentUrl = await createCBEPayment(payment)
+        paymentUrl = createCBEPayment(payment)
         break
       default:
-        return errorResponse("Unsupported gateway", 400)
+        return { success: false, message: "Unsupported gateway", status: 400 }
     }
 
-    return successResponse("Payment initiated", { payment, paymentUrl })
+    return {
+      success: true,
+      message: "Payment initiated",
+      data: { payment, paymentUrl },
+      status: 200,
+    }
   } catch (error) {
     console.error("Initiate payment service error:", error)
-    return errorResponse("Failed to initiate payment", 500)
+    return {
+      success: false,
+      message: "Failed to initiate payment",
+      status: 500,
+    }
   }
 }
 
-//  Payment Callback
+// ---------------------------
+// Payment Callback
+// ---------------------------
 export const paymentCallbackService = async (data) => {
   try {
     const { reference, status, gatewayMetadata } = data
@@ -63,7 +101,7 @@ export const paymentCallbackService = async (data) => {
           },
         })
 
-        // If top-up to wallet, credit wallet
+        // Wallet top-up
         if (payment.metadata.type === "WALLET_TOPUP") {
           const wallet = await tx.wallet.findUnique({
             where: { userId: payment.userId },
@@ -105,7 +143,9 @@ export const paymentCallbackService = async (data) => {
   }
 }
 
-//  Payment History
+// ---------------------------
+// Payment History
+// ---------------------------
 export const getPaymentHistoryService = async (userId) => {
   try {
     const payments = await prisma.payment.findMany({
@@ -119,17 +159,42 @@ export const getPaymentHistoryService = async (userId) => {
   }
 }
 
-// == Mock Gateway Integration ==
+// ---------------------------
+// Gateway Integrations
+// ---------------------------
+
+// Chapa payment
 const createChapaPayment = async (payment) => {
-  // Here you call Chapa API with payment.amount, payment.reference, callback URL, etc.
-  // Return the checkout/payment URL
-  return `https://checkout.chapa.com/pay/${payment.reference}`
+  try {
+    const tx_ref = payment.reference
+    const response = await chapa.initialize({
+      tx_ref,
+      amount: payment.amount,
+      currency: "ETB",
+      email: payment.metadata.email || "user@example.com", // get real email if available
+      first_name: payment.metadata.firstName || "User",
+      last_name: payment.metadata.lastName || "",
+      callback_url: `${process.env.BACKEND_URL}/payment/callback`,
+      return_url: `${process.env.FRONTEND_URL}/payment-success`,
+      customization: {
+        title: "Wallet Top-up",
+        description: "Add funds to your wallet",
+      },
+    })
+
+    return response.data.checkout_url
+  } catch (error) {
+    console.error("Chapa payment creation failed:", error)
+    throw new Error("Failed to create Chapa payment")
+  }
 }
 
-const createTelebirrPayment = async (payment) => {
+// Telebirr placeholder
+const createTelebirrPayment = (payment) => {
   return `https://pay.telebirr.com/${payment.reference}`
 }
 
-const createCBEPayment = async (payment) => {
+// CBE placeholder
+const createCBEPayment = (payment) => {
   return `https://cbe.com/pay/${payment.reference}`
 }

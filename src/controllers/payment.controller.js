@@ -9,8 +9,11 @@ import {
  */
 export const initiatePayment = async (req, res) => {
   try {
-    const result = await initiatePaymentService(req.user.id, req.body)
-    return res.status(result.statusCode).json(result)
+    const result = await initiatePaymentService(
+      "cmkoh7np700001wh5jspnf9w9",
+      req.body,
+    )
+    // return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Initiate payment controller error:", error)
     return res.status(500).json({
@@ -45,7 +48,7 @@ export const paymentCallback = async (req, res) => {
  */
 export const getPaymentHistory = async (req, res) => {
   try {
-    const result = await getPaymentHistoryService(req.user.id)
+    const result = await getPaymentHistoryService("cmkoh7np700001wh5jspnf9w9")
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get payment history controller error:", error)

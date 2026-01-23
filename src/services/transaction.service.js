@@ -1,10 +1,11 @@
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import bcrypt from "bcrypt"
 
 //  Wallet-to-Wallet Transfer
 export const transferFundsService = async (
   senderId,
-  { recipientId, amount, pin }
+  { recipientId, amount, pin, description },
 ) => {
   try {
     if (!recipientId || !amount || amount <= 0)
@@ -13,6 +14,7 @@ export const transferFundsService = async (
     const senderWallet = await prisma.wallet.findUnique({
       where: { userId: senderId },
     })
+
     const recipientWallet = await prisma.wallet.findUnique({
       where: { userId: recipientId },
     })
@@ -20,18 +22,24 @@ export const transferFundsService = async (
     if (!senderWallet) return errorResponse("Sender wallet not found", 404)
     if (!recipientWallet)
       return errorResponse("Recipient wallet not found", 404)
+
+    if (!senderWallet.isActive || senderWallet.isLocked)
+      return errorResponse("Sender wallet is inactive or locked", 403)
+
     if (senderWallet.balance < amount)
       return errorResponse("Insufficient balance", 400)
 
-    // Optional: verify PIN
-    if (senderWallet.password && senderWallet.password !== pin) {
-      return errorResponse("Invalid wallet PIN", 401)
+    // 🔐 PIN verification
+    if (senderWallet.pinHash) {
+      const validPin = await bcrypt.compare(pin, senderWallet.pinHash)
+      if (!validPin) return errorResponse("Invalid wallet PIN", 401)
     }
 
-    // Transfer transaction
+    const referenceBase = `TRF-${Date.now()}`
+
     await prisma.$transaction(async (tx) => {
       // Debit sender
-      await tx.wallet.update({
+      const updatedSenderWallet = await tx.wallet.update({
         where: { id: senderWallet.id },
         data: { balance: { decrement: amount } },
       })
@@ -41,13 +49,16 @@ export const transferFundsService = async (
           walletId: senderWallet.id,
           amount,
           type: "TRANSFER_OUT",
-          reference: `TRF-${Date.now()}`,
-          meta: { to: recipientId },
+          status: "SUCCESS",
+          reference: `${referenceBase}-OUT`,
+          balanceAfter: updatedSenderWallet.balance,
+          metadata: { to: recipientId },
+          description: description || null,
         },
       })
 
       // Credit recipient
-      await tx.wallet.update({
+      const updatedRecipientWallet = await tx.wallet.update({
         where: { id: recipientWallet.id },
         data: { balance: { increment: amount } },
       })
@@ -57,8 +68,11 @@ export const transferFundsService = async (
           walletId: recipientWallet.id,
           amount,
           type: "TRANSFER_IN",
-          reference: `TRF-${Date.now()}`,
-          meta: { from: senderId },
+          status: "SUCCESS",
+          reference: `${referenceBase}-IN`,
+          balanceAfter: updatedRecipientWallet.balance,
+          metadata: { from: senderId },
+          description: description || null,
         },
       })
     })
@@ -73,36 +87,73 @@ export const transferFundsService = async (
 //  Pay From Wallet
 export const payFromWalletService = async (
   userId,
-  { amount, merchant, pin }
+  { amount, merchantId, pin },
 ) => {
   try {
     if (!amount || amount <= 0)
       return errorResponse("Invalid payment amount", 400)
-    if (!merchant) return errorResponse("Merchant is required", 400)
 
-    const wallet = await prisma.wallet.findUnique({ where: { userId } })
-    if (!wallet) return errorResponse("Wallet not found", 404)
-    if (wallet.balance < amount)
+    if (!merchantId) return errorResponse("Merchant is required", 400)
+
+    const payerWallet = await prisma.wallet.findUnique({
+      where: { userId },
+    })
+
+    const merchantWallet = await prisma.wallet.findUnique({
+      where: { userId: merchantId },
+    })
+
+    if (!payerWallet) return errorResponse("Payer wallet not found", 404)
+    if (!merchantWallet) return errorResponse("Merchant wallet not found", 404)
+
+    if (!payerWallet.isActive || payerWallet.isLocked)
+      return errorResponse("Wallet is inactive or locked", 403)
+
+    if (payerWallet.balance < amount)
       return errorResponse("Insufficient balance", 400)
 
-    // Optional: verify PIN
-    if (wallet.password && wallet.password !== pin)
-      return errorResponse("Invalid wallet PIN", 401)
+    // 🔐 PIN verification
+    if (payerWallet.pinHash) {
+      const validPin = await bcrypt.compare(pin, payerWallet.pinHash)
+      if (!validPin) return errorResponse("Invalid wallet PIN", 401)
+    }
 
-    // Debit wallet and create WalletTransaction
+    const referenceBase = `PAY-${Date.now()}`
+
     await prisma.$transaction(async (tx) => {
-      await tx.wallet.update({
-        where: { id: wallet.id },
+      // Debit payer
+      const updatedPayerWallet = await tx.wallet.update({
+        where: { id: payerWallet.id },
         data: { balance: { decrement: amount } },
       })
 
       await tx.walletTransaction.create({
         data: {
-          walletId: wallet.id,
+          walletId: payerWallet.id,
           amount,
-          type: "DEBIT",
-          reference: `PAY-${Date.now()}`,
-          meta: { merchant },
+          type: "PAYMENT_OUT",
+          status: "SUCCESS",
+          reference: `${referenceBase}-OUT`,
+          balanceAfter: updatedPayerWallet.balance,
+          metadata: { toMerchant: merchantId },
+        },
+      })
+
+      // Credit merchant
+      const updatedMerchantWallet = await tx.wallet.update({
+        where: { id: merchantWallet.id },
+        data: { balance: { increment: amount } },
+      })
+
+      await tx.walletTransaction.create({
+        data: {
+          walletId: merchantWallet.id,
+          amount,
+          type: "PAYMENT_IN",
+          status: "SUCCESS",
+          reference: `${referenceBase}-IN`,
+          balanceAfter: updatedMerchantWallet.balance,
+          metadata: { fromUser: userId },
         },
       })
     })
@@ -115,19 +166,23 @@ export const payFromWalletService = async (
 }
 
 //  Internal Wallet Transaction History
-export const getTransactionHistoryService = async (userId) => {
+export const getTransactionHistoryService = async () => {
   try {
-    const wallet = await prisma.wallet.findUnique({ where: { userId } })
-    if (!wallet) return errorResponse("Wallet not found", 404)
-
     const transactions = await prisma.walletTransaction.findMany({
-      where: { walletId: wallet.id },
       orderBy: { createdAt: "desc" },
+      include: {
+        wallet: {
+          select: {
+            userId: true,
+            currency: true,
+          },
+        },
+      },
     })
 
-    return successResponse("Transaction history retrieved", transactions)
+    return successResponse("All transactions retrieved", transactions)
   } catch (error) {
-    console.error("Get transaction history service error:", error)
-    return errorResponse("Failed to fetch wallet transactions", 500)
+    console.error("Get all transactions service error:", error)
+    return errorResponse("Failed to fetch transactions", 500)
   }
 }

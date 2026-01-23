@@ -13,6 +13,7 @@ import "./config/passport.js"
 // Routes
 import minibusReservationRoutes from "./routes/minibusReservation.routes.js"
 import notificationRoute from "./routes/notification.route.js"
+import transactionRoutes from "./routes/transaction.routes.js"
 import bookingRoutes from "./routes/booking.routes.js"
 import paymentRoutes from "./routes/payment.routes.js"
 import vehicleRoute from "./routes/vehicles.route.js"
@@ -46,11 +47,11 @@ app.use(
       return callback(new Error("Not allowed by CORS"))
     },
     credentials: true,
-  })
+  }),
 )
 app.use(express.json())
 app.use(
-  session({ secret: "secretkey", resave: false, saveUninitialized: false })
+  session({ secret: "secretkey", resave: false, saveUninitialized: false }),
 )
 app.use(passport.initialize())
 app.use(passport.session())
@@ -59,6 +60,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/wallet", walletRoutes)
 app.use("/api/payment", paymentRoutes)
+app.use("/api/transactions", transactionRoutes)
 
 app.use("/api/notification", notificationRoute)
 app.use("/api/drivers", driverRoutes)

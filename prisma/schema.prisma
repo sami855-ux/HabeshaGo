@@ -18,6 +18,8 @@ model User {
 
   emailVerified     Boolean  @default(false)
   phoneVerified     Boolean  @default(false)
+  googleId          String?  @unique
+  appleId           String?  @unique
 
   // SECURITY / CONTROL
   isSuspended       Boolean   @default(false)
@@ -48,8 +50,6 @@ model User {
 
   @@map("user")
 }
-
-
 model Session {
   id               String   @id @default(cuid())
   userId           String
@@ -120,6 +120,7 @@ model WalletTransaction {
   walletId    Int
   amount      Decimal
   type        TransactionType
+  status      TransactionStatus @default(PENDING)
   balanceAfter Decimal
 
   reference   String           @unique
@@ -424,6 +425,16 @@ enum TransactionType {
   WITHDRAW
   REFUND
   ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  PAYMENT_OUT
+  PAYMENT_IN
+}
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
 }
 
 enum PaymentStatus {

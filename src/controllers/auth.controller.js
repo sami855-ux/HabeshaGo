@@ -6,6 +6,7 @@ import {
   hashToken,
   issueMobileTokens,
   issueTokens,
+  issueTokensSocial,
 } from "../services/token.service.js"
 import { hashPassword, verifyPassword } from "../services/password.service.js"
 import { verifyTOTP, generate2FASecret } from "../services/2fa.service.js"
@@ -197,10 +198,24 @@ export const googleCallback = async (req, res) => {
   try {
     const user = req.user
 
-    return issueTokens(user, req, res)
+    // Issue tokens + get JSON response
+    await issueTokensSocial(user, req, res)
   } catch (err) {
     console.error("Google login failed:", err)
-    return res.status(500).json({ message: "Google login failed" })
+    if (!res.headersSent) {
+      return res.status(500).json({ message: "Google login failed" })
+    }
+  }
+}
+
+export const appleCallback = async (req, res) => {
+  try {
+    const user = req.user
+
+    return issueTokens(user, req, res)
+  } catch (err) {
+    console.error("Apple login failed:", err)
+    return res.status(500).json({ message: "Apple login failed" })
   }
 }
 

@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from "../services/password.service.js"
 import { verifyTOTP, generate2FASecret } from "../services/2fa.service.js"
 
 import dotenv from "dotenv"
+import { errorResponse, successResponse } from "../utils/apiResponse.js"
 dotenv.config()
 
 // Registration
@@ -373,64 +374,187 @@ export const logoutAll = async (req, res) => {
 }
 
 export const enable2FA = async (req, res) => {
-  const { id } = req.user
-  const { base32, qrCode } = await generate2FASecret(req.user.email)
+  const userId = req.user.id
+  const email = req.user.email
 
-  await prisma.user.update({
-    where: { id },
-    data: { twoFactorSecret: base32, twoFactorEnabled: false },
+  // 1. Fetch user
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
   })
 
-  res.json({ qrCode, secret: base32 })
-}
+  if (!user) {
+    return res.status(404).json({ message: "User not found" })
+  }
 
-export const confirm2FA = async (req, res) => {
-  const { code } = req.body
-  const { id } = req.user
-  const user = await prisma.user.findUnique({ where: { id } })
+  // 2. Prevent re-enabling
+  if (user.twoFactorEnabled) {
+    return res.status(400).json({ message: "2FA is already enabled" })
+  }
 
-  if (!verifyTOTP(code, user.twoFactorSecret))
-    return res.status(401).json({ message: "Invalid 2FA code" })
+  // 3. Generate secret
+  const { base32, qrCode } = await generate2FASecret(email)
 
-  await prisma.user.update({ where: { id }, data: { twoFactorEnabled: true } })
-
-  res.json({ message: "2FA enabled successfully" })
-}
-
-export const disable2FA = async (req, res) => {
-  const { id } = req.user
+  // 4. Store secret (NOT enabled yet)
   await prisma.user.update({
-    where: { id },
-    data: { twoFactorEnabled: false, twoFactorSecret: null },
-  })
-  res.json({ message: "2FA disabled successfully" })
-}
-
-export const verify2FA = async (req, res) => {
-  const { userId, code } = req.body
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-
-  if (!user || !user.twoFactorEnabled)
-    return res.status(400).json({ message: "Invalid request" })
-  if (!verifyTOTP(code, user.twoFactorSecret))
-    return res.status(401).json({ message: "Invalid 2FA code" })
-
-  const refreshToken = generateRefreshToken()
-  const session = await prisma.session.create({
+    where: { id: userId },
     data: {
-      userId: user.id,
-      refreshTokenHash: hashToken(refreshToken),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      twoFactorSecret: base32,
+      twoFactorEnabled: false,
     },
   })
 
-  const accessToken = generateAccessToken({
-    sub: user.id,
-    role: user.role,
-    sessionId: session.id,
+  // 5. Return ONLY QR code
+  res.json({
+    message: "Scan the QR code using your authenticator app",
+    qrCode,
   })
+}
+export const confirm2FA = async (req, res) => {
+  try {
+    const { code } = req.body
+    const userId = req.user.id
 
-  res.json({ accessToken, refreshToken })
+    if (!code) {
+      return res.status(400).json(errorResponse("2FA code is required", 400))
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return res.status(404).json(errorResponse("User not found", 404))
+    }
+
+    if (user.twoFactorEnabled) {
+      return res.status(400).json(errorResponse("2FA is already enabled", 400))
+    }
+
+    if (!user.twoFactorSecret) {
+      return res.status(400).json(errorResponse("2FA setup not initiated", 400))
+    }
+
+    const isValid = verifyTOTP(code, user.twoFactorSecret)
+
+    if (!isValid) {
+      return res.status(401).json(errorResponse("Invalid 2FA code", 401))
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true,
+      },
+    })
+
+    return res.status(200).json(successResponse("2FA enabled successfully"))
+  } catch (error) {
+    console.error("confirm2FA error:", error)
+    return res.status(500).json(errorResponse("Failed to confirm 2FA", 500))
+  }
+}
+
+export const disable2FA = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { code } = req.body
+
+    if (!code) {
+      return res.status(400).json(errorResponse("2FA code is required", 400))
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return res.status(404).json(errorResponse("User not found", 404))
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res.status(400).json(errorResponse("2FA is not enabled", 400))
+    }
+
+    const isValid = verifyTOTP(code, user.twoFactorSecret)
+
+    if (!isValid) {
+      return res.status(401).json(errorResponse("Invalid 2FA code", 401))
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+      },
+    })
+
+    return res.status(200).json(successResponse("2FA disabled successfully"))
+  } catch (error) {
+    console.error("disable2FA error:", error)
+    return res.status(500).json(errorResponse("Failed to disable 2FA", 500))
+  }
+}
+
+export const verify2FA = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { code } = req.body
+
+    if (!code) {
+      return res.status(400).json(errorResponse("2FA code is required", 400))
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return res.status(404).json(errorResponse("User not found", 404))
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res
+        .status(400)
+        .json(errorResponse("2FA is not enabled for this account", 400))
+    }
+
+    const isValid = verifyTOTP(code, user.twoFactorSecret)
+
+    if (!isValid) {
+      return res.status(401).json(errorResponse("Invalid 2FA code", 401))
+    }
+
+    // Create refresh token & session
+    const refreshToken = generateRefreshToken()
+
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshTokenHash: hashToken(refreshToken),
+        expiresAt: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+        ),
+      },
+    })
+
+    // Issue access token
+    const accessToken = generateAccessToken({
+      sub: user.id,
+      role: user.role,
+      sessionId: session.id,
+    })
+
+    return res.status(200).json(
+      successResponse("2FA verification successful", {
+        accessToken,
+        refreshToken,
+      }),
+    )
+  } catch (error) {
+    console.error("verify2FA error:", error)
+    return res.status(500).json(errorResponse("Failed to verify 2FA", 500))
+  }
 }
 
 export const suspendUser = async (req, res) => {
@@ -450,18 +574,64 @@ export const suspendUser = async (req, res) => {
   res.json({ message: "User suspended successfully" })
 }
 
+// Get all active sessions for the logged-in user
 export const getSessions = async (req, res) => {
-  const sessions = await prisma.session.findMany({
-    where: { userId: req.user.id },
-  })
-  res.json(sessions)
+  try {
+    const userId = req.user.id
+
+    const sessions = await prisma.session.findMany({
+      where: { userId },
+      orderBy: { lastActiveAt: "desc" },
+      select: {
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+        lastActiveAt: true,
+        expiresAt: true,
+        revoked: true,
+        createdAt: true,
+      },
+    })
+
+    return res
+      .status(200)
+      .json(successResponse("User sessions retrieved successfully", sessions))
+  } catch (error) {
+    console.error("getSessions error:", error)
+    return res
+      .status(500)
+      .json(errorResponse("Failed to retrieve sessions", 500))
+  }
 }
 
+// Revoke a specific session (logout from a device)
 export const revokeSession = async (req, res) => {
-  const { sessionId } = req.params
-  await prisma.session.update({
-    where: { id: sessionId },
-    data: { revoked: true },
-  })
-  res.json({ message: "Session revoked" })
+  try {
+    const userId = req.user.id
+    const { sessionId } = req.params
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+    })
+
+    if (!session || session.userId !== userId) {
+      return res.status(404).json(errorResponse("Session not found", 404))
+    }
+
+    if (session.revoked) {
+      return res
+        .status(400)
+        .json(errorResponse("Session is already revoked", 400))
+    }
+
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { revoked: true },
+    })
+
+    return res.status(200).json(successResponse("Session revoked successfully"))
+  } catch (error) {
+    console.error("revokeSession error:", error)
+    return res.status(500).json(errorResponse("Failed to revoke session", 500))
+  }
 }

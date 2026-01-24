@@ -24,9 +24,9 @@ import passport from "passport"
 const router = express.Router()
 
 // Registration & verification
-router.post("/register", register) // passed
-router.post("/verify-otp", verifyOTP) // passed
-router.post("/resend-otp", resendOTP) // passed
+router.post("/register", register)
+router.post("/verify-otp", verifyOTP)
+router.post("/resend-otp", resendOTP)
 
 //App
 router.post("/app/verify-otp", verifyOTPApp)
@@ -39,10 +39,28 @@ router.post("/logout-all", authenticate, logoutAll)
 // Get authenticated user data
 router.get("/me", authenticate, getMe)
 
-// 2FA
-router.post("/2fa/verify", verify2FA)
+// Two-Factor Authentication (2FA)
+
+// Step 1: Start 2FA setup
+// - Generates a TOTP secret
+// - Stores it temporarily on the user
+// - Returns a QR code for authenticator apps
 router.post("/2fa/enable", enable2FA)
+
+// Step 2: Verify 2FA during login
+// - Used after password authentication
+// - Verifies the 6-digit OTP
+// - Issues access & refresh tokens on success
+router.post("/2fa/verify", verify2FA)
+
+// Step 3: Confirm & activate 2FA
+// - Verifies OTP after QR scan
+// - Permanently enables 2FA for the account
 router.post("/2fa/confirm", confirm2FA)
+
+// Step 4: Disable 2FA securely
+// - Requires a valid 2FA code
+// - Disables 2FA and removes stored secret
 router.post("/2fa/disable", disable2FA)
 
 // Social login

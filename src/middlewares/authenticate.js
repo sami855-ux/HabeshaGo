@@ -1,40 +1,57 @@
 import jwt from "jsonwebtoken"
 import prisma from "../prisma/client.js"
+import { errorResponse } from "../utils/apiResponse.js"
 
+/**
+ * Authentication middleware
+ * - Verifies access token
+ * - Checks session and user validity
+ * - Updates lastActiveAt for the session automatically
+ * - Attaches req.user for downstream controllers
+ */
 export const authenticate = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    // Extract token from Authorization header
     const authHeader = req.headers.authorization
     const token = authHeader?.startsWith("Bearer ")
       ? authHeader.split(" ")[1]
       : null
 
     if (!token) {
-      return res.status(401).json({ message: "Access token missing" })
+      return res.status(401).json(errorResponse("Access token missing", 401))
     }
 
+    // Verify JWT
     let decoded
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET)
     } catch (err) {
       return res
         .status(401)
-        .json({ message: "Invalid or expired access token" })
+        .json(errorResponse("Invalid or expired access token", 401))
     }
 
-    // Check if session exists in DB
+    // Fetch session and user
     const session = await prisma.session.findUnique({
       where: { id: decoded.sessionId },
       include: { user: true },
     })
 
     if (!session || session.revoked) {
-      return res.status(401).json({ message: "Session invalid or expired" })
+      return res
+        .status(401)
+        .json(errorResponse("Session invalid or expired", 401))
     }
 
     if (session.user.isSuspended) {
-      return res.status(403).json({ message: "Account suspended" })
+      return res.status(403).json(errorResponse("Account suspended", 403))
     }
+
+    // Update lastActiveAt for session (heartbeat)
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { lastActiveAt: new Date() },
+    })
 
     // Attach user info to request
     req.user = {
@@ -46,6 +63,6 @@ export const authenticate = async (req, res, next) => {
     next()
   } catch (err) {
     console.error("Authentication error:", err)
-    res.status(500).json({ message: "Internal server error" })
+    return res.status(500).json(errorResponse("Internal server error", 500))
   }
 }

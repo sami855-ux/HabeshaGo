@@ -61,6 +61,7 @@ app.use("/api/users", userRoutes)
 app.use("/api/wallet", walletRoutes)
 app.use("/api/payment", paymentRoutes)
 app.use("/api/transactions", transactionRoutes)
+app.use("/api/booking", bookingRoutes)
 
 app.use("/api/notification", notificationRoute)
 app.use("/api/drivers", driverRoutes)
@@ -68,7 +69,6 @@ app.use("/api/vehicles", vehicleRoute)
 app.use("/api/route", routeRoutes)
 
 app.use("/api/buses", busRoutes)
-app.use("/api/booking", bookingRoutes)
 app.use("/api/minibus-reservation", minibusReservationRoutes)
 app.use("/api/minibus", minibusRoute)
 

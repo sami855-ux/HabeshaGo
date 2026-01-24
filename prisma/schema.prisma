@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url      = env("DATABASE_URL")
 }
 
 model User {
@@ -40,7 +40,8 @@ model User {
 
   // RELATIONS 
   wallet                 Wallet?
-  bookings               Booking[]
+  bookings               Booking[] @relation("UserBookings")       // tickets owned
+  sharedBookings         Booking[] @relation("BookingSharedTo")    // tickets shared to this user
   payments               Payment[]
   chargingSessions       ChargingSession[]
   driver                 Driver?
@@ -137,6 +138,7 @@ model WalletTransaction {
 //User tops up wallet → Payment (SUCCESS) → WalletTransaction (CREDIT)
 // User pays directly with Telebirr → Payment (SUCCESS) → no wallet transaction
 // User pays from wallet → WalletTransaction (DEBIT) → Payment (optional record)
+
 model Payment {
   id            Int            @id @default(autoincrement())
   userId        String
@@ -154,17 +156,59 @@ model Payment {
   metadata      Json?
 
   walletId      Int?
-  bookingId     Int?
   minibusReservationId Int?
 
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  // Relations
   user          User           @relation(fields: [userId], references: [id])
   wallet        Wallet?        @relation(fields: [walletId], references: [id])
-  booking       Booking?
+  bookings      Booking[]      // One payment → many bookings
   minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
 }
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  userId        String        // Owner of the ticket
+  busId         Int
+  seatNumbers   Int[]
+  date          DateTime      // Trip start date & time
+  status        BookingStatus @default(CONFIRMED)
+  boardingStop  String?
+  alightingStop String?
+  bookingCode   String        @unique @default(uuid())
+  cancelledAt   DateTime?
+  payNow        Boolean       @default(false)
+
+  // Shared ticket info
+  sharedToId    String?       // Only one user can receive this ticket
+  sharedTo      User?         @relation("BookingSharedTo", fields: [sharedToId], references: [id])
+  sharedAt      DateTime?     // When the ticket was shared
+
+  // Ticket usage
+  qrCode        String?       // Base64 or URL for check-in
+  checkedIn     Boolean       @default(false)
+  checkedInAt   DateTime?     // Timestamp of check-in
+
+  // Optional features
+  discount          Decimal?  @default(0)     // Discount applied
+  promoCode         String?                      // Promo code used
+  seatType          SeatType?                   // NORMAL, VIP, SLEEPER, etc.
+  sharedTicketUsed  Boolean   @default(false)   // Ensure shared ticket is only used once
+  validUntil        DateTime?                   // Ticket expires (usually bus arrival time)
+
+  // Relations
+  paymentId     Int?          
+  payment       Payment?      @relation(fields: [paymentId], references: [id])
+  bus           Bus           @relation(fields: [busId], references: [id])
+  user          User          @relation("UserBookings", fields: [userId], references: [id])
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+
 
 model Notification {
   id        Int       @id @default(autoincrement())
@@ -191,13 +235,12 @@ model Notification {
   @@index([isRead])
 }
 
-
 model Bus {
   id              Int           @id @default(autoincrement())
   busNumber       String        @unique
   capacity        Int
   status          BusStatus     @default(ACTIVE)
-  driverId        String?          @unique
+  driverId        String?       @unique
   routeId         Int?
   currentStop     String?
   nextDestination String?
@@ -205,32 +248,12 @@ model Bus {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  vehicleId       Int?      @unique
-  vehicle         Vehicle?  @relation(fields: [vehicleId], references: [id])
+  vehicleId       Int?          @unique
+  vehicle         Vehicle?      @relation(fields: [vehicleId], references: [id])
   bookings        Booking[]
   driver          Driver?       @relation(fields: [driverId], references: [id])
   route           Route?        @relation(fields: [routeId], references: [id])
   positions       BusPosition[]
-}
-
-model Booking {
-  id            Int           @id @default(autoincrement())
-  userId        String
-  busId         Int
-  seatNumbers    Int[]
-  date          DateTime
-  status        BookingStatus @default(CONFIRMED)
-  boardingStop  String?
-  alightingStop String?
-  bookingCode   String        @unique @default(uuid())
-  cancelledAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  paymentId     Int?          @unique
-  bus           Bus           @relation(fields: [busId], references: [id])
-  payment       Payment?      @relation(fields: [paymentId], references: [id])
-  user          User          @relation(fields: [userId], references: [id])
-  payNow       Boolean   @default(false)
 }
 
 model BusPosition {
@@ -464,6 +487,10 @@ enum PaymentFlow {
   DIRECT_PAYMENT
 }
 
+enum SeatType {
+  NORMAL
+  DISABLED
+}
 
 
 

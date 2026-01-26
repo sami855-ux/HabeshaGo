@@ -1,4 +1,5 @@
 import {
+  changeWalletPinService,
   createWalletService,
   enableWalletBiometricService,
   getMyWalletService,
@@ -73,6 +74,30 @@ export const enableWalletBiometric = async (req, res) => {
       statusCode: 500,
       message: "Internal server error while enabling biometric",
       data: null,
+    })
+  }
+}
+
+export const changeWalletPin = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { newPin } = req.body
+
+    if (!newPin) {
+      return res.status(400).json({
+        success: false,
+        message: "New PIN is required",
+      })
+    }
+
+    const result = await changeWalletPinService(userId, newPin)
+
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Change wallet PIN error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Failed to change wallet PIN",
     })
   }
 }

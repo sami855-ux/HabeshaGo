@@ -63,7 +63,11 @@ export const getMyWalletService = async (userId) => {
   }
 }
 
-export const getWalletTransactionsService = async (userId) => {
+export const getWalletTransactionsService = async (
+  userId,
+  page = 1,
+  limit = 15,
+) => {
   try {
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
@@ -74,14 +78,47 @@ export const getWalletTransactionsService = async (userId) => {
       return errorResponse("Wallet not found", 404)
     }
 
-    const transactions = await prisma.walletTransaction.findMany({
-      where: { walletId: wallet.id },
-      orderBy: { createdAt: "desc" },
-    })
+    const skip = (page - 1) * limit
+
+    const [transactions, total] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.walletTransaction.count({
+        where: { walletId: wallet.id },
+      }),
+    ])
+
+    // 🔹 Map Prisma data → mock API shape
+    const formattedTransactions = transactions.map((tx) => ({
+      id: tx.id,
+      walletId: tx.walletId,
+      amount: tx.amount.toString(),
+      type: tx.type,
+      status: tx.status,
+      balanceAfter: tx.balanceAfter.toString(),
+      reference: tx.reference,
+      description:
+        tx.description ||
+        `${tx.type}`.charAt(0).toUpperCase() +
+          `${tx.type}`.slice(1).toLowerCase() +
+          " transaction",
+      metadata: tx.metadata,
+      createdAt: tx.createdAt.toISOString(),
+    }))
 
     return successResponse(
       "Wallet transactions retrieved successfully",
-      transactions,
+      {
+        transactions: formattedTransactions,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
       200,
     )
   } catch (error) {
@@ -97,7 +134,7 @@ export const createWalletService = async (userId, { pin }) => {
     if (existingWallet) return errorResponse("Wallet already exists", 409)
 
     if (!pin || pin.length < 6) {
-      return errorResponse("PIN is required and must be at least 6 digits", 400)
+      return errorResponse("PIN is required and must be at 6 digits", 400)
     }
 
     // Hash PIN
@@ -149,5 +186,39 @@ export const enableWalletBiometricService = async (
   } catch (error) {
     console.error("Error enabling biometric:", error)
     return errorResponse("Failed to enable biometric", 500)
+  }
+}
+
+export const changeWalletPinService = async (userId, newPin) => {
+  try {
+    // Find wallet
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId },
+      select: { id: true },
+    })
+
+    if (!wallet) {
+      return errorResponse("Wallet not found", 404)
+    }
+
+    // Hash new PIN
+    const pinHash = await bcrypt.hash(newPin, SALT_ROUNDS)
+
+    // Update wallet PIN
+    const updatedWallet = await prisma.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        pinHash,
+      },
+    })
+
+    return successResponse(
+      "Wallet PIN changed successfully",
+      updatedWallet,
+      200,
+    )
+  } catch (error) {
+    console.error("Change wallet PIN service error:", error)
+    return errorResponse("Failed to change wallet PIN", 500)
   }
 }

@@ -4,6 +4,7 @@ import {
   getWalletTransactions,
   createWallet,
   enableWalletBiometric,
+  changeWalletPin,
 } from "../controllers/wallet.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 
@@ -20,5 +21,8 @@ router.post("/create", authenticate, createWallet)
 
 // Enable biometric
 router.post("/biometric", authenticate, enableWalletBiometric)
+
+//Change pin
+router.patch("/change-pin", authenticate, changeWalletPin)
 
 export default router

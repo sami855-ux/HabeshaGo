@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken"
 import prisma from "../prisma/client.js"
 import { errorResponse } from "../utils/apiResponse.js"
+import e from "express"
 
 /**
  * Authentication middleware
@@ -58,6 +59,7 @@ export const authenticate = async (req, res, next) => {
       id: session.user.id,
       role: session.user.role,
       sessionId: session.id,
+      email: session.user.email,
     }
 
     next()

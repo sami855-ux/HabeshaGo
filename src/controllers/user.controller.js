@@ -1,5 +1,9 @@
-import { success } from "zod"
 import prisma from "../prisma/client.js"
+import {
+  sendOtpService,
+  updateProfileService,
+  verifyOtpService,
+} from "../services/user.service.js"
 
 /**
  * Controller: Get all users
@@ -155,5 +159,77 @@ export const deleteUser = async (req, res) => {
       success: false,
       message: error.message || "Server error",
     })
+  }
+}
+
+export const updateMyProfile = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const data = {
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      bio: req.body.bio,
+      location: req.body.location,
+    }
+
+    const user = await updateProfileService(userId, data, req.file)
+
+    res.json({
+      message: "Profile updated successfully",
+      user,
+    })
+  } catch (error) {
+    console.error("Profile update error:", error)
+    res.status(400).json({ message: error.message })
+  }
+}
+
+/**
+ * Send OTP for email or phone verification
+ * body: { channel: "email" | "phone", type?: "verification" | "resend" }
+ */
+export const sendOtp = async (req, res) => {
+  try {
+    const user = req.user
+    const { channel = "email", type = "verification" } = req.body
+
+    if (!["email", "phone"].includes(channel)) {
+      return res.status(400).json({ message: "Invalid channel" })
+    }
+
+    await sendOtpService(user, type)
+
+    return res.json({ message: "OTP sent successfully" })
+  } catch (error) {
+    console.error("Send OTP error:", error)
+    return res.status(500).json({ message: "Failed to send OTP" })
+  }
+}
+
+/**
+ * Verify OTP for email or phone verification
+ * body: { code: string, channel: "email" | "phone" }
+ */
+export const verifyOtp = async (req, res) => {
+  try {
+    const user = req.user
+    const { code, channel = "email" } = req.body
+
+    if (!code) {
+      return res.status(400).json({ message: "OTP code is required" })
+    }
+
+    const result = await verifyOtpService(user, code, channel)
+
+    return res.json({
+      message: "OTP verified successfully",
+      verified: true,
+      data: result,
+    })
+  } catch (error) {
+    console.error("Verify OTP error:", error)
+    return res.status(400).json({ message: error.message })
   }
 }

@@ -1,11 +1,11 @@
-import bcrypt from "bcrypt"
+import crypto from "node:crypto"
 
-const SALT_ROUNDS = 12
-
-export const hashPassword = async (password) => {
-  return bcrypt.hash(password, SALT_ROUNDS)
+export const hashPassword = (token) => {
+  return crypto.createHash("sha256").update(token).digest("hex")
 }
 
-export const verifyPassword = async (password, hash) => {
-  return bcrypt.compare(password, hash)
+export const verifyPassword = (token, hash) => {
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
+
+  return tokenHash === hash
 }

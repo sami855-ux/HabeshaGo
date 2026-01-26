@@ -27,7 +27,7 @@ export const register = async (req, res) => {
     let user = await prisma.user.findUnique({ where: { email } })
     if (!user) user = await prisma.user.create({ data: { email, name } })
 
-    await sendOTP(user)
+    await sendOTP(user, "login")
     res.json({ message: "OTP sent to email", success: true })
   } catch (error) {
     console.error("Register error:", error)
@@ -151,7 +151,7 @@ export const resendOTP = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) return res.status(404).json({ message: "User not found" })
 
-    await sendOTP(user)
+    await sendOTP(user, "resend")
     res.json({ message: "OTP resent successfully", success: true })
   } catch (error) {
     console.error("Resend OTP error:", error)
@@ -168,7 +168,6 @@ export const getMe = async (req, res) => {
       include: {
         wallet: {
           include: {
-            txns: true,
             payments: true,
           },
         },
@@ -242,6 +241,24 @@ export const refreshToken = async (req, res) => {
       return res.status(403).json({ message: "Invalid session" })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: {
+        wallet: {
+          include: {
+            payments: true,
+          },
+        },
+        bookings: true,
+        minibusReservations: true,
+        parkingReservations: true,
+        sessions: true,
+        otpCodes: true,
+      },
+    })
+
+    console.log(user.email)
+
     // 🔁 Rotate refresh token
     const newRefreshToken = generateRefreshToken({ sub: session.user.id })
     const newHashedToken = await hashPassword(newRefreshToken)
@@ -269,11 +286,7 @@ export const refreshToken = async (req, res) => {
 
     return res.json({
       accessToken,
-      user: {
-        id: session.user.id,
-        role: session.user.role,
-        email: session.user.email,
-      },
+      user,
     })
   } catch (err) {
     console.error("Refresh token error:", err)
@@ -343,13 +356,13 @@ export const refreshTokenApp = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    const { sessionId } = req.user
+    // const { sessionId } = req.user
 
-    // Revoke the session in DB
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { revoked: true },
-    })
+    // // Revoke the session in DB
+    // await prisma.session.update({
+    //   where: { id: sessionId },
+    //   data: { revoked: true },
+    // })
 
     // Clear the refresh token cookie
     res.clearCookie("refreshToken", {

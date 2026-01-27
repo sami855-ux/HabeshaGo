@@ -354,7 +354,7 @@ export default function BusForm({
       }
 
       // Make API call to create bus
-      const response = await axiosInstance.post("/bus", submitData)
+      const response = await axiosInstance.post("/buses", submitData)
 
       if (response.data.success) {
         // Success callback

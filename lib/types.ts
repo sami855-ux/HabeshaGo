@@ -60,15 +60,16 @@ export type PaymentMethod = "Wallet" | "Telebirr" | "Bank" | "Card" | "Manual"
 export type TransactionStatus = "SUCCESS" | "PENDING" | "FAILED"
 
 export interface Transaction {
-  id: string
-  date: Date
-  referenceId: string
-  type: TransactionType
+  id: number
+  walletId: number
   amount: number
-  paymentMethod: PaymentMethod
+  balanceAfter: number
+  type: TransactionType
   status: TransactionStatus
-  description: string
-  hasReceipt: boolean
+  reference: string
+  description?: string
+  metadata?: Record<string, any>
+  createdAt: Date
 }
 
 export interface TransactionTableProps {

@@ -81,6 +81,12 @@ import {
   Copy,
   Receipt,
   File,
+  ArrowUpRight,
+  ArrowDownRight,
+  Wallet,
+  Sparkles,
+  Hash,
+  MessageCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -89,7 +95,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns"
+import {
+  format,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  isToday,
+  isYesterday,
+} from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   AlertDialog,
@@ -112,6 +125,7 @@ import {
 } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface TransactionTableProps {
   data: Transaction[]
@@ -127,7 +141,9 @@ export function TransactionTable({
   data,
   isLoading = false,
 }: TransactionTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "createdAt", desc: true },
+  ])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [globalFilter, setGlobalFilter] = useState("")
@@ -143,8 +159,9 @@ export function TransactionTable({
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table")
 
-  // Memoize columns with selection column
+  // Enhanced columns with orange theme
   const tableColumns = useMemo<ColumnDef<Transaction>[]>(
     () => [
       {
@@ -159,7 +176,7 @@ export function TransactionTable({
               table.toggleAllPageRowsSelected(!!value)
             }
             aria-label="Select all"
-            className="translate-y-[2px]"
+            className="translate-y-[2px] data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
           />
         ),
         cell: ({ row }) => (
@@ -167,38 +184,212 @@ export function TransactionTable({
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             aria-label="Select row"
-            className="translate-y-[2px]"
+            className="translate-y-[2px] data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
           />
         ),
         enableSorting: false,
         enableHiding: false,
       },
-      ...columns,
+      {
+        id: "typeIcon",
+        header: "Type",
+        cell: ({ row }) => {
+          const transaction = row.original
+          const isCredit = transaction.type === "TRANSFER_IN"
+
+          return (
+            <div
+              className={cn(
+                "p-2 rounded-lg",
+                isCredit
+                  ? "bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20"
+                  : "bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20",
+              )}
+            >
+              {isCredit ? (
+                <ArrowDownRight className="size-4 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <ArrowUpRight className="size-4 text-orange-600 dark:text-orange-400" />
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "reference",
+        header: "Reference",
+        cell: ({ row }) => {
+          const transaction = row.original
+          return (
+            <div className="font-mono font-medium text-sm">
+              {transaction.reference}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "type",
+        header: "Transaction Type",
+        cell: ({ row }) => {
+          const transaction = row.original
+          const isCredit = transaction.type === "TRANSFER_IN"
+
+          return (
+            <div className="space-y-1">
+              <div className="font-medium">
+                {transaction.type === "TRANSFER_IN"
+                  ? "Money Received"
+                  : "Payment"}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {transaction.description}
+              </div>
+            </div>
+          )
+        },
+        filterFn: (row, columnId, filterValue) => {
+          if (!filterValue?.length) return true
+          const type = row.getValue(columnId) as string
+          return filterValue.includes(type)
+        },
+      },
+      {
+        accessorKey: "amount",
+        header: "Amount",
+        cell: ({ row }) => {
+          const transaction = row.original
+          const isCredit = transaction.type === "TRANSFER_IN"
+
+          return (
+            <div
+              className={cn(
+                "font-bold ",
+                isCredit
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-orange-600 dark:text-orange-400",
+              )}
+            >
+              {isCredit ? "+" : "-"}ETB {transaction.amount.toLocaleString()}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "balanceAfter",
+        header: "Balance",
+        cell: ({ row }) => {
+          const transaction = row.original
+          return (
+            <div className="font-medium ">
+              ETB {transaction.balanceAfter.toLocaleString()}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const transaction = row.original
+
+          const statusConfig = {
+            SUCCESS: {
+              label: "Success",
+              color: "bg-emerald-500",
+              text: "text-emerald-700 dark:text-emerald-300",
+              bg: "bg-emerald-50 dark:bg-emerald-900/20",
+              border: "border-emerald-200 dark:border-emerald-800",
+              icon: CheckCircle,
+            },
+            PENDING: {
+              label: "Pending",
+              color: "bg-amber-500",
+              text: "text-amber-700 dark:text-amber-300",
+              bg: "bg-amber-50 dark:bg-amber-900/20",
+              border: "border-amber-200 dark:border-amber-800",
+              icon: Clock,
+            },
+            FAILED: {
+              label: "Failed",
+              color: "bg-red-500",
+              text: "text-red-700 dark:text-red-300",
+              bg: "bg-red-50 dark:bg-red-900/20",
+              border: "border-red-200 dark:border-red-800",
+              icon: XCircle,
+            },
+          }
+
+          const config = statusConfig[transaction.status]
+          const Icon = config.icon
+
+          return (
+            <Badge
+              variant="outline"
+              className={cn(
+                "gap-1.5 px-3 py-1.5",
+                config.bg,
+                config.border,
+                config.text,
+              )}
+            >
+              <Icon className="size-3.5" />
+              {config.label}
+            </Badge>
+          )
+        },
+        filterFn: (row, columnId, filterValue) => {
+          if (!filterValue?.length) return true
+          const status = row.getValue(columnId) as string
+          return filterValue.includes(status)
+        },
+      },
+      {
+        accessorKey: "createdAt",
+        header: "Date",
+        cell: ({ row }) => {
+          const date = new Date(row.original.createdAt)
+          const isTodayDate = isToday(date)
+          const isYesterdayDate = isYesterday(date)
+
+          return (
+            <div className="space-y-1">
+              <div className="font-medium">
+                {isTodayDate
+                  ? "Today"
+                  : isYesterdayDate
+                    ? "Yesterday"
+                    : format(date, "MMM dd")}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {format(date, "hh:mm a")}
+              </div>
+            </div>
+          )
+        },
+      },
       {
         id: "actions",
         header: "Details",
         cell: ({ row }) => {
           const transaction = row.original
           return (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedTransaction(transaction)
-                  setSheetOpen(true)
-                }}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
-                <span className="sr-only">View details</span>
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedTransaction(transaction)
+                setSheetOpen(true)
+              }}
+              className="h-8 w-8 p-0 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+            >
+              <Eye className="size-4 text-orange-600 dark:text-orange-400" />
+              <span className="sr-only">View details</span>
+            </Button>
           )
         },
       },
     ],
-    []
+    [],
   )
 
   const table = useReactTable({
@@ -221,7 +412,6 @@ export function TransactionTable({
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  // Update selected rows when rowSelection changes
   useEffect(() => {
     const selected = table.getSelectedRowModel().rows.map((row) => row.original)
     setSelectedRows(selected)
@@ -235,58 +425,69 @@ export function TransactionTable({
       label: "Success",
       icon: CheckCircle,
       count: data.filter((t) => t.status === "SUCCESS").length,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-900/20",
     },
     {
       value: "PENDING",
       label: "Pending",
       icon: Clock,
       count: data.filter((t) => t.status === "PENDING").length,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-50 dark:bg-amber-900/20",
     },
     {
       value: "FAILED",
       label: "Failed",
       icon: XCircle,
       count: data.filter((t) => t.status === "FAILED").length,
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-50 dark:bg-red-900/20",
     },
   ]
 
   const typeOptions = [
     {
-      value: "Tax",
-      label: "Tax",
-      icon: Banknote,
-      count: data.filter((t) => t.type === "Tax").length,
+      value: "TRANSFER_IN",
+      label: "Money In",
+      icon: ArrowDownRight,
+      count: data.filter((t) => t.type === "TRANSFER_IN").length,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-900/20",
     },
     {
-      value: "Transfer",
-      label: "Transfer",
-      icon: TrendingUp,
-      count: data.filter((t) => t.type === "Transfer").length,
-    },
-    {
-      value: "Payment",
+      value: "PAYMENT",
       label: "Payment",
-      icon: CreditCard,
-      count: data.filter((t) => t.type === "Payment").length,
+      icon: ArrowUpRight,
+      count: data.filter((t) => t.type === "PAYMENT").length,
+      color: "text-orange-600 dark:text-orange-400",
+      bg: "bg-orange-50 dark:bg-orange-900/20",
     },
   ]
 
   // Calculate stats
-  const totalAmount = data.reduce((sum, t) => sum + t.amount, 0)
+  const totalIn = data
+    .filter((t) => t.type === "TRANSFER_IN")
+    .reduce((sum, t) => sum + t.amount, 0)
+
+  const totalOut = data
+    .filter((t) => t.type === "PAYMENT")
+    .reduce((sum, t) => sum + t.amount, 0)
+
+  const netFlow = totalIn - totalOut
   const successfulCount = data.filter((t) => t.status === "SUCCESS").length
   const successRate =
     data.length > 0 ? (successfulCount / data.length) * 100 : 0
   const pendingCount = data.filter((t) => t.status === "PENDING").length
-  const averageAmount = data.length > 0 ? totalAmount / data.length : 0
-  const todayAmount = data
-    .filter(
-      (t) =>
-        format(new Date(t.date), "yyyy-MM-dd") ===
-        format(new Date(), "yyyy-MM-dd")
-    )
+
+  const todayTransactions = data.filter((t) => isToday(new Date(t.createdAt)))
+  const todayIn = todayTransactions
+    .filter((t) => t.type === "TRANSFER_IN")
+    .reduce((sum, t) => sum + t.amount, 0)
+  const todayOut = todayTransactions
+    .filter((t) => t.type === "PAYMENT")
     .reduce((sum, t) => sum + t.amount, 0)
 
-  // Update active filters
   const updateActiveFilters = () => {
     const filters: string[] = []
     const statusFilter = table.getColumn("status")?.getFilterValue() as string[]
@@ -296,17 +497,18 @@ export function TransactionTable({
       filters.push(...statusFilter.map((s) => `Status: ${s}`))
     }
     if (typeFilter?.length) {
-      filters.push(...typeFilter.map((t) => `Type: ${t}`))
+      filters.push(
+        ...typeFilter.map(
+          (t) => `Type: ${t === "TRANSFER_IN" ? "Money In" : "Payment"}`,
+        ),
+      )
     }
     if (globalFilter) {
       filters.push(`Search: "${globalFilter}"`)
     }
     if (dateRange.from && dateRange.to) {
       filters.push(
-        `Date: ${format(dateRange.from, "MMM dd")} - ${format(
-          dateRange.to,
-          "MMM dd"
-        )}`
+        `Date: ${format(dateRange.from, "MMM dd")} - ${format(dateRange.to, "MMM dd")}`,
       )
     }
     setActiveFilters(filters)
@@ -323,26 +525,25 @@ export function TransactionTable({
 
   const handleExport = async () => {
     setIsExporting(true)
-    // Simulate export process
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
     const selectedData = selectedRows.length > 0 ? selectedRows : data
     const csvContent = [
       [
         "Date",
-        "Reference ID",
+        "Reference",
         "Type",
         "Amount",
-        "Payment Method",
+        "Balance",
         "Status",
         "Description",
       ],
       ...selectedData.map((t) => [
-        format(new Date(t.date), "yyyy-MM-dd"),
-        t.referenceId,
-        t.type,
+        format(new Date(t.createdAt), "yyyy-MM-dd HH:mm"),
+        t.reference,
+        t.type === "TRANSFER_IN" ? "Money In" : "Payment",
         t.amount,
-        t.paymentMethod,
+        t.balanceAfter,
         t.status,
         t.description,
       ]),
@@ -354,24 +555,23 @@ export function TransactionTable({
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`
+    a.download = `habeshago_transactions_${format(new Date(), "yyyy-MM-dd")}.csv`
     a.click()
 
     setIsExporting(false)
   }
 
   const handleBulkDelete = () => {
-    // In a real app, you would make an API call here
     console.log(
       "Deleting transactions:",
-      selectedRows.map((t) => t.id)
+      selectedRows.map((t) => t.id),
     )
     setShowDeleteDialog(false)
     table.resetRowSelection()
   }
 
   const handleQuickDateFilter = (
-    range: "today" | "week" | "month" | "year"
+    range: "today" | "week" | "month" | "year",
   ) => {
     const today = new Date()
     switch (range) {
@@ -391,290 +591,209 @@ export function TransactionTable({
     updateActiveFilters()
   }
 
-  // Transaction Details Sheet Component
+  // Transaction Details Sheet
   const TransactionDetailsSheet = ({
     transaction,
   }: {
     transaction: Transaction
   }) => {
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case "SUCCESS":
-          return "bg-green-500"
-        case "PENDING":
-          return "bg-amber-500"
-        case "FAILED":
-          return "bg-red-500"
-        default:
-          return "bg-gray-500"
-      }
-    }
-
-    const getPaymentMethodIcon = (method: string) => {
-      switch (method) {
-        case "Telebirr":
-          return "💰"
-        case "Bank":
-          return "🏦"
-        case "Card":
-          return "💳"
-        case "Manual":
-          return "📝"
-        default:
-          return "📊"
-      }
-    }
+    const isCredit = transaction.type === "TRANSFER_IN"
 
     return (
       <ScrollArea className="h-full">
         <div className="p-6">
           <SheetHeader className="text-left mb-6">
-            <SheetTitle className="flex items-center gap-2">
-              <div
-                className={`h-2 w-2 rounded-full ${getStatusColor(
-                  transaction.status
-                )}`}
-              />
-              Transaction Details
-            </SheetTitle>
+            <div className="flex items-center justify-between mb-2">
+              <SheetTitle className="text-xl">Transaction Details</SheetTitle>
+              <Badge
+                variant={
+                  transaction.status === "SUCCESS"
+                    ? "success"
+                    : transaction.status === "PENDING"
+                      ? "warning"
+                      : "destructive"
+                }
+                className="px-3 py-1"
+              >
+                {transaction.status}
+              </Badge>
+            </div>
             <SheetDescription>
               Complete information about this transaction
             </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-6">
-            {/* Header Section */}
-            <div className="bg-muted/30 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-2xl font-bold">
-                    {new Intl.NumberFormat("en-ET", {
-                      style: "currency",
-                      currency: "ETB",
-                    }).format(transaction.amount)}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {transaction.type}
-                  </p>
+            {/* Amount Card */}
+            <Card
+              className={cn(
+                "border-none",
+                isCredit
+                  ? "bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20"
+                  : "bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20",
+              )}
+            >
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center p-3 rounded-full bg-white/80 dark:bg-gray-900/50 mb-4">
+                    {isCredit ? (
+                      <ArrowDownRight className="size-8 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <ArrowUpRight className="size-8 text-orange-600 dark:text-orange-400" />
+                    )}
+                  </div>
+                  <div className="text-3xl font-bold mb-2">
+                    {isCredit ? "+" : "-"}ETB{" "}
+                    {transaction.amount.toLocaleString()}
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {isCredit ? "Money Received" : "Payment"}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    {transaction.description}
+                  </div>
                 </div>
-                <Badge
-                  variant={
-                    transaction.status === "SUCCESS"
-                      ? "success"
-                      : transaction.status === "PENDING"
-                      ? "warning"
-                      : "destructive"
-                  }
-                >
-                  {transaction.status}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback>
-                    {getPaymentMethodIcon(transaction.paymentMethod)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{transaction.paymentMethod}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(new Date(transaction.date), "PPpp")}
-                  </p>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Transaction Information */}
+            {/* Transaction Info */}
             <div className="space-y-4">
               <h4 className="font-semibold text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+                <FileText className="size-5 text-orange-500" />
                 Transaction Information
               </h4>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Reference ID</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Reference ID
+                  </p>
                   <div className="flex items-center gap-2">
-                    <code className="font-mono text-sm bg-muted px-2 py-1 rounded flex-1">
-                      {transaction.referenceId}
+                    <code className="font-mono text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded flex-1">
+                      {transaction.reference}
                     </code>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                       onClick={() =>
-                        navigator.clipboard.writeText(transaction.referenceId)
+                        navigator.clipboard.writeText(transaction.reference)
                       }
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="size-4" />
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Transaction Date
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Date & Time
                   </p>
                   <p className="font-medium">
-                    {format(new Date(transaction.date), "PP")}
+                    {format(new Date(transaction.createdAt), "PPpp")}
                   </p>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Payment Method
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Type
                   </p>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                    <p className="font-medium">{transaction.paymentMethod}</p>
-                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "gap-1.5",
+                      isCredit
+                        ? "border-emerald-200 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                        : "border-orange-200 text-orange-700 dark:border-orange-800 dark:text-orange-300",
+                    )}
+                  >
+                    {isCredit ? (
+                      <>
+                        <ArrowDownRight className="size-3" />
+                        Money In
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight className="size-3" />
+                        Payment
+                      </>
+                    )}
+                  </Badge>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Transaction Type
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Source
                   </p>
-                  <p className="font-medium">{transaction.type}</p>
+                  <p className="font-medium">
+                    {transaction.metadata?.source || "Not specified"}
+                  </p>
                 </div>
               </div>
             </div>
 
             <Separator />
 
-            {/* Amount Breakdown */}
+            {/* Balance Info */}
             <div className="space-y-4">
               <h4 className="font-semibold text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Amount Details
+                <Wallet className="size-5 text-orange-500" />
+                Balance Information
               </h4>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Amount</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Previous Balance
+                  </span>
                   <span className="font-medium">
-                    {new Intl.NumberFormat("en-ET", {
-                      style: "currency",
-                      currency: "ETB",
-                    }).format(transaction.amount)}
+                    ETB{" "}
+                    {(
+                      transaction.balanceAfter -
+                      (isCredit ? -transaction.amount : transaction.amount)
+                    ).toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Fee</span>
-                  <span className="font-medium">
-                    {new Intl.NumberFormat("en-ET", {
-                      style: "currency",
-                      currency: "ETB",
-                    }).format(transaction.amount * 0.015)}
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Transaction Amount
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      isCredit ? "text-emerald-600" : "text-orange-600",
+                    )}
+                  >
+                    {isCredit ? "+" : "-"}ETB{" "}
+                    {transaction.amount.toLocaleString()}
                   </span>
                 </div>
 
                 <Separator />
 
-                <div className="flex justify-between items-center font-semibold">
-                  <span>Total</span>
-                  <span className="text-lg">
-                    {new Intl.NumberFormat("en-ET", {
-                      style: "currency",
-                      currency: "ETB",
-                    }).format(transaction.amount * 1.015)}
+                <div className="flex justify-between items-center font-bold">
+                  <span>New Balance</span>
+                  <span className="text-lg text-gray-900 dark:text-white">
+                    ETB {transaction.balanceAfter.toLocaleString()}
                   </span>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Additional Information */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-lg flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
-                Additional Information
-              </h4>
-
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="font-medium">{transaction.description}</p>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Receipt Available
-                    </p>
-                    <Badge
-                      variant={transaction.hasReceipt ? "success" : "secondary"}
-                    >
-                      {transaction.hasReceipt ? "Available" : "Not Available"}
-                    </Badge>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Processed By
-                    </p>
-                    <p className="font-medium">System Auto</p>
-                  </div>
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button className="flex-1 gap-2">
-                <Receipt className="h-4 w-4" />
-                {transaction.hasReceipt
-                  ? "Download Receipt"
-                  : "Request Receipt"}
+              <Button className="flex-1 gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600">
+                <Receipt className="size-4" />
+                Download Receipt
               </Button>
-              <Button variant="outline" className="flex-1 gap-2">
-                <Printer className="h-4 w-4" />
+              <Button
+                variant="outline"
+                className="flex-1 gap-2 border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20"
+              >
+                <Printer className="size-4" />
                 Print
               </Button>
-              <Button variant="outline" className="gap-2">
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Timeline */}
-            <div className="space-y-4 pt-4">
-              <h4 className="font-semibold text-lg">Transaction Timeline</h4>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="h-2 w-2 rounded-full bg-green-500 mt-2" />
-                  <div className="flex-1">
-                    <p className="font-medium">Transaction Initiated</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(subDays(new Date(transaction.date), 1), "PPpp")}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                  <div className="flex-1">
-                    <p className="font-medium">Processing</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(transaction.date), "PPpp")}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="h-2 w-2 rounded-full bg-green-500 mt-2" />
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {transaction.status === "SUCCESS"
-                        ? "Completed Successfully"
-                        : transaction.status === "PENDING"
-                        ? "Pending Completion"
-                        : "Failed"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(transaction.date), "PPpp")}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -684,7 +803,7 @@ export function TransactionTable({
 
   if (isLoading) {
     return (
-      <Card className="border">
+      <Card className="border-none shadow-xl bg-gradient-to-br from-orange-50/50 to-amber-50/50 dark:from-gray-900 dark:to-gray-800">
         <CardHeader className="pb-6">
           <Skeleton className="h-8 w-48 mb-2" />
           <Skeleton className="h-4 w-64" />
@@ -692,7 +811,7 @@ export function TransactionTable({
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="border">
+              <Card key={i} className="border-none">
                 <CardContent className="pt-6">
                   <Skeleton className="h-4 w-24 mb-2" />
                   <Skeleton className="h-7 w-32" />
@@ -716,162 +835,174 @@ export function TransactionTable({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight ">
             Transaction History
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             View and manage all your transactions. Click on any row to view
             details.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => {
-              table.resetSorting()
-              table.resetColumnFilters()
-              clearAllFilters()
-            }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Reset All
-          </Button>
-          <Button
-            className="gap-2"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            {isExporting ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Exporting...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                Export
-              </>
-            )}
-          </Button>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+            <TabsList className="bg-gray-100 dark:bg-gray-800">
+              <TabsTrigger value="table" className="gap-2">
+                <FileText className="size-4" />
+                Table
+              </TabsTrigger>
+              <TabsTrigger value="grid" className="gap-2">
+                <Hash className="size-4" />
+                Grid
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Orange Theme */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
+        {/* Total Volume */}
+        <Card className="border-none bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-900 dark:to-gray-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Total Volume
                 </p>
-                <p className="text-2xl font-bold mt-2">
-                  {new Intl.NumberFormat("en-ET", {
-                    style: "currency",
-                    currency: "ETB",
-                    minimumFractionDigits: 0,
-                  }).format(totalAmount)}
+                <p className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
+                  ETB {(totalIn + totalOut).toLocaleString()}
                 </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  +5.2% from last month
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  {data.length} transactions
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 flex items-center justify-center">
+                <DollarSign className="size-5 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Net Flow */}
+        <Card className="border-none bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Today
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Net Flow
                 </p>
-                <p className="text-2xl font-bold mt-2">
-                  {new Intl.NumberFormat("en-ET", {
-                    style: "currency",
-                    currency: "ETB",
-                    minimumFractionDigits: 0,
-                  }).format(todayAmount)}
+                <p
+                  className={cn(
+                    "text-2xl font-bold mt-2",
+                    netFlow >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-orange-600 dark:text-orange-400",
+                  )}
+                >
+                  {netFlow >= 0 ? "+" : "-"}ETB{" "}
+                  {Math.abs(netFlow).toLocaleString()}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
-                  <Progress value={75} className="h-1 w-16" />
-                  <span className="text-xs text-muted-foreground">
-                    75% of goal
+                  <Progress
+                    value={totalIn ? (totalIn / (totalIn + totalOut)) * 100 : 0}
+                    className={cn(
+                      "h-1 w-16",
+                      netFlow >= 0
+                        ? "bg-emerald-200 dark:bg-emerald-900/30"
+                        : "bg-orange-200 dark:bg-orange-900/30",
+                    )}
+                  />
+                  <span className="text-xs text-gray-500">
+                    {totalIn
+                      ? ((totalIn / (totalIn + totalOut)) * 100).toFixed(0)
+                      : 0}
+                    % in
                   </span>
                 </div>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div
+                className={cn(
+                  "h-10 w-10 rounded-lg flex items-center justify-center",
+                  netFlow >= 0
+                    ? "bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30"
+                    : "bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30",
+                )}
+              >
+                <TrendingUp
+                  className={cn(
+                    "size-5",
+                    netFlow >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-orange-600 dark:text-orange-400",
+                  )}
+                />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Today's Activity */}
+        <Card className="border-none bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-900 dark:to-gray-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Today
+                </p>
+                <p className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
+                  {todayTransactions.length}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  +ETB {todayIn.toLocaleString()} / -ETB{" "}
+                  {todayOut.toLocaleString()}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
+                <Sparkles className="size-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Success Rate */}
+        <Card className="border-none bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Success Rate
                 </p>
-                <p className="text-2xl font-bold mt-2">
+                <p className="text-2xl font-bold mt-2 text-green-600 dark:text-green-400">
                   {successRate.toFixed(1)}%
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   {successfulCount} successful
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center justify-center">
+                <CheckCircle className="size-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Pending */}
+        <Card className="border-none bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Pending
                 </p>
-                <p className="text-2xl font-bold mt-2">{pendingCount}</p>
+                <p className="text-2xl font-bold mt-2 text-amber-600 dark:text-amber-400">
+                  {pendingCount}
+                </p>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                   {((pendingCount / data.length) * 100).toFixed(1)}% of total
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Avg. Value
-                </p>
-                <p className="text-2xl font-bold mt-2">
-                  {new Intl.NumberFormat("en-ET", {
-                    style: "currency",
-                    currency: "ETB",
-                    minimumFractionDigits: 0,
-                  }).format(averageAmount)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  per transaction
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
+                <Clock className="size-5 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
           </CardContent>
@@ -880,68 +1011,62 @@ export function TransactionTable({
 
       {/* Bulk Actions Bar */}
       {showBulkActions && (
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50/50 to-amber-50/50 dark:from-orange-900/10 dark:to-amber-900/10">
           <CardContent className="py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span className="font-medium">
+                  <Check className="size-4 text-orange-600 dark:text-orange-400" />
+                  <span className="font-medium text-gray-900 dark:text-white">
                     {selectedRows.length} transaction
                     {selectedRows.length !== 1 ? "s" : ""} selected
                   </span>
-                  <Badge variant="outline" className="ml-2">
-                    {new Intl.NumberFormat("en-ET", {
-                      style: "currency",
-                      currency: "ETB",
-                      minimumFractionDigits: 0,
-                    }).format(
-                      selectedRows.reduce((sum, t) => sum + t.amount, 0)
-                    )}
+                  <Badge
+                    variant="outline"
+                    className="ml-2 border-orange-200 text-orange-700 dark:border-orange-800 dark:text-orange-300"
+                  >
+                    ETB{" "}
+                    {selectedRows
+                      .reduce((sum, t) => sum + t.amount, 0)
+                      .toLocaleString()}
                   </Badge>
-                </div>
-                <Separator orientation="vertical" className="h-6" />
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="h-3 w-3" />
-                  {new Set(selectedRows.map((t) => t.paymentMethod)).size}{" "}
-                  payment methods
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                    >
                       Bulk Actions
-                      <ChevronDown className="h-3 w-3" />
+                      <ChevronDown className="size-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
                       Actions for {selectedRows.length} items
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleExport} className="gap-2">
-                      <Download className="h-4 w-4" />
+                      <Download className="size-4" />
                       Export Selected
                     </DropdownMenuItem>
                     <DropdownMenuItem className="gap-2">
-                      <Mail className="h-4 w-4" />
+                      <Mail className="size-4" />
                       Send Receipts
                     </DropdownMenuItem>
                     <DropdownMenuItem className="gap-2">
-                      <Printer className="h-4 w-4" />
+                      <Printer className="size-4" />
                       Print Selected
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2">
-                      <Archive className="h-4 w-4" />
-                      Archive Selected
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => setShowDeleteDialog(true)}
-                      className="gap-2 text-destructive focus:text-destructive"
+                      className="gap-2 text-red-600 focus:text-red-600"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="size-4" />
                       Delete Selected
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -950,9 +1075,9 @@ export function TransactionTable({
                   variant="ghost"
                   size="sm"
                   onClick={() => table.resetRowSelection()}
-                  className="gap-1"
+                  className="gap-1 text-gray-500 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="size-3" />
                   Clear
                 </Button>
               </div>
@@ -962,12 +1087,15 @@ export function TransactionTable({
       )}
 
       {/* Main Table Card */}
-      <Card>
+      <Card className="border-none shadow-xl bg-gradient-to-br from-white to-orange-50/50 dark:from-gray-900 dark:to-gray-800/50">
+        <div className="h-1 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600" />
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>Transactions</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-gray-900 dark:text-white">
+                Transactions
+              </CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">
                 {data.length} total transactions • {successRate.toFixed(1)}%
                 success rate
               </CardDescription>
@@ -976,15 +1104,32 @@ export function TransactionTable({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-2 "
                 onClick={() => {
                   table.resetSorting()
                   table.resetColumnFilters()
                   clearAllFilters()
                 }}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="size-4" />
                 Reset Filters
+              </Button>
+              <Button
+                className="gap-2"
+                onClick={handleExport}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-4" />
+                    Export
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -994,15 +1139,15 @@ export function TransactionTable({
           <div className="flex flex-col lg:flex-row gap-4 mb-6">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-gray-400" />
                 <Input
-                  placeholder="Search transactions by ID, amount, or description..."
+                  placeholder="Search by reference, description..."
                   value={globalFilter ?? ""}
                   onChange={(e) => {
                     setGlobalFilter(String(e.target.value))
                     updateActiveFilters()
                   }}
-                  className="pl-10"
+                  className="pl-10 "
                 />
                 {globalFilter && (
                   <Button
@@ -1014,7 +1159,7 @@ export function TransactionTable({
                     }}
                     className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="size-3" />
                   </Button>
                 )}
               </div>
@@ -1023,13 +1168,13 @@ export function TransactionTable({
               {/* Date Range Filter */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Calendar className="h-4 w-4" />
+                  <Button variant="outline" className="gap-2 ">
+                    <Calendar className="size-4" />
                     {dateRange.from ? (
                       dateRange.to ? (
                         <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
+                          {format(dateRange.from, "LLL dd")} -{" "}
+                          {format(dateRange.to, "LLL dd")}
                         </>
                       ) : (
                         format(dateRange.from, "LLL dd, y")
@@ -1078,13 +1223,13 @@ export function TransactionTable({
               {/* Status Filter */}
               <DropdownMenu onOpenChange={updateActiveFilters}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
+                  <Button variant="outline" className="gap-2 ">
+                    <Filter className="size-4" />
                     Status
                     {table.getColumn("status")?.getFilterValue() && (
                       <Badge
                         variant="secondary"
-                        className="ml-1 h-5 w-5 p-0 flex items-center justify-center"
+                        className="ml-1 h-5 w-5 p-0 flex items-center justify-center bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                       >
                         {
                           (
@@ -1123,7 +1268,7 @@ export function TransactionTable({
                             table
                               .getColumn("status")
                               ?.setFilterValue(
-                                currentFilter.filter((v) => v !== status.value)
+                                currentFilter.filter((v) => v !== status.value),
                               )
                           }
                           updateActiveFilters()
@@ -1131,7 +1276,7 @@ export function TransactionTable({
                         className="gap-2 justify-between"
                       >
                         <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
+                          <Icon className={cn("size-4", status.color)} />
                           {status.label}
                         </div>
                         <Badge variant="outline" className="ml-auto">
@@ -1140,32 +1285,19 @@ export function TransactionTable({
                       </DropdownMenuCheckboxItem>
                     )
                   })}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={
-                      !(table.getColumn("status")?.getFilterValue() as string[])
-                        ?.length
-                    }
-                    onCheckedChange={() => {
-                      table.getColumn("status")?.setFilterValue([])
-                      updateActiveFilters()
-                    }}
-                  >
-                    Show All
-                  </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               {/* Type Filter */}
               <DropdownMenu onOpenChange={updateActiveFilters}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <CreditCard className="h-4 w-4" />
+                  <Button variant="outline" className="gap-2 ">
+                    <CreditCard className="size-4" />
                     Type
                     {table.getColumn("type")?.getFilterValue() && (
                       <Badge
                         variant="secondary"
-                        className="ml-1 h-5 w-5 p-0 flex items-center justify-center"
+                        className="ml-1 h-5 w-5 p-0 flex items-center justify-center bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                       >
                         {
                           (
@@ -1202,7 +1334,7 @@ export function TransactionTable({
                             table
                               .getColumn("type")
                               ?.setFilterValue(
-                                currentFilter.filter((v) => v !== type.value)
+                                currentFilter.filter((v) => v !== type.value),
                               )
                           }
                           updateActiveFilters()
@@ -1210,7 +1342,7 @@ export function TransactionTable({
                         className="gap-2 justify-between"
                       >
                         <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
+                          <Icon className={cn("size-4", type.color)} />
                           {type.label}
                         </div>
                         <Badge variant="outline" className="ml-auto">
@@ -1219,42 +1351,6 @@ export function TransactionTable({
                       </DropdownMenuCheckboxItem>
                     )
                   })}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={
-                      !(table.getColumn("type")?.getFilterValue() as string[])
-                        ?.length
-                    }
-                    onCheckedChange={() => {
-                      table.getColumn("type")?.setFilterValue([])
-                      updateActiveFilters()
-                    }}
-                  >
-                    Show All
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <MoreVertical className="h-4 w-4" />
-                    More
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExport} className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Export All
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2">
-                    <Eye className="h-4 w-4" />
-                    Column Visibility
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    Generate Report
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -1263,9 +1359,9 @@ export function TransactionTable({
                   variant="ghost"
                   size="sm"
                   onClick={clearAllFilters}
-                  className="gap-1 text-muted-foreground"
+                  className="gap-1 text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="size-3" />
                   Clear All
                 </Button>
               )}
@@ -1275,18 +1371,18 @@ export function TransactionTable({
           {/* Active Filters */}
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="text-sm text-muted-foreground self-center">
+              <span className="text-sm text-gray-600 dark:text-gray-400 self-center">
                 Active filters:
               </span>
               {activeFilters.map((filter, index) => (
                 <Badge
                   key={index}
                   variant="secondary"
-                  className="gap-1 px-2 py-1 text-xs"
+                  className="gap-1 px-2 py-1 text-xs bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"
                 >
                   {filter}
                   <X
-                    className="h-3 w-3 cursor-pointer hover:text-destructive"
+                    className="size-3 cursor-pointer hover:text-orange-800 dark:hover:text-orange-200"
                     onClick={() => {
                       if (filter.startsWith("Status:")) {
                         const status = filter.replace("Status: ", "")
@@ -1297,7 +1393,7 @@ export function TransactionTable({
                         table
                           .getColumn("status")
                           ?.setFilterValue(
-                            currentFilter.filter((v) => v !== status)
+                            currentFilter.filter((v) => v !== status),
                           )
                       } else if (filter.startsWith("Type:")) {
                         const type = filter.replace("Type: ", "")
@@ -1308,7 +1404,7 @@ export function TransactionTable({
                         table
                           .getColumn("type")
                           ?.setFilterValue(
-                            currentFilter.filter((v) => v !== type)
+                            currentFilter.filter((v) => v !== type),
                           )
                       } else if (filter.startsWith("Search:")) {
                         setGlobalFilter("")
@@ -1324,22 +1420,25 @@ export function TransactionTable({
           )}
 
           {/* Table */}
-          <div className="rounded-md border">
+          <div className="rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   {table.getHeaderGroups().map((headerGroup) => (
-                    <TableRow key={headerGroup.id}>
+                    <TableRow
+                      key={headerGroup.id}
+                      className="bg-orange-50/50 dark:bg-orange-900/10"
+                    >
                       {headerGroup.headers.map((header) => (
                         <TableHead
                           key={header.id}
-                          className="whitespace-nowrap"
+                          className="whitespace-nowrap font-semibold text-gray-900 dark:text-white"
                         >
                           {header.isPlaceholder
                             ? null
                             : flexRender(
                                 header.column.columnDef.header,
-                                header.getContext()
+                                header.getContext(),
                               )}
                         </TableHead>
                       ))}
@@ -1354,15 +1453,15 @@ export function TransactionTable({
                         <TableRow
                           key={row.id}
                           className={cn(
-                            "group hover:bg-muted/50",
-                            row.getIsSelected() && "bg-primary/5"
+                            "group hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-colors",
+                            row.getIsSelected() &&
+                              "bg-orange-50 dark:bg-orange-900/20",
                           )}
                           data-state={row.getIsSelected() && "selected"}
                           onClick={(e) => {
-                            // Only open sheet if not clicking on checkbox or actions
                             if (
                               !(e.target as HTMLElement).closest(
-                                '[role="checkbox"], button'
+                                '[role="checkbox"], button',
                               )
                             ) {
                               setSelectedTransaction(transaction)
@@ -1373,11 +1472,11 @@ export function TransactionTable({
                           {row.getVisibleCells().map((cell) => (
                             <TableCell
                               key={cell.id}
-                              className="whitespace-nowrap"
+                              className="whitespace-nowrap py-4"
                             >
                               {flexRender(
                                 cell.column.columnDef.cell,
-                                cell.getContext()
+                                cell.getContext(),
                               )}
                             </TableCell>
                           ))}
@@ -1391,12 +1490,14 @@ export function TransactionTable({
                         className="h-48 text-center"
                       >
                         <div className="flex flex-col items-center justify-center gap-3">
-                          <div className="rounded-full bg-muted p-3">
-                            <Search className="h-8 w-8 text-muted-foreground" />
+                          <div className="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
+                            <Search className="size-8 text-orange-600 dark:text-orange-400" />
                           </div>
                           <div className="space-y-1">
-                            <p className="font-medium">No transactions found</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              No transactions found
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                               Try adjusting your search or filter criteria
                             </p>
                           </div>
@@ -1405,7 +1506,7 @@ export function TransactionTable({
                               variant="outline"
                               size="sm"
                               onClick={clearAllFilters}
-                              className="mt-2"
+                              className="mt-2 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300"
                             >
                               Clear all filters
                             </Button>
@@ -1421,23 +1522,23 @@ export function TransactionTable({
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Showing{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-gray-900 dark:text-white">
                 {table.getState().pagination.pageIndex *
                   table.getState().pagination.pageSize +
                   1}
               </span>{" "}
               to{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-gray-900 dark:text-white">
                 {Math.min(
                   (table.getState().pagination.pageIndex + 1) *
                     table.getState().pagination.pageSize,
-                  table.getFilteredRowModel().rows.length
+                  table.getFilteredRowModel().rows.length,
                 )}
               </span>{" "}
               of{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-gray-900 dark:text-white">
                 {table.getFilteredRowModel().rows.length}
               </span>{" "}
               transactions
@@ -1445,7 +1546,7 @@ export function TransactionTable({
 
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
                   Rows per page
                 </span>
                 <Select
@@ -1454,7 +1555,7 @@ export function TransactionTable({
                     table.setPageSize(Number(value))
                   }}
                 >
-                  <SelectTrigger className="w-20">
+                  <SelectTrigger className="w-20 border-orange-200 dark:border-orange-800">
                     <SelectValue
                       placeholder={String(table.getState().pagination.pageSize)}
                     />
@@ -1475,9 +1576,9 @@ export function TransactionTable({
                   size="icon"
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-900/20"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="size-4" />
                 </Button>
 
                 <div className="flex items-center gap-1 mx-2">
@@ -1504,7 +1605,8 @@ export function TransactionTable({
                             className={cn(
                               "h-8 w-8",
                               table.getState().pagination.pageIndex ===
-                                pageNumber && "bg-primary"
+                                pageNumber &&
+                                "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
                             )}
                           >
                             {pageNumber + 1}
@@ -1512,7 +1614,7 @@ export function TransactionTable({
                         )
                       }
                       return null
-                    }
+                    },
                   )}
                 </div>
 
@@ -1521,9 +1623,9 @@ export function TransactionTable({
                   size="icon"
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-900/20"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="size-4" />
                 </Button>
               </div>
             </div>
@@ -1539,20 +1641,20 @@ export function TransactionTable({
             <AlertDialogDescription>
               Are you sure you want to delete {selectedRows.length} transaction
               {selectedRows.length !== 1 ? "s" : ""}? This action cannot be
-              undone. The total value of selected transactions is{" "}
-              {new Intl.NumberFormat("en-ET", {
-                style: "currency",
-                currency: "ETB",
-                minimumFractionDigits: 0,
-              }).format(selectedRows.reduce((sum, t) => sum + t.amount, 0))}
+              undone. The total value of selected transactions is ETB{" "}
+              {selectedRows
+                .reduce((sum, t) => sum + t.amount, 0)
+                .toLocaleString()}
               .
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBulkDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
             >
               Delete {selectedRows.length} transaction
               {selectedRows.length !== 1 ? "s" : ""}
@@ -1561,9 +1663,12 @@ export function TransactionTable({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Transaction Details Sheet - Single Controlled Sheet */}
+      {/* Transaction Details Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-lg w-full">
+        <SheetContent
+          side="right"
+          className="sm:max-w-lg w-full border-l border-orange-200 dark:border-orange-800"
+        >
           {selectedTransaction && (
             <TransactionDetailsSheet transaction={selectedTransaction} />
           )}

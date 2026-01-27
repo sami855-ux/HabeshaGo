@@ -48,7 +48,7 @@ export interface VerifyOTPResponse {
 }
 
 export const verifyOTP = async (
-  payload: VerifyOTPPayload
+  payload: VerifyOTPPayload,
 ): Promise<VerifyOTPResponse> => {
   try {
     const { data } = await axiosInstance.post<{
@@ -102,10 +102,7 @@ export const getMe = async () => {
     const res = await axiosInstance.get("/auth/me/", { withCredentials: true })
 
     if (res.data.success) {
-      return {
-        user: res.data.user,
-        success: true,
-      }
+      return res.data
     } else {
       return {
         success: false,
@@ -122,7 +119,7 @@ export const logoutUser = async () => {
     const res = await axiosInstance.post(
       "/auth/logout",
       {},
-      { withCredentials: true }
+      { withCredentials: true },
     )
     return res.data
   } catch (err) {

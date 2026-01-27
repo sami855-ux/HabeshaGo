@@ -3,7 +3,9 @@ export interface User {
   name: string | null
   email: string | null
   phone: string | null
-  image: string | null
+  avaterUrl: string | null
+  bio: string | null
+  location: string | null
 
   role: "PASSENGER" | "DRIVER" | "ADMIN"
 
@@ -32,6 +34,16 @@ export interface Wallet {
   id: number
   balance: number
   currency: string
+  isActive?: boolean
+  isLocked?: boolean
+  points?: number
+  pinHash?: string | null
+  biometricEnabled?: boolean
+  biometricToken?: string | null
+  pinAttempts?: number
+  createdAt?: string
+  updatedAt?: string
+  userId?: string
 }
 
 export interface Session {
@@ -78,3 +90,33 @@ export type UserRole = "PASSENGER" | "DRIVER" | "ADMIN"
 // Theme types
 export type Theme = "light" | "dark" | "system"
 export type BadgeTheme = "default" | "light" | "dark" | "colorful"
+
+export interface ProfileData {
+  name: string
+  email: string
+  phone: string
+  avatarUrl: string
+  bio?: string
+  location?: string
+  language?: string
+  isPhoneVerified: boolean
+  isEmailVerified: boolean
+}
+
+export interface VerificationState {
+  isVerifying: boolean
+  verificationCode: string
+  timerActive: boolean
+  canResend: boolean
+  attempts: number
+  verificationMethod: "sms" | "call" | "email"
+  currentVerificationType: "phone" | "email" | null
+  tempValue: string
+}
+
+export type UserByPhoneResponse = {
+  id: string
+  name: string
+  phone: string | null
+  isVerified: boolean
+}

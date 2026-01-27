@@ -105,7 +105,7 @@ function Header({ className }: { className?: string }) {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unreadNotifications = notifications.filter((n) => !n.isRead)
+      const unreadNotifications = notifications?.filter((n) => !n.isRead)
       // await Promise.all(unreadNotifications.map(n =>
       //   markAsReadMutation.mutateAsync(n.id)
       // ))
@@ -128,7 +128,7 @@ function Header({ className }: { className?: string }) {
     try {
       // Delete all notifications
       await Promise.all(
-        notifications.map((n) => deleteNotificationMutation.mutateAsync(n.id))
+        notifications.map((n) => deleteNotificationMutation.mutateAsync(n.id)),
       )
       refetch()
     } catch (error) {
@@ -174,7 +174,7 @@ function Header({ className }: { className?: string }) {
       <header
         className={cn(
           "sticky top-0 z-30 h-16 bg-background border-b",
-          className
+          className,
         )}
       >
         <div className="container mx-auto h-full px-4">
@@ -287,7 +287,7 @@ function Header({ className }: { className?: string }) {
                           key={notification.id}
                           className={cn(
                             "px-2 py-2 hover:bg-accent rounded-sm",
-                            !notification.isRead && "bg-accent/50"
+                            !notification.isRead && "bg-accent/50",
                           )}
                         >
                           <div className="flex items-start justify-between">
@@ -300,7 +300,7 @@ function Header({ className }: { className?: string }) {
                                   <p
                                     className={cn(
                                       "text-sm font-medium truncate",
-                                      !notification.isRead && "font-semibold"
+                                      !notification.isRead && "font-semibold",
                                     )}
                                   >
                                     {notification.title}

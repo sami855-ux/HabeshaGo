@@ -1,104 +1,68 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { walletApi } from "@/services/wallet.api";
+import { getUserWallet } from "@/services/wallet.api"
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
+import { Wallet } from "@/types/user"
 
-/* =======================
-   THUNKS
-======================= */
-
-export const fetchWallet = createAsyncThunk(
-  "wallet/fetchWallet",
-  async (_, { rejectWithValue }) => {
-    try {
-      return await walletApi.getWallet();
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Failed to fetch wallet");
-    }
-  }
-);
-
-export const fetchTransactions = createAsyncThunk(
-  "wallet/fetchTransactions",
-  async (_, { rejectWithValue }) => {
-    try {
-      return await walletApi.transactions();
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Failed to fetch transactions");
-    }
-  }
-);
-
-export const depositWallet = createAsyncThunk(
-  "wallet/deposit",
-  async (amount: number, { dispatch, rejectWithValue }) => {
-    try {
-      await walletApi.deposit(amount);
-
-      // 🔥 FORCE STATE SYNC AFTER DEPOSIT
-      await dispatch(fetchWallet());
-      await dispatch(fetchTransactions());
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Deposit failed");
-    }
-  }
-);
-
-/* =======================
-   SLICE
-======================= */
-
-interface WalletState {
-  wallet: any | null;
-  transactions: any[];
-  loading: boolean;
-  error: string | null;
+type WalletState = {
+  wallet: Wallet | null
+  loading: boolean
+  error: string | null
+  hasWallet: boolean
 }
 
 const initialState: WalletState = {
   wallet: null,
-  transactions: [],
   loading: false,
   error: null,
-};
+  hasWallet: false, // explicit flag (very useful)
+}
+
+// 🔹 Fetch wallet after login
+export const fetchUserWallet = createAsyncThunk(
+  "wallet/fetchUserWallet",
+  async (_, { rejectWithValue }) => {
+    try {
+      const wallet = await getUserWallet()
+      return wallet // can be null
+    } catch (error) {
+      return rejectWithValue("Failed to fetch wallet")
+    }
+  },
+)
 
 const walletSlice = createSlice({
   name: "wallet",
   initialState,
-  reducers: {},
+  reducers: {
+    clearWallet: (state) => {
+      state.wallet = null
+      state.loading = false
+      state.error = null
+      state.hasWallet = false
+    },
+    setWallet: (state, action) => {
+      state.wallet = action.payload
+      state.hasWallet = Boolean(action.payload)
+    },
+  },
   extraReducers: (builder) => {
     builder
-
-      /* ===== FETCH WALLET ===== */
-      .addCase(fetchWallet.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+      .addCase(fetchUserWallet.pending, (state) => {
+        state.loading = true
+        state.error = null
       })
-      .addCase(fetchWallet.fulfilled, (state, action) => {
-        state.wallet = action.payload;
-        state.loading = false;
+      .addCase(fetchUserWallet.fulfilled, (state, action) => {
+        state.loading = false
+        state.wallet = action.payload
+        state.hasWallet = Boolean(action.payload)
       })
-      .addCase(fetchWallet.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
+      .addCase(fetchUserWallet.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload || "Something went wrong"
+        state.wallet = null
+        state.hasWallet = false
       })
-
-      /* ===== FETCH TRANSACTIONS ===== */
-      .addCase(fetchTransactions.fulfilled, (state, action) => {
-        state.transactions = action.payload;
-      })
-
-      /* ===== DEPOSIT ===== */
-      .addCase(depositWallet.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(depositWallet.fulfilled, (state) => {
-        state.loading = false;
-      })
-      .addCase(depositWallet.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      });
   },
-});
+})
 
-export default walletSlice.reducer;
+export const { clearWallet, setWallet } = walletSlice.actions
+export default walletSlice.reducer

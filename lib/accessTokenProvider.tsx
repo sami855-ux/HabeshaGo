@@ -2,7 +2,12 @@
 
 import { ReactNode, useEffect } from "react"
 import { useDispatch } from "react-redux"
-import { setUser, setAccessToken, clearUser } from "@/store/slices/userSlice"
+import {
+  setUser,
+  setAccessToken,
+  clearUser,
+  setLoading,
+} from "@/store/slices/userSlice"
 import { axiosInstance } from "@/services/axiosInstance"
 
 export default function SessionProvider({ children }: { children: ReactNode }) {
@@ -10,16 +15,19 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const restoreSession = async () => {
+      dispatch(setLoading(true))
       try {
         const res = await axiosInstance.post("/auth/refresh", {
           withCredentials: true,
         })
-        console.log(res)
+        console.log(res.data.user, res.data.accessToken)
 
         dispatch(setUser({ user: res.data.user }))
         dispatch(setAccessToken({ accessToken: res.data.accessToken }))
       } catch (error) {
         dispatch(clearUser())
+      } finally {
+        setLoading(false)
       }
     }
 

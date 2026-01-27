@@ -50,17 +50,24 @@ import { useRouter } from "next/navigation"
 import { LogoutModal } from "../logout-modal"
 import { clearUser } from "@/store/slices/userSlice"
 import { logoutUser } from "@/services/auth.user.api"
+import NotificationSheet from "./NotificationSheet"
+import { Skeleton } from "@/components/ui/skeleton"
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
   const dispatch = useDispatch()
-  const user = useSelector((state: RootState) => state.user.user)
+  const { user, loading } = useSelector((state: RootState) => state.user)
 
+  console.log(user)
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false)
+
+  // Mock unread count - you can update this based on your notification state
+  const [unreadNotificationCount] = useState(3)
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,9 +79,9 @@ function Header({ className }: { className?: string }) {
   const handleLogout = async () => {
     setIsLoading(true)
     try {
+      router.push("/")
       await logoutUser()
       dispatch(clearUser())
-      router.push("/")
     } catch (error) {
       console.error("Logout failed:", error)
     } finally {
@@ -88,13 +95,11 @@ function Header({ className }: { className?: string }) {
         className={cn(
           "sticky top-0 z-10 bg-background border-b w-full",
           isExpanded ? "h-32" : "h-16",
-          className
+          className,
         )}
       >
         <div className="container mx-auto w-full h-full">
           <div className="flex items-center justify-end h-full">
-            {/* Left Section */}
-
             {/* Center & Right Section */}
             <div className="flex gap-2">
               {/* Deposit Button - Desktop */}
@@ -151,52 +156,67 @@ function Header({ className }: { className?: string }) {
                   <Search className="w-5 h-5" />
                 </Button>
 
-                {/* Notifications Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="relative">
-                      <Bell className="w-5 h-5" />
-                      <Badge className="absolute -top-1 -right-1 px-1 min-w-0 w-2 h-2 bg-primary rounded-full" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-primary" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            Payment Received
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            From John Doe
-                          </p>
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Notifications Bell Button */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative"
+                        onClick={() => setIsNotificationSheetOpen(true)}
+                      >
+                        <Bell className="w-5 h-5" />
+                        {unreadNotificationCount > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="absolute -top-1 -right-1 px-1 min-w-0 w-5 h-5 flex items-center justify-center text-xs p-0"
+                          >
+                            {unreadNotificationCount > 9
+                              ? "9+"
+                              : unreadNotificationCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Notifications</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
                 {/* Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2">
                       <Avatar className="w-8 h-8">
-                        <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" />
-                        <AvatarFallback className="bg-primary">
-                          ST
-                        </AvatarFallback>
+                        {loading ? (
+                          <Skeleton className="w-full h-full rounded-full" />
+                        ) : (
+                          <>
+                            <AvatarImage src={user?.avaterUrl} />
+                            <AvatarFallback className="bg-primary">
+                              {user?.name?.charAt(0) || "G"}
+                            </AvatarFallback>
+                          </>
+                        )}
                       </Avatar>
                       <div className="hidden md:block text-left">
-                        <p className="text-sm font-medium">
-                          {user?.name
-                            ? user.name
-                            : user?.email?.slice(0, 9) || "Guest"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {user?.email}
-                        </p>
+                        {loading ? (
+                          <>
+                            <Skeleton className="h-4 w-24 mb-1" />
+                            <Skeleton className="h-3 w-32" />
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium">
+                              {user?.name || "Guest"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {user?.email}
+                            </p>
+                          </>
+                        )}
                       </div>
                       <ChevronDown className="hidden md:block w-4 h-4" />
                     </Button>
@@ -234,6 +254,12 @@ function Header({ className }: { className?: string }) {
           </div>
         </div>
       </header>
+
+      {/* Notification Sheet */}
+      <NotificationSheet
+        isOpen={isNotificationSheetOpen}
+        onOpenChange={setIsNotificationSheetOpen}
+      />
 
       {/* Search Modal */}
       <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>

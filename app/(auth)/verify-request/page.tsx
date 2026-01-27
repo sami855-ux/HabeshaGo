@@ -120,10 +120,9 @@ function VerifyPage() {
 
           const userRes = await getMe()
 
-          console.log(userRes)
-
           if (userRes.success) {
-            dispatch(setUser(userRes.user))
+            console.log(userRes.user)
+            dispatch(setUser({ user: userRes.user }))
 
             //Dynamic route based on the role
             if (userRes.user.role === "PASSENGER") {

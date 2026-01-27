@@ -12,6 +12,10 @@ import {
   ArrowUpDown,
   Menu,
   X,
+  ChevronFirst,
+  ChevronLast,
+  LogOut,
+  Bus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
@@ -22,6 +26,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 
 export type MenuItem = {
   id: string
@@ -55,7 +61,7 @@ function Sidebar() {
             setExpandedItems(newSet)
             localStorage.setItem(
               "sidebar-expanded-items",
-              JSON.stringify(Array.from(newSet))
+              JSON.stringify(Array.from(newSet)),
             )
           }
         }
@@ -73,7 +79,7 @@ function Sidebar() {
     for (const item of menuItems) {
       if (item.subItems) {
         const hasActiveChild = item.subItems.some(
-          (subItem) => pathname === `/user${subItem.path}`
+          (subItem) => pathname === `/user${subItem.path}`,
         )
         if (hasActiveChild) {
           return item.id
@@ -88,7 +94,7 @@ function Sidebar() {
     if (item.path && pathname === `/user${item.path}`) return true
     if (item.subItems) {
       return item.subItems.some(
-        (subItem) => pathname === `/user${subItem.path}`
+        (subItem) => pathname === `/user${subItem.path}`,
       )
     }
     return false
@@ -108,7 +114,7 @@ function Sidebar() {
       try {
         localStorage.setItem(
           "sidebar-expanded-items",
-          JSON.stringify(Array.from(newSet))
+          JSON.stringify(Array.from(newSet)),
         )
       } catch (error) {
         console.error("Failed to save expanded items to localStorage:", error)
@@ -128,7 +134,7 @@ function Sidebar() {
     try {
       localStorage.setItem(
         "sidebar-expanded-items",
-        JSON.stringify(Array.from(newSet))
+        JSON.stringify(Array.from(newSet)),
       )
     } catch (error) {
       console.error("Failed to save expanded items to localStorage:", error)
@@ -149,24 +155,29 @@ function Sidebar() {
       path: "/wallet",
     },
     {
-      id: "payments",
-      label: "Payments",
-      icon: <Currency className="h-5 w-5" />,
+      id: "trips",
+      label: "My Trips",
+      icon: <Bus className="h-5 w-5" />,
       subItems: [
-        { id: "send-money", label: "Send Money", path: "/payments/send-money" },
         {
-          id: "receive-money",
-          label: "Receive Money",
-          path: "/payments/receive-money",
+          id: "upcoming-trips",
+          label: "Upcoming Trips",
+          path: "/trips/upcoming",
         },
         {
-          id: "top-up-mobile-wallet",
-          label: "Top-up Mobile Wallet",
-          path: "/payments/top-up-mobile-wallet",
+          id: "active-ticket",
+          label: "Active Ticket",
+          path: "/trips/active",
+        },
+        {
+          id: "trip-history",
+          label: "Trip History",
+          path: "/trips/history",
         },
       ],
-      path: "/payments",
+      path: "/trips",
     },
+
     {
       id: "transactions",
       label: "Transactions",
@@ -209,34 +220,22 @@ function Sidebar() {
       {/* Sidebar Container */}
       <div
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen bg-background border-r border-border transition-all duration-300",
+          "fixed left-0 top-0 z-40 h-screen bg-background border-r border-border transition-all duration-300 flex flex-col",
           // Mobile: slide in/out
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
           // Desktop: always visible
           "lg:translate-x-0",
           // Width based on collapsed state
-          isCollapsed ? "w-20" : "w-64"
+          isCollapsed ? "w-20" : "w-64",
         )}
       >
-        {/* Desktop Collapse Toggle */}
-        <button
-          className="hidden lg:flex absolute -right-3 top-6 z-50 rounded-full bg-primary p-1.5 text-primary-foreground shadow-lg border border-border hover:bg-primary/90"
-          onClick={toggleSidebar}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3 rotate-180" />
-          )}
-        </button>
-
         {/* Sidebar Content */}
-        <div className="h-full flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Section */}
           <div
             className={cn(
-              "flex items-center gap-3 p-6 cursor-pointer transition-all duration-300",
-              isCollapsed && "lg:justify-center lg:p-4"
+              "flex items-center gap-3 p-6 cursor-pointer transition-all duration-300 flex-shrink-0",
+              isCollapsed && "lg:justify-center lg:p-4",
             )}
             onClick={() => {
               router.push("/user")
@@ -268,7 +267,7 @@ function Sidebar() {
                 {menuItems.map((item) => {
                   const isActive = isItemActive(item)
                   const hasActiveSubItem = item.subItems?.some((subItem) =>
-                    isSubItemActive(subItem.path)
+                    isSubItemActive(subItem.path),
                   )
 
                   return (
@@ -292,7 +291,7 @@ function Sidebar() {
                                 isActive &&
                                   "bg-primary/10 text-primary hover:bg-primary/20",
                                 hasActiveSubItem &&
-                                  "bg-primary/5 text-primary hover:bg-primary/15"
+                                  "bg-primary/5 text-primary hover:bg-primary/15",
                               )}
                             >
                               <div
@@ -303,7 +302,7 @@ function Sidebar() {
                                   hasActiveSubItem && "text-primary",
                                   !isActive &&
                                     !hasActiveSubItem &&
-                                    "text-muted-foreground group-hover:text-primary"
+                                    "text-muted-foreground group-hover:text-primary",
                                 )}
                               >
                                 {item.icon}
@@ -334,7 +333,7 @@ function Sidebar() {
                             isActive &&
                               "bg-primary/10 text-primary hover:bg-primary/20",
                             hasActiveSubItem &&
-                              "bg-primary/5 text-primary hover:bg-primary/15"
+                              "bg-primary/5 text-primary hover:bg-primary/15",
                           )}
                         >
                           <div
@@ -344,7 +343,7 @@ function Sidebar() {
                               hasActiveSubItem && "text-primary",
                               !isActive &&
                                 !hasActiveSubItem &&
-                                "text-muted-foreground group-hover:text-primary"
+                                "text-muted-foreground group-hover:text-primary",
                             )}
                           >
                             {item.icon}
@@ -354,7 +353,7 @@ function Sidebar() {
                             className={cn(
                               "flex-1 text-left transition-colors duration-200",
                               (isActive || hasActiveSubItem) &&
-                                "text-primary font-medium"
+                                "text-primary font-medium",
                             )}
                           >
                             {item.label}
@@ -364,7 +363,8 @@ function Sidebar() {
                               className={cn(
                                 "h-4 w-4 transition-transform duration-200 flex-shrink-0",
                                 expandedItems.has(item.id) && "rotate-180",
-                                (isActive || hasActiveSubItem) && "text-primary"
+                                (isActive || hasActiveSubItem) &&
+                                  "text-primary",
                               )}
                             />
                           )}
@@ -387,7 +387,7 @@ function Sidebar() {
                                     "hover:bg-accent hover:text-accent-foreground",
                                     isSubActive
                                       ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
-                                      : "text-muted-foreground hover:text-accent-foreground"
+                                      : "text-muted-foreground hover:text-accent-foreground",
                                   )}
                                   onClick={() => {
                                     if (subItem.path) {
@@ -406,13 +406,13 @@ function Sidebar() {
                                       "h-3 w-3 flex-shrink-0 transition-colors duration-200",
                                       isSubActive
                                         ? "text-primary"
-                                        : "text-muted-foreground"
+                                        : "text-muted-foreground",
                                     )}
                                   />
                                   <span
                                     className={cn(
                                       "whitespace-nowrap transition-colors duration-200",
-                                      isSubActive && "text-primary"
+                                      isSubActive && "text-primary",
                                     )}
                                   >
                                     {subItem.label}
@@ -443,7 +443,7 @@ function Sidebar() {
                       <button
                         className={cn(
                           "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground group",
-                          "lg:justify-center lg:px-3"
+                          "lg:justify-center lg:px-3",
                         )}
                         onClick={() => {
                           router.push("/user/settings")
@@ -462,7 +462,7 @@ function Sidebar() {
                       <button
                         className={cn(
                           "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground group",
-                          "lg:justify-center lg:px-3"
+                          "lg:justify-center lg:px-3",
                         )}
                         onClick={() => {
                           router.push("/user/support")
@@ -483,7 +483,7 @@ function Sidebar() {
                     className={cn(
                       "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
                       "hover:bg-accent hover:text-accent-foreground",
-                      "text-foreground hover:text-accent-foreground"
+                      "text-foreground hover:text-accent-foreground",
                     )}
                     onClick={() => {
                       router.push("/user/settings")
@@ -497,7 +497,7 @@ function Sidebar() {
                     className={cn(
                       "flex w-full items-center cursor-pointer gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
                       "hover:bg-accent hover:text-accent-foreground",
-                      "text-foreground hover:text-accent-foreground"
+                      "text-foreground hover:text-accent-foreground",
                     )}
                     onClick={() => {
                       router.push("/user/support")
@@ -509,6 +509,46 @@ function Sidebar() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+
+          {/* Bottom Section - Collapse Button */}
+          <div className="p-4 border-t border-border mt-auto">
+            <div
+              className={cn(
+                "transition-all duration-300",
+                isCollapsed ? "flex justify-center" : "space-y-4",
+              )}
+            >
+              {/* Collapse Button - Similar to Neon's Design */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size={isCollapsed ? "icon" : "default"}
+                      className={cn(
+                        "w-full border-none transition-all duration-200 rounded-sm",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        isCollapsed && "justify-center",
+                      )}
+                      onClick={toggleSidebar}
+                    >
+                      {isCollapsed ? (
+                        <ChevronLast className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <ChevronFirst className="h-4 w-4 mr-2" />
+                          <span>Collapse sidebar</span>
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </div>
@@ -523,6 +563,12 @@ function Sidebar() {
       )}
     </>
   )
+}
+
+// Mock user data - replace with your actual user data
+const user = {
+  name: "John Doe",
+  email: "john@example.com",
 }
 
 export default Sidebar

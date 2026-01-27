@@ -7,13 +7,15 @@ interface UserState {
   accessToken: string | null
   isAuthenticated: boolean
   loading: boolean
+  error?: string
 }
 
 const initialState: UserState = {
   user: null,
   accessToken: null,
   isAuthenticated: false,
-  loading: false,
+  loading: true,
+  error: undefined,
 }
 
 // Async thunk to fetch current user
@@ -24,13 +26,13 @@ export const fetchCurrentUser = createAsyncThunk(
       const response = await getMe()
 
       console.log(response)
-      return response
+      return response.user
     } catch (err: any) {
       return rejectWithValue(
-        err.response?.data || { message: "Failed to fetch user" }
+        err.response?.data || { message: "Failed to fetch user" },
       )
     }
-  }
+  },
 )
 
 const userSlice = createSlice({
@@ -38,8 +40,10 @@ const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<{ user: UserState["user"] }>) => {
+      console.log(action.payload.user)
       state.user = action.payload.user
       state.isAuthenticated = true
+      state.loading = false
     },
     updateUser: (state, action: PayloadAction<Partial<UserState["user"]>>) => {
       if (state.user) {
@@ -58,6 +62,9 @@ const userSlice = createSlice({
       state.accessToken = action.payload
       state.isAuthenticated = true
     },
+    setError: (state, action: PayloadAction<string>) => {
+      state.error = action.payload
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -70,7 +77,7 @@ const userSlice = createSlice({
           state.user = action.payload
           state.isAuthenticated = true
           state.loading = false
-        }
+        },
       )
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.user = null
@@ -80,7 +87,13 @@ const userSlice = createSlice({
   },
 })
 
-export const { setUser, updateUser, clearUser, setLoading, setAccessToken } =
-  userSlice.actions
+export const {
+  setUser,
+  updateUser,
+  clearUser,
+  setLoading,
+  setAccessToken,
+  setError,
+} = userSlice.actions
 
 export default userSlice.reducer

@@ -1,14 +1,16 @@
 import { axiosInstance } from "./axiosInstance"
 
-export const fetchAllNotification = async (userId: string | undefined) => {
+export const fetchAllNotification = async () => {
   try {
-    const response = await axiosInstance.get(`/notification/${userId}`)
+    const response = await axiosInstance.get(`/notification/me`)
 
-    console.log("Fetched Buses:", response.data)
-    // response.data will have { success, message, data }
-    return response.data
+    if (response.success) {
+      return response.data.notifications
+    } else {
+      return []
+    }
   } catch (error: any) {
-    console.error("Error fetching buses:", error)
+    console.error("Error fetching Notifications:", error)
 
     return {
       success: false,

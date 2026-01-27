@@ -5,35 +5,40 @@ import { Transaction } from "@/lib/types"
 import { subDays } from "date-fns"
 import { Suspense } from "react"
 
-// Mock data generator - moved outside component for better performance
+// Mock data generator aligned with WalletTransaction model
 function generateMockTransactions(): Transaction[] {
-  const types: Transaction["type"][] = ["Tax", "Transfer", "Payment"]
-  const methods: Transaction["paymentMethod"][] = [
-    "Telebirr",
-    "Bank",
-    "Card",
-    "Manual",
-  ]
+  const types: Transaction["type"][] = ["Payment", "Transfer", "Tax"]
+
   const statuses: Transaction["status"][] = ["SUCCESS", "PENDING", "FAILED"]
 
-  return Array.from({ length: 50 }, (_, i) => ({
-    id: `txn_${i + 1}`,
-    date: subDays(new Date(), Math.floor(Math.random() * 30)),
-    referenceId: `REF${String(i + 1000).padStart(6, "0")}`,
-    type: types[Math.floor(Math.random() * types.length)],
-    amount: Math.floor(Math.random() * 10000) + 100,
-    paymentMethod: methods[Math.floor(Math.random() * methods.length)],
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    description: `Transaction for ${types[
-      Math.floor(Math.random() * types.length)
-    ].toLowerCase()}`,
-    hasReceipt: Math.random() > 0.3,
-    counterparty: `Counterparty ${String.fromCharCode(65 + (i % 26))}`,
-    category: ["Business", "Personal", "Investment"][i % 3] as
-      | "Business"
-      | "Personal"
-      | "Investment",
-  }))
+  let runningBalance = 50000
+
+  return Array.from({ length: 50 }, (_, i) => {
+    const amount = Math.floor(Math.random() * 5000) + 100
+    const isCredit = Math.random() > 0.5
+
+    runningBalance += isCredit ? amount : -amount
+
+    return {
+      id: i + 1,
+      walletId: 1,
+
+      amount,
+      balanceAfter: runningBalance,
+
+      type: isCredit ? "TRANSFER_IN" : "PAYMENT",
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+
+      reference: `TXN-${String(i + 1000).padStart(6, "0")}`,
+      description: isCredit ? "Incoming transfer" : "Payment for ticket",
+
+      metadata: {
+        source: isCredit ? "Telebirr" : "Ticketing",
+      },
+
+      createdAt: subDays(new Date(), Math.floor(Math.random() * 30)),
+    }
+  })
 }
 
 // Loading component for better UX
@@ -54,24 +59,24 @@ function TransactionTableSkeleton() {
 }
 
 export default function TransactionHistoryPage() {
-  // Generate mock data once on component mount
   const mockTransactions = generateMockTransactions()
 
-  // Calculate some statistics for better UX
+  // Useful stats (optional)
   const totalAmount = mockTransactions.reduce((sum, t) => sum + t.amount, 0)
+
   const successfulCount = mockTransactions.filter(
-    (t) => t.status === "SUCCESS"
+    (t) => t.status === "SUCCESS",
   ).length
 
   return (
     <div className="container py-8">
       <div className="space-y-8">
-        {/* Main Table with Suspense */}
+        {/* Main Table */}
         <Suspense fallback={<TransactionTableSkeleton />}>
           <TransactionTable data={mockTransactions} />
         </Suspense>
 
-        {/* Help/Info Section */}
+        {/* Help Section */}
         <div className="bg-muted/30 border border-border rounded-lg p-6">
           <h3 className="font-semibold mb-2">
             Need help with your transactions?
@@ -84,10 +89,10 @@ export default function TransactionHistoryPage() {
             <div className="text-sm">
               <span className="font-medium">Support Email: </span>
               <a
-                href="mailto:support@example.com"
+                href="mailto:support@habeshago.com"
                 className="text-primary hover:underline"
               >
-                support@example.com
+                support@habeshago.com
               </a>
             </div>
             <div className="text-sm">

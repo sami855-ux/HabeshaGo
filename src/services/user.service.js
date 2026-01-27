@@ -88,3 +88,33 @@ export const verifyOtpService = async (user, code, channel) => {
 
   return true
 }
+
+export const getUsersByPhoneService = async (phone) => {
+  const users = await prisma.user.findMany({
+    where: phone
+      ? {
+          phone: {
+            contains: phone, // allows partial search
+            mode: "insensitive",
+          },
+        }
+      : {},
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      phoneVerified: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  })
+
+  // Format response exactly as requested
+  return users.map((user) => ({
+    id: user.id,
+    name: user.name ?? "Unknown",
+    phone: user.phone,
+    isVerified: user.phoneVerified,
+  }))
+}

@@ -15,12 +15,12 @@ const router = Router()
 router.post("/", createNotification)
 
 // user reads notifications
-router.get("/:id", getMyNotifications)
-router.get("/unread-count", getUnreadCount)
+router.get("/me", authenticate, getMyNotifications)
+router.get("/unread-count", authenticate, getUnreadCount)
 
 // update read status
-router.patch("/:id/read", markAsRead)
-router.patch("/read-all", markAllAsRead)
+router.patch("/:id/read", authenticate, markAsRead)
+router.patch("/read-all", authenticate, markAllAsRead)
 
 // delete
 router.delete("/:id", authenticate, deleteNotification)

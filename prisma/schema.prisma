@@ -36,6 +36,8 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  passengerCategory PassengerCategory @default(NORMAL) //ONly relevant for passengers
+
   // AUTH RELATIONS
   sessions          Session[]
   otpCodes          OtpCode[]
@@ -92,6 +94,31 @@ model OtpCode {
 
   @@index([userId])
   @@map("otp_code")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    String
+
+  title     String
+  message   String
+  type      NotificationType
+
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+
+  // optional navigation or action
+  actionUrl String?
+
+  // flexible extra data (bookingId, busId, routeId, etc.)
+  metadata  Json?
+
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
 }
 
 //Digital ticketing
@@ -171,6 +198,9 @@ model Payment {
   gateway       PaymentGateway @default(CHAPA)
   flow          PaymentFlow
 
+  pointsUsed    Int?      // optional
+  pointsValue   Decimal?  // optional
+  
   status        PaymentStatus  @default(PENDING)
 
   gatewayRef    String?        // From Chapa / Telebirr
@@ -192,10 +222,9 @@ model Payment {
 
 model Booking {
   id            Int           @id @default(autoincrement())
-  userId        String        // Owner of the ticket
+  userId        String
   busId         Int
-  seatNumbers   Int[]
-  date          DateTime      // Trip start date & time
+  date          DateTime
   status        BookingStatus @default(CONFIRMED)
   boardingStop  String?
   alightingStop String?
@@ -203,57 +232,40 @@ model Booking {
   cancelledAt   DateTime?
   payNow        Boolean       @default(false)
 
-  // Shared ticket info
-  sharedToId    String?       // Only one user can receive this ticket
-  sharedTo      User?         @relation("BookingSharedTo", fields: [sharedToId], references: [id])
-  sharedAt      DateTime?     // When the ticket was shared
+  // Ticket sharing
+  sharedToId        String?
+  sharedTo          User?       @relation("BookingSharedTo", fields: [sharedToId], references: [id])
+  sharedAt          DateTime?
+  sharedTicketUsed  Boolean     @default(false)
 
-  // Ticket usage
-  qrCode        String?       // Base64 or URL for check-in
-  checkedIn     Boolean       @default(false)
-  checkedInAt   DateTime?     // Timestamp of check-in
+  // Check-in / ticket usage
+  qrCode        String?
+  checkedIn     Boolean      @default(false)
+  checkedInAt   DateTime?
+  validUntil    DateTime?
 
-  // Optional features
-  discount          Decimal?  @default(0)     // Discount applied
-  promoCode         String?                      // Promo code used
-  seatType          SeatType?                   // NORMAL, VIP, SLEEPER, etc.
-  sharedTicketUsed  Boolean   @default(false)   // Ensure shared ticket is only used once
-  validUntil        DateTime?                   // Ticket expires (usually bus arrival time)
+  // Pricing
+  discount      Decimal?     @default(0)
+  promoCode     String?
+  amountPaid    Decimal?
+  totalAmount   Decimal?
+  currency      String       @default("ETB")
+
+  // Points
+  pointsUsed       Int?       // number of points user spent for this booking
+  pointsValue      Decimal?   // monetary equivalent of pointsUsed
+  pointsConversionRate Decimal? // rate used to convert points to money
 
   // Relations
-  paymentId     Int?          
-  payment       Payment?      @relation(fields: [paymentId], references: [id])
-  bus           Bus           @relation(fields: [busId], references: [id])
-  user          User          @relation("UserBookings", fields: [userId], references: [id])
+  paymentId     Int?
+  payment       Payment?     @relation(fields: [paymentId], references: [id])
+  bus           Bus          @relation(fields: [busId], references: [id])
+  user          User         @relation("UserBookings", fields: [userId], references: [id])
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
-model Notification {
-  id        Int       @id @default(autoincrement())
-  userId    String
-
-  title     String
-  message   String
-  type      NotificationType
-
-  isRead    Boolean   @default(false)
-  readAt    DateTime?
-
-  // optional navigation or action
-  actionUrl String?
-
-  // flexible extra data (bookingId, busId, routeId, etc.)
-  metadata  Json?
-
-  createdAt DateTime  @default(now())
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([isRead])
-}
 
 model Bus {
   id              Int           @id @default(autoincrement())
@@ -268,12 +280,36 @@ model Bus {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  lastServiceDate   DateTime?
+  nextServiceDate   DateTime?
+
+  departureTime     DateTime?
+  estimatedArrival  DateTime? //For the ai analysis
+  delayMinutes      Int      @default(0)
+
+  reservedSeats       Int        @default(0)
+  availableSeats      Int?
+
   vehicleId       Int?          @unique
   vehicle         Vehicle?      @relation(fields: [vehicleId], references: [id])
   bookings        Booking[]
   driver          Driver?       @relation(fields: [driverId], references: [id])
   route           Route?        @relation(fields: [routeId], references: [id])
   positions       BusPosition[]
+  seats           Seat[]      
+}
+
+model Seat {
+  id           Int          @id @default(autoincrement())
+  busId        Int
+  seatNumber   String       // A1, A2, B1...
+  category     SeatCategory @default(NORMAL)
+  isReserved   Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  bus          Bus          @relation(fields: [busId], references: [id])
+
+  @@unique([busId, seatNumber])
 }
 
 model BusPosition {
@@ -308,7 +344,6 @@ model Vehicle {
   @@map("vehicle")
 }
 
-
 model Route {
   id               Int            @id @default(autoincrement())
   name             String         @unique
@@ -316,13 +351,16 @@ model Route {
   destination      String
   distanceKm       Float?
   estimatedTimeMin Int?
+  price            Decimal?       
+  currency         String         @default("ETB") // optional
   isActive         Boolean        @default(true)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   buses            Bus[]
   minibuses        Minibus[]
-  midPoints        RouteMidPoint[] // relation to new model
+  midPoints        RouteMidPoint[]
 }
+
 
 model RouteMidPoint {
   id       Int    @id @default(autoincrement())
@@ -395,7 +433,6 @@ model Driver {
   
 }
 
-
 model Minibus {
   id           Int                  @id @default(autoincrement())
   plateNumber  String               @unique
@@ -452,6 +489,12 @@ model ParkingReservation {
   createdAt  DateTime   @default(now())
   lot        ParkingLot @relation(fields: [lotId], references: [id])
   user       User       @relation(fields: [userId], references: [id])
+}
+
+enum PassengerCategory {
+  NORMAL
+  ELDERLY
+  DISABLED
 }
 
 enum PointTransactionType {
@@ -539,11 +582,16 @@ enum SlotStatus {
   OUT_OF_SERVICE
 }
 
-
 enum BusStatus {
   ACTIVE
   UNDER_MAINTENANCE
   OUT_OF_SERVICE
+}
+
+enum SeatCategory {
+  NORMAL
+  DISABLED
+  ELDERLY
 }
 
 enum NotificationType {

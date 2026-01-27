@@ -5,6 +5,7 @@ import {
   updateMyProfile,
   sendOtp,
   verifyOtp,
+  getUsersByPhone,
 } from "../controllers/user.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import { upload } from "../config/multer.js"
@@ -22,6 +23,10 @@ router.patch(
   upload.single("avatar"),
   updateMyProfile,
 )
+
+// GET /api/users/by-phone?phone=+2519
+router.get("/by-phone", getUsersByPhone)
+
 //Send OTP for email or phone verification
 router.post("/me/send-otp", authenticate, sendOtp)
 

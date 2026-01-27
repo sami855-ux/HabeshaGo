@@ -37,6 +37,8 @@ export const transferFundsService = async (
 
     const referenceBase = `TRF-${Date.now()}`
 
+    let senderTxn
+
     await prisma.$transaction(async (tx) => {
       // Debit sender
       const updatedSenderWallet = await tx.wallet.update({
@@ -44,7 +46,7 @@ export const transferFundsService = async (
         data: { balance: { decrement: amount } },
       })
 
-      await tx.walletTransaction.create({
+      senderTxn = await tx.walletTransaction.create({
         data: {
           walletId: senderWallet.id,
           amount,
@@ -77,7 +79,7 @@ export const transferFundsService = async (
       })
     })
 
-    return successResponse("Transfer successful")
+    return successResponse("Transfer successful", senderTxn, 200)
   } catch (error) {
     console.error("Transfer service error:", error)
     return errorResponse("Failed to process transfer", 500)

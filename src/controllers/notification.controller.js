@@ -1,3 +1,4 @@
+import { success } from "zod"
 import prisma from "../prisma/client.js"
 
 /**
@@ -58,14 +59,18 @@ export const createNotificationService = async ({
  */
 export const getMyNotifications = async (req, res) => {
   try {
-    const { id: userId } = req.params
+    const userId = req.user.id
 
     const notifications = await prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
     })
 
-    res.json(notifications)
+    res.json({
+      notifications,
+      success: true,
+      message: "Notifications fetched successfully",
+    })
   } catch (error) {
     console.error("Get notifications error:", error)
     res.status(500).json({ message: "Failed to fetch notifications" })

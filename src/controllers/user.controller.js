@@ -1,5 +1,6 @@
 import prisma from "../prisma/client.js"
 import {
+  getUsersByPhoneService,
   sendOtpService,
   updateProfileService,
   verifyOtpService,
@@ -231,5 +232,26 @@ export const verifyOtp = async (req, res) => {
   } catch (error) {
     console.error("Verify OTP error:", error)
     return res.status(400).json({ message: error.message })
+  }
+}
+
+export const getUsersByPhone = async (req, res) => {
+  try {
+    const { phone } = req.query
+
+    const users = await getUsersByPhoneService(phone)
+
+    console.log(users)
+    return res.status(200).json({
+      success: true,
+      users,
+    })
+  } catch (error) {
+    console.error("Get users by phone error:", error)
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+    })
   }
 }

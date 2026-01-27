@@ -9,6 +9,7 @@ import {
  */
 export const transferFunds = async (req, res) => {
   try {
+    console.log(req.body)
     const result = await transferFundsService(req.user.id, req.body)
     return res.status(result.statusCode).json(result)
   } catch (error) {

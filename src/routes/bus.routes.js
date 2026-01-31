@@ -1,50 +1,71 @@
 import express from "express"
 import {
   createBus,
-  findAllBuses,
-  findBus,
+  getAllBuses,
+  getBusById,
   updateBus,
-  assignDriver,
-  updateStatus,
-  removeBus,
-  getSeatAvailability,
-  recordPosition,
+  deleteBus,
+  toggleBusStatus,
+  createBusSchedule,
+  bulkCreateBusSchedules,
+  getBusSchedules,
+  updateBusSchedule,
+  deleteBusSchedule,
   searchBuses,
 } from "../controllers/bus.controller.js"
 
-import {
-  createBusSchema,
-  updateBusSchema,
-  assignDriverSchema,
-  updateStatusSchema,
-  recordPositionSchema,
-} from "../schemas/bus.schema.js"
-
 const router = express.Router()
 
-// Validation middleware
-const validate = (schema) => (req, res, next) => {
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json(parsed.error)
-  req.body = parsed.data
-  next()
-}
+// Create a new bus
+// POST /api/buses
+router.post("/", createBus)
 
-// Routes
-router.post("/", validate(createBusSchema), createBus)
-// Search buses by start/end points
-// /buses/search?start=Main%20Station&end=University%20Stop
+// Get all buses
+// GET /api/buses
+router.get("/", getAllBuses)
+
+// Get a single bus by ID
+// GET /api/buses/:busId
+router.get("/:busId", getBusById)
+
+// Update a bus by ID
+// PUT /api/buses/:busId
+router.put("/:busId", updateBus)
+
+// Delete a bus by ID
+// DELETE /api/buses/:busId
+router.delete("/:busId", deleteBus)
+
+// Activate or deactivate a bus
+// PATCH /api/buses/:busId/status
+router.patch("/:busId/status", toggleBusStatus)
+
+/* ------------------ BUS SCHEDULE ------------------ */
+
+// Create a schedule for a bus
+// POST /api/buses/:busId/schedules
+router.post("/:busId/schedules", createBusSchedule)
+
+// Bulk create schedules for a bus
+// POST /api/buses/:busId/schedules/bulk
+router.post("/:busId/schedules/bulk", bulkCreateBusSchedules)
+
+// Get all schedules of a specific bus
+// GET /api/buses/:busId/schedules
+router.get("/:busId/schedules", getBusSchedules)
+
+// Update a bus schedule by schedule ID
+// PUT /api/bus-schedules/:scheduleId
+router.put("/schedules/:scheduleId", updateBusSchedule)
+
+// Delete a bus schedule by schedule ID
+// DELETE /api/bus-schedules/:scheduleId
+router.delete("/schedules/:scheduleId", deleteBusSchedule)
+
+/* ------------------ SEARCH BUS ------------------ */
+
+// Search buses by origin, destination, date, time, passengers
+// GET /api/buses/search?origin=Addis%20Ababa&destination=Bahir%20Dar&passengers=3&date=2026-02-01&time=14:00
 router.get("/search", searchBuses)
-router.get("/", findAllBuses)
-router.get("/:id", findBus)
-
-router.patch("/:id", validate(updateBusSchema), updateBus)
-router.patch("/:id/assign-driver", validate(assignDriverSchema), assignDriver)
-router.patch("/:id/status", validate(updateStatusSchema), updateStatus)
-router.delete("/:id", removeBus)
-
-// Special routes
-router.get("/:id/availability", getSeatAvailability)
-router.post("/:id/position", validate(recordPositionSchema), recordPosition)
 
 export default router

@@ -2,199 +2,275 @@ import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import chapa from "../config/chapa.js"
 
-// Utility to generate unique transaction references
-const generateReference = () =>
-  `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+/**
+ * Generate unique transaction reference
+ */
+const generateReference = (prefix = "payment") =>
+  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 
-// ---------------------------
-// Initiate Payment
-// ---------------------------
+// ===================================================
+// INITIATE PAYMENT
+// ===================================================
 export const initiatePaymentService = async (
   userId,
-  { amount, gateway, type, flow },
+  { amount, gateway, type, flow, bookingId, userInfo },
 ) => {
   try {
-    if (!amount || amount <= 0)
-      return { success: false, message: "Invalid amount", status: 400 }
+    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
 
-    if (!gateway)
-      return {
-        success: false,
-        message: "Payment gateway is required",
-        status: 400,
-      }
+    if (!gateway) return errorResponse("Payment gateway is required", 400)
 
-    if (!flow)
-      return {
-        success: false,
-        message: "Payment flow is required",
-        status: 400,
-      }
+    if (!type) return errorResponse("Payment type is required", 400)
 
-    const reference = generateReference()
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, phone: true },
+    })
+
+    if (!user) return errorResponse("User not found", 404)
+
+    const reference = generateReference(type.toLowerCase())
 
     // Create payment record
     const payment = await prisma.payment.create({
       data: {
         userId,
-        amount,
+        amount: parseFloat(amount),
         currency: "ETB",
-        method: "WALLET", // WALLET, TELEBIRR, CBE
-        gateway: gateway.toLowerCase() === "chapa" ? "CHAPA" : "INTERNAL",
+        gateway: "CHAPA",
+        method: "WALLET", // actual method unknown until Chapa confirms
         status: "PENDING",
-        flow, // WALLET_TOPUP, WALLET_PAYMENT, DIRECT_PAYMENT
+        flow, // WALLET_TOPUP | WALLET_PAYMENT | DIRECT_PAYMENT
         reference,
-        metadata: { type }, // e.g., WALLET_TOPUP
+        metadata: {
+          type,
+          bookingId: bookingId || null,
+          preferredMethod: userInfo?.preferredMethod || null, // UI choice
+          userInfo: {
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+          },
+        },
+        ...(bookingId && {
+          bookings: { connect: { id: parseInt(bookingId) } },
+        }),
       },
     })
 
-    // Generate external gateway URL
-    let paymentUrl
-    switch (gateway.toLowerCase()) {
-      case "chapa":
-        paymentUrl = await createChapaPayment(payment)
-        break
-      case "telebirr":
-        paymentUrl = createTelebirrPayment(payment)
-        break
-      case "cbe":
-        paymentUrl = createCBEPayment(payment)
-        break
-      default:
-        return { success: false, message: "Unsupported gateway", status: 400 }
-    }
+    // Only Chapa supported here
+    if (gateway.toLowerCase() !== "chapa")
+      return errorResponse("Unsupported gateway", 400)
 
-    return {
-      success: true,
-      message: "Payment initiated",
-      data: { payment, paymentUrl },
-      status: 200,
-    }
+    const chapaResult = await createChapaPayment(payment, user)
+
+    return successResponse(
+      "Payment initiated successfully",
+      {
+        payment: {
+          id: payment.id,
+          reference: payment.reference,
+          amount: payment.amount,
+          currency: payment.currency,
+          status: payment.status,
+          gateway: payment.gateway,
+        },
+        paymentUrl: chapaResult.paymentUrl,
+        expiresIn: "15 minutes",
+      },
+      201,
+    )
   } catch (error) {
-    console.error("Initiate payment service error:", error)
-    return {
-      success: false,
-      message: "Failed to initiate payment",
-      status: 500,
-    }
+    console.error("Initiate payment error:", error)
+    return errorResponse("Failed to initiate payment", 500)
   }
 }
 
-// ---------------------------
-// Payment Callback
-// ---------------------------
+// ===================================================
+// CHAPA CALLBACK / WEBHOOK
+// ===================================================
 export const paymentCallbackService = async (data) => {
   try {
-    const { reference, status, gatewayMetadata } = data
+    const reference = data.tx_ref || data.trx_ref
 
-    const payment = await prisma.payment.findUnique({ where: { reference } })
+    if (!reference) return errorResponse("Transaction reference missing", 400)
+
+    const payment = await prisma.payment.findUnique({
+      where: { reference },
+    })
+
     if (!payment) return errorResponse("Payment not found", 404)
 
-    if (status === "SUCCESS") {
-      await prisma.$transaction(async (tx) => {
-        // Mark payment success
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: "SUCCESS",
-            metadata: { ...payment.metadata, gatewayMetadata },
-          },
-        })
+    if (payment.status === "SUCCESS")
+      return successResponse("Payment already processed")
 
-        // Wallet top-up
-        if (payment.metadata.type === "WALLET_TOPUP") {
-          const wallet = await tx.wallet.findUnique({
-            where: { userId: payment.userId },
-          })
-          if (wallet) {
-            await tx.wallet.update({
-              where: { id: wallet.id },
-              data: { balance: { increment: payment.amount } },
-            })
+    // Verify with Chapa (SOURCE OF TRUTH)
+    const verification = await chapa.verify(reference)
 
-            await tx.walletTransaction.create({
-              data: {
-                walletId: wallet.id,
-                amount: payment.amount,
-                type: "DEPOSIT",
-                reference: payment.reference,
-                meta: { gateway: payment.method },
-              },
-            })
-          }
-        }
-      })
-
-      return successResponse("Payment successful")
-    } else {
+    if (
+      verification.status !== "success" ||
+      verification.data.status !== "success"
+    ) {
       await prisma.payment.update({
         where: { id: payment.id },
         data: {
           status: "FAILED",
-          metadata: { ...payment.metadata, gatewayMetadata },
+          metadata: {
+            ...payment.metadata,
+            callbackData: data,
+            verificationResponse: verification,
+          },
+        },
+      })
+      return errorResponse("Payment verification failed", 400)
+    }
+
+    const actualMethod =
+      verification.data.payment_method || verification.data.channel || "UNKNOWN"
+
+    await prisma.$transaction(async (tx) => {
+      // Update payment
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "SUCCESS",
+          method: actualMethod.toUpperCase(),
+          metadata: {
+            ...payment.metadata,
+            actualMethod,
+            callbackData: data,
+            verificationResponse: verification,
+            completedAt: new Date(),
+          },
         },
       })
 
-      return errorResponse("Payment failed", 400)
-    }
-  } catch (error) {
-    console.error("Payment callback service error:", error)
-    return errorResponse("Failed to process payment callback", 500)
-  }
-}
-
-// ---------------------------
-// Payment History
-// ---------------------------
-export const getPaymentHistoryService = async (userId) => {
-  try {
-    const payments = await prisma.payment.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
+      await handleSuccessfulPayment(tx, payment)
     })
-    return successResponse("Payment history retrieved", payments)
-  } catch (error) {
-    console.error("Get payment history service error:", error)
-    return errorResponse("Failed to fetch payment history", 500)
-  }
-}
 
-// ---------------------------
-// Gateway Integrations
-// ---------------------------
-
-// Chapa payment
-const createChapaPayment = async (payment) => {
-  try {
-    const tx_ref = payment.reference
-    const response = await chapa.initialize({
-      tx_ref,
+    return successResponse("Payment processed successfully", {
+      reference,
       amount: payment.amount,
-      currency: "ETB",
-      email: payment.metadata.email || "user@example.com", // get real email if available
-      first_name: payment.metadata.firstName || "User",
-      last_name: payment.metadata.lastName || "",
-      callback_url: `${process.env.BACKEND_URL}/payment/callback`,
-      return_url: `${process.env.FRONTEND_URL}/payment-success`,
-      customization: {
-        title: "Wallet Top-up",
-        description: "Add funds to your wallet",
-      },
+      method: actualMethod,
     })
-
-    return response.data.checkout_url
   } catch (error) {
-    console.error("Chapa payment creation failed:", error)
-    throw new Error("Failed to create Chapa payment")
+    console.error("Payment callback error:", error)
+    return errorResponse("Failed to process payment", 500)
   }
 }
 
-// Telebirr placeholder
-const createTelebirrPayment = (payment) => {
-  return `https://pay.telebirr.com/${payment.reference}`
+// ===================================================
+// HANDLE SUCCESSFUL PAYMENT
+// ===================================================
+const handleSuccessfulPayment = async (tx, payment) => {
+  const { type, bookingId } = payment.metadata
+
+  switch (type) {
+    case "WALLET_TOPUP":
+      return handleWalletTopup(tx, payment)
+
+    case "BUS_BOOKING":
+      return handleBusBookingPayment(tx, payment, bookingId)
+
+    case "MINIBUS_BOOKING":
+      return handleMinibusBookingPayment(tx, payment, bookingId)
+
+    default:
+      console.warn("Unhandled payment type:", type)
+  }
 }
 
-// CBE placeholder
-const createCBEPayment = (payment) => {
-  return `https://cbe.com/pay/${payment.reference}`
+// ---------------- WALLET TOPUP ----------------
+const handleWalletTopup = async (tx, payment) => {
+  const wallet = await tx.wallet.findUnique({
+    where: { userId: payment.userId },
+  })
+
+  if (!wallet) return
+
+  const newBalance = wallet.balance.add(payment.amount)
+
+  await tx.wallet.update({
+    where: { id: wallet.id },
+    data: { balance: newBalance },
+  })
+
+  await tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      amount: payment.amount,
+      type: "DEPOSIT",
+      status: "SUCCESS",
+      balanceAfter: newBalance,
+      reference: payment.reference,
+      description: `Wallet top-up via ${payment.method}`,
+      metadata: { paymentId: payment.id },
+    },
+  })
+}
+
+// ---------------- BUS BOOKING ----------------
+const handleBusBookingPayment = async (tx, payment, bookingId) => {
+  if (!bookingId) return
+
+  await tx.booking.update({
+    where: { id: parseInt(bookingId) },
+    data: {
+      status: "CONFIRMED",
+      paymentId: payment.id,
+      amountPaid: payment.amount,
+    },
+  })
+}
+
+// ---------------- MINIBUS BOOKING ----------------
+const handleMinibusBookingPayment = async (tx, payment, bookingId) => {
+  if (!bookingId) return
+
+  await tx.minibusReservation.update({
+    where: { id: parseInt(bookingId) },
+    data: {
+      status: "CONFIRMED",
+      paymentId: payment.id,
+    },
+  })
+}
+
+// ===================================================
+// CHAPA INITIALIZATION
+// ===================================================
+const createChapaPayment = async (payment, user) => {
+  const nameParts = (user.name || "User").split(" ")
+
+  const payload = {
+    amount: payment.amount.toString(),
+    currency: "ETB",
+
+    email: user.email,
+    first_name: nameParts[0],
+    last_name: nameParts.slice(1).join(" ") || "Customer",
+    phone_number: user.phone,
+
+    tx_ref: payment.reference,
+    callback_url: "http://localhost:5000/api/payments/chapa/callback",
+    return_url: `http://localhost:3000/payment/success?ref=${payment.reference}`,
+
+    // ✅ FLATTENED customization
+    "customization[title]": "HabeshaGo Payment",
+    "customization[description]": payment.metadata.type,
+
+    // ✅ FLATTENED meta (strings only)
+    "meta[payment_id]": payment.id.toString(),
+    "meta[user_id]": payment.userId.toString(),
+    "meta[type]": payment.metadata.type,
+  }
+
+  const response = await chapa.initialize(payload)
+
+  if (response.status !== "success")
+    throw new Error(response.message || "Chapa init failed")
+
+  return {
+    paymentUrl: response.data.checkout_url,
+  }
 }

@@ -1,347 +1,350 @@
+import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import prisma from "../prisma/client.js"
-import { NotFound, Conflict } from "../utils/error.js"
-import { BusStatus, BookingStatus } from "@prisma/client"
 
-// Create bus
 export const createBusService = async (data) => {
   try {
-    if (data.driverId) {
-      const driver = await prisma.driver.findUnique({
-        where: { id: data.driverId },
-      })
-      if (!driver)
-        return {
-          success: false,
-          statusCode: 404,
-          message: "Driver not found",
-          data: null,
-        }
+    // Extract and validate form data
+    const {
+      busNumber,           // String Required — must be unique (e.g., "BUS-101")
+      capacity,            // Int Required — number of seats
+      routeId,             // Int Optional at creation — but recommended to assign a route
+      driverId,            // String Optional — assign later or at creation if driver exists
+      currentStop,         // String Optional — where the bus is currently located
+      nextDestination,     // String Optional — next stop or final destination
+      departureTime,       // DateTime Optional — initial departure time
+      estimatedArrival,    // DateTime Optional — calculated from route
+      delayMinutes = 0,    // Int Optional — default 0
+      availableSeats,      // Int Optional — can default to capacity if not provided
+      vehicleId,           // Int Optional — if this bus is linked to a vehicle
+      lastServiceDate,     // DateTime Optional — for maintenance tracking
+      nextServiceDate,     // DateTime Optional — next maintenance date
+      status = "ACTIVE",   // BusStatus Optional — default ACTIVE
+      isActive = true,     // Boolean Optional — default true
+    } = data
 
-      const assignedBus = await prisma.bus.findFirst({
-        where: { driverId: data.driverId },
-      })
-      if (assignedBus)
-        return {
-          success: false,
-          statusCode: 409,
-          message: "Driver is already assigned to another bus",
-          data: null,
-        }
+    // Validate required fields
+    if (!busNumber || !capacity) {
+      return errorResponse("Bus number and capacity are required", 400)
     }
 
-    if (data.routeId) {
+    // Check if bus number already exists
+    const existingBus = await prisma.bus.findUnique({
+      where: { busNumber }
+    })
+    if (existingBus) {
+      return errorResponse("Bus number already exists", 400)
+    }
+
+    // Validate relations if provided
+    if (routeId) {
       const route = await prisma.route.findUnique({
-        where: { id: Number(data.routeId) },
+        where: { id: parseInt(routeId) }
       })
-      if (!route)
-        return {
-          success: false,
-          statusCode: 404,
-          message: "Route not found",
-          data: null,
-        }
+      if (!route) {
+        return errorResponse("Route not found", 404)
+      }
     }
 
+    if (driverId) {
+      const driver = await prisma.driver.findUnique({
+        where: { id: driverId }
+      })
+      if (!driver) {
+        return errorResponse("Driver not found", 404)
+      }
+      
+      // Check if driver is already assigned to another bus
+      const assignedBus = await prisma.bus.findUnique({
+        where: { driverId }
+      })
+      if (assignedBus) {
+        return errorResponse("Driver is already assigned to another bus", 400)
+      }
+    }
+
+    if (vehicleId) {
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id: parseInt(vehicleId) }
+      })
+      if (!vehicle) {
+        return errorResponse("Vehicle not found", 404)
+      }
+      
+      // Check if vehicle is already assigned to another bus
+      const assignedBus = await prisma.bus.findUnique({
+        where: { vehicleId: parseInt(vehicleId) }
+      })
+      if (assignedBus) {
+        return errorResponse("Vehicle is already assigned to another bus", 400)
+      }
+    }
+
+    // Prepare bus data for creation
+    const busData = {
+      busNumber,
+      capacity: parseInt(capacity),
+      status,
+      isActive,
+      delayMinutes: parseInt(delayMinutes),
+      reservedSeats: 0, // Default to 0 for new bus
+      availableSeats: availableSeats ? parseInt(availableSeats) : parseInt(capacity),
+    }
+
+    // Add optional fields if provided
+    if (routeId) busData.routeId = parseInt(routeId)
+    if (driverId) busData.driverId = driverId
+    if (currentStop) busData.currentStop = currentStop
+    if (nextDestination) busData.nextDestination = nextDestination
+    if (vehicleId) busData.vehicleId = parseInt(vehicleId)
+    
+    // Handle datetime fields
+    if (departureTime) {
+      busData.departureTime = new Date(departureTime)
+    }
+    if (estimatedArrival) {
+      busData.estimatedArrival = new Date(estimatedArrival)
+    }
+    if (lastServiceDate) {
+      busData.lastServiceDate = new Date(lastServiceDate)
+    }
+    if (nextServiceDate) {
+      busData.nextServiceDate = new Date(nextServiceDate)
+    }
+
+    // Create the bus with relations
     const bus = await prisma.bus.create({
-      data: {
-        busNumber: data.busNumber,
-        capacity: Number(data.capacity),
-        status: "ACTIVE",
-        isActive: true,
-        driverId: data.driverId ?? null,
-        routeId: data.routeId ? Number(data.routeId) : null,
-      },
-    })
-
-    return {
-      success: true,
-      statusCode: 201,
-      message: "Bus created successfully",
-      data: bus,
-    }
-  } catch (error) {
-    console.error("Error creating bus:", error)
-    return {
-      success: false,
-      statusCode: 500,
-      message: "Failed to create bus",
-      data: null,
-    }
-  }
-}
-
-// ===================== FIXED SEARCH =====================
-export const searchBusesService = async (start, end) => {
-  if (!start || !end) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Please provide both start and end points",
-      data: null,
-    }
-  }
-
-  try {
-    // Fetch buses whose route contains BOTH start and end
-    const buses = await prisma.bus.findMany({
-      where: {
-        isActive: true,
-        route: {
-          AND: [
-            {
-              OR: [
-                { origin: { contains: start, mode: "insensitive" } },
-                { destination: { contains: start, mode: "insensitive" } },
-                {
-                  midPoints: {
-                    some: { name: { contains: start, mode: "insensitive" } },
-                  },
-                },
-              ],
-            },
-            {
-              OR: [
-                { origin: { contains: end, mode: "insensitive" } },
-                { destination: { contains: end, mode: "insensitive" } },
-                {
-                  midPoints: {
-                    some: { name: { contains: end, mode: "insensitive" } },
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      },
+      data: busData,
       include: {
-        route: { include: { midPoints: true } },
-        route: { include: { midPoints: true } },
-        driver: true,
+        route: true,
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        bookings: true,
-        positions: true,
-      },
-      orderBy: { id: "desc" },
+        schedules: true
+      }
     })
 
-    // Transform data for frontend
-    const data = buses.map((bus) => ({
-      id: bus.id,
-      busNumber: bus.busNumber,
-      capacity: bus.capacity,
-      status: bus.status,
-      driverId: bus.driverId || undefined,
-      driverName: bus.driver?.name || undefined,
-      routeId: bus.routeId || undefined,
-      routeName: bus.route?.name || undefined,
-      origin: bus.route?.origin,
-      destination: bus.route?.destination,
-      midPoints: bus.route?.midPoints?.map((mp) => ({
-        id: mp.id,
-        name: mp.name,
-        lat: mp.lat,
-        lng: mp.lng,
-      })),
-      vehicleId: bus.vehicleId || undefined,
-      vehicleType: bus.vehicle?.type || undefined,
-      vehicleModel: bus.vehicle?.model || undefined,
-      bookings: bus.bookings?.map((b) => ({
-        id: b.id,
-        userId: b.userId,
-        seatNumber: b.seatNumber,
-        date: b.date.toISOString(),
-        status: b.status,
-        boardingStop: b.boardingStop,
-        alightingStop: b.alightingStop,
-        bookingCode: b.bookingCode,
-        cancelledAt: b.cancelledAt?.toISOString() || null,
-        payNow: b.payNow,
-        paymentId: b.paymentId || null,
-        createdAt: b.createdAt.toISOString(),
-        updatedAt: b.updatedAt.toISOString(),
-      })),
-      positions: bus.positions?.map((p) => ({
-        id: p.id,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        timestamp: p.timestamp.toISOString(),
-      })),
-      currentStop: bus.currentStop || null,
-      nextDestination: bus.nextDestination || null,
-      isActive: bus.isActive,
-      createdAt: bus.createdAt.toISOString(),
-      updatedAt: bus.updatedAt.toISOString(),
-    }))
-
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Buses retrieved successfully",
-      data,
-    }
+    return successResponse("Bus created successfully", bus, 201)
   } catch (error) {
-    console.error("Error searching buses:", error)
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Buses retrieved successfully",
-      data: [],
+    console.error("Create bus error:", error)
+    
+    // Handle Prisma specific errors
+    if (error.code === 'P2002') {
+      return errorResponse("Bus number must be unique", 400)
     }
+    if (error.code === 'P2003') {
+      return errorResponse("Invalid reference to related record", 400)
+    }
+    
+    return errorResponse("Failed to create bus", 500)
   }
 }
 
-// ===================== OTHER SERVICES =====================
-export const findAllBusesService = async (query) => {
-  const where = {}
-  if (query.routeId) where.routeId = query.routeId
-  if (query.status) where.status = query.status
-  if (query.isActive !== undefined) where.isActive = query.isActive
-
-  const buses = await prisma.bus.findMany({
-    where,
-    orderBy: { id: "desc" },
-    include: { driver: true, route: true },
-  })
-
-  // Transform to match the desired structure
-  const data = buses.map((bus) => ({
-    id: bus.id,
-    busNumber: bus.busNumber,
-    capacity: bus.capacity,
-    status: bus.status,
-    driverId: bus.driverId ?? undefined,
-    driverName: bus.driver?.user ? bus.driver.user.name : "No Name",
-    routeId: bus.routeId ?? undefined,
-    routeName: bus.route?.name ?? undefined,
-    currentStop: bus.currentStop ?? null,
-    nextDestination: bus.nextDestination ?? null,
-    isActive: bus.isActive,
-    isDeleted: false, // assuming soft delete flag is false by default
-    createdAt: bus.createdAt.toISOString(),
-    updatedAt: bus.updatedAt.toISOString(),
-  }))
-
-  return { data }
-}
-
-export const findBusService = async (id) => {
-  const bus = await prisma.bus.findUnique({
-    where: { id },
-    include: { driver: true, route: true },
-  })
-  if (!bus) throw new NotFound("Bus not found")
-  return bus
-}
-
-export const updateBusService = async (id, data) => {
-  const bus = await prisma.bus.findUnique({ where: { id } })
-  if (!bus) throw new NotFound("Bus not found")
-
-  if (data.driverId !== undefined && data.driverId !== null) {
-    const driver = await prisma.driver.findUnique({
-      where: { id: data.driverId },
+export const getAllBusesService = async () => {
+  try {
+    const buses = await prisma.bus.findMany({
+      include: { schedules: true, route: true },
     })
-    if (!driver) throw new NotFound("Driver not found")
+    return successResponse("Buses retrieved successfully", buses, 200)
+  } catch (error) {
+    console.error("Get all buses error:", error)
+    return errorResponse("Failed to fetch buses", 500)
+  }
+}
 
-    const otherBus = await prisma.bus.findFirst({
-      where: { driverId: data.driverId },
+export const getBusByIdService = async (busId) => {
+  try {
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId },
+      include: { schedules: true, route: true },
     })
-    if (otherBus && otherBus.id !== id)
-      throw new Conflict("Driver already assigned to another bus")
+    if (!bus) return errorResponse("Bus not found", 404)
+    return successResponse("Bus retrieved successfully", bus, 200)
+  } catch (error) {
+    console.error("Get bus by ID error:", error)
+    return errorResponse("Failed to fetch bus", 500)
   }
+}
 
-  if (data.routeId !== undefined && data.routeId !== null) {
-    const route = await prisma.route.findUnique({
-      where: { id: data.routeId },
+export const updateBusService = async (busId, data) => {
+  try {
+    const bus = await prisma.bus.update({ where: { id: busId }, data })
+    return successResponse("Bus updated successfully", bus, 200)
+  } catch (error) {
+    console.error("Update bus error:", error)
+    return errorResponse("Failed to update bus", 500)
+  }
+}
+
+export const deleteBusService = async (busId) => {
+  try {
+    await prisma.bus.delete({ where: { id: busId } })
+    return successResponse("Bus deleted successfully", null, 200)
+  } catch (error) {
+    console.error("Delete bus error:", error)
+    return errorResponse("Failed to delete bus", 500)
+  }
+}
+
+export const toggleBusStatusService = async (busId, isActive) => {
+  try {
+    const bus = await prisma.bus.update({
+      where: { id: busId },
+      data: { isActive },
     })
-    if (!route) throw new NotFound("Route not found")
-  }
-
-  return prisma.bus.update({
-    where: { id },
-    data: {
-      ...data,
-      driverId: data.driverId ?? undefined,
-      routeId: data.routeId ?? undefined,
-    },
-  })
-}
-
-export const assignDriverService = async (id, { driverId }) => {
-  const bus = await prisma.bus.findUnique({ where: { id } })
-  if (!bus) throw new NotFound("Bus not found")
-  if (!driverId)
-    return prisma.bus.update({ where: { id }, data: { driverId: null } })
-
-  const driver = await prisma.driver.findUnique({ where: { id: driverId } })
-  if (!driver) throw new NotFound("Driver not found")
-
-  const otherBus = await prisma.bus.findFirst({ where: { driverId } })
-  if (otherBus && otherBus.id !== id)
-    throw new Conflict("Driver already assigned to another bus")
-
-  return prisma.bus.update({ where: { id }, data: { driverId } })
-}
-
-export const updateStatusService = async (id, { status }) => {
-  const bus = await prisma.bus.findUnique({ where: { id } })
-  if (!bus) throw new NotFound("Bus not found")
-  return prisma.bus.update({ where: { id }, data: { status } })
-}
-
-export const removeBusService = async (id) => {
-  const bus = await prisma.bus.findUnique({ where: { id } })
-  if (!bus) throw new NotFound("Bus not found")
-  return prisma.bus.update({ where: { id }, data: { isActive: false } })
-}
-
-export const getSeatAvailabilityService = async (busId, dateIso) => {
-  const bus = await prisma.bus.findUnique({ where: { id: busId } })
-  if (!bus) throw new NotFound("Bus not found")
-
-  const date = new Date(dateIso)
-  const start = new Date(date)
-  start.setUTCHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
-
-  const bookings = await prisma.booking.findMany({
-    where: {
-      busId,
-      date: { gte: start, lt: end },
-      status: { not: BookingStatus.CANCELLED },
-    },
-    select: { seatNumber: true },
-  })
-
-  const occupiedSeats = bookings.map((b) => b.seatNumber)
-  const freeSeats = Array.from(
-    { length: bus.capacity },
-    (_, i) => i + 1
-  ).filter((i) => !occupiedSeats.includes(i))
-
-  return {
-    busId,
-    date: date.toISOString(),
-    capacity: bus.capacity,
-    occupiedSeats,
-    freeSeats,
+    return successResponse("Bus status updated successfully", bus, 200)
+  } catch (error) {
+    console.error("Toggle bus status error:", error)
+    return errorResponse("Failed to update bus status", 500)
   }
 }
 
-export const recordPositionService = async (
-  busId,
-  { latitude, longitude, timestamp }
+/* ------------------ BUS SCHEDULE ------------------ */
+
+export const createBusScheduleService = async (busId, startTime) => {
+  try {
+    const bus = await prisma.bus.findUnique({ where: { id: busId } })
+    if (!bus || !bus.routeId)
+      return errorResponse("Bus or route not found", 404)
+
+    const overlap = await prisma.busSchedule.findFirst({
+      where: { busId, startTime },
+    })
+    if (overlap) return errorResponse("Schedule already exists", 400)
+
+    const schedule = await prisma.busSchedule.create({
+      data: { busId, routeId: bus.routeId, startTime },
+    })
+    return successResponse("Bus schedule created successfully", schedule, 201)
+  } catch (error) {
+    console.error("Create bus schedule error:", error)
+    return errorResponse("Failed to create schedule", 500)
+  }
+}
+
+export const bulkCreateBusSchedulesService = async (busId, startTimes) => {
+  try {
+    const bus = await prisma.bus.findUnique({ where: { id: busId } })
+    if (!bus || !bus.routeId)
+      return errorResponse("Bus or route not found", 404)
+
+    const schedules = []
+    for (const time of startTimes) {
+      const overlap = await prisma.busSchedule.findFirst({
+        where: { busId, startTime: time },
+      })
+      if (!overlap) {
+        const schedule = await prisma.busSchedule.create({
+          data: { busId, routeId: bus.routeId, startTime: time },
+        })
+        schedules.push(schedule)
+      }
+    }
+    return successResponse("Bus schedules created successfully", schedules, 201)
+  } catch (error) {
+    console.error("Bulk create bus schedules error:", error)
+    return errorResponse("Failed to create schedules", 500)
+  }
+}
+
+export const getBusSchedulesService = async (busId) => {
+  try {
+    const schedules = await prisma.busSchedule.findMany({
+      where: { busId },
+      include: { route: true },
+    })
+    return successResponse(
+      "Bus schedules retrieved successfully",
+      schedules,
+      200,
+    )
+  } catch (error) {
+    console.error("Get bus schedules error:", error)
+    return errorResponse("Failed to fetch schedules", 500)
+  }
+}
+
+export const updateBusScheduleService = async (scheduleId, data) => {
+  try {
+    const schedule = await prisma.busSchedule.update({
+      where: { id: scheduleId },
+      data,
+    })
+    return successResponse("Bus schedule updated successfully", schedule, 200)
+  } catch (error) {
+    console.error("Update bus schedule error:", error)
+    return errorResponse("Failed to update schedule", 500)
+  }
+}
+
+export const deleteBusScheduleService = async (scheduleId) => {
+  try {
+    await prisma.busSchedule.delete({ where: { id: scheduleId } })
+    return successResponse("Bus schedule deleted successfully", null, 200)
+  } catch (error) {
+    console.error("Delete bus schedule error:", error)
+    return errorResponse("Failed to delete schedule", 500)
+  }
+}
+
+/* ------------------ SEARCH BUS ------------------ */
+
+export const searchBusesService = async (
+  origin,
+  destination,
+  passengers,
+  date,
+  time,
 ) => {
-  const bus = await prisma.bus.findUnique({ where: { id: busId } })
-  if (!bus) throw new NotFound("Bus not found")
+  try {
+    if (!origin || !destination || !date || !time || !passengers) {
+      return errorResponse("Missing required search parameters", 400)
+    }
 
-  return prisma.busPosition.create({
-    data: {
-      busId,
-      latitude,
-      longitude,
-      timestamp: timestamp ? new Date(timestamp) : new Date(),
-    },
-  })
+    const routes = await prisma.route.findMany({
+      where: { origin, destination },
+    })
+    if (routes.length === 0) return errorResponse("No routes found", 404)
+
+    const routeIds = routes.map((r) => r.id)
+
+    const schedules = await prisma.busSchedule.findMany({
+      where: { routeId: { in: routeIds }, isActive: true },
+      include: { bus: true, route: true },
+    })
+
+    // Filter by start time and available seats
+    const result = schedules
+      .filter(
+        (s) =>
+          s.startTime >= time &&
+          s.bus.capacity - s.bus.reservedSeats >= passengers,
+      )
+      .map((s) => {
+        const [h, m] = s.startTime.split(":").map(Number)
+        const arrival = new Date(date)
+        arrival.setHours(h, m + (s.route.estimatedTimeMin || 0))
+        return {
+          busId: s.busId,
+          busNumber: s.bus.busNumber,
+          startTime: s.startTime,
+          arrivalTime: arrival.toTimeString().slice(0, 5),
+          availableSeats: s.bus.capacity - s.bus.reservedSeats,
+        }
+      })
+
+    return successResponse("Buses retrieved successfully", result, 200)
+  } catch (error) {
+    console.error("Search buses error:", error)
+    return errorResponse("Failed to search buses", 500)
+  }
 }

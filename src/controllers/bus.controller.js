@@ -1,87 +1,118 @@
 import {
   createBusService,
-  findAllBusesService,
-  findBusService,
+  getAllBusesService,
+  getBusByIdService,
   updateBusService,
-  assignDriverService,
-  updateStatusService,
-  removeBusService,
-  getSeatAvailabilityService,
-  recordPositionService,
+  deleteBusService,
+  toggleBusStatusService,
+  createBusScheduleService,
+  bulkCreateBusSchedulesService,
+  getBusSchedulesService,
+  updateBusScheduleService,
+  deleteBusScheduleService,
   searchBusesService,
 } from "../services/bus.service.js"
 
-// Create bus
-export const createBus = async (req, res) => {
+// Helper function to handle controller errors
+const handleControllerError = (error, operation, res) => {
+  console.error(`${operation} controller error:`, error)
+  return res.status(500).json({
+    success: false,
+    statusCode: 500,
+    message: `Internal server error while ${operation.toLowerCase()}`,
+    data: null,
+  })
+}
+
+// Helper function to wrap async controllers
+const asyncHandler = (fn, operation) => async (req, res) => {
   try {
-    const result = await createBusService(req.body)
+    const result = await fn(req, res)
     return res.status(result.statusCode).json(result)
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      statusCode: 500,
-      message: "Internal server error while creating bus.",
-      data: null,
-    })
+    return handleControllerError(error, operation, res)
   }
 }
 
-export const searchBuses = async (req, res) => {
-  const { start, end } = req.query
+export const createBus = asyncHandler(
+  async (req) => await createBusService(req.body),
+  "Create bus"
+)
 
-  console.log(start, end)
-  const result = await searchBusesService(start, end)
+export const getAllBuses = asyncHandler(
+  async () => await getAllBusesService(),
+  "Get all buses"
+)
 
-  return res.status(result.statusCode).json(result)
-}
+export const getBusById = asyncHandler(
+  async (req) => await getBusByIdService(parseInt(req.params.busId)),
+  "Get bus"
+)
 
-// Get all buses
-export const findAllBuses = async (req, res) => {
-  const buses = await findAllBusesService(req.query)
-  res.json(buses)
-}
+export const updateBus = asyncHandler(
+  async (req) => await updateBusService(parseInt(req.params.busId), req.body),
+  "Update bus"
+)
 
-// Get one bus
-export const findBus = async (req, res) => {
-  const bus = await findBusService(Number(req.params.id))
-  res.json(bus)
-}
+export const deleteBus = asyncHandler(
+  async (req) => await deleteBusService(parseInt(req.params.busId)),
+  "Delete bus"
+)
 
-// Update bus
-export const updateBus = async (req, res) => {
-  const bus = await updateBusService(Number(req.params.id), req.body)
-  res.json(bus)
-}
+export const toggleBusStatus = asyncHandler(
+  async (req) => await toggleBusStatusService(
+    parseInt(req.params.busId),
+    req.body.isActive
+  ),
+  "Toggle bus status"
+)
 
-// Assign/unassign driver
-export const assignDriver = async (req, res) => {
-  const bus = await assignDriverService(Number(req.params.id), req.body)
-  res.json(bus)
-}
+/* ---------------- BUS SCHEDULE ---------------- */
 
-// Update bus status
-export const updateStatus = async (req, res) => {
-  const bus = await updateStatusService(Number(req.params.id), req.body)
-  res.json(bus)
-}
+export const createBusSchedule = asyncHandler(
+  async (req) => await createBusScheduleService(
+    parseInt(req.params.busId),
+    req.body.startTime
+  ),
+  "Create bus schedule"
+)
 
-// Soft delete
-export const removeBus = async (req, res) => {
-  const bus = await removeBusService(Number(req.params.id))
-  res.json({ message: "Bus removed", bus })
-}
+export const bulkCreateBusSchedules = asyncHandler(
+  async (req) => await bulkCreateBusSchedulesService(
+    parseInt(req.params.busId),
+    req.body.startTimes
+  ),
+  "Bulk create schedules"
+)
 
-// Get seat availability
-export const getSeatAvailability = async (req, res) => {
-  const availability = await getSeatAvailabilityService(
-    Number(req.params.id),
-    req.query.date
-  )
-  res.json(availability)
-}
+export const getBusSchedules = asyncHandler(
+  async (req) => await getBusSchedulesService(parseInt(req.params.busId)),
+  "Get bus schedules"
+)
 
-// Record position
-export const recordPosition = async (req, res) => {
-  const position = await recordPositionService(Number(req.params.id), req.body)
-  res.json(position)
-}
+export const updateBusSchedule = asyncHandler(
+  async (req) => await updateBusScheduleService(
+    parseInt(req.params.scheduleId),
+    req.body
+  ),
+  "Update bus schedule"
+)
+
+export const deleteBusSchedule = asyncHandler(
+  async (req) => await deleteBusScheduleService(parseInt(req.params.scheduleId)),
+  "Delete bus schedule"
+)
+
+export const searchBuses = asyncHandler(
+  async (req) => {
+    const { origin, destination, passengers, date, time } = req.query
+    return await searchBusesService(
+      origin,
+      destination,
+      parseInt(passengers),
+      date,
+      time
+    )
+  },
+  "Search buses"
+)

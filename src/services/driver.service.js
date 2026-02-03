@@ -1,193 +1,237 @@
 import prisma from "../prisma/client.js"
+import { successResponse, errorResponse } from "../utils/apiResponse.js"
 
-export const createDriverService = async (dto) => {
-  // Check if user exists
-  const user = await prisma.user.findUnique({
-    where: { id: dto.userId },
-  })
+// CREATE DRIVER
 
-  if (!user) {
-    return {
-      success: false,
-      statusCode: 404,
-      message: "User not found. Driver cannot be created.",
-      data: null,
+export const createDriverService = async (data) => {
+  try {
+    const requiredFields = [
+      "userId",
+      "licenseNo",
+      "driverLicenseUrl",
+      "idType",
+      "idFrontUrl",
+      "idBackUrl",
+    ]
+
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return errorResponse(`Field "${field}" is required`, 400)
+      }
     }
-  }
 
-  // Check if user is already a driver
-  const existingDriver = await prisma.driver.findUnique({
-    where: { userId: dto.userId },
-  })
-
-  if (existingDriver) {
-    return {
-      success: false,
-      statusCode: 409,
-      message: "User is already registered as a driver.",
-      data: null,
+    const validIdTypes = ["PASSPORT", "NATIONAL_ID", "KEBELE_ID"]
+    if (!validIdTypes.includes(data.idType)) {
+      return errorResponse(
+        `Invalid idType. Must be one of: ${validIdTypes.join(", ")}`,
+        400,
+      )
     }
-  }
 
-  // Create driver
-  const driver = await prisma.driver.create({
-    data: {
-      userId: dto.userId,
-      licenseNo: dto.licenseNo,
-      experience: dto.experience ?? null,
-    },
-  })
+    const existingDriver = await prisma.driver.findUnique({
+      where: { userId: data.userId },
+    })
 
-  return {
-    success: true,
-    statusCode: 201,
-    message: "Driver created successfully.",
-    data: driver,
+    if (existingDriver) {
+      return errorResponse("A driver already exists for this user", 409)
+    }
+
+    const driver = await prisma.driver.create({
+      data: {
+        userId: data.userId,
+        licenseNo: data.licenseNo,
+        experience: data.experience ?? 0,
+        driverLicenseUrl: data.driverLicenseUrl,
+        idType: data.idType,
+        idFrontUrl: data.idFrontUrl,
+        idBackUrl: data.idBackUrl,
+      },
+    })
+
+    return successResponse("Driver created successfully", driver, 201)
+  } catch (error) {
+    console.error("Create driver error:", error)
+
+    if (error.code === "P2002") {
+      return errorResponse("Duplicate driver entry", 409)
+    }
+
+    return errorResponse("Failed to create driver", 500)
   }
 }
 
+// GET ALL DRIVERS
 export const getAllDriversService = async () => {
   try {
     const drivers = await prisma.driver.findMany({
       include: {
         user: true,
+        // vehicle: true,
+        // assignedBus: true,
+        // assignedMinibus: true,
+      },
+    })
+
+    return successResponse("Drivers retrieved successfully", drivers, 200)
+  } catch (error) {
+    console.error("Get all drivers error:", error)
+    return errorResponse("Failed to fetch drivers", 500)
+  }
+}
+
+// GET DRIVER BY ID
+export const getDriverByIdService = async (driverId) => {
+  try {
+    const driver = await prisma.driver.findUnique({
+      where: { id: driverId },
+      include: {
+        user: true,
+        vehicle: true,
         assignedBus: true,
         assignedMinibus: true,
       },
     })
 
-    if (!drivers || drivers.length === 0) {
-      return {
-        success: true,
-        statusCode: 200,
-        message: "No drivers found.",
-        data: [],
-      }
+    if (!driver) {
+      return errorResponse("Driver not found", 404)
     }
 
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Drivers retrieved successfully.",
-      data: drivers,
-    }
+    return successResponse("Driver retrieved successfully", driver, 200)
   } catch (error) {
-    console.error("Error fetching drivers:", error)
-
-    return {
-      success: false,
-      statusCode: 500,
-      message: "Failed to retrieve drivers.",
-      data: null,
-    }
+    console.error("Get driver by id error:", error)
+    return errorResponse("Failed to fetch driver", 500)
   }
 }
 
-// Get a single driver
-export const getDriverService = async (id) => {
+// UPDATE DRIVER
+export const updateDriverService = async (driverId, data) => {
+  try {
+    const driver = await prisma.driver.update({
+      where: { id: driverId },
+      data,
+    })
+
+    return successResponse("Driver updated successfully", driver, 200)
+  } catch (error) {
+    console.error("Update driver error:", error)
+    return errorResponse("Failed to update driver", 500)
+  }
+}
+
+// VERIFY / REJECT DOCUMENTS
+export const verifyDriverDocumentsService = async (
+  driverId,
+  adminId,
+  licenseStatus,
+  idStatus,
+  rejectionReason,
+) => {
+  try {
+    const existingDriver = await prisma.driver.findUnique({
+      where: { id: driverId },
+    })
+
+    if (!existingDriver) {
+      return errorResponse("Driver not found", 404)
+    }
+
+    const driver = await prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        licenseStatus: licenseStatus ?? existingDriver.licenseStatus,
+        idStatus: idStatus ?? existingDriver.idStatus,
+        verifiedById: adminId,
+        verifiedAt: new Date(),
+        rejectionReason: rejectionReason ?? null,
+      },
+    })
+
+    return successResponse(
+      "Driver documents verified successfully",
+      driver,
+      200,
+    )
+  } catch (error) {
+    console.error("Verify driver documents error:", error)
+    return errorResponse("Failed to verify documents", 500)
+  }
+}
+
+// ASSIGN VEHICLE
+export const assignVehicleToDriverService = async (driverId, vehicleId) => {
   try {
     const driver = await prisma.driver.findUnique({
-      where: { id: Number(id) },
-      include: { user: true, assignedBus: true, assignedMinibus: true },
+      where: { id: driverId },
     })
 
     if (!driver) {
-      return {
-        success: false,
-        statusCode: 404,
-        message: `Driver with ID ${id} not found.`,
-        data: null,
-      }
+      return errorResponse("Driver not found", 404)
     }
 
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Driver retrieved successfully.",
-      data: driver,
-    }
-  } catch (error) {
-    console.error(`Error fetching driver ${id}:`, error)
-
-    return {
-      success: false,
-      statusCode: 500,
-      message: "Failed to retrieve driver.",
-      data: null,
-    }
-  }
-}
-
-// Update a driver
-export const updateDriverService = async (id, dto) => {
-  try {
-    const driver = await prisma.driver.findUnique({ where: { id: Number(id) } })
-
-    if (!driver) {
-      return {
-        success: false,
-        statusCode: 404,
-        message: `Driver with ID ${id} not found.`,
-        data: null,
-      }
+    if (driver.licenseStatus !== "VERIFIED" || driver.idStatus !== "VERIFIED") {
+      return errorResponse("Driver documents are not verified", 403)
     }
 
     const updatedDriver = await prisma.driver.update({
-      where: { id: Number(id) },
-      data: dto,
-      include: { user: true, assignedBus: true, assignedMinibus: true },
+      where: { id: driverId },
+      data: { vehicleId },
     })
 
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Driver updated successfully.",
-      data: updatedDriver,
-    }
+    return successResponse(
+      "Vehicle assigned to driver successfully",
+      updatedDriver,
+      200,
+    )
   } catch (error) {
-    console.error(`Error updating driver ${id}:`, error)
-
-    return {
-      success: false,
-      statusCode: 500,
-      message: "Failed to update driver.",
-      data: null,
-    }
+    console.error("Assign vehicle error:", error)
+    return errorResponse("Failed to assign vehicle", 500)
   }
 }
 
-// Delete a driver
-export const deleteDriverService = async (id) => {
+// TOGGLE DUTY STATUS
+export const toggleDriverDutyService = async (userId) => {
   try {
-    const driver = await prisma.driver.findUnique({ where: { id: Number(id) } })
-
-    if (!driver) {
-      return {
-        success: false,
-        statusCode: 404,
-        message: `Driver with ID ${id} not found.`,
-        data: null,
-      }
-    }
-
-    const deletedDriver = await prisma.driver.delete({
-      where: { id: Number(id) },
+    const driver = await prisma.driver.findUnique({
+      where: { userId },
     })
 
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Driver deleted successfully.",
-      data: deletedDriver,
+    if (!driver) {
+      return errorResponse("Driver not found", 404)
     }
-  } catch (error) {
-    console.error(`Error deleting driver ${id}:`, error)
 
-    return {
-      success: false,
-      statusCode: 500,
-      message: "Failed to delete driver.",
-      data: null,
-    }
+    const updatedDriver = await prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        isOnDuty: !driver.isOnDuty,
+        lastActiveAt: new Date(),
+      },
+    })
+
+    return successResponse("Driver duty status updated", updatedDriver, 200)
+  } catch (error) {
+    console.error("Toggle duty error:", error)
+    return errorResponse("Failed to update duty status", 500)
+  }
+}
+
+// BLOCK / UNBLOCK DRIVER
+export const blockDriverService = async (driverId, block) => {
+  try {
+    const updatedDriver = await prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        status: block ? "INACTIVE" : "ACTIVE",
+        isOnDuty: false,
+      },
+    })
+
+    return successResponse(
+      block ? "Driver blocked successfully" : "Driver unblocked successfully",
+      updatedDriver,
+      200,
+    )
+  } catch (error) {
+    console.error("Block driver error:", error)
+    return errorResponse("Failed to update driver status", 500)
   }
 }

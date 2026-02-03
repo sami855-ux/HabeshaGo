@@ -1,32 +1,54 @@
-import express from "express";
+import express from "express"
 import {
   createDriver,
-  getDrivers,
-  getDriver,
+  getDriverById,
+  getAllDrivers,
   updateDriver,
-  deleteDriver,
-} from "../controllers/driver.controller.js";
-import {
-  createDriverSchema,
-  updateDriverSchema,
-} from "../schemas/driver.schema.js";
+  verifyDriverDocuments,
+  assignVehicleToDriver,
+  toggleDutyStatus,
+  blockDriver,
+} from "../controllers/driver.controller.js"
+import { authenticate, requireAdmin } from "../middlewares/authenticate.js"
+import { upload } from "../config/multer.js"
 
-const router = express.Router();
+const router = express.Router()
 
-// Validation middleware
-const validate = (schema) => (req, res, next) => {
-  try {
-    schema.parse(req.body);
-    next();
-  } catch (err) {
-    res.status(400).json({ error: err.errors });
-  }
-};
+// Create driver profile (admin)
+router.post(
+  "/",
+  authenticate,
+  requireAdmin,
+  upload.fields([
+    { name: "driverLicense", maxCount: 1 },
+    { name: "idFront", maxCount: 1 },
+    { name: "idBack", maxCount: 1 },
+  ]),
+  createDriver,
+)
 
-router.post("/", validate(createDriverSchema), createDriver);
-router.get("/", getDrivers);
-router.get("/:id", getDriver);
-router.patch("/:id", validate(updateDriverSchema), updateDriver);
-router.delete("/:id", deleteDriver);
+// Get drivers
+router.get("/", getAllDrivers)
+router.get("/:id", authenticate, getDriverById)
 
-export default router;
+// Update driver basic info
+router.put("/:id", authenticate, requireAdmin, updateDriver)
+
+// Verify / reject documents
+router.post("/:id/verify", authenticate, requireAdmin, verifyDriverDocuments)
+
+// Assign vehicle
+router.post(
+  "/:id/assign-vehicle",
+  authenticate,
+  requireAdmin,
+  assignVehicleToDriver,
+)
+
+// Driver on/off duty
+router.post("/:id/duty", authenticate, toggleDutyStatus)
+
+// Block / unblock driver
+router.post("/:id/block", authenticate, requireAdmin, blockDriver)
+
+export default router

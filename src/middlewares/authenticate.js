@@ -68,3 +68,26 @@ export const authenticate = async (req, res, next) => {
     return res.status(500).json(errorResponse("Internal server error", 500))
   }
 }
+
+export const requireAdmin = (req, res, next) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        statusCode: 403,
+        message: "Access denied. Admins only.",
+        data: null,
+      })
+    }
+
+    next()
+  } catch (error) {
+    console.error("Require admin middleware error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while checking admin access",
+      data: null,
+    })
+  }
+}

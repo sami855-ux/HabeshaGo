@@ -5,6 +5,10 @@ import {
   getAllVehicles,
   updateVehicle,
   getVehicleStats,
+  updateVehicleStatus,
+  updateVehicleMileage,
+  assignDriver,
+  unassignDriver,
 } from "../controllers/vehicle.controller.js"
 
 const router = express.Router()
@@ -23,5 +27,13 @@ router.delete("/:id", deleteVehicle)
 
 //satas
 router.get("/stats", getVehicleStats)
+
+/* ---------------- STATUS ---------------- */
+router.patch("/:id/status", updateVehicleStatus)
+router.patch("/:id/mileage", updateVehicleMileage)
+
+/* ---------------- DRIVER ---------------- */
+router.post("/:id/assign-driver", assignDriver)
+router.patch("/:id/unassign-driver", unassignDriver)
 
 export default router

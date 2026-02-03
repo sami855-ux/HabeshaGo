@@ -298,7 +298,7 @@ model Bus {
   positions       BusPosition[]
   seats           Seat[]
 
-  schedules       BusSchedule[]   // ✅ ADD THIS
+  schedules       BusSchedule[]   
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -349,23 +349,85 @@ model BusPosition {
 
 model Vehicle {
   id           Int           @id @default(autoincrement())
+
+  plateNumber  String        @unique
+  vin          String?       @unique
   type         VehicleType
   model        String
-  plateNumber  String        @unique
-  capacity     Int
   manufacturer String?
   year         Int?
+  capacity     Int
+
   status       VehicleStatus @default(ACTIVE)
-  isActive     Boolean       @default(true)
+  mileage      Int           @default(0)
+
+  ownerName    String?
+  ownerPhone   String?
+  gpsDeviceId  String?
+
+  // ✅ relation
+  driverAssignments DriverAssignment[]
+  buses        Bus[]
+  minibuses    Minibus[]
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  // reverse 1:1 relations
-  bus      Bus?
-  minibus  Minibus?
-  driver   Driver?
+  @@index([status])
+  @@index([type])
+  @@map("vehicles")
+}
 
-  @@map("vehicle")
+model Driver {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  licenseNo       String
+  experience      Int?
+  status          Status   @default(ACTIVE)
+
+  driverLicenseUrl String
+  licenseStatus    VerificationStatus @default(PENDING)
+
+  idType          IdType
+  idFrontUrl      String
+  idBackUrl       String
+  idStatus        VerificationStatus @default(PENDING)
+
+  verifiedById    String?
+  verifiedAt      DateTime?
+  rejectionReason String?
+
+  isOnDuty        Boolean  @default(false)
+  lastActiveAt    DateTime?
+
+  rating          Float    @default(0)
+  totalTrips      Int      @default(0)
+  complaintsCount Int      @default(0)
+
+  // ✅ relation
+  assignments     DriverAssignment[]
+  buses        Bus[]
+  minibuses    Minibus[]
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  createdAt       DateTime @default(now())
+}
+model DriverAssignment {
+  id        Int      @id @default(autoincrement())
+
+  vehicleId Int
+  driverId  String
+
+  startDate DateTime @default(now())
+  endDate   DateTime?
+
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver    Driver   @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId])
+  @@index([driverId])
 }
 
 model Route {
@@ -429,35 +491,6 @@ model ChargingSession {
   user       User         @relation(fields: [userId], references: [id])
 }
 
-model Driver {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  licenseNo       String
-  experience      Int?
-  status          Status   @default(ACTIVE)
-
-  // Vehicle assignment
-  vehicleId       Int?     @unique
-  vehicle         Vehicle? @relation(fields: [vehicleId], references: [id])
-
-  // Bus/Minibus assignment
-  assignedBus     Bus?
-  assignedMinibus Minibus?
-
-  // User relation
-  user            User     @relation(fields: [userId], references: [id])
-
-  // Additional operator fields
-  assignedRoute           String?
-  assignedParkingArea     String?
-  shift                   String?
-  assignedChargingStation String?
-  chargerType             String?
-
-  createdAt       DateTime @default(now())
-  
-}
-
 model Minibus {
   id           Int                  @id @default(autoincrement())
   plateNumber  String               @unique
@@ -515,6 +548,50 @@ model ParkingReservation {
   lot        ParkingLot @relation(fields: [lotId], references: [id])
   user       User       @relation(fields: [userId], references: [id])
 }
+
+model AuditLog {
+  id          String   @id @default(cuid())
+
+  action      AuditAction
+  entityType  EntityType
+  entityId    String
+
+  actorId    String? 
+  actorRole  UserRole?
+
+  targetUserId String?
+
+  oldValue   Json?
+  newValue   Json?
+
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  VERIFY
+  REJECT
+  ACTIVATE
+  DEACTIVATE
+  DELETE
+}
+
+enum EntityType {
+  DRIVER
+  VEHICLE
+  BUS
+  USER
+  WALLET
+}
+
 
 enum PassengerCategory {
   NORMAL
@@ -628,7 +705,17 @@ enum NotificationType {
   WALLET
   ALERT
 }
+enum IdType {
+  PASSPORT
+  NATIONAL_ID
+  KEBELE_ID
+}
 
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
 
 enum VehicleType {
   BUS
@@ -642,6 +729,7 @@ enum VehicleStatus {
   ACTIVE
   UNDER_MAINTENANCE
   OUT_OF_SERVICE
+  RETIRED
 }
 
 enum Status {

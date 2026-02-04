@@ -9,12 +9,16 @@ import {
   updateVehicleMileage,
   assignDriver,
   unassignDriver,
+  getVehicleById,
 } from "../controllers/vehicle.controller.js"
 
 const router = express.Router()
 
 // Create a new vehicle
 router.post("/", createVehicle)
+
+//Get a vehicle by Id
+router.get("/:id", getVehicleById)
 
 // Get all vehicles
 router.get("/", getAllVehicles)

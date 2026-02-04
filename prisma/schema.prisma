@@ -309,8 +309,6 @@ model BusSchedule {
   id        Int      @id @default(autoincrement())
 
   busId     Int
-  routeId   Int
-
   startTime String   // "12:30", "15:00", "17:30"
   isActive  Boolean  @default(true)
 
@@ -318,10 +316,8 @@ model BusSchedule {
   updatedAt DateTime @updatedAt
 
   bus       Bus    @relation(fields: [busId], references: [id])
-  route     Route  @relation(fields: [routeId], references: [id])
 
   @@unique([busId, startTime])
-  @@index([routeId])
 }
 
 model Seat {
@@ -440,14 +436,16 @@ model Route {
   price            Decimal?       
   currency         String         @default("ETB") // optional
   isActive         Boolean        @default(true)
+  isSuspended      Boolean           @default(false)   // System Management
+  createdBy        Int?    
+
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+
   buses            Bus[]
   minibuses        Minibus[]
   midPoints        RouteMidPoint[]
-  schedules        BusSchedule[]   // ✅ ADD THIS
 }
-
 
 model RouteMidPoint {
   id       Int    @id @default(autoincrement())

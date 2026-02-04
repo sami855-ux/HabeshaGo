@@ -89,17 +89,58 @@ export const getVehicleById = async (req, res) => {
   try {
     const id = Number(req.params.id)
 
+    if (isNaN(id)) {
+      return res.status(400).json(errorResponse("Invalid vehicle ID", 400))
+    }
+
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
+      include: {
+        driverAssignments: {
+          where: { endDate: null }, // only active driver
+          include: {
+            driver: {
+              select: {
+                id: true,
+                experience: true,
+                user: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!vehicle) {
-      return res.status(404).json({ error: "Vehicle not found" })
+      return res.status(404).json(errorResponse("Vehicle not found", 404))
     }
 
-    res.json(vehicle)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+    // extract single active driver
+    const activeDriver = vehicle.driverAssignments[0]?.driver
+
+    const formattedVehicle = {
+      ...vehicle,
+      driver: activeDriver
+        ? {
+            id: activeDriver.id,
+            name: activeDriver.user?.name,
+            experience: activeDriver.experience,
+          }
+        : null,
+      driverAssignments: undefined, // hide raw relation if you want cleaner response
+    }
+
+    return res
+      .status(200)
+      .json(successResponse("Vehicle fetched successfully", formattedVehicle))
+  } catch (error) {
+    console.error("Get vehicle by ID error:", error)
+
+    return res.status(500).json(errorResponse("Failed to fetch vehicle", 500))
   }
 }
 
@@ -284,84 +325,74 @@ export const assignDriver = async (req, res) => {
       return res.status(400).json(errorResponse("driverId is required", 400))
     }
 
-    const assignment = await prisma.$transaction(async (tx) => {
-      // Ensure vehicle exists
-      const vehicle = await tx.vehicle.findUniqueOrThrow({
+    const result = await prisma.$transaction(async (tx) => {
+      const vehicle = await tx.vehicle.findUnique({
         where: { id: vehicleId },
         include: {
-          driverAssignments: {
-            where: { endDate: null }, // only active assignments
-          },
+          driverAssignments: { where: { endDate: null } },
         },
       })
 
-      // If vehicle already has an active driver
-      if (vehicle.driverAssignments.length > 0) {
-        return res
-          .status(400)
-          .json(
-            errorResponse(
-              "Vehicle is already assigned to a driver",
-              400,
-              vehicle.driverAssignments,
-            ),
-          )
+      if (!vehicle) {
+        return { type: "NOT_FOUND" }
       }
 
-      // Ensure driver exists
-      const driver = await tx.driver.findUniqueOrThrow({
+      if (vehicle.driverAssignments.length > 0) {
+        return { type: "VEHICLE_BUSY", data: vehicle.driverAssignments }
+      }
+
+      const driver = await tx.driver.findUnique({
         where: { id: driverId },
         include: {
-          assignments: {
-            where: { endDate: null }, // only active assignments
-          },
+          assignments: { where: { endDate: null } },
         },
       })
 
-      // If driver is already assigned to a vehicle
-      if (driver.assignments.length > 0) {
-        return res
-          .status(400)
-          .json(
-            errorResponse(
-              "Driver is already assigned to a vehicle",
-              400,
-              driver.assignments,
-            ),
-          )
+      if (!driver) {
+        return { type: "NOT_FOUND" }
       }
 
-      // Create new assignment
-      return tx.driverAssignment.create({
-        data: {
-          vehicleId,
-          driverId,
-        },
-        include: {
-          driver: true,
-          vehicle: true,
-        },
+      if (driver.assignments.length > 0) {
+        return { type: "DRIVER_BUSY", data: driver.assignments }
+      }
+
+      const assignment = await tx.driverAssignment.create({
+        data: { vehicleId, driverId },
+        include: { driver: true, vehicle: true },
       })
+
+      return { type: "SUCCESS", data: assignment }
     })
 
-    // Only return success if a new assignment was created
-    if (assignment && !assignment.hasOwnProperty("success")) {
-      return res
-        .status(201)
-        .json(successResponse("Driver assigned successfully", assignment))
-    }
-  } catch (err) {
-    if (err.code === "P2025") {
+    // ✅ Handle all responses here (ONE place only)
+
+    if (result.type === "NOT_FOUND") {
       return res
         .status(404)
         .json(errorResponse("Vehicle or Driver not found", 404))
     }
 
+    if (result.type === "VEHICLE_BUSY") {
+      return res
+        .status(400)
+        .json(errorResponse("Vehicle already assigned", 400, result.data))
+    }
+
+    if (result.type === "DRIVER_BUSY") {
+      return res
+        .status(400)
+        .json(errorResponse("Driver already assigned", 400, result.data))
+    }
+
     return res
-      .status(500)
-      .json(errorResponse("Failed to assign driver", 500, err.message))
+      .status(201)
+      .json(successResponse("Driver assigned successfully", result.data))
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json(errorResponse("Failed to assign driver", 500))
   }
 }
+
 export const unassignDriver = async (req, res) => {
   try {
     const vehicleId = Number(req.params.id)

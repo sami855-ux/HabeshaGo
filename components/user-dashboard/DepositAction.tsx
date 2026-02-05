@@ -22,7 +22,7 @@ export default function DepositAction() {
   const router = useRouter()
   const buttons = [
     {
-      label: "Deposit",
+      label: "Top Up",
       icon: Plus,
       variant: "default" as const,
       color: "emerald",
@@ -32,7 +32,7 @@ export default function DepositAction() {
       iconBg: "bg-emerald-100/20 text-white",
       hoverEffect:
         "shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40",
-      onClick: () => console.log("Deposit clicked"),
+      onClick: () => router.push("/user/wallet/deposite"),
     },
     {
       label: "Send",

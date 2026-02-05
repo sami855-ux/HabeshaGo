@@ -85,3 +85,19 @@ export const fetchAllRoutesSimple = async () => {
     }
   }
 }
+
+export const getRouteById = async (routeId: string) => {
+  try {
+    const res = await axiosInstance.get(`/route/${routeId}`)
+
+    if (res.data.success) {
+      return res.data.data
+    } else {
+      return {}
+    }
+  } catch (error) {
+    console.error("Error fetching routes:", error)
+
+    return {}
+  }
+}

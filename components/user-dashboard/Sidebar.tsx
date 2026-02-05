@@ -158,23 +158,6 @@ function Sidebar() {
       id: "trips",
       label: "My Trips",
       icon: <Bus className="h-5 w-5" />,
-      subItems: [
-        {
-          id: "upcoming-trips",
-          label: "Upcoming Trips",
-          path: "/trips/upcoming",
-        },
-        {
-          id: "active-ticket",
-          label: "Active Ticket",
-          path: "/trips/active",
-        },
-        {
-          id: "trip-history",
-          label: "Trip History",
-          path: "/trips/history",
-        },
-      ],
       path: "/trips",
     },
 

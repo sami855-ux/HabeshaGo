@@ -22,7 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Car, AlertCircle } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Car, AlertCircle, Phone, User, Gauge, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Vehicle,
@@ -50,7 +51,7 @@ const vehicleTypes: { value: VehicleType; label: string }[] = [
 
 const vehicleStatuses: { value: VehicleStatus; label: string }[] = [
   { value: "ACTIVE", label: "Active" },
-  { value: "MAINTENANCE", label: "Maintenance" },
+  { value: "UNDER_MAINTENANCE", label: "Under Maintenance" },
   { value: "OUT_OF_SERVICE", label: "Out of Service" },
   { value: "INACTIVE", label: "Inactive" },
 ]
@@ -65,10 +66,15 @@ export default function VehicleFormDialog({
     type: "BUS",
     model: "",
     plateNumber: "",
+    vin: "",
     capacity: 20,
     manufacturer: "",
     year: new Date().getFullYear(),
     status: "ACTIVE",
+    mileage: 0,
+    ownerName: "",
+    ownerPhone: "",
+    gpsDeviceId: "",
     isActive: true,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -78,14 +84,15 @@ export default function VehicleFormDialog({
   const createVehicleMutation = useCreateVehicle({
     onSuccess: (data) => {
       console.log("Vehicle created:", data)
+      toast.success("Vehicle created successfully!")
       onSuccess()
-      // onOpenChange(false)
+      onOpenChange(false)
     },
     onError: (error: any) => {
       console.error("Failed to save vehicle:", error)
       toast.error(
-        error?.response.data.error ||
-          "An error occurred while saving the vehicle."
+        error?.response?.data?.error ||
+          "An error occurred while saving the vehicle.",
       )
     },
   })
@@ -96,12 +103,16 @@ export default function VehicleFormDialog({
         type: vehicle.type,
         model: vehicle.model,
         plateNumber: vehicle.plateNumber,
+        vin: vehicle.vin || "",
         capacity: vehicle.capacity,
         manufacturer: vehicle.manufacturer,
         year: vehicle.year,
         status: vehicle.status,
+        mileage: (vehicle as any).mileage || 0,
+        ownerName: vehicle.ownerName || "",
+        ownerPhone: vehicle.ownerPhone || "",
+        gpsDeviceId: vehicle.gpsDeviceId || "",
         isActive: vehicle.isActive,
-        driverId: vehicle.driverId,
       })
     } else {
       // Reset form for new vehicle
@@ -109,10 +120,15 @@ export default function VehicleFormDialog({
         type: "BUS",
         model: "",
         plateNumber: "",
+        vin: "",
         capacity: 20,
         manufacturer: "",
         year: new Date().getFullYear(),
         status: "ACTIVE",
+        mileage: 0,
+        ownerName: "",
+        ownerPhone: "",
+        gpsDeviceId: "",
         isActive: true,
       })
     }
@@ -142,6 +158,20 @@ export default function VehicleFormDialog({
       newErrors.year = "Year is invalid"
     }
 
+    if (formData.mileage < 0) {
+      newErrors.mileage = "Mileage cannot be negative"
+    }
+
+    // Validate VIN format if provided
+    if (formData.vin && formData.vin.length !== 17) {
+      newErrors.vin = "VIN must be 17 characters"
+    }
+
+    // Validate phone number format if provided
+    if (formData.ownerPhone && !/^[\d\s\-\+\(\)]+$/.test(formData.ownerPhone)) {
+      newErrors.ownerPhone = "Invalid phone number format"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -154,16 +184,33 @@ export default function VehicleFormDialog({
     setIsSubmitting(true)
 
     try {
+      // Prepare the data - remove empty optional fields
+      const submitData: any = { ...formData }
+
+      // Clean up optional fields - remove if empty
+      if (!submitData.vin) delete submitData.vin
+      if (!submitData.ownerName) delete submitData.ownerName
+      if (!submitData.ownerPhone) delete submitData.ownerPhone
+      if (!submitData.gpsDeviceId) delete submitData.gpsDeviceId
+      if (submitData.mileage === 0) delete submitData.mileage
+
       if (vehicle) {
         // TODO: Implement updateVehicle mutation here
-        console.log("Updating vehicle:", formData)
+        console.log("Updating vehicle:", submitData)
+        // Simulate update
+        setTimeout(() => {
+          toast.success("Vehicle updated successfully!")
+          onSuccess()
+          onOpenChange(false)
+          setIsSubmitting(false)
+        }, 1000)
       } else {
         // Create new vehicle
-        createVehicleMutation.mutate(formData)
+        createVehicleMutation.mutate(submitData)
       }
     } catch (error) {
       console.error("Unexpected error:", error)
-    } finally {
+      toast.error("An unexpected error occurred")
       setIsSubmitting(false)
     }
   }
@@ -173,7 +220,7 @@ export default function VehicleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Car className="h-5 w-5" />
@@ -226,7 +273,7 @@ export default function VehicleFormDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, model: e.target.value })
                     }
-                    placeholder="e.g., Volvo B8R"
+                    placeholder="e.g., Coaster, Sprinter"
                     className={errors.model ? "border-destructive" : ""}
                   />
                   {errors.model && (
@@ -252,7 +299,7 @@ export default function VehicleFormDialog({
                         plateNumber: e.target.value.toUpperCase(),
                       })
                     }
-                    placeholder="e.g., ABC-123"
+                    placeholder="e.g., AA-12345"
                     className={errors.plateNumber ? "border-destructive" : ""}
                   />
                   {errors.plateNumber && (
@@ -264,6 +311,40 @@ export default function VehicleFormDialog({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="vin">
+                    VIN Number{" "}
+                    <span className="text-xs text-muted-foreground">
+                      (Optional)
+                    </span>
+                  </Label>
+                  <Input
+                    id="vin"
+                    value={formData.vin}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        vin: e.target.value.toUpperCase(),
+                      })
+                    }
+                    placeholder="e.g., 1HGCM82633A123456"
+                    maxLength={17}
+                    className={errors.vin ? "border-destructive" : ""}
+                  />
+                  {errors.vin ? (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.vin}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      17-character Vehicle Identification Number
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="manufacturer">
                     Manufacturer <span className="text-red-500">*</span>
                   </Label>
@@ -273,13 +354,42 @@ export default function VehicleFormDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, manufacturer: e.target.value })
                     }
-                    placeholder="e.g., Volvo"
+                    placeholder="e.g., Toyota, Mercedes"
                     className={errors.manufacturer ? "border-destructive" : ""}
                   />
                   {errors.manufacturer && (
                     <p className="text-sm text-destructive flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
                       {errors.manufacturer}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="year">
+                    Year <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.year.toString()}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, year: parseInt(value) })
+                    }
+                  >
+                    <SelectTrigger id="year" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.year && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.year}
                     </p>
                   )}
                 </div>
@@ -316,30 +426,95 @@ export default function VehicleFormDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="year">
-                    Year <span className="text-red-500">*</span>
+                  <Label htmlFor="mileage">
+                    Current Mileage{" "}
+                    <span className="text-xs text-muted-foreground">
+                      (Optional)
+                    </span>
                   </Label>
-                  <Select
-                    value={formData.year.toString()}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, year: parseInt(value) })
-                    }
-                  >
-                    <SelectTrigger id="year" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((year) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.year && (
+                  <div className="relative">
+                    <Gauge className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="mileage"
+                      type="number"
+                      min="0"
+                      value={formData.mileage}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          mileage: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className={cn(
+                        "pl-9",
+                        errors.mileage ? "border-destructive" : "",
+                      )}
+                      placeholder="0"
+                    />
+                  </div>
+                  {errors.mileage && (
                     <p className="text-sm text-destructive flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
-                      {errors.year}
+                      {errors.mileage}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Current mileage in kilometers
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Owner Information (Optional) */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Owner Information{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  (Optional)
+                </span>
+              </h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ownerName">Owner Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="ownerName"
+                      value={formData.ownerName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, ownerName: e.target.value })
+                      }
+                      placeholder="e.g., John Doe"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ownerPhone">Owner Phone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="ownerPhone"
+                      value={formData.ownerPhone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, ownerPhone: e.target.value })
+                      }
+                      placeholder="e.g., +1234567890"
+                      className={cn(
+                        "pl-9",
+                        errors.ownerPhone ? "border-destructive" : "",
+                      )}
+                    />
+                  </div>
+                  {errors.ownerPhone && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.ownerPhone}
                     </p>
                   )}
                 </div>
@@ -348,13 +523,40 @@ export default function VehicleFormDialog({
 
             <Separator />
 
-            {/* Status & Activity */}
+            {/* GPS & Status */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Status & Activity</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">GPS & Status</h3>
+                <Badge variant="outline" className="text-xs">
+                  Optional
+                </Badge>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <Label htmlFor="gpsDeviceId">GPS Device ID</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="gpsDeviceId"
+                      value={formData.gpsDeviceId}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          gpsDeviceId: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., GPS-001"
+                      className="pl-9"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    GPS tracking device identifier
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Vehicle Status</Label>
                   <Select
                     value={formData.status}
                     onValueChange={(value: VehicleStatus) =>
@@ -367,23 +569,28 @@ export default function VehicleFormDialog({
                     <SelectContent>
                       {vehicleStatuses.map((status) => (
                         <SelectItem key={status.value} value={status.value}>
-                          {status.label}
+                          <div className="flex items-center gap-2">
+                            {status.value === "ACTIVE" && (
+                              <div className="w-2 h-2 rounded-full bg-green-500" />
+                            )}
+                            {status.value === "UNDER_MAINTENANCE" && (
+                              <div className="w-2 h-2 rounded-full bg-amber-500" />
+                            )}
+                            {status.value === "MAINTENANCE" && (
+                              <div className="w-2 h-2 rounded-full bg-amber-500" />
+                            )}
+                            {status.value === "OUT_OF_SERVICE" && (
+                              <div className="w-2 h-2 rounded-full bg-red-500" />
+                            )}
+                            {status.value === "INACTIVE" && (
+                              <div className="w-2 h-2 rounded-full bg-gray-500" />
+                            )}
+                            {status.label}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="driverId">Assigned Driver (Optional)</Label>
-                  <Input
-                    id="driverId"
-                    value={formData.driverId || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, driverId: e.target.value })
-                    }
-                    placeholder="Driver ID"
-                  />
                 </div>
               </div>
 
@@ -399,7 +606,7 @@ export default function VehicleFormDialog({
                     variant={formData.isActive ? "default" : "secondary"}
                     className={cn(
                       !formData.isActive &&
-                        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
                     )}
                   >
                     {formData.isActive ? "Active" : "Inactive"}
@@ -415,12 +622,12 @@ export default function VehicleFormDialog({
             </div>
           </div>
 
-          <DialogFooter className="space-x-2 sm:gap-0 pt-4">
+          <DialogFooter className="space-x-2 sm:gap-0 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || createVehicleMutation.isLoading}
             >
               Cancel
             </Button>

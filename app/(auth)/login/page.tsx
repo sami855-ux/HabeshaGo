@@ -7,33 +7,30 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Loader,
   Send,
-  Mail,
   Sparkles,
-  Check,
-  Phone,
-  HelpCircle,
+  Bus,
+  Wallet,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition, useEffect, useRef } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
-import { FaApple, FaGithub } from "react-icons/fa"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { FaApple, FaFacebook, FaTiktok } from "react-icons/fa"
 import { register } from "@/services/auth.user.api"
 
-// Common email domains for suggestions
+/* ---------------------------------- */
+/* Helpers */
+/* ---------------------------------- */
+
 const COMMON_EMAIL_DOMAINS = [
   "gmail.com",
   "outlook.com",
@@ -41,379 +38,264 @@ const COMMON_EMAIL_DOMAINS = [
   "mail.com",
 ]
 
-function LoginPage() {
+/* ---------------------------------- */
+/* Slider Content – HabeshaGo */
+/* ---------------------------------- */
+
+const SLIDES = [
+  {
+    image:
+      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1600&q=60",
+    title: "Book buses across Ethiopia",
+    subtitle: "Fast & reliable transport",
+    description:
+      "Search routes, compare schedules, and reserve your seat in seconds.",
+  },
+  {
+    image:
+      "https://images.unsplash.com/photo-1502920514313-52581002a659?w=1600&q=60",
+    title: "Smart routes & schedules",
+    subtitle: "Travel with confidence",
+    description: "Live departure times, route details, and seat availability.",
+  },
+  {
+    image:
+      "https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=1600&q=60",
+    title: "Secure wallet payments",
+    subtitle: "Simple & trusted",
+    description: "Top up once, pay instantly, and manage all your bookings.",
+  },
+  {
+    image:
+      "https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=1600&q=60",
+    title: "All your trips in one place",
+    subtitle: "Easy management",
+    description:
+      "Tickets, history, notifications, and refunds—organized for you.",
+  },
+]
+
+const FEATURES = [
+  { icon: <Bus className="h-4 w-4" />, label: "Bus Booking" },
+  { icon: <MapPin className="h-4 w-4" />, label: "Live Routes" },
+  { icon: <Wallet className="h-4 w-4" />, label: "Wallet & Payments" },
+]
+
+/* ---------------------------------- */
+/* Component */
+/* ---------------------------------- */
+
+export default function LoginPage() {
   const router = useRouter()
 
-  const [applePending, startAppleTransition] = useTransition()
-  const [googlePending, startGoogleTransition] = useTransition()
-  const [githubPending, startGithubTransition] = useTransition()
-  const [emailPending, startEmailTransition] = useTransition()
+  const [googlePending, startGoogle] = useTransition()
+  const [emailPending, startEmail] = useTransition()
 
   const [email, setEmail] = useState("")
-  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false)
-  const [emailSuggestions, setEmailSuggestions] = useState<string[]>([])
   const [emailError, setEmailError] = useState("")
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
-  const [showPhoneTooltip, setShowPhoneTooltip] = useState(false)
-  const [activeHelp, setActiveHelp] = useState<"email" | "phone" | null>(null)
+  const [slideIndex, setSlideIndex] = useState(0)
 
-  const emailInputRef = useRef<HTMLInputElement>(null)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
-  const phoneButtonRef = useRef<HTMLButtonElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Prevent body scroll when suggestions are shown
+  /* ---------------------------------- */
+  /* Slider logic */
+  /* ---------------------------------- */
+
+  const nextSlide = () => setSlideIndex((p) => (p + 1) % SLIDES.length)
+
+  const prevSlide = () =>
+    setSlideIndex((p) => (p === 0 ? SLIDES.length - 1 : p - 1))
+
   useEffect(() => {
-    if (showEmailSuggestions) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = "unset"
-    }
+    const interval = setInterval(nextSlide, 6000)
+    return () => clearInterval(interval)
+  }, [])
 
-    return () => {
-      document.body.style.overflow = "unset"
-    }
-  }, [showEmailSuggestions])
+  /* ---------------------------------- */
+  /* Auth */
+  /* ---------------------------------- */
 
-  // Handle click outside to close suggestions
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        emailInputRef.current &&
-        !emailInputRef.current.contains(event.target as Node)
-      ) {
-        setShowEmailSuggestions(false)
-        setSelectedSuggestionIndex(-1)
-      }
+  const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
-      // Close phone tooltip if clicking outside
-      if (
-        phoneButtonRef.current &&
-        !phoneButtonRef.current.contains(event.target as Node) &&
-        showPhoneTooltip
-      ) {
-        setShowPhoneTooltip(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showPhoneTooltip])
-
-  // Generate email suggestions
-  useEffect(() => {
-    if (!email.includes("@") && email.length > 0) {
-      const suggestions = COMMON_EMAIL_DOMAINS.map(
-        (domain) => `${email}@${domain}`
-      )
-      setEmailSuggestions(suggestions)
-      setShowEmailSuggestions(true)
-      setSelectedSuggestionIndex(-1)
-    } else {
-      setShowEmailSuggestions(false)
-    }
-  }, [email])
-
-  // Validate email format
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  // Handle email suggestion click
-  const handleEmailSuggestionClick = (suggestedEmail: string) => {
-    setEmail(suggestedEmail)
-    setShowEmailSuggestions(false)
-    setSelectedSuggestionIndex(-1)
-    setEmailError("")
-    emailInputRef.current?.focus()
-  }
-
-  // Handle keyboard navigation for suggestions
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showEmailSuggestions || emailSuggestions.length === 0) return
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault()
-        setSelectedSuggestionIndex((prev) =>
-          prev < emailSuggestions.length - 1 ? prev + 1 : 0
-        )
-        break
-
-      case "ArrowUp":
-        e.preventDefault()
-        setSelectedSuggestionIndex((prev) =>
-          prev > 0 ? prev - 1 : emailSuggestions.length - 1
-        )
-        break
-
-      case "Enter":
-        e.preventDefault()
-        if (
-          selectedSuggestionIndex >= 0 &&
-          selectedSuggestionIndex < emailSuggestions.length
-        ) {
-          handleEmailSuggestionClick(emailSuggestions[selectedSuggestionIndex])
-        }
-        break
-
-      case "Escape":
-        e.preventDefault()
-        setShowEmailSuggestions(false)
-        setSelectedSuggestionIndex(-1)
-        break
-
-      case "Tab":
-        setShowEmailSuggestions(false)
-        setSelectedSuggestionIndex(-1)
-        break
-    }
-  }
-
-  // Handle email change
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setEmail(value)
-
-    if (value && !validateEmail(value) && value.includes("@")) {
-      setEmailError("Please enter a valid email address")
-    } else {
-      setEmailError("")
-    }
-  }
-
-  // Handle phone login
-  const handlePhoneLogin = () => {
-    setShowPhoneTooltip(true)
-    setTimeout(() => {
-      router.push("/phone")
-    }, 1000)
-  }
-
-  async function signInWithGithub() {}
-
-  const signInWithGoogle = () => {
-    // Redirect the entire page to backend Google login
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
-    // "http://localhost:5000/api/auth/google"
-  }
-
-  async function signInWithApple() {}
-
-  const signInWithEmail = (e) => {
+  const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
-    // Validate email
     if (!validateEmail(email)) {
-      setEmailError("Please enter a valid email address")
+      setEmailError("Enter a valid email address")
       return
     }
 
-    startEmailTransition(async () => {
-      const response = await register({ email })
-
-      if (!response.success) return
-
-      toast.success("OTP is send to your email")
-      // Optional: move to OTP screen
+    startEmail(async () => {
+      const res = await register({ email })
+      if (!res.success) return
+      toast.success("OTP sent to your email")
       router.push(`/verify-request?email=${email}`)
     })
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-md mx-auto border shadow-lg">
-        <CardHeader className="space-y-2 pb-4">
-          <CardTitle className="text-2xl text-center font-semibold">
-            Sign in to your account
-          </CardTitle>
-          <CardDescription className="text-center">
-            Enter your email to receive a one-time passcode
-          </CardDescription>
-        </CardHeader>
+  const signInWithGoogle = () => {
+    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
+  }
 
-        <CardContent className="space-y-6">
-          {/* Social Login Buttons - Grid Layout */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Google Button - Full width */}
+  const slide = SLIDES[slideIndex]
+
+  return (
+    <div className="min-h-screen flex bg-background text-foreground">
+      {/* ---------------- LEFT SLIDER ---------------- */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <img
+          src={slide.image}
+          alt={slide.title}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/80" />
+
+        {/* Navigation buttons */}
+        <button
+          onClick={prevSlide}
+          aria-label="Previous slide"
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/10 backdrop-blur-md p-3 text-white hover:bg-white/20 transition"
+        >
+          <ChevronLeft />
+        </button>
+
+        <button
+          onClick={nextSlide}
+          aria-label="Next slide"
+          className="absolute right-6 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/10 backdrop-blur-md p-3 text-white hover:bg-white/20 transition"
+        >
+          <ChevronRight />
+        </button>
+
+        <div className="relative z-10 p-16 flex flex-col justify-between w-full">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
+              <Bus className="text-primary-foreground" />
+            </div>
+            <span className="text-2xl font-bold text-white">HabeshaGo</span>
+          </div>
+
+          {/* Text */}
+          <div className="max-w-xl">
+            <h1 className="text-4xl font-bold text-white mb-3">
+              {slide.title}
+            </h1>
+            <p className="text-lg text-white/80 mb-2">{slide.subtitle}</p>
+            <p className="text-white/70">{slide.description}</p>
+
+            <div className="flex gap-3 mt-6">
+              {FEATURES.map((f, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm text-white"
+                >
+                  {f.icon}
+                  {f.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Dots */}
+          <div className="flex gap-2">
+            {SLIDES.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlideIndex(i)}
+                className={`h-2 rounded-full transition-all ${
+                  i === slideIndex
+                    ? "w-8 bg-white"
+                    : "w-2 bg-white/40 hover:bg-white/70"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- RIGHT AUTH ---------------- */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6">
+        <Card className="w-full max-w-md shadow-none border-none bg-background">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl">Welcome to HabeshaGo</CardTitle>
+            <CardDescription>
+              Book buses, manage trips, and travel smarter
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
             <Button
               onClick={signInWithGoogle}
-              className="w-full font-medium h-11 col-span-2"
               variant="outline"
+              className="w-full h-12 cursor-pointer"
               disabled={googlePending}
             >
-              {googlePending ? (
-                <Loader className="animate-spin size-4" />
-              ) : (
-                <div className="flex items-center justify-center w-full cursor-pointer">
-                  <FcGoogle className="w-5 h-5 mr-3" />
-                  <span>Google</span>
-                </div>
-              )}
+              <FcGoogle className="mr-3 h-5 w-5" />
+              Continue with Google
             </Button>
 
-            {/* Apple Button - Primary Style */}
             <Button
-              onClick={signInWithApple}
-              className="w-full font-medium h-11"
-              variant="default"
-              disabled={applePending}
+              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer"
+              onClick={() => toast.info("TikTok login coming soon")}
             >
-              {applePending ? (
-                <Loader className="animate-spin size-4" />
-              ) : (
-                <div className="flex items-center justify-center w-full cursor-pointer">
-                  <FaApple className="w-5 h-5 mr-3" />
-                  <span>Apple</span>
+              <FaApple className="mr-3" />
+              Continue with Apple
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-card px-3 text-muted-foreground">OR</span>
+              </div>
+            </div>
+
+            <form onSubmit={submitEmail} className="space-y-4">
+              <div>
+                <Label>Email address</Label>
+                <div className="relative mt-2">
+                  <Input
+                    ref={inputRef}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="h-12 pr-10"
+                  />
+                  {email && !email.includes("@") && (
+                    <Sparkles className="absolute right-3 top-3.5 h-5 w-5 text-primary" />
+                  )}
                 </div>
-              )}
-            </Button>
-
-            {/* Phone Button - Secondary Style */}
-            <Button
-              ref={phoneButtonRef}
-              onClick={handlePhoneLogin}
-              className="w-full font-medium h-11"
-              variant="secondary"
-            >
-              <div className="flex items-center justify-center w-full cursor-pointer">
-                <Phone className="w-5 h-5 mr-3" />
-                <span>Phone</span>
-              </div>
-            </Button>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center z-10">
-              <div className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-sm z-50">
-              <span className="px-3 text-muted-foreground bg-card">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          {/* Email Login */}
-          <form className="space-y-4" onSubmit={signInWithEmail}>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email address
-                </Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() =>
-                          setActiveHelp(activeHelp === "email" ? null : "email")
-                        }
-                      >
-                        <HelpCircle className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Enter your email to receive a one-time passcode</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <div className="relative" ref={suggestionsRef}>
-                <Input
-                  ref={emailInputRef}
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={handleEmailChange}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => {
-                    if (email && !email.includes("@")) {
-                      setShowEmailSuggestions(true)
-                    }
-                  }}
-                  className={`pr-10 ${emailError ? "border-destructive" : ""}`}
-                  required
-                />
-                {email && !email.includes("@") && (
-                  <Sparkles className="absolute right-3 top-3 h-4 w-4 text-primary" />
+                {emailError && (
+                  <p className="text-sm text-destructive mt-1">{emailError}</p>
                 )}
+              </div>
 
-                {/* Email Suggestions Dropdown */}
-                {showEmailSuggestions && emailSuggestions.length > 0 && (
+              <Button
+                type="submit"
+                className="w-full h-12"
+                disabled={emailPending}
+              >
+                {emailPending ? (
                   <>
-                    {/* Overlay to prevent background scrolling */}
-                    <div
-                      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-                      onClick={() => setShowEmailSuggestions(false)}
-                    />
-
-                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-80 overflow-y-auto">
-                      <div className="px-3 py-2 border-b bg-muted/50 sticky top-0">
-                        <p className="text-xs text-muted-foreground">
-                          Press ↑↓ to navigate • Enter to select • Esc to close
-                        </p>
-                      </div>
-                      {emailSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                            index === selectedSuggestionIndex
-                              ? "bg-accent text-accent-foreground"
-                              : "hover:bg-accent hover:text-accent-foreground"
-                          }`}
-                          onClick={() => handleEmailSuggestionClick(suggestion)}
-                          onMouseEnter={() => setSelectedSuggestionIndex(index)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-3 h-3 text-muted-foreground" />
-                            <span>{suggestion}</span>
-                          </div>
-                          {index === selectedSuggestionIndex && (
-                            <Check className="w-3 h-3" />
-                          )}
-                        </button>
-                      ))}
-                      <div className="px-3 py-2 border-t bg-muted/50 sticky bottom-0">
-                        <p className="text-xs text-muted-foreground">
-                          {emailSuggestions.length} email suggestions
-                        </p>
-                      </div>
-                    </div>
+                    <Loader className="animate-spin mr-2" />
+                    Sending OTP
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2" />
+                    Continue
                   </>
                 )}
-              </div>
-              {emailError && (
-                <p className="text-sm text-destructive">{emailError}</p>
-              )}
-            </div>
+              </Button>
+            </form>
 
-            <Button
-              className="w-full cursor-pointer h-11"
-              type="submit"
-              disabled={emailPending}
-            >
-              {emailPending ? (
-                <>
-                  <Loader className="animate-spin mr-2 size-4" />
-                  Sending OTP...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Send OTP
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground text-center">
+              By continuing, you agree to HabeshaGo’s Terms & Privacy Policy
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
-
-export default LoginPage

@@ -30,7 +30,6 @@ import {
 import { cn } from "@/lib/utils"
 import VehiclesTable from "@/components/admin-dashboard/vehicle/vehicles-table"
 import VehicleFormDialog from "@/components/admin-dashboard/vehicle/vehicle-form-dialog"
-import FilterSheet from "@/components/admin-dashboard/vehicle/filter-sheet"
 import { Vehicle, VehicleFilters } from "@/types/vehicle"
 import { useAllVehicles } from "@/hooks/useGetAllVehicle"
 import { getVehicleStats, VehicleStats } from "@/services/vehicle.api"
@@ -88,12 +87,12 @@ export default function VehiclesManagement() {
       confirm(
         `Are you sure you want to ${
           vehicle.isActive ? "deactivate" : "delete"
-        } ${vehicle.plateNumber}?`
+        } ${vehicle.plateNumber}?`,
       )
     ) {
       console.log(
         `${vehicle.isActive ? "Deactivating" : "Deleting"} vehicle`,
-        vehicle.id
+        vehicle.id,
       )
       await refetch() // Refresh vehicles
     }
@@ -185,8 +184,7 @@ export default function VehiclesManagement() {
               ) : (
                 <>
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {stats?.activeVehicles ||
-                      vehicles.filter((v) => v.isActive).length}
+                    {stats?.activeVehicles}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Currently operational
@@ -209,8 +207,9 @@ export default function VehiclesManagement() {
               ) : (
                 <>
                   <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                    {stats?.maintenanceVehicles ||
-                      vehicles.filter((v) => v.status === "MAINTENANCE").length}
+                    {stats?.underMaintenanceVehicles ||
+                      vehicles.filter((v) => v.status === "UNDER_MAINTENANCE")
+                        .length}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Under repair/service
@@ -245,48 +244,6 @@ export default function VehiclesManagement() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Controls */}
-        <Card className="mb-6">
-          <CardContent className="pt-6 flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by plate, model, or manufacturer..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <FilterSheet
-                filters={filters}
-                onFiltersChange={(newFilters) =>
-                  setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }))
-                }
-                onReset={() =>
-                  setFilters({
-                    page: 1,
-                    limit: 10,
-                    sortBy: "plateNumber",
-                    sortOrder: "asc",
-                  })
-                }
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => refetch()}
-                disabled={isLoading}
-              >
-                <RefreshCw
-                  className={cn("h-4 w-4", isLoading && "animate-spin")}
-                />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Table Section */}
         <Card>

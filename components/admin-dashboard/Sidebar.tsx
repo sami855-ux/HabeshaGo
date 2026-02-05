@@ -16,6 +16,8 @@ import {
   MapPin,
   Menu,
   X,
+  ChevronFirst,
+  ChevronLast,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
@@ -26,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button"
 
 export type MenuItem = {
   id: string
@@ -42,9 +45,17 @@ function Sidebar() {
   const { isCollapsed, toggleSidebar } = useSidebar()
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
-  // Load expanded items from localStorage on mount
+  // Mark component as mounted (client-side)
   useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Load expanded items from localStorage only after component mounts
+  useEffect(() => {
+    if (!isMounted) return
+
     const loadExpandedItems = () => {
       try {
         const stored = localStorage.getItem("sidebar-expanded-items")
@@ -59,7 +70,7 @@ function Sidebar() {
             setExpandedItems(newSet)
             localStorage.setItem(
               "sidebar-expanded-items",
-              JSON.stringify(Array.from(newSet))
+              JSON.stringify(Array.from(newSet)),
             )
           }
         }
@@ -71,14 +82,14 @@ function Sidebar() {
     }
 
     loadExpandedItems()
-  }, [])
+  }, [isMounted, pathname]) // Re-run when component mounts and pathname changes
 
   // Find the parent item that should be auto-expanded based on current path
   const findActiveParent = () => {
     for (const item of menuItems) {
       if (item.subItems) {
         const hasActiveChild = item.subItems.some(
-          (subItem) => subItem.path === pathname
+          (subItem) => subItem.path === pathname,
         )
         if (hasActiveChild) {
           return item.id
@@ -102,8 +113,10 @@ function Sidebar() {
     return subItemPath === pathname
   }
 
-  // Auto-expand parent items when subitem is active and save to localStorage
+  // Auto-expand parent items when subitem is active
   useEffect(() => {
+    if (!isMounted) return
+
     const activeParent = findActiveParent()
     if (activeParent && !expandedItems.has(activeParent)) {
       const newSet = new Set([...expandedItems, activeParent])
@@ -111,13 +124,13 @@ function Sidebar() {
       try {
         localStorage.setItem(
           "sidebar-expanded-items",
-          JSON.stringify(Array.from(newSet))
+          JSON.stringify(Array.from(newSet)),
         )
       } catch (error) {
         console.error("Failed to save expanded items to localStorage:", error)
       }
     }
-  }, [pathname])
+  }, [pathname, isMounted])
 
   const toggleSubmenu = (itemId: string) => {
     const newSet = new Set(expandedItems)
@@ -132,17 +145,11 @@ function Sidebar() {
     try {
       localStorage.setItem(
         "sidebar-expanded-items",
-        JSON.stringify(Array.from(newSet))
+        JSON.stringify(Array.from(newSet)),
       )
     } catch (error) {
       console.error("Failed to save expanded items to localStorage:", error)
     }
-  }
-
-  // Clear all expanded items (useful for reset)
-  const clearExpandedItems = () => {
-    setExpandedItems(new Set())
-    localStorage.removeItem("sidebar-expanded-items")
   }
 
   const menuItems: MenuItem[] = [
@@ -207,8 +214,17 @@ function Sidebar() {
       label: "Fleet / Operations",
       icon: <ShoppingCart className="h-5 w-5" />,
       subItems: [
-        { id: "buses", label: "Buses", path: "/admin/fleet/buses" },
         { id: "drivers", label: "Drivers", path: "/admin/fleet/drivers" },
+        {
+          id: "parking",
+          label: "Parking Operators",
+          path: "/admin/fleet/parking",
+        },
+        {
+          id: "ev-charging",
+          label: "EV Charging Operators",
+          path: "/admin/fleet/ev-charging",
+        },
       ],
     },
     {
@@ -249,6 +265,13 @@ function Sidebar() {
     },
   ]
 
+  // Don't render anything during SSR to avoid hydration mismatch
+  if (!isMounted) {
+    return (
+      <div className="fixed left-0 top-0 z-40 h-screen w-20 bg-background border-r border-border lg:block hidden" />
+    )
+  }
+
   return (
     <>
       {/* Mobile Toggle Button */}
@@ -266,34 +289,22 @@ function Sidebar() {
       {/* Sidebar Container */}
       <div
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen bg-background border-r border-border transition-all duration-300",
+          "fixed left-0 top-0 z-40 h-screen bg-background border-r border-border transition-all duration-300 flex flex-col",
           // Mobile: slide in/out
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
           // Desktop: always visible
           "lg:translate-x-0",
           // Width based on collapsed state
-          isCollapsed ? "w-20" : "w-64"
+          isCollapsed ? "w-20" : "w-64",
         )}
       >
-        {/* Desktop Collapse Toggle */}
-        <button
-          className="hidden lg:flex absolute -right-3 top-6 z-10 rounded-full bg-primary p-1.5 text-primary-foreground shadow-lg border border-border hover:bg-primary/90"
-          onClick={toggleSidebar}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3 rotate-180" />
-          )}
-        </button>
-
         {/* Sidebar Content */}
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col overflow-hidden">
           {/* Top Section */}
           <div
             className={cn(
-              "flex items-center gap-3 p-6 cursor-pointer transition-all duration-300",
-              isCollapsed && "lg:justify-center lg:p-4"
+              "flex items-center gap-3 p-6 cursor-pointer transition-all duration-300 flex-shrink-0",
+              isCollapsed && "lg:justify-center lg:p-4",
             )}
             onClick={() => {
               router.push("/dashboard")
@@ -325,7 +336,7 @@ function Sidebar() {
                 {menuItems.map((item) => {
                   const isActive = isItemActive(item)
                   const hasActiveSubItem = item.subItems?.some((subItem) =>
-                    isSubItemActive(subItem.path)
+                    isSubItemActive(subItem.path),
                   )
 
                   return (
@@ -350,7 +361,7 @@ function Sidebar() {
                                 isActive &&
                                   "bg-primary/10 text-primary hover:bg-primary/20",
                                 hasActiveSubItem &&
-                                  "bg-primary/5 text-primary hover:bg-primary/15"
+                                  "bg-primary/5 text-primary hover:bg-primary/15",
                               )}
                             >
                               <div
@@ -361,7 +372,7 @@ function Sidebar() {
                                   hasActiveSubItem && "text-primary",
                                   !isActive &&
                                     !hasActiveSubItem &&
-                                    "text-muted-foreground group-hover:text-primary"
+                                    "text-muted-foreground group-hover:text-primary",
                                 )}
                               >
                                 {item.icon}
@@ -394,7 +405,7 @@ function Sidebar() {
                             isActive &&
                               "bg-primary/10 text-primary hover:bg-primary/20",
                             hasActiveSubItem &&
-                              "bg-primary/5 text-primary hover:bg-primary/15"
+                              "bg-primary/5 text-primary hover:bg-primary/15",
                           )}
                         >
                           <div
@@ -405,7 +416,7 @@ function Sidebar() {
                               hasActiveSubItem && "text-primary",
                               !isActive &&
                                 !hasActiveSubItem &&
-                                "text-muted-foreground group-hover:text-primary"
+                                "text-muted-foreground group-hover:text-primary",
                             )}
                           >
                             {item.icon}
@@ -415,7 +426,7 @@ function Sidebar() {
                             className={cn(
                               "flex-1 text-left transition-colors duration-200",
                               (isActive || hasActiveSubItem) &&
-                                "text-primary font-medium"
+                                "text-primary font-medium",
                             )}
                           >
                             {item.label}
@@ -425,7 +436,8 @@ function Sidebar() {
                               className={cn(
                                 "h-4 w-4 transition-transform duration-200 flex-shrink-0",
                                 expandedItems.has(item.id) && "rotate-180",
-                                (isActive || hasActiveSubItem) && "text-primary"
+                                (isActive || hasActiveSubItem) &&
+                                  "text-primary",
                               )}
                             />
                           )}
@@ -448,7 +460,7 @@ function Sidebar() {
                                     "hover:bg-accent hover:text-accent-foreground",
                                     isSubActive
                                       ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
-                                      : "text-muted-foreground hover:text-accent-foreground"
+                                      : "text-muted-foreground hover:text-accent-foreground",
                                   )}
                                   onClick={() => {
                                     if (subItem.path) {
@@ -467,13 +479,13 @@ function Sidebar() {
                                       "h-3 w-3 flex-shrink-0 transition-colors duration-200",
                                       isSubActive
                                         ? "text-primary"
-                                        : "text-muted-foreground"
+                                        : "text-muted-foreground",
                                     )}
                                   />
                                   <span
                                     className={cn(
                                       "whitespace-nowrap transition-colors duration-200",
-                                      isSubActive && "text-primary"
+                                      isSubActive && "text-primary",
                                     )}
                                   >
                                     {subItem.label}
@@ -490,18 +502,45 @@ function Sidebar() {
             </TooltipProvider>
           </div>
 
-          {/* Optional: Debug/reset button (remove in production) */}
-          {process.env.NODE_ENV === "development" && !isCollapsed && (
-            <div className="p-4 border-t border-border">
-              <button
-                onClick={clearExpandedItems}
-                className="text-xs text-muted-foreground hover:text-foreground"
-                title="Clear saved expanded menu states"
-              >
-                Reset menu state
-              </button>
+          {/* Bottom Section - Collapse Button */}
+          <div className="p-4 border-t border-border mt-auto">
+            <div
+              className={cn(
+                "transition-all duration-300",
+                isCollapsed ? "flex justify-center" : "space-y-4",
+              )}
+            >
+              {/* Collapse Button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size={isCollapsed ? "icon" : "default"}
+                      className={cn(
+                        "w-full transition-all duration-200 bg-transparent border-none",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        isCollapsed && "justify-center",
+                      )}
+                      onClick={toggleSidebar}
+                    >
+                      {isCollapsed ? (
+                        <ChevronLast className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <ChevronFirst className="h-4 w-4 mr-2" />
+                          <span>Collapse sidebar</span>
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

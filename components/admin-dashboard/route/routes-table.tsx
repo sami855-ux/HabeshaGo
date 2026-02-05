@@ -66,12 +66,14 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  Ban,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Route as RouteType } from "@/types/route"
 import RouteDialog from "@/components/admin-dashboard/route/route-dialog"
 import DeleteConfirmationDialog from "@/components/admin-dashboard/route/delete-confirmation-dialog"
 import { useAllRoutesQuery } from "@/hooks/useGetAllRoutes"
+import { useRouter } from "next/navigation"
 
 // Status badge mapping
 const statusConfig = {
@@ -88,232 +90,19 @@ const statusConfig = {
   },
 }
 
-// Table columns
-const columns: ColumnDef<RouteType>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
+export const suspensionStatusConfig = {
+  true: {
+    label: "Suspended",
+    color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+    icon: Ban,
   },
-  {
-    accessorKey: "name",
-    header: "Route ID",
-    cell: ({ row }) => {
-      const route = row.original
-      return (
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-            <Route className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-foreground">{route.name}</span>
-            <span className="text-sm text-muted-foreground">
-              {route.midPoints?.length || 0} mid-points
-            </span>
-          </div>
-        </div>
-      )
-    },
+  false: {
+    label: "Operational",
+    color:
+      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+    icon: Activity,
   },
-  {
-    accessorKey: "origin",
-    header: "Origin",
-    cell: ({ row }) => {
-      const route = row.original
-      return (
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{route.origin}</span>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "destination",
-    header: "Destination",
-    cell: ({ row }) => {
-      const route = row.original
-      return (
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{route.destination}</span>
-        </div>
-      )
-    },
-  },
-  {
-    id: "distanceTime",
-    header: "Distance & Time",
-    cell: ({ row }) => {
-      const route = row.original
-      return (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Route className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {route.distanceKm ? `${route.distanceKm} km` : "N/A"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm">
-              {route.estimatedTimeMin ? `${route.estimatedTimeMin} min` : "N/A"}
-            </span>
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    id: "vehicles",
-    header: "Vehicles",
-    cell: ({ row }) => {
-      const route = row.original
-      return (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Bus className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {route.busCount || 0} buses
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Car className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm">{route.minibusCount || 0} minibuses</span>
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "isActive",
-    header: "Status",
-    cell: ({ row }) => {
-      const isActive = row.getValue("isActive") as boolean
-      const config = isActive ? statusConfig.active : statusConfig.inactive
-      const Icon = config.icon
-      return (
-        <Badge variant="secondary" className={cn("gap-1.5", config.color)}>
-          <Icon className="h-3.5 w-3.5" />
-          {config.label}
-        </Badge>
-      )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Created",
-    cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt"))
-      return (
-        <div className="text-sm">
-          {date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </div>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const route = row.original
-      const [isDialogOpen, setIsDialogOpen] = useState(false)
-      const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-
-      return (
-        <>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <Eye className="h-4 w-4" />
-              View
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-semibold">
-                  Actions
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2 cursor-pointer"
-                  onClick={() => setIsDialogOpen(true)}
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit Route
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 cursor-pointer">
-                  <Map className="h-4 w-4" />
-                  View on Map
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 cursor-pointer">
-                  <Activity className="h-4 w-4" />
-                  {route.isActive ? "Deactivate" : "Activate"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2 cursor-pointer text-red-600 dark:text-red-400"
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Route
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <RouteDialog
-            open={isDialogOpen}
-            onOpenChange={setIsDialogOpen}
-            route={route}
-            isEdit={true}
-          />
-
-          <DeleteConfirmationDialog
-            open={isDeleteDialogOpen}
-            onOpenChange={setIsDeleteDialogOpen}
-            route={route}
-          />
-        </>
-      )
-    },
-  },
-]
+}
 
 // Skeleton Loading Component
 const TableSkeleton = () => {
@@ -361,18 +150,18 @@ const TableSkeleton = () => {
                               cellIndex === 0
                                 ? "40px"
                                 : cellIndex === 1
-                                ? "180px"
-                                : cellIndex === 2
-                                ? "120px"
-                                : cellIndex === 3
-                                ? "120px"
-                                : cellIndex === 4
-                                ? "100px"
-                                : cellIndex === 5
-                                ? "100px"
-                                : cellIndex === 6
-                                ? "80px"
-                                : "100px",
+                                  ? "180px"
+                                  : cellIndex === 2
+                                    ? "120px"
+                                    : cellIndex === 3
+                                      ? "120px"
+                                      : cellIndex === 4
+                                        ? "100px"
+                                        : cellIndex === 5
+                                          ? "100px"
+                                          : cellIndex === 6
+                                            ? "80px"
+                                            : "100px",
                           }}
                         ></div>
                       </div>
@@ -527,6 +316,8 @@ const extractRoutesFromResponse = (data: any): RouteType[] => {
 }
 
 export default function RoutesTable() {
+  const router = useRouter()
+
   const { data: apiResponse, isLoading, error, refetch } = useAllRoutesQuery()
   const [sorting, setSorting] = useState<SortingState>([
     { id: "createdAt", desc: true },
@@ -557,6 +348,219 @@ export default function RoutesTable() {
       midPoints: route.midPoints || [],
     }))
   }, [apiResponse])
+
+  // Table columns
+  const columns: ColumnDef<RouteType>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "name",
+      header: "Route ID",
+      cell: ({ row }) => {
+        const route = row.original
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <Route className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-foreground">
+                {route.name}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {route.midPoints?.length || 0} mid-points
+              </span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "origin",
+      header: "Origin",
+      cell: ({ row }) => {
+        const route = row.original
+        return (
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{route.origin}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "destination",
+      header: "Destination",
+      cell: ({ row }) => {
+        const route = row.original
+        return (
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{route.destination}</span>
+          </div>
+        )
+      },
+    },
+    {
+      id: "distanceTime",
+      header: "Distance & Time",
+      cell: ({ row }) => {
+        const route = row.original
+        return (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Route className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {route.distanceKm ? `${route.distanceKm} km` : "N/A"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm">
+                {route.estimatedTimeMin
+                  ? `${route.estimatedTimeMin} min`
+                  : "N/A"}
+              </span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: "vehicles",
+      header: "Vehicles",
+      cell: ({ row }) => {
+        const route = row.original
+        return (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Bus className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {route.busCount || 0} buses
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Car className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm">
+                {route.minibusCount || 0} minibuses
+              </span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => {
+        const isActive = row.getValue("isActive") as boolean
+        const config = isActive ? statusConfig.active : statusConfig.inactive
+        const Icon = config.icon
+        return (
+          <Badge variant="secondary" className={cn("gap-1.5", config.color)}>
+            <Icon className="h-3.5 w-3.5" />
+            {config.label}
+          </Badge>
+        )
+      },
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+      },
+    },
+    {
+      accessorKey: "isSuspended",
+      header: "Suspended",
+      cell: ({ row }) => {
+        const isSuspended = row.getValue("isSuspended") as boolean
+        const config = isSuspended
+          ? suspensionStatusConfig[isSuspended]
+          : suspensionStatusConfig[isSuspended]
+        const Icon = config.icon
+        return (
+          <Badge variant="secondary" className={cn("gap-1.5", config.color)}>
+            <Icon className="h-3.5 w-3.5" />
+            {config.label}
+          </Badge>
+        )
+      },
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created",
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("createdAt"))
+        return (
+          <div className="text-sm">
+            {date.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </div>
+        )
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const route = row.original
+        const [isDialogOpen, setIsDialogOpen] = useState(false)
+        const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
+        return (
+          <>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => router.push(`/admin/manage-route/${route.id}`)}
+              >
+                <Eye className="h-4 w-4" />
+                View
+              </Button>
+            </div>
+
+            <RouteDialog
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
+              route={route}
+              isEdit={true}
+            />
+
+            <DeleteConfirmationDialog
+              open={isDeleteDialogOpen}
+              onOpenChange={setIsDeleteDialogOpen}
+              route={route}
+            />
+          </>
+        )
+      },
+    },
+  ]
 
   const table = useReactTable({
     data: routes,
@@ -710,8 +714,8 @@ export default function RoutesTable() {
           </Button>
           <Button
             size="sm"
-            className="gap-2 bg-blue-600 hover:bg-blue-700"
-            onClick={() => setIsCreateDialogOpen(true)}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 cursor-pointer"
+            onClick={() => router.push("/admin/manage-route/add-new-route")}
           >
             <Plus className="h-4 w-4" />
             New Route
@@ -733,7 +737,7 @@ export default function RoutesTable() {
                           ? null
                           : flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                       </TableHead>
                     )
@@ -753,7 +757,7 @@ export default function RoutesTable() {
                       <TableCell key={cell.id}>
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext()
+                          cell.getContext(),
                         )}
                       </TableCell>
                     ))}

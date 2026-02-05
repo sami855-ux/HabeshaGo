@@ -436,7 +436,7 @@ model Route {
   price            Decimal?       
   currency         String         @default("ETB") // optional
   isActive         Boolean        @default(true)
-  isSuspended      Boolean           @default(false)   // System Management
+  isSuspended      Boolean        @default(false)   // System Management
   createdBy        Int?    
 
   createdAt        DateTime       @default(now())
@@ -454,6 +454,7 @@ model RouteMidPoint {
   name     String
   lat      Float
   lng      Float
+  order    Int    @default(0)
 
   @@index([routeId]) // optional index for faster searches
 }

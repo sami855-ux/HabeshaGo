@@ -10,6 +10,7 @@ import {
   assignDriver,
   unassignDriver,
   getVehicleById,
+  updateVehicleLocation,
 } from "../controllers/vehicle.controller.js"
 
 const router = express.Router()
@@ -39,5 +40,8 @@ router.patch("/:id/mileage", updateVehicleMileage)
 /* ---------------- DRIVER ---------------- */
 router.post("/:id/assign-driver", assignDriver)
 router.patch("/:id/unassign-driver", unassignDriver)
+
+//Save gps LOcation
+router.post("/location", updateVehicleLocation)
 
 export default router

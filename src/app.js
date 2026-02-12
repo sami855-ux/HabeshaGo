@@ -1,14 +1,15 @@
 import dotenv from "dotenv"
 dotenv.config()
 
+import http from "http"
+import express from "express"
 import cookieParser from "cookie-parser"
 import session from "express-session"
 import passport from "passport"
-import express from "express"
 import cors from "cors"
 
-// Passport config
 import "./config/passport.js"
+import { initSocket } from "./socket/index.js"
 
 // Routes
 import minibusReservationRoutes from "./routes/minibusReservation.routes.js"
@@ -27,11 +28,10 @@ import busRoutes from "./routes/bus.routes.js"
 import auditRoute from "./routes/audit.route.js"
 import midPointRoute from "./routes/midpoint.routes.js"
 
-const PORT = process.env.PORT || 5000
-
 const app = express()
 
 app.use(cookieParser())
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -42,22 +42,28 @@ app.use(
         "https://your-web-domain.com",
       ]
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
+      if (allowedOrigins.includes(origin)) return callback(null, true)
 
       return callback(new Error("Not allowed by CORS"))
     },
     credentials: true,
   }),
 )
+
 app.use(express.json())
+
 app.use(
-  session({ secret: "secretkey", resave: false, saveUninitialized: false }),
+  session({
+    secret: "secretkey",
+    resave: false,
+    saveUninitialized: false,
+  }),
 )
+
 app.use(passport.initialize())
 app.use(passport.session())
 
+// routes
 app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/wallet", walletRoutes)
@@ -67,16 +73,19 @@ app.use("/api/drivers", driverRoutes)
 app.use("/api/buses", busRoutes)
 app.use("/api/route", routeRoutes)
 app.use("/api/midpoint", midPointRoute)
-
 app.use("/api/payment", paymentRoutes)
 app.use("/api/booking", bookingRoutes)
-
 app.use("/api/vehicles", vehicleRoute)
-
 app.use("/api/minibus-reservation", minibusReservationRoutes)
 app.use("/api/minibus", minibusRoute)
 app.use("/api/audit", auditRoute)
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port https://localhost:${PORT}`)
+const server = http.createServer(app)
+
+initSocket(server)
+
+const PORT = process.env.PORT || 5000
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`)
 })

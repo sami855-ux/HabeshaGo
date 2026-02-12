@@ -353,6 +353,7 @@ model Vehicle {
   manufacturer String?
   year         Int?
   capacity     Int
+  vehicleImageUrl String?    @default("")
 
   status       VehicleStatus @default(ACTIVE)
   mileage      Int           @default(0)
@@ -361,10 +362,12 @@ model Vehicle {
   ownerPhone   String?
   gpsDeviceId  String?
 
-  // ✅ relation
+  // relations
   driverAssignments DriverAssignment[]
   buses        Bus[]
   minibuses    Minibus[]
+
+  locations    VehicleLocation[]
 
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -372,6 +375,23 @@ model Vehicle {
   @@index([status])
   @@index([type])
   @@map("vehicles")
+}
+
+
+model VehicleLocation {
+  id         Int      @id @default(autoincrement())
+
+  vehicleId  Int
+  lat        Float
+  lng        Float
+  speed      Float?
+  heading    Float?
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, recordedAt])
 }
 
 model Driver {

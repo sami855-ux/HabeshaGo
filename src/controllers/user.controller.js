@@ -18,7 +18,7 @@ export const getAllUsers = async (req, res) => {
         name: true,
         email: true,
         phone: true,
-        image: true,
+        avaterUrl: true,
         role: true,
         emailVerified: true,
         phoneVerified: true,
@@ -64,13 +64,6 @@ export const getAllUsers = async (req, res) => {
             id: true,
             expiresAt: true,
             createdAt: true,
-          },
-        },
-        accounts: {
-          select: {
-            id: true,
-            provider: true,
-            providerAccountId: true,
           },
         },
       },

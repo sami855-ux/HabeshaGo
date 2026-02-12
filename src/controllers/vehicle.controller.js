@@ -1,4 +1,6 @@
 import prisma from "../prisma/client.js"
+import { setLatestVehicleLocation } from "../services/redisService.service.js"
+import { emitToVehicle } from "../socket/index.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 
 export const createVehicle = async (req, res) => {
@@ -428,5 +430,78 @@ export const unassignDriver = async (req, res) => {
     return res
       .status(500)
       .json(errorResponse("Failed to unassign driver", 500, err.message))
+  }
+}
+
+export const updateVehicleLocation = async (req, res) => {
+  try {
+    let { vehicleId, lat, lng, speed, heading, accuracy } = req.body
+
+    // required fields
+    if (!vehicleId)
+      return res.status(400).json(errorResponse("vehicleId is required", 400))
+
+    if (lat === undefined || lng === undefined)
+      return res
+        .status(400)
+        .json(errorResponse("lat and lng are required", 400))
+
+    // convert types
+    vehicleId = Number(vehicleId)
+    lat = Number(lat)
+    lng = Number(lng)
+    speed = speed ? Number(speed) : null
+    heading = heading ? Number(heading) : null
+    accuracy = accuracy ? Number(accuracy) : null
+
+    // validate numbers
+    if (Number.isNaN(vehicleId) || vehicleId <= 0)
+      return res.status(400).json(errorResponse("Invalid vehicleId", 400))
+
+    if (Number.isNaN(lat) || lat < -90 || lat > 90)
+      return res.status(400).json(errorResponse("Invalid latitude", 400))
+
+    if (Number.isNaN(lng) || lng < -180 || lng > 180)
+      return res.status(400).json(errorResponse("Invalid longitude", 400))
+
+    // check vehicle exists
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { id: true },
+    })
+
+    if (!vehicle)
+      return res.status(404).json(errorResponse("Vehicle not found", 404))
+
+    // save history in DB
+    const location = await prisma.vehicleLocation.create({
+      data: {
+        vehicleId,
+        lat,
+        lng,
+        speed,
+        heading,
+        accuracy,
+      },
+    })
+
+    console.log(location)
+
+    // save latest in Redis via service
+    await setLatestVehicleLocation(vehicleId, location)
+
+    // realtime socket emit
+    emitToVehicle(vehicleId, "vehicle:location", location)
+
+    // success response
+    return res
+      .status(201)
+      .json(successResponse("Location updated successfully", location, 201))
+  } catch (error) {
+    console.error("GPS update error:", error)
+
+    return res
+      .status(500)
+      .json(errorResponse("Failed to update vehicle location", 500))
   }
 }

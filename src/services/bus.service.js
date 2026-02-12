@@ -5,21 +5,21 @@ export const createBusService = async (data) => {
   try {
     // Extract and validate form data
     const {
-      busNumber,           // String Required — must be unique (e.g., "BUS-101")
-      capacity,            // Int Required — number of seats
-      routeId,             // Int Optional at creation — but recommended to assign a route
-      driverId,            // String Optional — assign later or at creation if driver exists
-      currentStop,         // String Optional — where the bus is currently located
-      nextDestination,     // String Optional — next stop or final destination
-      departureTime,       // DateTime Optional — initial departure time
-      estimatedArrival,    // DateTime Optional — calculated from route
-      delayMinutes = 0,    // Int Optional — default 0
-      availableSeats,      // Int Optional — can default to capacity if not provided
-      vehicleId,           // Int Optional — if this bus is linked to a vehicle
-      lastServiceDate,     // DateTime Optional — for maintenance tracking
-      nextServiceDate,     // DateTime Optional — next maintenance date
-      status = "ACTIVE",   // BusStatus Optional — default ACTIVE
-      isActive = true,     // Boolean Optional — default true
+      busNumber, // String Required — must be unique (e.g., "BUS-101")
+      capacity, // Int Required — number of seats
+      routeId, // Int Optional at creation — but recommended to assign a route
+      driverId, // String Optional — assign later or at creation if driver exists
+      currentStop, // String Optional — where the bus is currently located
+      nextDestination, // String Optional — next stop or final destination
+      departureTime, // DateTime Optional — initial departure time
+      estimatedArrival, // DateTime Optional — calculated from route
+      delayMinutes = 0, // Int Optional — default 0
+      availableSeats, // Int Optional — can default to capacity if not provided
+      vehicleId, // Int Optional — if this bus is linked to a vehicle
+      lastServiceDate, // DateTime Optional — for maintenance tracking
+      nextServiceDate, // DateTime Optional — next maintenance date
+      status = "ACTIVE", // BusStatus Optional — default ACTIVE
+      isActive = true, // Boolean Optional — default true
     } = data
 
     // Validate required fields
@@ -29,7 +29,7 @@ export const createBusService = async (data) => {
 
     // Check if bus number already exists
     const existingBus = await prisma.bus.findUnique({
-      where: { busNumber }
+      where: { busNumber },
     })
     if (existingBus) {
       return errorResponse("Bus number already exists", 400)
@@ -38,7 +38,7 @@ export const createBusService = async (data) => {
     // Validate relations if provided
     if (routeId) {
       const route = await prisma.route.findUnique({
-        where: { id: parseInt(routeId) }
+        where: { id: parseInt(routeId) },
       })
       if (!route) {
         return errorResponse("Route not found", 404)
@@ -47,15 +47,15 @@ export const createBusService = async (data) => {
 
     if (driverId) {
       const driver = await prisma.driver.findUnique({
-        where: { id: driverId }
+        where: { id: driverId },
       })
       if (!driver) {
         return errorResponse("Driver not found", 404)
       }
-      
+
       // Check if driver is already assigned to another bus
       const assignedBus = await prisma.bus.findUnique({
-        where: { driverId }
+        where: { driverId },
       })
       if (assignedBus) {
         return errorResponse("Driver is already assigned to another bus", 400)
@@ -64,15 +64,15 @@ export const createBusService = async (data) => {
 
     if (vehicleId) {
       const vehicle = await prisma.vehicle.findUnique({
-        where: { id: parseInt(vehicleId) }
+        where: { id: parseInt(vehicleId) },
       })
       if (!vehicle) {
         return errorResponse("Vehicle not found", 404)
       }
-      
+
       // Check if vehicle is already assigned to another bus
       const assignedBus = await prisma.bus.findUnique({
-        where: { vehicleId: parseInt(vehicleId) }
+        where: { vehicleId: parseInt(vehicleId) },
       })
       if (assignedBus) {
         return errorResponse("Vehicle is already assigned to another bus", 400)
@@ -87,7 +87,9 @@ export const createBusService = async (data) => {
       isActive,
       delayMinutes: parseInt(delayMinutes),
       reservedSeats: 0, // Default to 0 for new bus
-      availableSeats: availableSeats ? parseInt(availableSeats) : parseInt(capacity),
+      availableSeats: availableSeats
+        ? parseInt(availableSeats)
+        : parseInt(capacity),
     }
 
     // Add optional fields if provided
@@ -96,7 +98,7 @@ export const createBusService = async (data) => {
     if (currentStop) busData.currentStop = currentStop
     if (nextDestination) busData.nextDestination = nextDestination
     if (vehicleId) busData.vehicleId = parseInt(vehicleId)
-    
+
     // Handle datetime fields
     if (departureTime) {
       busData.departureTime = new Date(departureTime)
@@ -123,28 +125,28 @@ export const createBusService = async (data) => {
                 id: true,
                 name: true,
                 email: true,
-                phone: true
-              }
-            }
-          }
+                phone: true,
+              },
+            },
+          },
         },
         vehicle: true,
-        schedules: true
-      }
+        schedules: true,
+      },
     })
 
     return successResponse("Bus created successfully", bus, 201)
   } catch (error) {
     console.error("Create bus error:", error)
-    
+
     // Handle Prisma specific errors
-    if (error.code === 'P2002') {
+    if (error.code === "P2002") {
       return errorResponse("Bus number must be unique", 400)
     }
-    if (error.code === 'P2003') {
+    if (error.code === "P2003") {
       return errorResponse("Invalid reference to related record", 400)
     }
-    
+
     return errorResponse("Failed to create bus", 500)
   }
 }
@@ -152,9 +154,30 @@ export const createBusService = async (data) => {
 export const getAllBusesService = async () => {
   try {
     const buses = await prisma.bus.findMany({
-      include: { schedules: true, route: true },
+      include: {
+        schedules: true,
+        route: true,
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     })
-    return successResponse("Buses retrieved successfully", buses, 200)
+
+    const formattedBuses = buses.map((bus) => ({
+      ...bus,
+      driverName: bus.driver?.user?.name ?? "Unassigned",
+    }))
+
+    return successResponse("Buses retrieved successfully", formattedBuses, 200)
   } catch (error) {
     console.error("Get all buses error:", error)
     return errorResponse("Failed to fetch buses", 500)
@@ -165,10 +188,34 @@ export const getBusByIdService = async (busId) => {
   try {
     const bus = await prisma.bus.findUnique({
       where: { id: busId },
-      include: { schedules: true, route: true },
+      include: {
+        schedules: true,
+        route: true,
+        vehicle: true,
+        driver: {
+          include: {
+            user: {
+              select: {
+                name: true, // just grab the name
+              },
+            },
+          },
+        },
+      },
     })
-    if (!bus) return errorResponse("Bus not found", 404)
-    return successResponse("Bus retrieved successfully", bus, 200)
+
+    const formattedBus = {
+      ...bus,
+      driver: bus.driver
+        ? {
+            ...bus.driver,
+            name: bus.driver.user?.name ?? "Unassigned", // add name directly on driver
+          }
+        : null,
+    }
+
+    if (!formattedBus) return errorResponse("Bus not found", 404)
+    return successResponse("Bus retrieved successfully", formattedBus, 200)
   } catch (error) {
     console.error("Get bus by ID error:", error)
     return errorResponse("Failed to fetch bus", 500)

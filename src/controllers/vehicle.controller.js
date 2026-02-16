@@ -99,7 +99,7 @@ export const getVehicleById = async (req, res) => {
       where: { id },
       include: {
         driverAssignments: {
-          where: { endDate: null }, // only active driver
+          where: { endDate: null }, 
           include: {
             driver: {
               select: {

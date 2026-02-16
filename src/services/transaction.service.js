@@ -2,6 +2,8 @@ import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import bcrypt from "bcrypt"
 
+const MAX_ATTEMPTS = 5
+
 //  Wallet-to-Wallet Transfer
 export const transferFundsService = async (
   senderId,
@@ -11,13 +13,14 @@ export const transferFundsService = async (
     if (!recipientId || !amount || amount <= 0)
       return errorResponse("Invalid transfer data", 400)
 
-    const senderWallet = await prisma.wallet.findUnique({
-      where: { userId: senderId },
-    })
+    if (senderId === recipientId)
+      return errorResponse("Cannot transfer to self", 400)
 
-    const recipientWallet = await prisma.wallet.findUnique({
-      where: { userId: recipientId },
-    })
+    // Fetch wallets
+    const [senderWallet, recipientWallet] = await Promise.all([
+      prisma.wallet.findUnique({ where: { userId: senderId } }),
+      prisma.wallet.findUnique({ where: { userId: recipientId } }),
+    ])
 
     if (!senderWallet) return errorResponse("Sender wallet not found", 404)
     if (!recipientWallet)
@@ -29,9 +32,9 @@ export const transferFundsService = async (
     if (senderWallet.balance < amount)
       return errorResponse("Insufficient balance", 400)
 
-    // 🔐 PIN verification
+    // PIN verification
     if (senderWallet.pinHash) {
-      const validPin = await bcrypt.compare(pin, senderWallet.pinHash)
+      const validPin = await bcrypt.compare(pin || "", senderWallet.pinHash)
       if (!validPin) return errorResponse("Invalid wallet PIN", 401)
     }
 
@@ -39,6 +42,7 @@ export const transferFundsService = async (
 
     let senderTxn
 
+    // Atomic transaction
     await prisma.$transaction(async (tx) => {
       // Debit sender
       const updatedSenderWallet = await tx.wallet.update({
@@ -49,13 +53,14 @@ export const transferFundsService = async (
       senderTxn = await tx.walletTransaction.create({
         data: {
           walletId: senderWallet.id,
+          recipientWalletId: recipientWallet.id, // <-- link recipient wallet
           amount,
           type: "TRANSFER_OUT",
           status: "SUCCESS",
           reference: `${referenceBase}-OUT`,
           balanceAfter: updatedSenderWallet.balance,
           metadata: { to: recipientId },
-          description: description || null,
+          description: description || `Transfer to ${recipientId}`,
         },
       })
 
@@ -74,7 +79,7 @@ export const transferFundsService = async (
           reference: `${referenceBase}-IN`,
           balanceAfter: updatedRecipientWallet.balance,
           metadata: { from: senderId },
-          description: description || null,
+          description: description || `Received from ${senderId}`,
         },
       })
     })
@@ -186,5 +191,67 @@ export const getTransactionHistoryService = async () => {
   } catch (error) {
     console.error("Get all transactions service error:", error)
     return errorResponse("Failed to fetch transactions", 500)
+  }
+}
+
+export const verifyWalletPinService = async (userId, body) => {
+  try {
+    const { pin } = body
+
+    if (!pin) {
+      return errorResponse("PIN required", 400)
+    }
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId },
+    })
+
+    if (!wallet) {
+      return errorResponse("Wallet not found", 404)
+    }
+
+    if (!wallet.isActive) {
+      return errorResponse("Wallet inactive", 403)
+    }
+
+    if (wallet.isLocked) {
+      return errorResponse("Wallet locked due to too many attempts", 423)
+    }
+
+    if (!wallet.pinHash) {
+      return errorResponse("PIN not set", 400)
+    }
+
+    const isMatch = await bcrypt.compare(pin, wallet.pinHash)
+
+    // ❌ wrong pin
+    if (!isMatch) {
+      const attempts = wallet.pinAttempts + 1
+      const lock = attempts >= MAX_ATTEMPTS
+
+      await prisma.wallet.update({
+        where: { userId },
+        data: {
+          pinAttempts: attempts,
+          isLocked: lock,
+        },
+      })
+
+      return errorResponse(
+        lock ? "Wallet locked due to too many attempts" : "Invalid PIN",
+        401,
+      )
+    }
+
+    // ✅ correct pin
+    await prisma.wallet.update({
+      where: { userId },
+      data: { pinAttempts: 0 },
+    })
+
+    return successResponse("PIN verified successfully", { verified: true }, 200)
+  } catch (error) {
+    console.error("Verify wallet PIN service error:", error)
+    return errorResponse("Failed to verify wallet PIN", 500)
   }
 }

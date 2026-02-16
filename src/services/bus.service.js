@@ -1,6 +1,8 @@
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import prisma from "../prisma/client.js"
 
+const MIN_INTERVAL = 45
+
 export const createBusService = async (data) => {
   try {
     // Extract and validate form data
@@ -191,7 +193,11 @@ export const getBusByIdService = async (busId) => {
       include: {
         schedules: true,
         route: true,
-        vehicle: true,
+        vehicle: {
+          include: {
+            locations: true,
+          },
+        },
         driver: {
           include: {
             user: {
@@ -255,22 +261,88 @@ export const toggleBusStatusService = async (busId, isActive) => {
   }
 }
 
-/* ------------------ BUS SCHEDULE ------------------ */
+/*---------- BUS SCHEDULE---------- */
 
+const timeToMinutes = (timeStr) => {
+  const [h, m] = timeStr.split(":").map(Number)
+  return h * 60 + m
+}
+
+const minutesToTime = (mins) => {
+  const normalized = ((mins % 1440) + 1440) % 1440
+  const h = Math.floor(normalized / 60)
+  const m = normalized % 60
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
+const isValidTime = (t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t)
+
+const addMinutesToTime = (timeStr, minutesToAdd) => {
+  return minutesToTime(timeToMinutes(timeStr) + minutesToAdd)
+}
 export const createBusScheduleService = async (busId, startTime) => {
   try {
-    const bus = await prisma.bus.findUnique({ where: { id: busId } })
-    if (!bus || !bus.routeId)
-      return errorResponse("Bus or route not found", 404)
-
-    const overlap = await prisma.busSchedule.findFirst({
-      where: { busId, startTime },
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId },
+      include: {
+        route: {
+          select: { estimatedTimeMin: true },
+        },
+      },
     })
-    if (overlap) return errorResponse("Schedule already exists", 400)
+
+    if (!bus || !bus.route) return errorResponse("Bus or route not found", 404)
+
+    const duration = bus.route.estimatedTimeMin || 0
+    const newStartMin = timeToMinutes(startTime)
+    const newEndMin = newStartMin + duration
+
+    // 🔹 Get existing schedules
+    const existing = await prisma.busSchedule.findMany({
+      where: { busId },
+      orderBy: { startTime: "asc" },
+    })
+
+    // 🔹 Interval validation (your existing logic)
+    for (const s of existing) {
+      const sStart = timeToMinutes(s.startTime)
+      const sEnd = timeToMinutes(s.endTime)
+
+      const gapBefore = newStartMin - sEnd
+      const gapAfter = sStart - newEndMin
+
+      if (
+        newStartMin === sStart ||
+        (gapBefore >= 0 && gapBefore < MIN_INTERVAL) ||
+        (gapAfter >= 0 && gapAfter < MIN_INTERVAL)
+      ) {
+        return errorResponse(
+          `Minimum ${MIN_INTERVAL} minutes interval required between schedules`,
+          400,
+        )
+      }
+    }
+
+    // 🔥 Direction Logic
+    let direction = "FORWARD"
+
+    if (existing.length > 0) {
+      const lastSchedule = existing[existing.length - 1]
+
+      direction = lastSchedule.direction === "FORWARD" ? "REVERSE" : "FORWARD"
+    }
+
+    const endTime = minutesToTime(newEndMin)
 
     const schedule = await prisma.busSchedule.create({
-      data: { busId, routeId: bus.routeId, startTime },
+      data: {
+        busId,
+        startTime,
+        endTime,
+        direction,
+      },
     })
+
     return successResponse("Bus schedule created successfully", schedule, 201)
   } catch (error) {
     console.error("Create bus schedule error:", error)
@@ -280,23 +352,101 @@ export const createBusScheduleService = async (busId, startTime) => {
 
 export const bulkCreateBusSchedulesService = async (busId, startTimes) => {
   try {
-    const bus = await prisma.bus.findUnique({ where: { id: busId } })
-    if (!bus || !bus.routeId)
-      return errorResponse("Bus or route not found", 404)
+    if (!Array.isArray(startTimes) || !startTimes.length)
+      return errorResponse("startTimes must be a non-empty array", 400)
 
-    const schedules = []
-    for (const time of startTimes) {
-      const overlap = await prisma.busSchedule.findFirst({
-        where: { busId, startTime: time },
-      })
-      if (!overlap) {
-        const schedule = await prisma.busSchedule.create({
-          data: { busId, routeId: bus.routeId, startTime: time },
-        })
-        schedules.push(schedule)
-      }
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId },
+      include: {
+        route: {
+          select: { estimatedTimeMin: true },
+        },
+      },
+    })
+
+    if (!bus || !bus.route) return errorResponse("Bus or route not found", 404)
+
+    const duration = bus.route.estimatedTimeMin || 0
+
+    // Validate time format
+    for (const t of startTimes) {
+      if (!isValidTime(t))
+        return errorResponse(`Invalid time format: ${t}`, 400)
     }
-    return successResponse("Bus schedules created successfully", schedules, 201)
+
+    // Remove duplicates + sort
+    const uniqueTimes = [...new Set(startTimes)].sort(
+      (a, b) => timeToMinutes(a) - timeToMinutes(b),
+    )
+
+    // Get existing schedules sorted by time
+    const existing = await prisma.busSchedule.findMany({
+      where: { busId },
+      orderBy: { startTime: "asc" },
+    })
+
+    const existingRanges = existing.map((s) => ({
+      start: timeToMinutes(s.startTime),
+      end: timeToMinutes(s.endTime),
+    }))
+
+    const newSchedules = []
+
+    for (const time of uniqueTimes) {
+      const start = timeToMinutes(time)
+      const end = start + duration
+
+      const conflicts = [...existingRanges, ...newSchedules].some((s) => {
+        const gapBefore = start - s.end
+        const gapAfter = s.start - end
+
+        return (
+          start === s.start ||
+          (gapBefore >= 0 && gapBefore < MIN_INTERVAL) ||
+          (gapAfter >= 0 && gapAfter < MIN_INTERVAL)
+        )
+      })
+
+      if (conflicts) {
+        return errorResponse(
+          `Schedule ${time} violates ${MIN_INTERVAL} minute interval rule`,
+          400,
+        )
+      }
+
+      newSchedules.push({ start, end })
+    }
+
+    // 🔥 Direction logic
+
+    let nextDirection = "FORWARD"
+
+    if (existing.length > 0) {
+      const lastExisting = existing[existing.length - 1]
+
+      nextDirection =
+        lastExisting.direction === "FORWARD" ? "REVERSE" : "FORWARD"
+    }
+
+    const schedulesWithDirection = newSchedules.map((s) => {
+      const schedule = {
+        busId,
+        startTime: minutesToTime(s.start),
+        endTime: minutesToTime(s.end),
+        direction: nextDirection,
+      }
+
+      // Alternate for next one
+      nextDirection = nextDirection === "FORWARD" ? "REVERSE" : "FORWARD"
+
+      return schedule
+    })
+
+    const created = await prisma.$transaction(
+      schedulesWithDirection.map((data) => prisma.busSchedule.create({ data })),
+    )
+
+    return successResponse("Bus schedules created successfully", created, 201)
   } catch (error) {
     console.error("Bulk create bus schedules error:", error)
     return errorResponse("Failed to create schedules", 500)
@@ -343,8 +493,7 @@ export const deleteBusScheduleService = async (scheduleId) => {
   }
 }
 
-/* ------------------ SEARCH BUS ------------------ */
-
+/*---------- SEARCH BUS---------- */
 export const searchBusesService = async (
   origin,
   destination,
@@ -357,41 +506,193 @@ export const searchBusesService = async (
       return errorResponse("Missing required search parameters", 400)
     }
 
+    // Find routes containing both origin and destination midpoints
     const routes = await prisma.route.findMany({
-      where: { origin, destination },
+      where: {
+        AND: [
+          { midPoints: { some: { name: origin } } },
+          { midPoints: { some: { name: destination } } },
+        ],
+      },
+      include: { midPoints: true }, // as stored
     })
+
     if (routes.length === 0) return errorResponse("No routes found", 404)
 
     const routeIds = routes.map((r) => r.id)
 
-    const schedules = await prisma.busSchedule.findMany({
-      where: { routeId: { in: routeIds }, isActive: true },
-      include: { bus: true, route: true },
+    // Find all buses for these routes with approved drivers
+    const buses = await prisma.bus.findMany({
+      where: {
+        routeId: { in: routeIds },
+        isActive: true,
+        driver: {
+          is: {
+            idStatus: { not: "REJECTED" },
+            licenseStatus: { not: "REJECTED" },
+          },
+        },
+      },
+      include: {
+        driver: { include: { user: true } },
+        vehicle: true,
+        route: { include: { midPoints: true } },
+        schedules: true,
+      },
     })
 
-    // Filter by start time and available seats
-    const result = schedules
-      .filter(
-        (s) =>
-          s.startTime >= time &&
-          s.bus.capacity - s.bus.reservedSeats >= passengers,
-      )
-      .map((s) => {
-        const [h, m] = s.startTime.split(":").map(Number)
-        const arrival = new Date(date)
-        arrival.setHours(h, m + (s.route.estimatedTimeMin || 0))
+    if (buses.length === 0)
+      return errorResponse("No buses assigned to these routes", 404)
+
+    const [requestedHour, requestedMinute] = time.split(":").map(Number)
+    const requestedTotalMinutes = requestedHour * 60 + requestedMinute
+    const requestedDate = new Date(date)
+
+    let oppositeDirectionFound = false
+
+    const result = buses
+      .map((bus) => {
+        const midPoints = bus.route.midPoints
+
+        const originPoint = midPoints.find((mp) => mp.name === origin)
+        const destinationPoint = midPoints.find((mp) => mp.name === destination)
+
+        if (!originPoint || !destinationPoint) return null
+        if (originPoint.order === destinationPoint.order) return null
+
+        const requiredDirection =
+          originPoint.order < destinationPoint.order ? "FORWARD" : "REVERSE"
+
+        // Filter schedules matching the required direction and active
+        const directionSchedules = bus.schedules.filter(
+          (s) => s.isActive && s.direction === requiredDirection,
+        )
+
+        if (directionSchedules.length === 0) {
+          oppositeDirectionFound = true
+          return null
+        }
+
+        // Filter schedules that are at or after the requested time
+        const upcomingSchedules = directionSchedules.filter((s) => {
+          const [h, m] = s.startTime.split(":").map(Number)
+          const totalMin = h * 60 + m
+          return (
+            totalMin >= requestedTotalMinutes &&
+            bus.capacity - bus.reservedSeats >= passengers
+          )
+        })
+        // keep DB order as stored
+        //.sort((a,b) => ... ) // not needed
+
+        if (upcomingSchedules.length === 0) {
+          oppositeDirectionFound = true
+          return null
+        }
+
+        // Take only the next 2 schedules
+        const nextSchedules = upcomingSchedules.slice(0, 2).map((s) => {
+          const [sh, sm] = s.startTime.split(":").map(Number)
+          const startDate = new Date(requestedDate)
+          startDate.setHours(sh, sm, 0, 0)
+
+          const arrivalDate = new Date(startDate)
+          arrivalDate.setMinutes(
+            arrivalDate.getMinutes() + (bus.route.estimatedTimeMin || 0),
+          )
+
+          return {
+            scheduleId: s.id,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            direction: s.direction,
+            availableSeats: bus.capacity - bus.reservedSeats,
+            estimatedArrival: arrivalDate,
+          }
+        })
+
         return {
-          busId: s.busId,
-          busNumber: s.bus.busNumber,
-          startTime: s.startTime,
-          arrivalTime: arrival.toTimeString().slice(0, 5),
-          availableSeats: s.bus.capacity - s.bus.reservedSeats,
+          bus: {
+            id: bus.id,
+            busNumber: bus.busNumber,
+            capacity: bus.capacity,
+            reservedSeats: bus.reservedSeats,
+            currentStop: bus.currentStop,
+            nextDestination: bus.nextDestination,
+            status: bus.status,
+            departureTime: bus.departureTime,
+            driver: bus.driver,
+            driverName: bus.driver.user.name || "",
+            vehicle: bus.vehicle,
+            route: {
+              id: bus.route.id,
+              name: bus.route.name,
+              price: bus.route.price,
+              currency: bus.route.currency,
+              estimatedTimeMin: bus.route.estimatedTimeMin,
+              midPoints: midPoints.map((mp) => mp.name),
+            },
+            travelDirection: requiredDirection,
+          },
+          nextSchedules,
         }
       })
+      .filter(Boolean)
 
-    return successResponse("Buses retrieved successfully", result, 200)
+    if (result.length === 0) {
+      if (oppositeDirectionFound) {
+        return errorResponse(
+          "The bus is moving in the opposite direction at the selected time",
+          404,
+        )
+      }
+      return errorResponse("No upcoming schedules found", 404)
+    }
+
+    return successResponse("Buses with next schedules retrieved", result, 200)
   } catch (error) {
     console.error("Search buses error:", error)
     return errorResponse("Failed to search buses", 500)
+  }
+}
+
+export const getRouteMidPointsService = async (routeId) => {
+  try {
+    const midPoints = await prisma.routeMidPoint.findMany({
+      where: { routeId: parseInt(routeId) },
+      orderBy: { order: "asc" },
+    })
+
+    return successResponse("Route midpoints fetched successfully", midPoints)
+  } catch (error) {
+    return errorResponse("Failed to fetch route midpoints", 500, error.message)
+  }
+}
+
+export const getAllMidPointsService = async () => {
+  try {
+    const midPoints = await prisma.routeMidPoint.findMany({
+      select: {
+        name: true,
+      },
+      orderBy: [{ routeId: "asc" }, { order: "asc" }],
+    })
+
+    if (!midPoints?.length) {
+      return successResponse("No midpoints found", [])
+    }
+
+    const uniqueNames = [
+      ...new Map(
+        midPoints
+          .map((m) => m.name?.trim())
+          .filter(Boolean) // remove null/empty
+          .map((name) => [name.toLowerCase(), name]), // case-insensitive unique
+      ).values(),
+    ].sort((a, b) => a.localeCompare(b))
+
+    return successResponse("Midpoint names fetched successfully", uniqueNames)
+  } catch (error) {
+    return errorResponse("Failed to fetch midpoints", 500, error.message)
   }
 }

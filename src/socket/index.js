@@ -1,5 +1,5 @@
 import { Server } from "socket.io"
-import { getLatestVehicleLocation } from "../services/redisService.service"
+import { getLatestVehicleLocation } from "../services/redisService.service.js"
 
 let io = null
 

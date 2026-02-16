@@ -12,6 +12,8 @@ import {
   updateBusSchedule,
   deleteBusSchedule,
   searchBuses,
+  getRouteMidPointsController,
+  getAllMidPointsController,
 } from "../controllers/bus.controller.js"
 
 const router = express.Router()
@@ -23,6 +25,16 @@ router.post("/", createBus)
 // Get all buses
 // GET /api/buses
 router.get("/", getAllBuses)
+
+/* ------------------ SEARCH BUS ------------------ */
+
+// Search buses by origin, destination, date, time, passengers
+// GET /api/buses/search?origin=Addis%20Ababa&destination=Bahir%20Dar&passengers=3&date=2026-02-01&time=14:00
+router.get("/search", searchBuses)
+
+//Get all the midpoints
+// GET /api/buses/midpoints
+router.get("/midpoints", getAllMidPointsController)
 
 // Get a single bus by ID
 // GET /api/buses/:busId
@@ -39,6 +51,8 @@ router.delete("/:busId", deleteBus)
 // Activate or deactivate a bus
 // PATCH /api/buses/:busId/status
 router.patch("/:busId/status", toggleBusStatus)
+
+router.get("/route/:routeId/midpoints", getRouteMidPointsController)
 
 /* ------------------ BUS SCHEDULE ------------------ */
 
@@ -61,11 +75,5 @@ router.put("/schedules/:scheduleId", updateBusSchedule)
 // Delete a bus schedule by schedule ID
 // DELETE /api/bus-schedules/:scheduleId
 router.delete("/schedules/:scheduleId", deleteBusSchedule)
-
-/* ------------------ SEARCH BUS ------------------ */
-
-// Search buses by origin, destination, date, time, passengers
-// GET /api/buses/search?origin=Addis%20Ababa&destination=Bahir%20Dar&passengers=3&date=2026-02-01&time=14:00
-router.get("/search", searchBuses)
 
 export default router

@@ -146,7 +146,8 @@ model Wallet {
   updatedAt      DateTime  @updatedAt
 
   user           User                @relation(fields: [userId], references: [id])
-  transactions   WalletTransaction[]
+  sentTransactions     WalletTransaction[] @relation("SenderWallet")
+  receivedTransactions WalletTransaction[] @relation("RecipientWallet")
   payments       Payment[]
   pointLogs      PointTransaction[]   
 }
@@ -163,26 +164,31 @@ model PointTransaction {
   wallet    Wallet   @relation(fields: [walletId], references: [id])
 }
 
-
 //WalletTransaction = internal money movement
 model WalletTransaction {
-  id          Int              @id @default(autoincrement())
-  walletId    Int
-  amount      Decimal
-  type        TransactionType
-  status      TransactionStatus @default(PENDING)
-  balanceAfter Decimal
+  id               Int               @id @default(autoincrement())
 
-  reference   String           @unique
-  description String?
-  metadata    Json?
+  walletId         Int               // sender or primary wallet
+  recipientWalletId Int?             // receiver wallet (for transfers)
 
-  createdAt   DateTime         @default(now())
+  amount           Decimal
+  type             TransactionType
+  status           TransactionStatus @default(PENDING)
+  balanceAfter     Decimal
 
-  wallet      Wallet           @relation(fields: [walletId], references: [id])
+  reference        String            @unique
+  description      String?
+  metadata         Json?
+
+  createdAt        DateTime          @default(now())
+
+  wallet           Wallet            @relation("SenderWallet", fields: [walletId], references: [id])
+  recipientWallet  Wallet?           @relation("RecipientWallet", fields: [recipientWalletId], references: [id])
 
   @@index([walletId])
+  @@index([recipientWalletId])
 }
+
 //Payment = interaction with external gateways (Chapa, Telebirr, CBE)
 //User tops up wallet → Payment (SUCCESS) → WalletTransaction (CREDIT)
 // User pays directly with Telebirr → Payment (SUCCESS) → no wallet transaction
@@ -198,8 +204,8 @@ model Payment {
   gateway       PaymentGateway @default(CHAPA)
   flow          PaymentFlow
 
-  pointsUsed    Int?      // optional
-  pointsValue   Decimal?  // optional
+  pointsUsed    Int?      
+  pointsValue   Decimal?  
   
   status        PaymentStatus  @default(PENDING)
 
@@ -229,6 +235,7 @@ model Booking {
   boardingStop  String?
   alightingStop String?
   bookingCode   String        @unique @default(uuid())
+  seatsBooked   Int           @default(0) 
   cancelledAt   DateTime?
   payNow        Boolean       @default(false)
 
@@ -265,7 +272,6 @@ model Booking {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
-
 
 model Bus {
   id              Int           @id @default(autoincrement())
@@ -304,12 +310,13 @@ model Bus {
   updatedAt       DateTime      @updatedAt
 }
 
-
 model BusSchedule {
   id        Int      @id @default(autoincrement())
 
   busId     Int
-  startTime String   // "12:30", "15:00", "17:30"
+  startTime String
+  endTime   String
+  direction ScheduleDirection @default(FORWARD)
   isActive  Boolean  @default(true)
 
   createdAt DateTime @default(now())
@@ -317,8 +324,9 @@ model BusSchedule {
 
   bus       Bus    @relation(fields: [busId], references: [id])
 
-  @@unique([busId, startTime])
+  @@unique([busId, startTime, direction])
 }
+
 
 model Seat {
   id           Int          @id @default(autoincrement())
@@ -376,8 +384,6 @@ model Vehicle {
   @@index([type])
   @@map("vehicles")
 }
-
-
 model VehicleLocation {
   id         Int      @id @default(autoincrement())
 
@@ -477,6 +483,21 @@ model RouteMidPoint {
   order    Int    @default(0)
 
   @@index([routeId]) // optional index for faster searches
+}
+
+model PromoCode {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  type            DiscountType
+  value           Float
+  maxUsage        Int?     
+  usedCount       Int      @default(0)
+  minAmount       Float?  
+  expiresAt       DateTime?
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model EVStation {
@@ -629,6 +650,16 @@ enum UserRole {
   PASSENGER
   DRIVER
   ADMIN
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum ScheduleDirection {
+  FORWARD     // Origin -> Destination
+  REVERSE     // Destination -> Origin
 }
 
 //Digital ticketing enums

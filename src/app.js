@@ -27,6 +27,7 @@ import userRoutes from "./routes/user.route.js"
 import busRoutes from "./routes/bus.routes.js"
 import auditRoute from "./routes/audit.route.js"
 import midPointRoute from "./routes/midpoint.routes.js"
+import promoCodeRoute from "./routes/promoCode.route.js"
 
 const app = express()
 
@@ -69,6 +70,7 @@ app.use("/api/users", userRoutes)
 app.use("/api/wallet", walletRoutes)
 app.use("/api/notification", notificationRoute)
 app.use("/api/transactions", transactionRoutes)
+app.use("/api/promp-code", promoCodeRoute)
 app.use("/api/drivers", driverRoutes)
 app.use("/api/buses", busRoutes)
 app.use("/api/route", routeRoutes)

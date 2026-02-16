@@ -63,12 +63,9 @@ export const getMyWalletService = async (userId) => {
   }
 }
 
-export const getWalletTransactionsService = async (
-  userId,
-  page = 1,
-  limit = 15,
-) => {
+export const getWalletTransactionsService = async (userId) => {
   try {
+    // 1️⃣ Find the user's wallet
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
       select: { id: true },
@@ -78,21 +75,24 @@ export const getWalletTransactionsService = async (
       return errorResponse("Wallet not found", 404)
     }
 
-    const skip = (page - 1) * limit
+    // 2️⃣ Fetch transactions including recipient wallet and recipient user
+    const transactions = await prisma.walletTransaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        recipientWallet: {
+          select: {
+            user: {
+              select: {
+                name: true, // recipient user name
+              },
+            },
+          },
+        },
+      },
+    })
 
-    const [transactions, total] = await Promise.all([
-      prisma.walletTransaction.findMany({
-        where: { walletId: wallet.id },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.walletTransaction.count({
-        where: { walletId: wallet.id },
-      }),
-    ])
-
-    // 🔹 Map Prisma data → mock API shape
+    // 3️⃣ Map Prisma data → formatted response
     const formattedTransactions = transactions.map((tx) => ({
       id: tx.id,
       walletId: tx.walletId,
@@ -108,19 +108,13 @@ export const getWalletTransactionsService = async (
           " transaction",
       metadata: tx.metadata,
       createdAt: tx.createdAt.toISOString(),
+      recipientName: tx.recipientWallet?.user?.name || null,
     }))
 
-    return successResponse(
-      "Wallet transactions retrieved successfully",
-      {
-        transactions: formattedTransactions,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-      200,
-    )
+    return successResponse("Wallet transactions retrieved successfully", {
+      transactions: formattedTransactions,
+      total: formattedTransactions.length,
+    })
   } catch (error) {
     console.error("Error fetching wallet transactions:", error)
     return errorResponse("Failed to fetch wallet transactions", 500)

@@ -3,7 +3,7 @@ import * as bookingService from "../services/booking.service.js"
 export const createBooking = async (req, res) => {
   try {
     const result = await bookingService.createBookingService({
-      userId: req.user.id,
+      userId: "cmknyr7sc00005zku6ti238bw",
       ...req.body,
     })
     return res.status(result.statusCode).json(result)
@@ -20,7 +20,9 @@ export const createBooking = async (req, res) => {
 
 export const getUserBookings = async (req, res) => {
   try {
-    const result = await bookingService.getUserBookingsService(req.user.id)
+    const result = await bookingService.getUserBookingsService(
+      "cmknyr7sc00005zku6ti238bw",
+    )
     return res.status(result.statusCode).json(result)
   } catch (err) {
     console.error("Get user bookings controller error:", err)

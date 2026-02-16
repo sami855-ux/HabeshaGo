@@ -2,56 +2,185 @@ import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import { generateQRCode } from "../utils/qrcode.js"
 
+export const POINTS_CONVERSION_RATE = 0.1
+
 /**
  * Create a new booking
  */
 export const createBookingService = async ({
   userId,
   busId,
-  seatNumbers,
   date,
   boardingStop,
   alightingStop,
-  payNow,
-  discount,
+  totalAmount,
+  seats = 1,
+  discount = 0,
   promoCode,
-  seatType,
+  pointsUsed = 0,
+  isPointUsed = false,
+  paymentMethod = "WALLET",
+  currency = "ETB",
 }) => {
   try {
-    // Check seat availability
-    const existingBookings = await prisma.booking.findMany({
-      where: { busId, date },
-    })
-    const bookedSeats = existingBookings.flatMap((b) => b.seatNumbers)
-    const conflictSeats = seatNumbers.filter((s) => bookedSeats.includes(s))
-    if (conflictSeats.length > 0) {
-      return errorResponse(
-        `Seats already booked: ${conflictSeats.join(", ")}`,
-        400,
+    return await prisma.$transaction(async (tx) => {
+      // 0️⃣ Fetch bus with route midPoints
+      const bus = await tx.bus.findUnique({
+        where: { id: busId },
+        include: {
+          route: { include: { midPoints: { orderBy: { id: "asc" } } } },
+        },
+      })
+      if (!bus) return errorResponse("Bus not found", 404)
+      if (!bus.route) return errorResponse("Bus route not found", 404)
+
+      // 0.1️⃣ Auto-fill boarding/alighting stops if missing
+      const midPoints = bus.route.midPoints.map((mp) => mp.name)
+      if (!boardingStop) boardingStop = midPoints[0] || null
+      if (!alightingStop)
+        alightingStop = midPoints[midPoints.length - 1] || null
+      if (!boardingStop || !alightingStop)
+        return errorResponse(
+          "Route does not have valid midPoints for boarding or alighting",
+          400,
+        )
+
+      // 0.5️⃣ Check max seats per user manually
+      const userBookings = await tx.booking.findMany({
+        where: { userId, busId, validUntil: { gte: new Date() } },
+        select: { seatsBooked: true },
+      })
+      const seatsAlreadyBooked = userBookings.reduce(
+        (total, b) => total + (b.seatsBooked || 0),
+        0,
       )
-    }
 
-    // Create booking with QR code
-    const booking = await prisma.booking.create({
-      data: {
-        userId,
-        busId,
-        seatNumbers,
-        date,
-        boardingStop,
-        alightingStop,
-        payNow,
-        discount,
-        promoCode,
-        seatType,
-        qrCode: await generateQRCode(),
-      },
+      console.log(userBookings)
+      const MAX_TICKETS_PER_USER = 5
+      if (seatsAlreadyBooked + seats > MAX_TICKETS_PER_USER) {
+        return errorResponse(
+          `Booking limit exceeded: a user can only book ${MAX_TICKETS_PER_USER} seats per bus`,
+          400,
+        )
+      }
+
+      // 0.7️⃣ Check available seats for the bus
+      const bookedSeats = await tx.booking.findMany({
+        where: { busId, validUntil: { gte: new Date() } },
+        select: { seatsBooked: true },
+      })
+      const reservedSeats = bookedSeats.reduce(
+        (total, b) => total + (b.seatsBooked || 0),
+        0,
+      )
+      const availableSeats = bus.capacity - reservedSeats
+      if (seats > availableSeats) {
+        return errorResponse(
+          `Not enough available seats: requested ${seats}, only ${availableSeats} left`,
+          400,
+        )
+      }
+
+      // 1️⃣ Points value
+      const pointsValue = isPointUsed ? pointsUsed * POINTS_CONVERSION_RATE : 0
+
+      // 2️⃣ Final payable amount
+      const finalAmount =
+        Number(totalAmount) - Number(discount) - Number(pointsValue)
+      if (finalAmount < 0)
+        return errorResponse(
+          `Invalid payment: discount (${discount}) + points value (${pointsValue}) exceed total amount (${totalAmount})`,
+          400,
+        )
+
+      // 3️⃣ Wallet payment
+      let walletId = null
+      if (paymentMethod === "WALLET") {
+        const wallet = await tx.wallet.findUnique({ where: { userId } })
+        if (!wallet) return errorResponse("Wallet not found", 404)
+        if (!wallet.isActive) return errorResponse("Wallet inactive", 403)
+        if (isPointUsed && pointsUsed > wallet.points)
+          return errorResponse(
+            `Insufficient points: you tried to use ${pointsUsed} points but only have ${wallet.points}`,
+            400,
+          )
+        if (wallet.balance < finalAmount)
+          return errorResponse(
+            `Insufficient wallet balance: your wallet has ${wallet.balance} but payment requires ${finalAmount}`,
+            400,
+          )
+        await tx.wallet.update({
+          where: { userId },
+          data: {
+            balance: { decrement: finalAmount },
+            ...(isPointUsed && { points: { decrement: pointsUsed } }),
+          },
+        })
+        walletId = wallet.id
+      }
+
+      // 4️⃣ Payment record
+      const payment = await tx.payment.create({
+        data: {
+          userId,
+          amount: finalAmount,
+          method: paymentMethod,
+          flow:
+            paymentMethod === "WALLET" ? "WALLET_PAYMENT" : "DIRECT_PAYMENT",
+          status: paymentMethod === "WALLET" ? "SUCCESS" : "PENDING",
+          reference: `PAY-${Date.now()}`,
+          walletId,
+          currency,
+          pointsUsed: isPointUsed ? pointsUsed : 0,
+          pointsValue: isPointUsed ? pointsValue : 0,
+        },
+      })
+
+      // 5️⃣ Generate QR code
+      const qrCode = await generateQRCode()
+
+      // 6️⃣ Create booking
+      const booking = await tx.booking.create({
+        data: {
+          userId,
+          busId,
+          date,
+          boardingStop,
+          alightingStop,
+          seatsBooked: seats,
+          payNow: true,
+          discount,
+          promoCode,
+          totalAmount,
+          amountPaid: finalAmount,
+          currency,
+          pointsUsed: isPointUsed ? pointsUsed : 0,
+          pointsValue: isPointUsed ? pointsValue : 0,
+          pointsConversionRate: isPointUsed ? POINTS_CONVERSION_RATE : 0,
+          paymentId: payment.id,
+          qrCode,
+          validUntil: date,
+        },
+        include: { payment: true, bus: true },
+      })
+
+      // 7️⃣ Update bus seats
+      await tx.bus.update({
+        where: { id: busId },
+        data: {
+          reservedSeats: reservedSeats + seats,
+          availableSeats: bus.capacity - (reservedSeats + seats),
+        },
+      })
+
+      return successResponse("Booking created successfully", {
+        booking,
+        payment,
+      })
     })
-
-    return successResponse("Booking created successfully", booking)
   } catch (err) {
-    console.error("Create booking service error:", err)
-    return errorResponse("Failed to create booking", 500)
+    console.error("Booking error:", err)
+    return errorResponse("Failed to process booking", 500)
   }
 }
 
@@ -62,10 +191,25 @@ export const getUserBookingsService = async (userId) => {
   try {
     const bookings = await prisma.booking.findMany({
       where: { userId },
-      include: { bus: true, payment: true, sharedTo: true },
+      include: {
+        bus: {
+          include: {
+            route: true, // this brings origin & destination
+          },
+        },
+        payment: true,
+        sharedTo: true,
+      },
       orderBy: { date: "desc" },
     })
-    return successResponse("Bookings retrieved", bookings)
+
+    const formattedBookings = bookings.map((booking) => ({
+      ...booking,
+      origin: booking.bus?.route?.origin || null,
+      destination: booking.bus?.route?.destination || null,
+    }))
+
+    return successResponse("Bookings retrieved", formattedBookings)
   } catch (err) {
     console.error("Get user bookings service error:", err)
     return errorResponse("Failed to fetch bookings", 500)

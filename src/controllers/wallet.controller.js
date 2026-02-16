@@ -29,7 +29,9 @@ export const getMyWallet = async (req, res) => {
  */
 export const getWalletTransactions = async (req, res) => {
   try {
-    const result = await getWalletTransactionsService(req.user.id)
+    const result = await getWalletTransactionsService(
+      "cmknyr7sc00005zku6ti238bw",
+    )
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get wallet transactions controller error:", error)

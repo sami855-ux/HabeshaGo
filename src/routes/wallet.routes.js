@@ -7,14 +7,18 @@ import {
   changeWalletPin,
 } from "../controllers/wallet.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
+import { verifyWalletPin } from "../controllers/transaction.controller.js"
 
 const router = express.Router()
 
 // Wallet info
 router.get("/me", authenticate, getMyWallet)
 
+// Verify wallet
+router.post("/verify-pin", authenticate, verifyWalletPin)
+
 // Wallet transactions
-router.get("/transactions", authenticate, getWalletTransactions)
+router.get("/transactions", getWalletTransactions)
 
 // Create wallet + PIN
 router.post("/create", authenticate, createWallet)

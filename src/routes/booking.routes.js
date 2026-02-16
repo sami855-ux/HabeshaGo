@@ -23,10 +23,10 @@ const router = express.Router()
 // USER ROUTES
 
 // Create a new booking (purchase ticket)
-router.post("/", authenticate, createBooking)
+router.post("/", createBooking)
 
 // List all bookings for logged-in user
-router.get("/", authenticate, getUserBookings)
+router.get("/", getUserBookings)
 
 // Get a single booking by ID (owned or shared)
 router.get("/:id", authenticate, getBookingById)

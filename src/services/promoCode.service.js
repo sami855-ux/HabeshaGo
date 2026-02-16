@@ -29,7 +29,7 @@ export const createPromoCodeService = async ({
 }
 
 // Apply promo code
-export const applyPromoCodeService = async ({ userId, code, totalAmount }) => {
+export const applyPromoCodeService = async ({ code, totalAmount }) => {
   try {
     const promo = await prisma.promoCode.findUnique({ where: { code } })
     if (!promo || !promo.isActive) {

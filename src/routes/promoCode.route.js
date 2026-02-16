@@ -3,6 +3,7 @@ import {
   applyPromoCode,
   createPromoCode,
 } from "../controllers/promoCode.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 

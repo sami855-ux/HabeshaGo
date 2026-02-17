@@ -264,10 +264,12 @@ model Booking {
   pointsConversionRate Decimal? // rate used to convert points to money
 
   // Relations
+  scheduleId    Int?     
   paymentId     Int?
   payment       Payment?     @relation(fields: [paymentId], references: [id])
   bus           Bus          @relation(fields: [busId], references: [id])
   user          User         @relation("UserBookings", fields: [userId], references: [id])
+  schedule      BusSchedule?   @relation(fields: [scheduleId], references: [id])
 
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -293,9 +295,6 @@ model Bus {
   lastServiceDate   DateTime?
   nextServiceDate   DateTime?
 
-  reservedSeats    Int        @default(0)
-  availableSeats   Int?
-
   vehicleId       Int?          @unique
   vehicle         Vehicle?      @relation(fields: [vehicleId], references: [id])
   driver          Driver?       @relation(fields: [driverId], references: [id])
@@ -312,7 +311,6 @@ model Bus {
 
 model BusSchedule {
   id        Int      @id @default(autoincrement())
-
   busId     Int
   startTime String
   endTime   String
@@ -322,11 +320,11 @@ model BusSchedule {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bus       Bus    @relation(fields: [busId], references: [id])
+  bus       Bus       @relation(fields: [busId], references: [id])
+  bookings  Booking[]
 
-  @@unique([busId, startTime, direction])
+  @@unique([busId, startTime, direction]) // only one schedule per bus per startTime + direction
 }
-
 
 model Seat {
   id           Int          @id @default(autoincrement())
@@ -451,7 +449,6 @@ model DriverAssignment {
   @@index([vehicleId])
   @@index([driverId])
 }
-
 model Route {
   id               Int            @id @default(autoincrement())
   name             String         @unique

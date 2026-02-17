@@ -506,7 +506,6 @@ export const searchBusesService = async (
       return errorResponse("Missing required search parameters", 400)
     }
 
-    // Find routes containing both origin and destination midpoints
     const routes = await prisma.route.findMany({
       where: {
         AND: [
@@ -514,14 +513,13 @@ export const searchBusesService = async (
           { midPoints: { some: { name: destination } } },
         ],
       },
-      include: { midPoints: true }, // as stored
+      include: { midPoints: true },
     })
 
     if (routes.length === 0) return errorResponse("No routes found", 404)
 
     const routeIds = routes.map((r) => r.id)
 
-    // Find all buses for these routes with approved drivers
     const buses = await prisma.bus.findMany({
       where: {
         routeId: { in: routeIds },
@@ -544,14 +542,39 @@ export const searchBusesService = async (
     if (buses.length === 0)
       return errorResponse("No buses assigned to these routes", 404)
 
-    const [requestedHour, requestedMinute] = time.split(":").map(Number)
-    const requestedTotalMinutes = requestedHour * 60 + requestedMinute
-    const requestedDate = new Date(date)
+    const userSelectedDate = new Date(date)
+
+    const bookingDateStart = new Date(
+      Date.UTC(
+        userSelectedDate.getUTCFullYear(),
+        userSelectedDate.getUTCMonth(),
+        userSelectedDate.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    )
+
+    const bookingDateEnd = new Date(
+      Date.UTC(
+        userSelectedDate.getUTCFullYear(),
+        userSelectedDate.getUTCMonth(),
+        userSelectedDate.getUTCDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
+    )
+
+    const [reqH, reqM] = time.split(":").map(Number)
+    const requestedTotalMinutes = reqH * 60 + reqM
 
     let oppositeDirectionFound = false
 
-    const result = buses
-      .map((bus) => {
+    const result = await Promise.all(
+      buses.map(async (bus) => {
         const midPoints = bus.route.midPoints
 
         const originPoint = midPoints.find((mp) => mp.name === origin)
@@ -563,7 +586,6 @@ export const searchBusesService = async (
         const requiredDirection =
           originPoint.order < destinationPoint.order ? "FORWARD" : "REVERSE"
 
-        // Filter schedules matching the required direction and active
         const directionSchedules = bus.schedules.filter(
           (s) => s.isActive && s.direction === requiredDirection,
         )
@@ -573,56 +595,78 @@ export const searchBusesService = async (
           return null
         }
 
-        // Filter schedules that are at or after the requested time
-        const upcomingSchedules = directionSchedules.filter((s) => {
-          const [h, m] = s.startTime.split(":").map(Number)
-          const totalMin = h * 60 + m
-          return (
-            totalMin >= requestedTotalMinutes &&
-            bus.capacity - bus.reservedSeats >= passengers
-          )
-        })
-        // keep DB order as stored
-        //.sort((a,b) => ... ) // not needed
+        const upcomingSchedules = await Promise.all(
+          directionSchedules.map(async (s) => {
+            const [h, m] = s.startTime.split(":").map(Number)
+            const startTotalMin = h * 60 + m
 
-        if (upcomingSchedules.length === 0) {
-          oppositeDirectionFound = true
-          return null
-        }
+            const timeDifference = startTotalMin - requestedTotalMinutes
 
-        // Take only the next 2 schedules
-        const nextSchedules = upcomingSchedules.slice(0, 2).map((s) => {
-          const [sh, sm] = s.startTime.split(":").map(Number)
-          const startDate = new Date(requestedDate)
-          startDate.setHours(sh, sm, 0, 0)
+            // Only future schedules within 2 hours
+            if (timeDifference <= 0 || timeDifference > 120) return null
 
-          const arrivalDate = new Date(startDate)
-          arrivalDate.setMinutes(
-            arrivalDate.getMinutes() + (bus.route.estimatedTimeMin || 0),
-          )
+            const bookedSeatsAgg = await prisma.booking.aggregate({
+              _sum: { seatsBooked: true },
+              where: {
+                scheduleId: s.id,
+                date: {
+                  gte: bookingDateStart,
+                  lt: bookingDateEnd,
+                },
+              },
+            })
 
-          return {
-            scheduleId: s.id,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            direction: s.direction,
-            availableSeats: bus.capacity - bus.reservedSeats,
-            estimatedArrival: arrivalDate,
-          }
-        })
+            const bookings = await prisma.booking.findMany({
+              where: {
+                scheduleId: s.id,
+                date: {
+                  gte: bookingDateStart,
+                  lt: bookingDateEnd,
+                },
+              },
+            })
+
+            console.log(bookings)
+
+            const reservedSeats = bookedSeatsAgg._sum.seatsBooked || 0
+            const availableSeats = bus.capacity - reservedSeats
+            if (availableSeats < passengers) return null
+
+            const startDate = new Date(bookingDateStart)
+            startDate.setUTCHours(h, m, 0, 0)
+
+            const arrivalDate = new Date(startDate)
+            arrivalDate.setMinutes(
+              arrivalDate.getMinutes() + (bus.route.estimatedTimeMin || 0),
+            )
+
+            return {
+              schedule: s,
+              availableSeats,
+              estimatedArrival: arrivalDate,
+              startDate,
+            }
+          }),
+        )
+
+        const filteredSchedules = upcomingSchedules.filter(Boolean)
+        if (filteredSchedules.length === 0) return null
+
+        const nearest = filteredSchedules.sort(
+          (a, b) => a.startDate - b.startDate,
+        )[0]
 
         return {
           bus: {
             id: bus.id,
             busNumber: bus.busNumber,
             capacity: bus.capacity,
-            reservedSeats: bus.reservedSeats,
             currentStop: bus.currentStop,
             nextDestination: bus.nextDestination,
             status: bus.status,
             departureTime: bus.departureTime,
             driver: bus.driver,
-            driverName: bus.driver.user.name || "",
+            driverName: bus.driver.user?.name || "",
             vehicle: bus.vehicle,
             route: {
               id: bus.route.id,
@@ -631,25 +675,36 @@ export const searchBusesService = async (
               currency: bus.route.currency,
               estimatedTimeMin: bus.route.estimatedTimeMin,
               midPoints: midPoints.map((mp) => mp.name),
+              origin: bus.route.origin,
+              destination: bus.route.destination,
+              distanceKm: bus.route.distanceKm,
             },
             travelDirection: requiredDirection,
           },
-          nextSchedules,
+          nearestSchedule: {
+            scheduleId: nearest.schedule.id,
+            startTime: nearest.schedule.startTime,
+            endTime: nearest.schedule.endTime,
+            direction: nearest.schedule.direction,
+            availableSeats: nearest.availableSeats,
+            estimatedArrival: nearest.estimatedArrival,
+            direction: nearest.direction,
+          },
         }
-      })
-      .filter(Boolean)
+      }),
+    )
 
-    if (result.length === 0) {
-      if (oppositeDirectionFound) {
-        return errorResponse(
-          "The bus is moving in the opposite direction at the selected time",
-          404,
-        )
-      }
-      return errorResponse("No upcoming schedules found", 404)
+    const filteredResult = result.filter(Boolean)
+
+    if (filteredResult.length === 0) {
+      return successResponse("No buses within 2 hours", [], 200)
     }
 
-    return successResponse("Buses with next schedules retrieved", result, 200)
+    return successResponse(
+      "Buses with nearest upcoming schedule retrieved",
+      filteredResult,
+      200,
+    )
   } catch (error) {
     console.error("Search buses error:", error)
     return errorResponse("Failed to search buses", 500)

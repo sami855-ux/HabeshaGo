@@ -24,7 +24,7 @@ export const applyPromoCode = async (req, res) => {
   try {
     const { code, totalAmount } = req.body
     const result = await applyPromoCodeService({
-      userId: "cmknyr7sc00005zku6ti238bw",
+      userId: req.user.id,
       code,
       totalAmount,
     })

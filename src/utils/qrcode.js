@@ -2,10 +2,8 @@ import QRCode from "qrcode"
 
 export const generateQRCode = async (text = null) => {
   try {
-    // If no text is provided, generate a random UUID
     const qrText = text || crypto.randomUUID()
 
-    // Generate QR code as Base64
     const qrCodeBase64 = await QRCode.toDataURL(qrText, {
       errorCorrectionLevel: "H",
       type: "image/png",

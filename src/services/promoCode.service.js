@@ -32,6 +32,7 @@ export const createPromoCodeService = async ({
 export const applyPromoCodeService = async ({ code, totalAmount }) => {
   try {
     const promo = await prisma.promoCode.findUnique({ where: { code } })
+
     if (!promo || !promo.isActive) {
       return errorResponse("Promo code not found or inactive", 404)
     }
@@ -51,9 +52,18 @@ export const applyPromoCodeService = async ({ code, totalAmount }) => {
       return errorResponse("Promo code usage limit reached", 400)
     }
 
-    // Calculate discount
     const discount =
       promo.type === "PERCENT" ? (totalAmount * promo.value) / 100 : promo.value
+
+    // 🔥 Increment usage
+    await prisma.promoCode.update({
+      where: { id: promo.id },
+      data: {
+        usedCount: {
+          increment: 1,
+        },
+      },
+    })
 
     return successResponse("Promo code applied successfully", {
       code: promo.code,

@@ -10,6 +10,7 @@ export const POINTS_CONVERSION_RATE = 0.1
 export const createBookingService = async ({
   userId,
   busId,
+  scheduleStartTime,
   date,
   boardingStop,
   alightingStop,
@@ -23,92 +24,116 @@ export const createBookingService = async ({
   currency = "ETB",
 }) => {
   try {
+    // Pre-generate QR code outside transaction
+    const qrPayload = JSON.stringify({ bookingCode: "TEMP", userId })
+    const qrCode = await generateQRCode(qrPayload)
+
     return await prisma.$transaction(async (tx) => {
-      // 0️⃣ Fetch bus with route midPoints
+      // 1️⃣ Find bus with route & schedules
       const bus = await tx.bus.findUnique({
         where: { id: busId },
         include: {
           route: { include: { midPoints: { orderBy: { id: "asc" } } } },
+          schedules: true,
         },
       })
       if (!bus) return errorResponse("Bus not found", 404)
       if (!bus.route) return errorResponse("Bus route not found", 404)
 
-      // 0.1️⃣ Auto-fill boarding/alighting stops if missing
+      // 2️⃣ Find schedule (startTime only, no date)
+      const schedule = bus.schedules.find(
+        (s) => s.startTime === scheduleStartTime && s.isActive,
+      )
+      if (!schedule) return errorResponse("Schedule not found", 404)
+
+      // 3️⃣ Auto-fill boarding/alighting stops
       const midPoints = bus.route.midPoints.map((mp) => mp.name)
       if (!boardingStop) boardingStop = midPoints[0] || null
       if (!alightingStop)
         alightingStop = midPoints[midPoints.length - 1] || null
       if (!boardingStop || !alightingStop)
-        return errorResponse(
-          "Route does not have valid midPoints for boarding or alighting",
-          400,
-        )
+        return errorResponse("Route does not have valid midPoints", 400)
 
-      // 0.5️⃣ Check max seats per user manually
+      // Ensure we get a Date object
+      const bookingDate = new Date(date) // `date` comes from frontend ISO string
+
+      // Ensure valid Date
+      if (isNaN(bookingDate.getTime())) {
+        return errorResponse("Invalid date provided", 400)
+      }
+      // Start of day
+      const bookingDateStart = new Date(bookingDate)
+      bookingDateStart.setHours(0, 0, 0, 0)
+
+      // End of day
+      const bookingDateEnd = new Date(bookingDate)
+      bookingDateEnd.setHours(23, 59, 59, 999)
+
+      // 4️⃣ Check max tickets per user for this schedule + date
       const userBookings = await tx.booking.findMany({
-        where: { userId, busId, validUntil: { gte: new Date() } },
+        where: {
+          userId,
+          scheduleId: schedule.id,
+          date: {
+            gte: bookingDateStart,
+            lt: bookingDateEnd,
+          },
+        },
         select: { seatsBooked: true },
       })
       const seatsAlreadyBooked = userBookings.reduce(
         (total, b) => total + (b.seatsBooked || 0),
         0,
       )
-
-      console.log(userBookings)
       const MAX_TICKETS_PER_USER = 5
       if (seatsAlreadyBooked + seats > MAX_TICKETS_PER_USER) {
         return errorResponse(
-          `Booking limit exceeded: a user can only book ${MAX_TICKETS_PER_USER} seats per bus`,
+          `Booking limit exceeded: max ${MAX_TICKETS_PER_USER} seats per schedule`,
           400,
         )
       }
 
-      // 0.7️⃣ Check available seats for the bus
-      const bookedSeats = await tx.booking.findMany({
-        where: { busId, validUntil: { gte: new Date() } },
-        select: { seatsBooked: true },
+      // Aggregate booked seats for that schedule and date
+      const bookedSeatsAgg = await tx.booking.aggregate({
+        _sum: { seatsBooked: true },
+        where: {
+          scheduleId: schedule.id,
+          date: {
+            gte: bookingDateStart,
+            lt: bookingDateEnd,
+          },
+        },
       })
-      const reservedSeats = bookedSeats.reduce(
-        (total, b) => total + (b.seatsBooked || 0),
-        0,
-      )
+      const reservedSeats = bookedSeatsAgg._sum.seatsBooked || 0
       const availableSeats = bus.capacity - reservedSeats
       if (seats > availableSeats) {
         return errorResponse(
-          `Not enough available seats: requested ${seats}, only ${availableSeats} left`,
+          `Not enough seats: requested ${seats}, only ${availableSeats} left`,
           400,
         )
       }
 
-      // 1️⃣ Points value
+      // 6️⃣ Points & final amount
       const pointsValue = isPointUsed ? pointsUsed * POINTS_CONVERSION_RATE : 0
-
-      // 2️⃣ Final payable amount
       const finalAmount =
         Number(totalAmount) - Number(discount) - Number(pointsValue)
       if (finalAmount < 0)
         return errorResponse(
-          `Invalid payment: discount (${discount}) + points value (${pointsValue}) exceed total amount (${totalAmount})`,
+          `Invalid payment: discount + points exceed total`,
           400,
         )
 
-      // 3️⃣ Wallet payment
+      // 7️⃣ Wallet payment
       let walletId = null
       if (paymentMethod === "WALLET") {
         const wallet = await tx.wallet.findUnique({ where: { userId } })
         if (!wallet) return errorResponse("Wallet not found", 404)
         if (!wallet.isActive) return errorResponse("Wallet inactive", 403)
         if (isPointUsed && pointsUsed > wallet.points)
-          return errorResponse(
-            `Insufficient points: you tried to use ${pointsUsed} points but only have ${wallet.points}`,
-            400,
-          )
+          return errorResponse(`Insufficient points`, 400)
         if (wallet.balance < finalAmount)
-          return errorResponse(
-            `Insufficient wallet balance: your wallet has ${wallet.balance} but payment requires ${finalAmount}`,
-            400,
-          )
+          return errorResponse(`Insufficient balance`, 400)
+
         await tx.wallet.update({
           where: { userId },
           data: {
@@ -119,7 +144,7 @@ export const createBookingService = async ({
         walletId = wallet.id
       }
 
-      // 4️⃣ Payment record
+      // 8️⃣ Payment record
       const payment = await tx.payment.create({
         data: {
           userId,
@@ -136,14 +161,15 @@ export const createBookingService = async ({
         },
       })
 
-      // 5️⃣ Generate QR code
-      const qrCode = await generateQRCode()
+      // 9️⃣ Create booking
+      const validUntil = new Date(date)
+      validUntil.setHours(validUntil.getHours() + 4) // add 4 hours
 
-      // 6️⃣ Create booking
       const booking = await tx.booking.create({
         data: {
           userId,
           busId,
+          scheduleId: schedule.id,
           date,
           boardingStop,
           alightingStop,
@@ -159,23 +185,16 @@ export const createBookingService = async ({
           pointsConversionRate: isPointUsed ? POINTS_CONVERSION_RATE : 0,
           paymentId: payment.id,
           qrCode,
-          validUntil: date,
+          validUntil,
         },
         include: { payment: true, bus: true },
       })
 
-      // 7️⃣ Update bus seats
-      await tx.bus.update({
-        where: { id: busId },
-        data: {
-          reservedSeats: reservedSeats + seats,
-          availableSeats: bus.capacity - (reservedSeats + seats),
-        },
-      })
-
+      // ✅ No need to update schedule.reservedSeats anymore
       return successResponse("Booking created successfully", {
         booking,
         payment,
+        availableSeats: availableSeats - seats,
       })
     })
   } catch (err) {

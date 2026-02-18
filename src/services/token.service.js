@@ -47,7 +47,7 @@ export const issueTokens = async (user, req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     })
 
     // Return access token in response body
@@ -139,7 +139,7 @@ export const issueTokensSocial = async (user, req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     })
 
     // Decide role-based redirect URL

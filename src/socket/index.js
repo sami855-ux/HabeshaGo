@@ -35,6 +35,19 @@ export const initSocket = (server) => {
       }
     })
 
+    // user notifications
+
+    socket.on("joinUserNotification", (userId) => {
+      if (!userId) return
+      socket.join(`user-${userId}`)
+      console.log(`👤 User ${userId} joined room user-${userId}`)
+    })
+
+    socket.on("joinAdminNotification", (adminId) => {
+      socket.join(`admin-${adminId}`)
+      console.log(`🛡 Admin ${socket.id} joined admins room`)
+    })
+
     // Join the map room to receive all vehicle updates
     socket.on("joinMap", async (vehicleIds) => {
       socket.join("map")
@@ -78,14 +91,14 @@ export const getIO = () => {
 
 // Helper emitters (clean API)
 // Use these everywhere instead of io.to(...)
-export const emitToUser = (userId, event, payload) => {
-  io.to(`user-${userId}`).emit(event, payload)
-}
-
 export const emitToVehicle = (vehicleId, event, payload) => {
   io.to(`vehicle-${vehicleId}`).emit(event, payload)
 }
 
-export const emitToAdmins = (event, payload) => {
-  io.to("admins").emit(event, payload)
+export const emitToUserNotification = (userId, payload) => {
+  io.to(`user-${userId}`).emit("notification:new", payload)
+}
+
+export const emitToAdminNotification = (adminId, payload) => {
+  io.to(`admin-${adminId}`).emit("notification:new", payload)
 }

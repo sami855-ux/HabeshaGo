@@ -1,5 +1,6 @@
 import { success } from "zod"
 import prisma from "../prisma/client.js"
+import { emitToUserNotification } from "../socket/index.js"
 
 /**
  * Create a notification (used internally by system/admin/services)
@@ -23,6 +24,19 @@ export const createNotification = async (req, res) => {
       },
     })
 
+    const unreadCount = await prisma.notification.count({
+    where: {
+      userId,
+      isRead: false,
+    },
+  })
+
+  // 3️⃣ Emit real-time event
+  emitToUserNotification(userId, {
+    notification,
+    unreadCount,
+  })
+
     res.status(201).json(notification)
   } catch (error) {
     console.error("Create notification error:", error)
@@ -35,14 +49,15 @@ export const createNotificationService = async ({
   title,
   message,
   type,
-  actionUrl,
-  metadata,
+  actionUrl = null,
+  metadata = null,
 }) => {
   if (!userId || !title || !message || !type) {
     throw new Error("Missing required fields")
   }
 
-  return prisma.notification.create({
+  // 1️⃣ Create notification
+  const notification = await prisma.notification.create({
     data: {
       userId,
       title,
@@ -52,6 +67,22 @@ export const createNotificationService = async ({
       metadata,
     },
   })
+
+  // 2️⃣ Get updated unread count
+  const unreadCount = await prisma.notification.count({
+    where: {
+      userId,
+      isRead: false,
+    },
+  })
+
+  // 3️⃣ Emit real-time event
+  emitToUserNotification(userId, {
+    notification,
+    unreadCount,
+  })
+
+  return notification
 }
 
 /**

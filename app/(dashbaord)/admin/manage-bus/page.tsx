@@ -11,7 +11,7 @@ import BusTable from "@/components/admin-dashboard/BusTable"
 import BulkActions from "@/components/admin-dashboard/BulkActions"
 import FiltersSheet from "@/components/admin-dashboard/FiltersSheet"
 import LoadingSkeleton from "@/components/admin-dashboard/LoadingSkeleton"
-import { useAllBusesQuery } from "@/hooks/useGetAllBuses"
+import { useAllBuses } from "@/hooks/useAllBus"
 
 // Dummy data as fallback
 const dummyBuses = [
@@ -157,6 +157,7 @@ const extractBusData = (apiData: any) => {
 
 export default function BusManagementPage() {
   const router = useRouter()
+  const { data: apiResponse, isLoading, isRefetching, error, refetch } = useAllBuses()
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -175,14 +176,6 @@ export default function BusManagementPage() {
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
-  // React Query for data fetching
-  const {
-    data: apiResponse,
-    isLoading,
-    isRefetching,
-    error,
-    refetch,
-  } = useAllBusesQuery()
 
   console.log("API Response:", apiResponse)
 
@@ -195,11 +188,7 @@ export default function BusManagementPage() {
   }, [error])
 
   // Extract and transform data from API or use dummy data
-  const buses = useDummyData
-    ? dummyBuses
-    : extractBusData(apiResponse).length > 0
-    ? extractBusData(apiResponse)
-    : dummyBuses // Fallback to dummy data if API returns empty
+  const buses = apiResponse ? extractBusData(apiResponse) : []
 
   // Get unique values for filters
   const uniqueRoutes = Array.from(

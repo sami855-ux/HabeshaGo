@@ -1,20 +1,8 @@
-import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import "mapbox-gl/dist/mapbox-gl.css"
 import "./globals.css"
+
+import type { Metadata } from "next"
+import "mapbox-gl/dist/mapbox-gl.css"
 import AppProvider from "./Provider"
-import { QueryProvider } from "@/Providers/QueryProvider"
-import SessionProviderClient from "@/Providers/SessionProviderClient"
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-})
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   title: "HabeshaGo",
@@ -23,16 +11,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-  session, // <-- optional if you want to pass preloaded session
 }: Readonly<{
   children: React.ReactNode
   session?: any
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

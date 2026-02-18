@@ -20,7 +20,6 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
         const res = await axiosInstance.post("/auth/refresh", {
           withCredentials: true,
         })
-        console.log(res.data.user, res.data.accessToken)
 
         dispatch(setUser({ user: res.data.user }))
         dispatch(setAccessToken({ accessToken: res.data.accessToken }))

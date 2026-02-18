@@ -1,59 +1,65 @@
+// components/user-dashboard/trip/TripsEmptyState.tsx
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Search } from "lucide-react"
+import { Calendar, Search, Filter, Ticket } from "lucide-react"
+import { TripCategory } from "@/types/trips"
 
 interface TripsEmptyStateProps {
-  category: "upcoming" | "past"
+  category: TripCategory
+  hasFilters?: boolean
+  onClearFilters?: () => void
 }
 
-export default function TripsEmptyState({ category }: TripsEmptyStateProps) {
+export default function TripsEmptyState({
+  category,
+  hasFilters,
+  onClearFilters,
+}: TripsEmptyStateProps) {
   const messages = {
     upcoming: {
-      title: "No upcoming journeys",
-      description:
-        "Your next adventure awaits! Explore available bus routes and plan your trip.",
-      icon: (
-        <div className="relative">
-          <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-            <Calendar className="h-3 w-3 text-blue-600" />
-          </div>
-          <MapPin className="h-16 w-16 text-blue-200" />
-        </div>
-      ),
-      buttonText: "Discover Routes",
-      buttonIcon: <MapPin className="h-4 w-4 mr-2" />,
+      title: hasFilters ? "No matching upcoming trips" : "No upcoming trips",
+      description: hasFilters
+        ? "Try adjusting your filters to see more results"
+        : "You don't have any upcoming trips. Book your next adventure!",
+      icon: Calendar,
     },
     past: {
-      title: "No travel history yet",
-      description:
-        "Your completed trips will appear here. Start your first journey with HabeshaGo!",
-      icon: (
-        <div className="relative">
-          <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-            <Search className="h-3 w-3 text-green-600" />
-          </div>
-          <Calendar className="h-16 w-16 text-green-200" />
-        </div>
-      ),
-      buttonText: "Book First Trip",
-      buttonIcon: <Calendar className="h-4 w-4 mr-2" />,
+      title: hasFilters ? "No matching past trips" : "No past trips",
+      description: hasFilters
+        ? "Try adjusting your filters to see more results"
+        : "Your past trips will appear here once you complete some journeys",
+      icon: Ticket,
     },
   }
 
   const message = messages[category]
 
   return (
-    <div className="text-center py-16 px-4">
-      <div className="inline-flex items-center justify-center p-6 mb-6 bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-sm border border-gray-100">
-        {message.icon}
+    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+      <div className="flex justify-center mb-4">
+        <div className="p-4 bg-gray-100 rounded-full">
+          {hasFilters ? (
+            <Filter className="h-8 w-8 text-gray-400" />
+          ) : (
+            <message.icon className="h-8 w-8 text-gray-400" />
+          )}
+        </div>
       </div>
-      <h3 className="text-2xl font-bold text-gray-900 mb-3">{message.title}</h3>
-      <p className="text-gray-600 mb-8 max-w-md mx-auto text-lg">
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        {message.title}
+      </h3>
+      <p className="text-gray-600 mb-6 max-w-sm mx-auto">
         {message.description}
       </p>
-      <Button size="lg" className="gap-2 px-8 h-12">
-        {message.buttonIcon}
-        {message.buttonText}
-      </Button>
+      {hasFilters && onClearFilters && (
+        <Button onClick={onClearFilters} variant="outline">
+          Clear Filters
+        </Button>
+      )}
+      {!hasFilters && category === "upcoming" && (
+        <Button className="bg-orange-600 hover:bg-orange-700">
+          Book a Trip
+        </Button>
+      )}
     </div>
   )
 }

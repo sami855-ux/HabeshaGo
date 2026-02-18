@@ -52,7 +52,6 @@ function Header({ className }: { className?: string }) {
   const dispatch = useDispatch()
   const { user, loading } = useSelector((state: RootState) => state.user)
 
-  console.log(user)
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)

@@ -88,7 +88,7 @@ const fetchTransactions = async (): Promise<{
 }> => {
   // Using the actual API service
   const response = await getWalletTransactions()
-  return { transactions: response.data || [] }
+  return { transactions: response.transactions || [] }
 }
 
 // Helper functions
@@ -278,6 +278,18 @@ const createColumns = (
     },
   },
   {
+    accessorKey: "recipientName",
+    header: "Recipient Name",
+    cell: ({ row }) => {
+      const recipientName = row.getValue("recipientName") as string | null
+      return <p>{recipientName ?? "No recipient name"}</p>
+    },
+    filterFn: (row, columnId, filterValue) => {
+      if (!filterValue || filterValue === "all") return true
+      return row.getValue(columnId) === filterValue
+    },
+  },
+  {
     accessorKey: "amount",
     header: ({ column }) => (
       <Button
@@ -346,6 +358,7 @@ const createColumns = (
       return row.getValue(columnId) === filterValue
     },
   },
+
   {
     accessorKey: "balanceAfter",
     header: ({ column }) => (

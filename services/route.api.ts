@@ -66,7 +66,6 @@ export const fetchAllRoutesSimple = async () => {
   try {
     const response = await axiosInstance.get("/route")
 
-    // assuming response.data.data is the routes array
     return response.data.data.map((route: any) => ({
       id: route.id,
       name: route.name,
@@ -74,6 +73,12 @@ export const fetchAllRoutesSimple = async () => {
       destination: route.destination,
       distanceKm: route.distanceKm ?? 0,
       estimatedTimeMin: route.estimatedTimeMin ?? 0,
+
+      // NEW: convert midPoints -> stops
+      stops:
+        route.midPoints
+          ?.sort((a: any, b: any) => a.order - b.order)
+          .map((point: any) => point.name) ?? [],
     }))
   } catch (error: any) {
     console.error("Error fetching routes:", error)
@@ -85,6 +90,7 @@ export const fetchAllRoutesSimple = async () => {
     }
   }
 }
+
 
 export const getRouteById = async (routeId: string) => {
   try {

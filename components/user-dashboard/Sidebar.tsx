@@ -16,6 +16,8 @@ import {
   ChevronLast,
   LogOut,
   Bus,
+  Receipt,
+  Ticket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
@@ -155,34 +157,16 @@ function Sidebar() {
       path: "/wallet",
     },
     {
+      id: "payment",
+      label: "Payment",
+      icon: <Receipt className="h-5 w-5" />,
+      path: "/payment",
+    },
+    {
       id: "trips",
       label: "My Trips",
-      icon: <Bus className="h-5 w-5" />,
+      icon: <Ticket className="h-5 w-5" />,
       path: "/trips",
-    },
-
-    {
-      id: "transactions",
-      label: "Transactions",
-      icon: <ArrowUpDown className="h-5 w-5" />,
-      subItems: [
-        {
-          id: "transaction-history",
-          label: "Transaction History",
-          path: "/transactions/history",
-        },
-        {
-          id: "pending-transactions",
-          label: "Pending Transactions",
-          path: "/transactions/pending",
-        },
-        {
-          id: "failed-transactions",
-          label: "Failed Transactions",
-          path: "/transactions/failed",
-        },
-      ],
-      path: "/transactions",
     },
   ]
 

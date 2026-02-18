@@ -4,25 +4,44 @@ export const fetchAllBuses = async () => {
   try {
     const res = await axiosInstance.get("/buses")
 
-    return res.data
+    return res.data.data
   } catch (error: any) {
     console.error("Error fetching buses:", error)
-
-    // normalize error so frontend can handle it easily
-    throw (
-      error.response?.data || {
-        success: false,
-        message: "Failed to fetch buses",
-      }
-    )
+    return []
   }
 }
 
-export const searchBuses = async (start: string, end: string) => {
-  const res = await axiosInstance.get("/buses/search", {
-    params: { start, end },
-  })
-  return res.data.data
+export const searchBusesAPI = async (searchData) => {
+  try {
+    // Build query string
+    const params = new URLSearchParams({
+      origin: searchData.from,
+      destination: searchData.to,
+      date: searchData.date,
+      time: searchData.time,
+      passengers: searchData.passengers.toString(),
+    })
+
+    console.log(params)
+
+    // Make API call
+    const res = await axiosInstance.get(`/buses/search?${params.toString()}`)
+    return res.data
+  } catch (error) {
+    console.error("Error searching buses:", error)
+    return error?.response?.data || []
+  }
+}
+
+export const updateBus = async (busId: string, updates: any) => {
+  const busIdNumber = Number(busId)
+  try {
+    const res = await axiosInstance.put(`/buses/${busIdNumber}`, updates)
+    return res.data
+  } catch (error) {
+    console.log("Error updating bus:", error)
+    return { success: false, message: "Error updating bus" }
+  }
 }
 
 export const getAllBuses = async (params?: {
@@ -35,9 +54,30 @@ export const getAllBuses = async (params?: {
   return res.data
 }
 
-export const getBusById = async (busId: number) => {
-  const res = await axiosInstance.get(`/buses/${busId}`)
-  return res.data
+export const getBusById = async (busId: string) => {
+  const busIdNumber = Number(busId)
+  try {
+    const res = await axiosInstance.get(`/buses/${busIdNumber}`)
+    return res.data.data
+  } catch (error) {
+    console.log("Error fetching bus by ID:", error)
+    return {}
+  }
+}
+
+export const getAllMidpoints = async () => {
+  try {
+    const res = await axiosInstance.get("/buses/midpoints")
+
+    if (res.data.success) {
+      return res.data.data
+    } else {
+      return []
+    }
+  } catch (error) {
+    console.log("Error Fetching all the midpoints", error)
+    return []
+  }
 }
 
 export const getSeatAvailability = async (busId: number, date: string) => {
@@ -51,7 +91,7 @@ export const recordBusPosition = async (
   busId: number,
   latitude: number,
   longitude: number,
-  timestamp?: string
+  timestamp?: string,
 ) => {
   const res = await axiosInstance.post(`/buses/${busId}/position`, {
     latitude,

@@ -24,6 +24,7 @@ import { transferFunds } from "@/services/transaction"
 import { toast } from "sonner"
 import { useAppDispatch, useAppSelector } from "@/store/store"
 import { fetchUserWallet } from "@/store/slices/walletSlice"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface User {
   id: string
@@ -46,6 +47,7 @@ interface Transaction {
 export default function SendMoneyPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const queryClient = useQueryClient()
   const { wallet, loading: walletLoading } = useAppSelector(
     (state) => state.wallet,
   )
@@ -107,6 +109,10 @@ export default function SendMoneyPage() {
       toast.success("Transfer successful!", {
         description: `You have sent ETB ${amount.toLocaleString()} to ${receiver.name}.`,
       })
+
+      //Invalidate query
+      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] })
+
       // ✅ Use backend transaction directly
       setTransaction({
         id: res.data.id,

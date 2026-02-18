@@ -40,7 +40,6 @@ const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<{ user: UserState["user"] }>) => {
-      console.log(action.payload.user)
       state.user = action.payload.user
       state.isAuthenticated = true
       state.loading = false

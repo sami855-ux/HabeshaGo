@@ -58,3 +58,20 @@ export const changePinAPI = async (currentPin: string, newPin: string) => {
     return null
   }
 }
+
+export const verifyPin = async (pin: string) => {
+  try {
+    const res = await axiosInstance.post("/wallet/verify-pin", {
+      pin,
+    })
+
+    if (res.data.success) {
+      return true
+    } else {
+      return false
+    }
+  } catch (error) {
+    console.error("Error verifying wallet PIN:", error)
+    return false
+  }
+}

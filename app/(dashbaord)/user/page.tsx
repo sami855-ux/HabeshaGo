@@ -41,7 +41,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Progress } from "@/components/ui/progress"
 import {
   Tooltip,
   TooltipContent,
@@ -194,8 +193,9 @@ function Page() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="">
-          <h1 className="text-2xl font-bold text-foreground">
-            Welcome back, {user?.name || "User"}! 👋
+          <h1 className="text-2xl font-bold text-foreground flex gap-2">
+            Welcome back, <p className="capitalize">{user?.name || "User"}</p>!
+            👋
           </h1>
           <p className="text-muted-foreground">
             Here's what's happening with your transportation services today
@@ -207,7 +207,12 @@ function Page() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => router.push("/user/settings")}
+                >
                   <Settings className="size-4" />
                 </Button>
               </TooltipTrigger>
@@ -217,8 +222,11 @@ function Page() {
             </Tooltip>
           </TooltipProvider>
 
-          <Avatar>
-            <AvatarImage src={user?.avatar} />
+          <Avatar
+            onClick={() => router.push("/user/Profile")}
+            className="cursor-pointer"
+          >
+            <AvatarImage src={user?.avaterUrl} />
             <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-500">
               <UserCircle className="size-5 text-white" />
             </AvatarFallback>
@@ -316,9 +324,6 @@ function Page() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
-                    <Zap className="size-5 text-white" />
-                  </div>
                   <div>
                     <CardTitle className="text-xl">Quick Actions</CardTitle>
                     <CardDescription>

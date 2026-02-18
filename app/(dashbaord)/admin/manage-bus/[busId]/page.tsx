@@ -1,683 +1,1049 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import dynamic from "next/dynamic"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
+import { useState, useEffect, useRef } from "react"
+import { io } from "socket.io-client"
+import { useParams, useRouter } from "next/navigation"
 import {
-  CalendarDays,
+  Bus as BusIcon,
   Users,
   MapPin,
   Clock,
+  Calendar,
+  Wrench,
+  CheckCircle,
+  AlertCircle,
+  Gauge,
+  Fuel,
+  Settings,
+  Edit,
   User,
-  Phone,
-  Route as RouteIcon,
-  Navigation,
+  Route,
+  Car,
+  CalendarClock,
   Map,
-  Bus as BusIcon,
+  Navigation,
+  Shield,
+  Activity,
+  MoreVertical,
+  Phone,
+  Mail,
+  Star,
+  ChevronRight,
+  RefreshCw,
+  Download,
+  Printer,
+  Share2,
+  Bell,
+  ShieldAlert,
+  Layers,
+  Loader2,
+  ArrowLeft,
+  Trash2,
+  Plus,
+  X,
+  ChevronLeft,
 } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
-// Dynamically import ALL leaflet components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-)
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-)
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-)
-const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
-  ssr: false,
-})
-const Polyline = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Polyline),
-  { ssr: false }
-)
+// Import components
+import { StatusBadge } from "@/components/admin-dashboard/bus-detail/StatusBadge"
+import { UpdateBusDialog } from "@/components/admin-dashboard/bus-detail/UpdateBusDialog"
+import { UpdateDriverDialog } from "@/components/admin-dashboard/bus-detail/UpdateDriverDialog"
+import { UpdateRouteDialog } from "@/components/admin-dashboard/bus-detail/UpdateRouteDialog"
 
-// Types based on the schema
-type BusStatus = "ACTIVE" | "INACTIVE" | "MAINTENANCE"
+// UI Components
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { fetchAllDriversSimple } from "@/services/driver.api"
+import { fetchAllRoutesSimple } from "@/services/route.api"
+import { getAllSimpleVehicles } from "@/services/vehicle.api"
+import { getBusById, updateBus } from "@/services/bus.api"
+import BusMap from "@/components/admin-dashboard/bus-detail/SingleBusMap"
 
-type Driver = {
+// Types
+interface SimpleDriver {
   id: string
   name: string
+  licenseNo: string
+  status: string
   phone?: string
+  email?: string
+  rating?: number
 }
 
-type Booking = {
-  id: number
-  seatNumber: number
-  status: "CONFIRMED" | "CANCELLED"
-}
-
-type BusPosition = {
-  latitude: number
-  longitude: number
-  timestamp: Date
-}
-
-type RouteMidPoint = {
-  name: string
-  lat: number
-  lng: number
-}
-
-type Route = {
+interface SimpleRoute {
   id: number
   name: string
   origin: string
   destination: string
-  distanceKm?: number | null
-  estimatedTimeMin?: number | null
-  midPoints: RouteMidPoint[]
+  distanceKm?: number
+  estimatedTimeMin?: number
+  price?: number
+  currency?: string
 }
 
-type Bus = {
+interface SimpleVehicle {
+  id: number
+  plateNumber: string
+  model: string
+  manufacturer?: string
+  year?: number
+  capacity: number
+  status: string
+  mileage?: number
+  // 🚨 ERROR PRONE: we might need locations array from vehicle object
+  locations?: Array<{
+    id: number
+    vehicleId: number
+    lat: number
+    lng: number
+    accuracy?: number
+    heading?: number
+    speed?: number
+    recordedAt: string
+  }>
+}
+
+interface Bus {
   id: number
   busNumber: string
   capacity: number
-  status: BusStatus
+  status: string
+  driverId?: string
+  routeId?: number
+  vehicleId?: number
+  currentStop?: string
+  nextDestination?: string
   isActive: boolean
-  currentStop?: string | null
-  nextDestination?: string | null
-  createdAt: Date
-  updatedAt: Date
-  driver?: Driver | null
-  route?: Route | null
-  positions: BusPosition[]
-  bookings: Booking[]
+  departureTime?: string
+  estimatedArrival?: string
+  delayMinutes: number
+  lastServiceDate?: string
+  nextServiceDate?: string
+  reservedSeats: number
+  availableSeats?: number
+  createdAt: string
+  updatedAt: string
+  driver?: SimpleDriver
+  route?: SimpleRoute
+  vehicle?: SimpleVehicle & { locations?: any[] } // 💣 allow locations
+  schedules?: any[]
+  seats?: any[]
 }
 
-// Mock data
-const MOCK_BUS: Bus = {
-  id: 123,
-  busNumber: "B-7892",
-  capacity: 48,
-  status: "ACTIVE",
-  isActive: true,
-  currentStop: "Downtown Plaza",
-  nextDestination: "Central Station",
-  createdAt: new Date("2024-01-15"),
-  updatedAt: new Date("2024-03-20T14:30:00"),
-  driver: {
-    id: "D001",
-    name: "Michael Chen",
-    phone: "+1 (555) 123-4567",
-  },
-  route: {
-    id: 1,
-    name: "Downtown Express",
-    origin: "Westgate Terminal",
-    destination: "Eastside Mall",
-    distanceKm: 12.5,
-    estimatedTimeMin: 45,
-    midPoints: [
-      { name: "City Center", lat: 40.7128, lng: -74.006 },
-      { name: "River Park", lat: 40.758, lng: -73.9855 },
-      { name: "University Campus", lat: 40.8075, lng: -73.9626 },
-    ],
-  },
-  positions: [
-    {
-      latitude: 40.758896,
-      longitude: -73.98513,
-      timestamp: new Date("2024-03-20T14:30:00"),
-    },
-  ],
-  bookings: [
-    { id: 1, seatNumber: 1, status: "CONFIRMED" },
-    { id: 2, seatNumber: 2, status: "CONFIRMED" },
-    { id: 3, seatNumber: 3, status: "CONFIRMED" },
-    { id: 4, seatNumber: 4, status: "CANCELLED" },
-    { id: 5, seatNumber: 5, status: "CONFIRMED" },
-    { id: 6, seatNumber: 15, status: "CONFIRMED" },
-    { id: 7, seatNumber: 22, status: "CONFIRMED" },
-    { id: 8, seatNumber: 30, status: "CONFIRMED" },
-  ],
-}
-
-// Sub-component 1: BusHeader
-function BusHeader({ bus }: { bus: Bus }) {
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(date))
-  }
-
-  const statusConfig = {
-    ACTIVE: {
-      label: "Active",
-      variant: "default" as const,
-      color: "bg-green-100 text-green-800 border-green-200",
-    },
-    INACTIVE: {
-      label: "Inactive",
-      variant: "secondary" as const,
-      color: "bg-gray-100 text-gray-800 border-gray-200",
-    },
-    MAINTENANCE: {
-      label: "Maintenance",
-      variant: "destructive" as const,
-      color: "bg-red-100 text-red-800 border-red-200",
-    },
-  }
-
-  const status = statusConfig[bus.status]
+// Occupancy indicator component
+const OccupancyIndicator = ({ bus }: { bus: Bus }) => {
+  const occupied = bus.reservedSeats || 0
+  const total = bus.capacity || 78
+  const percentage = total > 0 ? (occupied / total) * 100 : 0
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <BusIcon className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold tracking-tight">
-                Bus {bus.busNumber}
-              </h1>
-              <Badge variant={status.variant} className={`${status.color}`}>
-                {status.label}
-              </Badge>
-              {bus.isActive && (
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-sm text-muted-foreground">Live</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                <span>Capacity: {bus.capacity} seats</span>
-              </div>
-              <Separator orientation="vertical" className="h-4" />
-              <div className="flex items-center gap-1">
-                <CalendarDays className="h-4 w-4" />
-                <span>Since {new Date(bus.createdAt).getFullYear()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2 text-right">
-            {bus.currentStop && bus.nextDestination && (
-              <div className="flex items-center justify-end gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">
-                  {bus.currentStop} → {bus.nextDestination}
-                </span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Updated {formatDate(bus.updatedAt)}</span>
-            </div>
-          </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-muted-foreground" />
+          <span className="font-medium">Occupancy</span>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Sub-component 3: BusInfo
-function BusInfo({
-  bus,
-  confirmedBookings,
-  availableSeats,
-}: {
-  bus: Bus
-  confirmedBookings: number
-  availableSeats: number
-}) {
-  const occupancyRate = (confirmedBookings / bus.capacity) * 100
-
-  return (
-    <div className="space-y-6">
-      {/* Driver Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Driver Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {bus.driver ? (
-            <>
-              <div>
-                <p className="text-2xl font-semibold">{bus.driver.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  Driver ID: {bus.driver.id}
-                </p>
-              </div>
-              {bus.driver.phone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4" />
-                  <span>{bus.driver.phone}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="py-8 text-center">
-              <User className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-muted-foreground">No driver assigned</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Route Information */}
-      {bus.route && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RouteIcon className="h-5 w-5" />
-              Route Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-lg font-semibold">{bus.route.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {bus.route.origin} → {bus.route.destination}
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-2 gap-4">
-              {bus.route.distanceKm && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Distance</p>
-                  <p className="text-lg font-semibold">
-                    {bus.route.distanceKm} km
-                  </p>
-                </div>
-              )}
-
-              {bus.route.estimatedTimeMin && (
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Estimated Time
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {bus.route.estimatedTimeMin} min
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {bus.route.midPoints.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Stops ({bus.route.midPoints.length})
-                </p>
-                <div className="space-y-1">
-                  {bus.route.midPoints.slice(0, 3).map((point, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground"></div>
-                      <span className="text-sm">{point.name}</span>
-                    </div>
-                  ))}
-                  {bus.route.midPoints.length > 3 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{bus.route.midPoints.length - 3} more stops
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Seat Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Seat Availability
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Occupancy</span>
-              <span>{occupancyRate.toFixed(0)}%</span>
-            </div>
-            <Progress value={occupancyRate} className="h-2" />
-          </div>
-
-          <Separator />
-
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-primary">{bus.capacity}</p>
-              <p className="text-xs text-muted-foreground">Total Seats</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">
-                {confirmedBookings}
-              </p>
-              <p className="text-xs text-muted-foreground">Booked</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-muted-foreground">
-                {availableSeats}
-              </p>
-              <p className="text-xs text-muted-foreground">Available</p>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <Badge variant="outline" className="w-full justify-center">
-              {availableSeats > 0
-                ? `${availableSeats} seats available`
-                : "Fully Booked"}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+        <span className="font-bold text-lg">
+          {occupied}/{total}
+        </span>
+      </div>
+      <Progress value={percentage} className="h-3" />
+      <div className="flex justify-between text-sm text-muted-foreground">
+        <span>Available: {total - occupied}</span>
+        <span>{Math.round(percentage)}% occupied</span>
+      </div>
     </div>
   )
 }
 
-// Sub-component 2: BusMap (with proper Leaflet handling)
-function BusMap({
-  positions,
-  route,
-  currentStop,
-}: {
-  positions: BusPosition[]
-  route?: Route | null
-  currentStop?: string | null
-}) {
-  const [isMounted, setIsMounted] = useState(false)
-  const [Leaflet, setLeaflet] = useState<any>(null)
-  const [leafletLoaded, setLeafletLoaded] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-
-    // Dynamically import leaflet only on client side
-    if (typeof window !== "undefined") {
-      import("leaflet").then((L) => {
-        // Fix for default icons
-        delete (L.Icon.Default.prototype as any)._getIconUrl
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: "/leaflet/images/marker-icon-2x.png",
-          iconUrl: "/leaflet/images/marker-icon.png",
-          shadowUrl: "/leaflet/images/marker-shadow.png",
-        })
-        setLeaflet(L)
-        setLeafletLoaded(true)
-      })
-    }
-  }, [])
-
-  const latestPosition = positions[0]
-
-  if (!isMounted || !leafletLoaded) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Live Location</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[400px] bg-muted rounded-lg flex items-center justify-center">
-            <p className="text-muted-foreground">Loading map...</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!latestPosition) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Live Location</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[400px] bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-            <Navigation className="h-12 w-12 text-muted-foreground" />
-            <p className="text-muted-foreground">No GPS data available</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Create bus icon using Leaflet divIcon
-  const busIcon = Leaflet.divIcon({
-    html: `
-      <div style="
-        background: #3b82f6;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        border: 2px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 6v6"/>
-          <path d="M15 6v6"/>
-          <path d="M2 12h19.6"/>
-          <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 7.8 19.1 7 18 7H4a2 2 0 0 0-2 2v10h3"/>
-          <circle cx="7" cy="18" r="2"/>
-          <path d="M9 18h5"/>
-          <circle cx="16" cy="18" r="2"/>
-        </svg>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
-    className: "custom-bus-icon",
-  })
-
-  // Create stop icon
-  const stopIcon = Leaflet.divIcon({
-    html: `
-      <div style="
-        background: #ef4444;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      "></div>
-    `,
-    iconSize: [20, 20],
-    iconAnchor: [10, 20],
-    popupAnchor: [0, -20],
-    className: "custom-stop-icon",
-  })
-
-  // Generate route points
-  const routePoints: [number, number][] = []
-  if (route) {
-    const originCoords: [number, number] = [40.7128, -74.006]
-    routePoints.push(originCoords)
-
-    route.midPoints.forEach((mp) => {
-      routePoints.push([mp.lat, mp.lng])
-    })
-
-    const destCoords: [number, number] = [40.758, -73.9855]
-    routePoints.push(destCoords)
-  }
+// Service status component
+const ServiceStatus = ({ bus }: { bus: Bus }) => {
+  const today = new Date()
+  const lastService = bus.lastServiceDate
+    ? new Date(bus.lastServiceDate)
+    : new Date()
+  const nextService = bus.nextServiceDate
+    ? new Date(bus.nextServiceDate)
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  const daysUntilService = Math.ceil(
+    (nextService.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  )
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Navigation className="h-5 w-5" />
-          Live Location
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[400px] rounded-lg overflow-hidden border">
-          <MapContainer
-            center={[latestPosition.latitude, latestPosition.longitude]}
-            zoom={13}
-            className="h-full w-full"
-            scrollWheelZoom={true}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium">Service Status</h4>
+        {daysUntilService <= 0 ? (
+          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+            <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
+            Service Due
+          </Badge>
+        ) : daysUntilService <= 7 ? (
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            <Calendar className="h-3.5 w-3.5 mr-1.5" />
+            Soon: {daysUntilService}d
+          </Badge>
+        ) : (
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+            OK: {daysUntilService}d
+          </Badge>
+        )}
+      </div>
 
-            {/* Bus Marker */}
-            <Marker
-              position={[latestPosition.latitude, latestPosition.longitude]}
-              icon={busIcon}
-            >
-              <Popup>
-                <div className="space-y-1">
-                  <p className="font-medium">Bus Location</p>
-                  <p className="text-sm text-muted-foreground">
-                    {currentStop || "In transit"}
-                  </p>
-                  <p className="text-xs">
-                    Updated:{" "}
-                    {new Date(latestPosition.timestamp).toLocaleTimeString()}
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-
-            {/* Route Polyline */}
-            {routePoints.length > 0 && (
-              <Polyline
-                pathOptions={{ color: "#3b82f6", weight: 4, opacity: 0.7 }}
-                positions={routePoints}
-              />
-            )}
-
-            {/* Route Stops */}
-            {route?.midPoints.map((point, index) => (
-              <Marker
-                key={index}
-                position={[point.lat, point.lng]}
-                icon={stopIcon}
-              >
-                <Popup>
-                  <div className="space-y-1">
-                    <p className="font-medium">{point.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Stop {index + 1} on route
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-primary"></div>
-              <span>Current Bus Position</span>
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Last Service</div>
+              <div className="font-medium">
+                {format(lastService, "MMM d, yyyy")}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {Math.ceil(
+                  (today.getTime() - lastService.getTime()) /
+                    (1000 * 60 * 60 * 24),
+                )}{" "}
+                days ago
+              </div>
             </div>
-            <div className="text-muted-foreground">
-              Last GPS:{" "}
-              {new Date(latestPosition.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {routePoints.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-0.5 bg-blue-500"></div>
-              <span>
-                Route: {route?.origin} → {route?.destination}
-              </span>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Next Service</div>
+              <div className="font-medium">
+                {format(nextService, "MMM d, yyyy")}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                in {daysUntilService} days
+              </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }
 
-// Main Page Component
-export default function BusDetailPage() {
-  const [loading, setLoading] = useState(true)
-  const [bus, setBus] = useState<Bus | null>(null)
+// Driver card component
+const DriverCard = ({ driver }: { driver: SimpleDriver }) => (
+  <Card>
+    <CardContent className="pt-6">
+      <div className="flex items-start gap-4">
+        <Avatar className="h-16 w-16 border-2 border-primary/10">
+          <AvatarImage
+            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.name}`}
+          />
+          <AvatarFallback>
+            {driver.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")}
+          </AvatarFallback>
+        </Avatar>
 
-  useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setBus(MOCK_BUS)
-      setLoading(false)
-    }, 500)
+        <div className="flex-1 space-y-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="font-bold text-lg">{driver.name}</h4>
+              <p className="text-sm text-muted-foreground">
+                License: {driver.licenseNo}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+              <span className="font-medium">{driver.rating || 4.5}</span>
+            </div>
+          </div>
 
-    return () => clearTimeout(timer)
-  }, [])
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-muted-foreground">Status</div>
+              <StatusBadge status={driver.status} />
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">Phone</div>
+              <div className="font-medium">{driver.phone || "N/A"}</div>
+            </div>
+          </div>
 
-  if (loading || !bus) {
-    return (
-      <div className="container max-w-6xl py-8 space-y-8">
-        <div className="space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4 animate-pulse" />
-          <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
+          {driver.phone && (
+            <div className="flex items-center gap-4 pt-2">
+              <a
+                href={`tel:${driver.phone}`}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
+              >
+                <Phone className="h-4 w-4" />
+                Call
+              </a>
+              {driver.email && (
+                <a
+                  href={`mailto:${driver.email}`}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Mail className="h-4 w-4" />
+                  Email
+                </a>
+              )}
+            </div>
+          )}
         </div>
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="h-[400px] bg-muted rounded-lg animate-pulse" />
-          </div>
-          <div className="space-y-4">
-            <div className="h-32 bg-muted rounded animate-pulse" />
-            <div className="h-32 bg-muted rounded animate-pulse" />
-            <div className="h-24 bg-muted rounded animate-pulse" />
-          </div>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+export default function BusDetailsPage() {
+  const params = useParams()
+  const router = useRouter()
+
+  const busId = params.busId
+  const [bus, setBus] = useState<Bus | null>(null)
+  const [drivers, setDrivers] = useState<SimpleDriver[]>([])
+  const [routes, setRoutes] = useState<SimpleRoute[]>([])
+  const [vehicles, setVehicles] = useState<SimpleVehicle[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("overview")
+  // 💣 location state: can be from socket OR from bus.vehicle.locations fallback
+  const [location, setLocation] = useState<any>(null)
+  const socketRef = useRef<any>(null)
+
+  // 🚨 ERROR PRONE: fetch bus data and THEN derive initial location from vehicle.locations
+  useEffect(() => {
+    fetchBusData()
+  }, [busId])
+
+  // 🔥 NEW EFFECT: after bus loads, set initial location from vehicle.locations (if socket null/empty)
+  useEffect(() => {
+    if (bus?.vehicle?.locations && bus.vehicle.locations.length > 0) {
+      // 💣 assume last index is latest (may not be sorted)
+      const latest = bus.vehicle.locations[bus.vehicle.locations.length - 1]
+      if (latest?.lat && latest?.lng) {
+        console.log("📍 Using fallback location from vehicle.locations", latest)
+        setLocation(latest)
+        toast.info("Using last known location from vehicle history")
+      }
+    }
+  }, [bus?.vehicle?.locations])
+
+  // 🚨 SOCKET effect: overwrites location when realtime data arrives
+  useEffect(() => {
+    if (!bus?.vehicleId) return
+
+    const s = io("http://localhost:5000")
+    socketRef.current = s
+
+    const vehicleId = bus.vehicleId
+
+    console.log("Joining vehicle room:", vehicleId)
+
+    s.emit("joinVehicle", vehicleId)
+
+    s.on("vehicle:location", (loc) => {
+      console.log("📡 vehicle Info from socket", loc)
+      setLocation(loc) // 💣 overwrites fallback, good
+    })
+
+    return () => {
+      console.log("Leaving vehicle room:", vehicleId)
+
+      s.emit("leaveVehicle", vehicleId)
+      s.disconnect()
+      socketRef.current = null
+    }
+  }, [bus?.vehicleId])
+
+  const fetchBusData = async () => {
+    try {
+      setLoading(true)
+
+      // Fetch all data in parallel
+      const [driversData, routesData, vehiclesData, busData] =
+        await Promise.all([
+          fetchAllDriversSimple(),
+          fetchAllRoutesSimple(),
+          getAllSimpleVehicles(),
+          getBusById(busId),
+        ])
+
+      console.log("🚌 Bus data received:", busData)
+
+      setDrivers(driversData)
+      setRoutes(routesData)
+      setVehicles(vehiclesData)
+      setBus(busData)
+
+      // 💣 also try to set location from busData if it has vehicle.locations
+      if (busData?.vehicle?.locations?.length > 0) {
+        const latest = busData.vehicle.locations[busData.vehicle.locations.length - 1]
+        if (latest?.lat && latest?.lng) {
+          setLocation(latest)
+        }
+      }
+    } catch (error) {
+      toast.error("Failed to load bus data")
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateBus = async (data: any) => {
+    console.log(data)
+    try {
+      // API call to update bus
+      const res = await updateBus(busId, data)
+      if (res.success) {
+        toast.success("Bus updated successfully")
+      } else {
+        toast.error(res.message)
+      }
+      setBus((prev) => (prev ? { ...prev, ...data } : null))
+    } catch (error) {
+      toast.error("Failed to update bus")
+    }
+  }
+
+  const handleUpdateDriver = async (driverId: string | null) => {
+    try {
+      const res = await updateBus(busId, {
+        driverId,
+      })
+      if (res.success) {
+        const selectedDriver = drivers.find((d) => d.id === driverId)
+        setBus((prev) =>
+          prev
+            ? {
+                ...prev,
+                driverId,
+                driver: selectedDriver,
+              }
+            : null,
+        )
+        toast.success("Driver updated successfully")
+      } else {
+        toast.error(res.message)
+      }
+    } catch (error) {
+      toast.error("Failed to update driver")
+    }
+  }
+
+  const handleUpdateRoute = async (routeId: number | null) => {
+    try {
+      const res = await updateBus(busId, {
+        routeId,
+      })
+      if (res.success) {
+        const selectedRoute = routes.find((r) => r.id === routeId)
+        setBus((prev) =>
+          prev
+            ? {
+                ...prev,
+                routeId,
+                route: selectedRoute,
+              }
+            : null,
+        )
+        toast.success("Route updated successfully")
+      } else {
+        toast.error(res.message)
+      }
+    } catch (error) {
+      toast.error("Failed to update route")
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading bus details...</p>
         </div>
       </div>
     )
   }
 
-  const confirmedBookings = bus.bookings.filter(
-    (b) => b.status === "CONFIRMED"
-  ).length
-  const availableSeats = bus.capacity - confirmedBookings
-
-  return (
-    <div className="container max-w-6xl py-8 space-y-8">
-      <BusHeader bus={bus} />
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <BusMap
-            positions={bus.positions}
-            route={bus.route}
-            currentStop={bus.currentStop}
-          />
-        </div>
-        <div>
-          <BusInfo
-            bus={bus}
-            confirmedBookings={confirmedBookings}
-            availableSeats={availableSeats}
-          />
+  if (!bus) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <BusIcon className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <h2 className="text-2xl font-bold mb-2">Bus not found</h2>
+          <p className="text-muted-foreground mb-4">
+            The requested bus could not be found.
+          </p>
+          <Button>Go Back</Button>
         </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div
+              className="h-12 w-12 rounded-xl  flex items-center justify-center"
+              onClick={() => router.back()}
+            >
+              <ChevronLeft className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {bus.busNumber}
+              </h1>
+              <p className="text-muted-foreground">
+                Vehicle #{bus.vehicleId} • Added{" "}
+                {format(new Date(bus.createdAt), "MMM d, yyyy")}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <UpdateBusDialog bus={bus} onUpdate={handleUpdateBus} />
+          <UpdateDriverDialog
+            bus={bus}
+            drivers={drivers}
+            onUpdate={handleUpdateDriver}
+          />
+          <UpdateRouteDialog
+            bus={bus}
+            routes={routes}
+            onUpdate={handleUpdateRoute}
+          />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setActiveTab("schedules")}>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                View Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Download className="h-4 w-4 mr-2" />
+                Export Data
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Printer className="h-4 w-4 mr-2" />
+                Print Details
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Bus
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Status Banner */}
+      <div
+        className={cn(
+          "rounded-lg border p-4",
+          bus.status === "ACTIVE"
+            ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/10"
+            : bus.status === "UNDER_MAINTENANCE"
+              ? "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-900/10"
+              : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10",
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {bus.status === "ACTIVE" ? (
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+            ) : bus.status === "UNDER_MAINTENANCE" ? (
+              <Wrench className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            )}
+            <div>
+              <h3 className="font-semibold">
+                {bus.status === "ACTIVE"
+                  ? "Bus is Active"
+                  : bus.status === "UNDER_MAINTENANCE"
+                    ? "Under Maintenance"
+                    : "Bus is out of service"}
+              </h3>
+              <p className="text-sm opacity-80">
+                {bus.status === "ACTIVE"
+                  ? "Operating normally"
+                  : bus.status === "UNDER_MAINTENANCE"
+                    ? "Scheduled for service"
+                    : "Not in service"}
+              </p>
+            </div>
+          </div>
+          <StatusBadge status={bus.status} />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList className="grid grid-cols-2 lg:grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="driver">Driver</TabsTrigger>
+          <TabsTrigger value="vehicle">Vehicle</TabsTrigger>
+          <TabsTrigger value="actions">Actions</TabsTrigger>
+          <TabsTrigger value="map">Map</TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Route Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Route className="h-5 w-5" />
+                    Route Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {bus.route ? (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-xl font-bold">
+                            {bus.route.name}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline">
+                              {bus.route.distanceKm} km
+                            </Badge>
+                            <Badge variant="outline">
+                              {bus.route.estimatedTimeMin} min
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 dark:bg-green-900/20"
+                            >
+                              {bus.route.currency} {bus.route.price}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveTab("actions")}
+                        >
+                          Change Route
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                            <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">Origin</div>
+                            <div className="text-muted-foreground">
+                              {bus.route.origin}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                            <MapPin className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">Destination</div>
+                            <div className="text-muted-foreground">
+                              {bus.route.destination}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Route className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-muted-foreground">No route assigned</p>
+                      <Button
+                        variant="outline"
+                        className="mt-3"
+                        onClick={() => setActiveTab("actions")}
+                      >
+                        Assign Route
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Real-time Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Real-time Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">
+                        Current Status
+                      </div>
+                      <div className="font-medium text-lg">
+                        {bus.currentStop || "Not in service"}
+                      </div>
+                      {bus.departureTime && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Departed:{" "}
+                          {format(new Date(bus.departureTime), "HH:mm")}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">
+                        Next Destination
+                      </div>
+                      <div className="font-medium text-lg">
+                        {bus.nextDestination || "Not set"}
+                      </div>
+                      {bus.estimatedArrival && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          ETA: {format(new Date(bus.estimatedArrival), "HH:mm")}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">
+                        Delay Status
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {bus.delayMinutes > 0 ? (
+                          <>
+                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                            <span className="font-medium text-amber-600">
+                              {bus.delayMinutes} min delay
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="font-medium text-green-600">
+                              On time
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">
+                        GPS Tracking
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Navigation className="h-4 w-4 text-blue-500" />
+                        <span className="font-medium">
+                          {bus.vehicle?.status === "ACTIVE"
+                            ? "Active"
+                            : "Inactive"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              {/* Occupancy Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Seat Occupancy
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <OccupancyIndicator bus={bus} />
+                </CardContent>
+              </Card>
+
+              {/* Service Status Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Maintenance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ServiceStatus bus={bus} />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Driver Tab */}
+        <TabsContent value="driver" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Driver Information</h2>
+            <UpdateDriverDialog
+              bus={bus}
+              drivers={drivers}
+              onUpdate={handleUpdateDriver}
+            />
+          </div>
+
+          {bus.driver ? (
+            <DriverCard driver={bus.driver} />
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <User className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No Driver Assigned
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    This bus doesn't have a driver assigned yet.
+                  </p>
+                  <UpdateDriverDialog
+                    bus={bus}
+                    drivers={drivers}
+                    onUpdate={handleUpdateDriver}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Vehicle Tab */}
+        <TabsContent value="vehicle" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Vehicle Information</h2>
+            <Button variant="outline" size="sm">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Vehicle
+            </Button>
+          </div>
+
+          {bus.vehicle ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-lg">
+                        {bus.vehicle.manufacturer} {bus.vehicle.model}
+                      </h4>
+                      <div className="flex items-center gap-3 mt-1">
+                        {bus.vehicle.year && (
+                          <Badge variant="outline">{bus.vehicle.year}</Badge>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className="bg-blue-50 dark:bg-blue-900/20"
+                        >
+                          {bus.vehicle.plateNumber}
+                        </Badge>
+                      </div>
+                    </div>
+                    <StatusBadge status={bus.vehicle.status} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">
+                        Capacity
+                      </div>
+                      <div className="font-medium">
+                        {bus.vehicle.capacity} seats
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">
+                        Mileage
+                      </div>
+                      <div className="font-medium">
+                        {bus.vehicle.mileage?.toLocaleString() || "N/A"} km
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <Car className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No Vehicle Assigned
+                  </h3>
+                  <p className="text-muted-foreground">
+                    This bus doesn't have a vehicle assigned yet.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+       {/* 🗺️ MAP TAB - with fallback to vehicle.locations */}
+<TabsContent value="map" className="space-y-4">
+  <div className="flex items-center justify-between">
+    <h2 className="text-2xl font-bold">Live Tracking</h2>
+    <div className="flex items-center gap-2">
+      <Badge variant={socketRef.current ? "default" : "outline"} 
+             className={cn(socketRef.current ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800")}>
+        {socketRef.current ? "🟢 Live" : "🟡 Historical"}
+      </Badge>
+      {!socketRef.current && bus?.vehicle?.locations && (
+        <Badge variant="outline">
+          📍 {bus.vehicle.locations.length} points
+        </Badge>
+      )}
+    </div>
+  </div>
+  
+  {/* 💣 ERROR PRONE: location can be null, BusMap must handle undefined */}
+  <BusMap 
+    location={location} 
+    busVehicleLocations={bus?.vehicle?.locations || []} 
+    busNumber={bus?.busNumber}
+  />
+  
+  <div className="text-xs text-muted-foreground flex justify-between">
+    <span>
+      {location || (bus?.vehicle?.locations?.length > 0) ? (
+        <>
+          📍 Bus {bus?.busNumber} - {
+            (location || bus?.vehicle?.locations?.[bus.vehicle.locations.length - 1])?.lat?.toFixed(6)
+          }, {
+            (location || bus?.vehicle?.locations?.[bus.vehicle.locations.length - 1])?.lng?.toFixed(6)
+          }
+          {(location || bus?.vehicle?.locations?.[bus.vehicle.locations.length - 1])?.speed && 
+            ` • ${(location || bus?.vehicle?.locations?.[bus.vehicle.locations.length - 1]).speed} km/h`
+          }
+        </>
+      ) : (
+        "📍 No location data available"
+      )}
+    </span>
+    <span>
+      {socketRef.current ? "🔌 Socket connected" : "🔌 Socket idle"}
+    </span>
+  </div>
+</TabsContent>
+
+        {/* Actions Tab */}
+        <TabsContent value="actions" className="space-y-6">
+          <h2 className="text-2xl font-bold">Management Actions</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Edit className="h-5 w-5" />
+                  Update Bus
+                </CardTitle>
+                <CardDescription>Modify bus details and status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UpdateBusDialog bus={bus} onUpdate={handleUpdateBus} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Driver Management
+                </CardTitle>
+                <CardDescription>Assign or change drivers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UpdateDriverDialog
+                  bus={bus}
+                  drivers={drivers}
+                  onUpdate={handleUpdateDriver}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Route className="h-5 w-5" />
+                  Route Management
+                </CardTitle>
+                <CardDescription>Change bus route assignment</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UpdateRouteDialog
+                  bus={bus}
+                  routes={routes}
+                  onUpdate={handleUpdateRoute}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

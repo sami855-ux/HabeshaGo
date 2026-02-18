@@ -4,9 +4,6 @@ import React, { useState, useRef, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -24,25 +21,155 @@ import {
   AlertCircle,
   Lock,
   Loader2,
-  //   ChapaLogo,
+  User,
+  ArrowLeft,
+  FileText,
+  Info,
+  Star,
+  Tag,
+  Percent,
+  Gift,
+  Sparkles,
+  X,
 } from "lucide-react"
 import { format } from "date-fns"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { Booking, Bus as BusType, PaymentMethod } from "@/types/booking"
 import BookingConfirmation from "./booking-confirmation"
+import PaymentStep from "./payment-step"
+import { useAppSelector } from "@/store/store"
+import { verifyPin } from "@/services/wallet.api"
+import { validatePromoCode, PromoCodeResponse } from "@/services/promoCode"
+import {
+  createNewBooking,
+  BookingRequest,
+  BookingResponse,
+} from "@/services/booking.api"
+import { toast } from "sonner"
+
+// Types based on your data structure
+interface BusSchedule {
+  scheduleId: number
+  startTime: string
+  endTime: string
+  availableSeats: number
+}
+
+interface BusRoute {
+  id: number
+  name: string
+  price: string
+  currency: string
+  estimatedTimeMin: number
+  midPoints: string[]
+}
+
+interface BusVehicle {
+  id: number
+  plateNumber: string
+  vin: string
+  type: string
+  model: string
+  manufacturer: string
+  year: number
+  capacity: number
+  vehicleImageUrl: string
+  status: string
+  mileage: number
+  ownerName: string | null
+  ownerPhone: string | null
+  gpsDeviceId: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface BusDriver {
+  id: string
+  userId: string
+  licenseNo: string
+  experience: number
+  status: string
+  driverLicenseUrl: string
+  licenseStatus: string
+  idType: string
+  idFrontUrl: string
+  idBackUrl: string
+  idStatus: string
+  verifiedById: string | null
+  verifiedAt: string | null
+  rejectionReason: string | null
+  isOnDuty: boolean
+  lastActiveAt: string | null
+  rating: number
+  totalTrips: number
+  complaintsCount: number
+  createdAt: string
+}
+
+interface BusData {
+  id: number
+  busNumber: string
+  capacity: number
+  reservedSeats: number
+  currentStop: string | null
+  nextDestination: string | null
+  status: "ACTIVE" | "UNDER_MAINTENANCE" | "ON_TRIP" | "OFF_DUTY"
+  departureTime: string | null
+  estimatedArrival: string | null
+  delayMinutes: number
+  lastServiceDate: string
+  nextServiceDate: string
+  driver: BusDriver
+  vehicle: BusVehicle
+  route: BusRoute
+}
+
+interface Booking {
+  id: string
+  bookingCode: string
+  busId: number
+  scheduleId: number
+  passengerCount: number
+  totalPrice: number
+  status: string
+  createdAt: Date
+}
+
+type PaymentMethod = "CHAPA" | "WALLET" | "CARD" | "BANK"
 
 interface BookingPageProps {
-  bus: BusType
+  bus: BusData
+  schedule: BusSchedule
   selectedDate: Date
+  selectedTime: string
   passengers: number
   onBack: () => void
   onBookingComplete: (booking: Booking) => void
 }
 
+// Helper function to parse balance string to number
+const parseBalance = (balance: string | undefined | null): number => {
+  if (!balance) return 0
+  // Remove any non-numeric characters except decimal point
+  const cleaned = balance.replace(/[^0-9.]/g, "")
+  return parseFloat(cleaned) || 0
+}
+
+// Format currency helper
+const formatCurrency = (amount: number, currency: string = "ETB") => {
+  return new Intl.NumberFormat("en-ET", {
+    style: "currency",
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
 export default function BookingPage({
   bus,
+  schedule,
   selectedDate,
+  selectedTime,
   passengers,
   onBack,
   onBookingComplete,
@@ -50,30 +177,145 @@ export default function BookingPage({
   const [step, setStep] = useState<"payment" | "pin" | "processing">("payment")
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
-  const [bookingData, setBookingData] = useState<Partial<Booking>>({
-    boardingStop: bus.route.origin,
-    alightingStop: bus.route.destination,
-    payNow: true,
-    currency: "ETB",
-  })
-
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CHAPA")
+
+  // Promo code state
   const [promoCode, setPromoCode] = useState("")
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false)
+  const [promoError, setPromoError] = useState<string | null>(null)
+  const [promoSuccess, setPromoSuccess] = useState<{
+    code: string
+    discount: number
+    promoId: string
+  } | null>(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+
   const [usePoints, setUsePoints] = useState(false)
   const [pin, setPin] = useState(["", "", "", "", "", ""])
   const [showPinError, setShowPinError] = useState(false)
   const [chapaCheckoutUrl, setChapaCheckoutUrl] = useState<string | null>(null)
   const pinInputsRef = useRef<Array<HTMLInputElement | null>>([])
 
-  // Calculate pricing
-  const basePrice = bus.route.distanceKm * (bus.pricePerKm || 0.15)
-  const totalPrice = basePrice * passengers
-  const discountAmount = promoCode === "SAVE10" ? totalPrice * 0.1 : 0
-  const pointsValue = usePoints ? 50 : 0 // Example: 50 ETB worth of points
-  const finalAmount = totalPrice - discountAmount - pointsValue
+  // Refs for scrolling
+  const topRef = useRef<HTMLDivElement>(null)
+  const paymentRef = useRef<HTMLDivElement>(null)
+  const pinRef = useRef<HTMLDivElement>(null)
+  const processingRef = useRef<HTMLDivElement>(null)
 
-  // Wallet balance simulation
-  const walletBalance = 1000 // ETB
+  // Get wallet from Redux store
+  const { wallet, loading: walletLoading } = useAppSelector(
+    (store) => store.wallet,
+  )
+
+  // Parse wallet balance from string to number
+  const walletBalance = parseBalance(wallet?.balance)
+  const walletPoints = parseFloat(wallet?.points?.toString() || "0") || 0
+
+  // Calculate pricing
+  const basePrice = parseFloat(bus.route.price) || 0
+  const totalPrice = basePrice * passengers
+  const serviceFee = totalPrice * 0.04 // 4% service fee
+  const subtotal = totalPrice + serviceFee
+  const vat = subtotal * 0.1 // 10% VAT
+  const totalBeforeDiscount = subtotal + vat
+
+  // Calculate points value based on actual wallet points
+  const pointsValue =
+    usePoints && walletPoints > 0
+      ? Math.min(
+          Math.floor(walletPoints / 100) * 50,
+          totalBeforeDiscount - discountAmount,
+        )
+      : 0
+
+  const pointsUsed = usePoints ? Math.floor(pointsValue / 0.5) : 0 // 100 points = 50 ETB, so 1 point = 0.5 ETB
+
+  const finalAmount = totalBeforeDiscount - discountAmount - pointsValue
+  const hasEnoughBalance = walletBalance >= finalAmount
+
+  // Validate promo code
+  const validatePromo = async () => {
+    setIsValidatingPromo(true)
+    setPromoError(null)
+
+    try {
+      const response = await validatePromoCode({
+        code: promoCode,
+        totalAmount: totalBeforeDiscount,
+      })
+
+      // Check if response has the expected fields
+      if (response.success) {
+        setPromoSuccess({
+          code: response.code,
+          discount: response.discount,
+          promoId: response.promoId,
+        })
+        setDiscountAmount(response.discount)
+        setPromoError(null)
+        toast.success("Promo code applied!", {
+          description: `You saved ${formatCurrency(response.discount, bus.route.currency)}`,
+        })
+      } else {
+        setPromoError(response.message || "Invalid promo code")
+        setDiscountAmount(0)
+        setPromoSuccess(null)
+        toast.error(response.message || "Invalid promo code")
+      }
+    } catch (error) {
+      console.error("Promo validation failed:", error)
+      setPromoError(
+        error.message || "Failed to validate promo code. Please try again.",
+      )
+      toast.error(error.message || "Promo validation failed")
+    } finally {
+      setIsValidatingPromo(false)
+    }
+  }
+
+  const removePromo = () => {
+    setPromoCode("")
+    setPromoSuccess(null)
+    setDiscountAmount(0)
+    setPromoError(null)
+    toast.info("Promo code removed")
+  }
+
+  // Auto-select wallet if user has enough balance
+  useEffect(() => {
+    if (hasEnoughBalance && walletBalance > 0) {
+      setPaymentMethod("WALLET")
+    }
+  }, [walletBalance, hasEnoughBalance])
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    // Always scroll to top of the page
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+
+    // Also scroll the specific section into view
+    if (step === "payment" && paymentRef.current) {
+      paymentRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    } else if (step === "pin" && pinRef.current) {
+      pinRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    } else if (step === "processing" && processingRef.current) {
+      processingRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }
+  }, [step])
+
+  // Initial scroll on mount
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }, [])
 
   const handlePinChange = (index: number, value: string) => {
     if (value.length > 1) value = value.slice(0, 1)
@@ -83,7 +325,6 @@ export default function BookingPage({
     setPin(newPin)
     setShowPinError(false)
 
-    // Auto-focus next input
     if (value && index < 5) {
       pinInputsRef.current[index + 1]?.focus()
     }
@@ -96,34 +337,35 @@ export default function BookingPage({
   }
 
   const verifyWalletPin = async (enteredPin: string): Promise<boolean> => {
-    // Simulate API call to verify PIN
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // In real app, this would call your backend
-    // For demo, valid PIN is "123456"
-    return enteredPin === "123456"
+    try {
+      const response = await verifyPin(enteredPin)
+      return response
+    } catch (error) {
+      console.error("PIN verification failed:", error)
+      return false
+    }
   }
 
   const processChapaPayment = async () => {
-    // Simulate Chapa payment initialization
     setIsLoading(true)
+    setStep("processing")
 
     try {
-      // In real app, this would call your backend to create Chapa checkout
+      // Here you would integrate with Chapa API
       await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // For demo, simulate Chapa checkout URL
       const checkoutUrl = `https://checkout.chapa.co/checkout/payment/${Math.random().toString(36).substr(2, 9)}`
       setChapaCheckoutUrl(checkoutUrl)
 
-      // Simulate redirect to Chapa
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // In a real app, you would redirect to Chapa checkout
+      // window.location.href = checkoutUrl
 
-      // After successful payment on Chapa, complete booking
+      // For demo, we'll complete the booking after redirect simulation
+      await new Promise((resolve) => setTimeout(resolve, 2000))
       await completeBooking("CHAPA")
     } catch (error) {
       console.error("Chapa payment failed:", error)
-      alert("Payment processing failed. Please try again.")
+      toast.error("Payment processing failed. Please try again.")
+      setStep("payment")
     } finally {
       setIsLoading(false)
     }
@@ -135,11 +377,18 @@ export default function BookingPage({
       return
     }
 
+    if (!hasEnoughBalance) {
+      toast.error(
+        `Insufficient wallet balance. Your balance is ${formatCurrency(walletBalance, bus.route.currency)} but payment is ${formatCurrency(finalAmount, bus.route.currency)}`,
+      )
+      setStep("payment")
+      return
+    }
+
     setIsLoading(true)
     setStep("processing")
 
     try {
-      // Verify PIN
       const isValid = await verifyWalletPin(enteredPin)
 
       if (!isValid) {
@@ -149,90 +398,107 @@ export default function BookingPage({
         return
       }
 
-      // Check wallet balance
-      if (walletBalance < finalAmount) {
-        alert("Insufficient wallet balance")
-        setStep("payment")
-        setIsLoading(false)
-        return
-      }
-
-      // Process wallet payment
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Complete booking
+      // Proceed with booking after PIN verification
       await completeBooking("WALLET")
     } catch (error) {
       console.error("Wallet payment failed:", error)
-      alert("Payment processing failed. Please try again.")
+      toast.error("Payment processing failed. Please try again.")
       setStep("payment")
       setIsLoading(false)
     }
   }
 
   const completeBooking = async (method: PaymentMethod) => {
-    // Generate booking data
-    const bookingCode = `BUS${Date.now().toString().slice(-8)}`
-    const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${bookingCode}`
+    try {
+      const adjustedDate = new Date(selectedDate)
+      adjustedDate.setHours(adjustedDate.getHours() + 4)
 
-    const booking: Booking = {
-      id: Math.floor(Math.random() * 1000),
-      userId: "user123", // In real app, get from auth
-      busId: bus.id,
-      date: selectedDate,
-      status: "CONFIRMED",
-      bookingCode,
-      boardingStop: bookingData.boardingStop || bus.route.origin,
-      alightingStop: bookingData.alightingStop || bus.route.destination,
-      payNow: true,
-      sharedTicketUsed: false,
-      checkedIn: false,
-      currency: "ETB",
-      discount: discountAmount,
-      promoCode: promoCode || undefined,
-      amountPaid: finalAmount,
-      totalAmount: totalPrice,
-      pointsUsed: usePoints ? 100 : undefined,
-      pointsValue: usePoints ? pointsValue : undefined,
-      pointsConversionRate: usePoints ? 0.5 : undefined,
-      qrCode,
-      bus: bus,
-      user: {
-        id: "user123",
-        name: "Current User", // In real app, get from auth
-        email: "user@example.com",
-        phone: "+251911223344",
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      payment: {
-        id: Math.floor(Math.random() * 1000),
-        bookingId: Math.floor(Math.random() * 1000),
-        amount: finalAmount,
-        currency: "ETB",
-        method: method,
-        status: "COMPLETED",
-        transactionId: `TX${Date.now().toString().slice(-8)}`,
-        processedAt: new Date(),
-      },
+      // Prepare booking request data
+      const bookingData: BookingRequest = {
+        busId: bus.id,
+        date: adjustedDate.toISOString(),
+        totalAmount: finalAmount,
+        currency: bus.route.currency,
+        isPointUsed: usePoints,
+        scheduleStartTime: schedule.startTime,
+        seats: passengers,
+      }
+
+      // Add discount if applicable
+      if (discountAmount > 0 && promoSuccess) {
+        bookingData.discount = discountAmount
+        bookingData.promoCode = promoSuccess.code
+      }
+
+      // Add points if used
+      if (usePoints && pointsUsed > 0) {
+        bookingData.pointsUsed = pointsUsed
+        bookingData.pointsConversionRate = 0.5 // 1 point = 0.5 ETB
+        bookingData.isPointUsed = true
+      }
+
+      // Create booking via API
+      const response = await createNewBooking(bookingData)
+
+      // Check if booking was successful
+      if (response && "booking" in response) {
+        const bookingResponse = response as BookingResponse
+
+        // Create booking object for the UI
+        const booking: Booking = {
+          id:
+            bookingResponse.booking.id ||
+            Math.random().toString(36).substr(2, 9),
+          bookingCode:
+            bookingResponse.booking.bookingCode ||
+            `BUS${Date.now().toString().slice(-8)}`,
+          busId: bus.id,
+          scheduleId: schedule.scheduleId,
+          passengerCount: passengers,
+          totalPrice: finalAmount,
+          status: "CONFIRMED",
+          createdAt: new Date(),
+        }
+
+        // If using wallet, update wallet balance (handled by API)
+        if (method === "WALLET" && wallet) {
+          toast.success(
+            `Wallet payment successful! ${formatCurrency(finalAmount, bus.route.currency)} deducted.`,
+          )
+        }
+
+        setIsLoading(false)
+        setShowConfirmation(true)
+        onBookingComplete(booking)
+
+        toast.success("Booking confirmed successfully!")
+      } else {
+        throw new Error("Booking creation failed")
+      }
+    } catch (error) {
+      console.error("Booking creation failed:", error)
+      toast.error("Failed to create booking. Please try again.")
+      setStep("payment")
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
-    setShowConfirmation(true)
-    onBookingComplete(booking)
   }
 
   const handlePayment = () => {
     if (paymentMethod === "WALLET") {
+      if (!hasEnoughBalance) {
+        toast.error(
+          `Insufficient wallet balance. Your balance is ${formatCurrency(walletBalance, bus.route.currency)} but payment is ${formatCurrency(finalAmount, bus.route.currency)}`,
+        )
+        return
+      }
       setStep("pin")
     } else if (paymentMethod === "CHAPA") {
       processChapaPayment()
     } else {
-      // For demo, process other payments
       setIsLoading(true)
+      setStep("processing")
       setTimeout(() => {
         completeBooking(paymentMethod)
-        setIsLoading(false)
       }, 2000)
     }
   }
@@ -244,7 +510,19 @@ export default function BookingPage({
 
   if (showConfirmation) {
     return (
-      <BookingConfirmation booking={bookingData as Booking} onClose={onBack} />
+      <BookingConfirmation
+        booking={{
+          bookingCode: `BUS${Date.now().toString().slice(-8)}`,
+          totalPrice: finalAmount,
+          currency: bus.route.currency,
+          passengers,
+          busNumber: bus.busNumber,
+          routeName: bus.route.name,
+          selectedDate,
+          selectedTime,
+        }}
+        onClose={onBack}
+      />
     )
   }
 
@@ -255,15 +533,19 @@ export default function BookingPage({
       exit={{ opacity: 0, scale: 0.95 }}
       className="min-h-screen bg-gradient-to-b from-orange-50/30 to-white dark:from-gray-900 dark:to-gray-950 py-8"
     >
+      {/* Invisible anchor at the top */}
+      <div ref={topRef} className="absolute top-0 left-0 w-0 h-0" />
+
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Header */}
         <div className="mb-8">
           <Button
             variant="ghost"
             onClick={onBack}
-            className="mb-6 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+            className="mb-6 hover:bg-orange-50 dark:hover:bg-orange-900/20 group"
           >
-            ← Back to Search
+            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Search
           </Button>
 
           <div className="flex items-center justify-between">
@@ -272,19 +554,19 @@ export default function BookingPage({
                 Complete Your Booking
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Bus {bus.busNumber} • {bus.route.origin} →{" "}
-                {bus.route.destination}
+                Bus {bus.busNumber} • {bus.route.name}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center">
                 {["payment", "pin", "processing"].map((s, i) => (
                   <React.Fragment key={s}>
-                    <div
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
                       className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
                         step === s
-                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white scale-110"
+                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white scale-110 shadow-lg"
                           : i < ["payment", "pin", "processing"].indexOf(step)
                             ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                             : "bg-gray-100 dark:bg-gray-800 text-gray-500",
@@ -293,7 +575,7 @@ export default function BookingPage({
                       {i === 0 && <Wallet className="w-4 h-4" />}
                       {i === 1 && <Lock className="w-4 h-4" />}
                       {i === 2 && <Loader2 className="w-4 h-4 animate-spin" />}
-                    </div>
+                    </motion.div>
                     {i < 2 && (
                       <div
                         className={cn(
@@ -309,7 +591,7 @@ export default function BookingPage({
               </div>
               <Badge
                 className={cn(
-                  "ml-2 transition-all duration-300",
+                  "ml-2 transition-all duration-300 px-3 py-1",
                   step === "payment"
                     ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white"
                     : step === "pin"
@@ -334,225 +616,184 @@ export default function BookingPage({
               {step === "payment" && (
                 <motion.div
                   key="payment"
+                  ref={paymentRef}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="space-y-6"
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6 scroll-mt-24"
                 >
-                  {/* Bus Summary Card */}
-                  <Card className="p-6 bg-gradient-to-br from-orange-50 to-amber-50/50 dark:from-gray-800 dark:to-gray-800/50 border border-orange-100 dark:border-orange-900/30">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                          {bus.busNumber} • {bus.route.name}
-                        </h3>
-                        <div className="flex items-center gap-4 mt-2">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {format(selectedDate, "EEE, MMM d, yyyy")}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {format(new Date(bus.departureTime), "hh:mm a")} -{" "}
-                              {format(
-                                new Date(bus.estimatedArrival),
-                                "hh:mm a",
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
-                        {bus.availableSeats} seats left
-                      </Badge>
+                  {/* Promo Code Section */}
+                  <Card className="p-6 border-2 border-orange-100 dark:border-orange-900/30">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Gift className="w-5 h-5 text-orange-500" />
+                      <h3 className="text-lg font-semibold">
+                        Have a promo code?
+                      </h3>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="w-4 h-4 text-green-500" />
-                          <span className="text-sm font-medium">Boarding</span>
-                        </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
                         <Input
-                          value={bookingData.boardingStop}
-                          onChange={(e) =>
-                            setBookingData({
-                              ...bookingData,
-                              boardingStop: e.target.value,
-                            })
-                          }
-                          className="bg-white/50 dark:bg-gray-800/50"
-                          placeholder={bus.route.origin}
+                          placeholder="Enter promo code"
+                          value={promoCode}
+                          onChange={(e) => {
+                            setPromoCode(e.target.value.toUpperCase())
+                            setPromoError(null)
+                          }}
+                          disabled={promoSuccess !== null}
+                          className={cn(
+                            "pr-8",
+                            promoError && "border-red-300 focus:ring-red-200",
+                            promoSuccess &&
+                              "border-green-300 bg-green-50 dark:bg-green-900/20",
+                          )}
                         />
+                        {promoCode && !promoSuccess && (
+                          <button
+                            onClick={() => setPromoCode("")}
+                            className="absolute right-2 top-1/2 -translate-y-1/2"
+                          >
+                            <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                          </button>
+                        )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="w-4 h-4 text-red-500" />
-                          <span className="text-sm font-medium">Alighting</span>
-                        </div>
-                        <Input
-                          value={bookingData.alightingStop}
-                          onChange={(e) =>
-                            setBookingData({
-                              ...bookingData,
-                              alightingStop: e.target.value,
-                            })
-                          }
-                          className="bg-white/50 dark:bg-gray-800/50"
-                          placeholder={bus.route.destination}
-                        />
-                      </div>
-                    </div>
-                  </Card>
 
-                  {/* Payment Method */}
-                  <Card className="p-6 shadow-none">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <CreditCard className="w-6 h-6 text-orange-500" />
-                      Select Payment Method
-                    </h3>
-
-                    <RadioGroup
-                      value={paymentMethod}
-                      onValueChange={(value) =>
-                        setPaymentMethod(value as PaymentMethod)
-                      }
-                      className="space-y-4"
-                    >
-                      {/* Chapa Payment */}
-                      <div className="flex items-center space-x-3 p-4 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-orange-500 dark:hover:border-orange-700 transition-all duration-300 group">
-                        <RadioGroupItem value="CHAPA" id="chapa" />
-                        <Label
-                          htmlFor="chapa"
-                          className="flex-1 cursor-pointer"
+                      {!promoSuccess ? (
+                        <Button
+                          onClick={validatePromo}
+                          disabled={!promoCode.trim() || isValidatingPromo}
+                          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 min-w-[100px]"
                         >
-                          <div className="flex items-center justify-between gap-4 w-full py-2">
-                            <div className="flex items-center gap-4">
-                              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 group-hover:scale-105 transition-transform">
-                                {/* <ChapaLogo className="w-6 h-6 text-blue-600 dark:text-blue-400" /> */}
-                              </div>
+                          {isValidatingPromo ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            "Apply"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={removePromo}
+                          className="border-green-500 text-green-600 hover:bg-green-50"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Promo Error */}
+                    <AnimatePresence>
+                      {promoError && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mt-2 flex items-center gap-1 text-sm text-red-600"
+                        >
+                          <AlertCircle className="w-4 h-4" />
+                          {promoError}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Promo Success */}
+                    <AnimatePresence>
+                      {promoSuccess && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-bold text-gray-900 dark:text-white">
-                                    Chapa
-                                  </p>
-                                </div>
-                                <p className="text-sm text-gray-500">
-                                  Secure online payment gateway
+                                <p className="font-medium text-green-700 dark:text-green-300">
+                                  Promo code "{promoSuccess.code}" applied!
+                                </p>
+                                <p className="text-xs text-green-600 dark:text-green-400">
+                                  You saved{" "}
+                                  {formatCurrency(
+                                    promoSuccess.discount,
+                                    bus.route.currency,
+                                  )}
                                 </p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-500">
-                                Supports
-                              </div>
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                Card, Mobile, Bank
-                              </div>
-                            </div>
                           </div>
-                        </Label>
-                      </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                      {/* Wallet Payment */}
-                      <div className="flex items-center space-x-3 p-4 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-300 group">
-                        <RadioGroupItem value="WALLET" id="wallet" />
-                        <Label
-                          htmlFor="wallet"
-                          className="flex-1 cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-4">
-                              <div className="p-3 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 group-hover:scale-105 transition-transform">
-                                <Wallet className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gps-3 ">
-                                  <p className="font-bold text-gray-900 dark:text-white">
-                                    HabeshaGo Wallet
-                                  </p>
-                                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
-                                    Recommended
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="text-sm font-semibold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                    ETB {walletBalance.toFixed(2)}
-                                  </div>
-
-                                  <span className="text-xs text-gray-500">
-                                    available
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-500">
-                                Secure & Fast
-                              </div>
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                6-digit PIN required
-                              </div>
-                            </div>
-                          </div>
-                        </Label>
+                    {/* Popular Promos */}
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 mb-2">
+                        Popular codes:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {["SAVE10", "WELCOME20", "BUS5", "FIRSTRIDE"].map(
+                          (code) => (
+                            <Badge
+                              key={code}
+                              variant="outline"
+                              className="cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                              onClick={() =>
+                                !promoSuccess && setPromoCode(code)
+                              }
+                            >
+                              <Tag className="w-3 h-3 mr-1" />
+                              {code}
+                            </Badge>
+                          ),
+                        )}
                       </div>
-                    </RadioGroup>
-                  </Card>
-
-                  {/* Promo Code */}
-                  <Card className="p-6 shadow-none">
-                    <h3 className="text-xl font-bold mb-6">Promo Code</h3>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <Input
-                          value={promoCode}
-                          onChange={(e) => setPromoCode(e.target.value)}
-                          placeholder="Enter promo code"
-                          className="h-12 text-base"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          if (promoCode === "SAVE10") {
-                            alert("🎉 10% discount applied!")
-                          } else if (promoCode) {
-                            alert("Invalid promo code")
-                          }
-                        }}
-                        className="h-12 px-6"
-                      >
-                        Apply Code
-                      </Button>
-                    </div>
-                    <div className="mt-3 text-sm text-gray-500">
-                      Try code:{" "}
-                      <span className="font-mono text-orange-600">SAVE10</span>{" "}
-                      for 10% off
                     </div>
                   </Card>
+
+                  {/* Payment Methods */}
+                  <PaymentStep
+                    bus={bus}
+                    schedule={schedule}
+                    selectedDate={selectedDate}
+                    selectedTime={selectedTime}
+                    passengers={passengers}
+                    paymentMethod={paymentMethod}
+                    setPaymentMethod={setPaymentMethod}
+                    promoCode={promoCode}
+                    setPromoCode={setPromoCode}
+                    usePoints={usePoints}
+                    setUsePoints={setUsePoints}
+                    basePrice={basePrice}
+                    totalPrice={totalPrice}
+                    discountAmount={discountAmount}
+                    pointsValue={pointsValue}
+                    finalAmount={finalAmount}
+                  />
                 </motion.div>
               )}
 
               {step === "pin" && (
                 <motion.div
                   key="pin"
+                  ref={pinRef}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="space-y-6"
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6 scroll-mt-24"
                 >
                   {/* PIN Entry Card */}
-                  <Card className="p-8 bg-gradient-to-br shadow-none from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border border-blue-200 dark:border-blue-800/50">
+                  <Card className="p-8 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border border-blue-200 dark:border-blue-800/50">
                     <div className="text-center mb-8">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                        className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center"
+                      >
                         <Lock className="w-8 h-8 text-white" />
-                      </div>
+                      </motion.div>
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         Wallet Payment Security
                       </h3>
@@ -562,7 +803,7 @@ export default function BookingPage({
                       <div className="mt-2 text-sm text-gray-500">
                         Amount to pay:{" "}
                         <span className="font-bold text-green-600 dark:text-green-400">
-                          ETB {finalAmount.toFixed(2)}
+                          {formatCurrency(finalAmount, bus.route.currency)}
                         </span>
                       </div>
                     </div>
@@ -586,7 +827,7 @@ export default function BookingPage({
                               }
                               onKeyDown={(e) => handlePinKeyDown(index, e)}
                               className={cn(
-                                "w-14 h-14 text-2xl font-bold text-center border-2 rounded-xl",
+                                "w-14 h-14 text-2xl font-bold text-center border-2 rounded-xl transition-all",
                                 showPinError
                                   ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
                                   : "border-gray-300 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-500",
@@ -625,7 +866,7 @@ export default function BookingPage({
                             Current Balance
                           </div>
                           <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                            ETB {walletBalance.toFixed(2)}
+                            {formatCurrency(walletBalance, bus.route.currency)}
                           </div>
                         </div>
                         <div className="text-right">
@@ -633,10 +874,27 @@ export default function BookingPage({
                             After Payment
                           </div>
                           <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                            ETB {(walletBalance - finalAmount).toFixed(2)}
+                            {formatCurrency(
+                              walletBalance - finalAmount,
+                              bus.route.currency,
+                            )}
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Quick PIN Reminder */}
+                    <div className="text-center">
+                      <button
+                        onClick={() => {
+                          toast.info("Demo PIN: 123456", {
+                            description: "For testing purposes only",
+                          })
+                        }}
+                        className="text-xs text-blue-500 hover:text-blue-600 underline"
+                      >
+                        Forgot PIN?
+                      </button>
                     </div>
                   </Card>
 
@@ -673,14 +931,27 @@ export default function BookingPage({
               {step === "processing" && (
                 <motion.div
                   key="processing"
+                  ref={processingRef}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-center py-12"
+                  transition={{ duration: 0.3 }}
+                  className="text-center py-12 scroll-mt-24"
                 >
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 360, 360],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center"
+                  >
                     <Loader2 className="w-12 h-12 text-white animate-spin" />
-                  </div>
+                  </motion.div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
                     Processing Payment
                   </h3>
@@ -693,7 +964,8 @@ export default function BookingPage({
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        Securely processing ETB {finalAmount.toFixed(2)}
+                        Securely processing{" "}
+                        {formatCurrency(finalAmount, bus.route.currency)}
                       </span>
                     </div>
                   </div>
@@ -717,27 +989,37 @@ export default function BookingPage({
                 <Button
                   onClick={step === "payment" ? handlePayment : handlePinSubmit}
                   disabled={
-                    isLoading || (step === "pin" && pin.some((d) => !d))
+                    isLoading ||
+                    walletLoading ||
+                    (step === "pin" && pin.some((d) => !d)) ||
+                    (step === "payment" &&
+                      paymentMethod === "WALLET" &&
+                      !hasEnoughBalance)
                   }
-                  className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 px-8 h-12"
+                  className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 px-8 h-12 relative overflow-hidden group"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : step === "payment" ? (
-                    <>
-                      {paymentMethod === "WALLET"
-                        ? "Pay with Wallet"
-                        : paymentMethod === "CHAPA"
-                          ? "Pay with Chapa"
-                          : "Pay Now"}
-                      <ChevronRight className="ml-2 w-5 h-5" />
-                    </>
-                  ) : (
-                    "Confirm Payment"
-                  )}
+                  <span className="relative z-10 flex items-center">
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : step === "payment" ? (
+                      <>
+                        {paymentMethod === "WALLET"
+                          ? hasEnoughBalance
+                            ? "Pay with Wallet"
+                            : "Insufficient Balance"
+                          : paymentMethod === "CHAPA"
+                            ? "Pay with Chapa"
+                            : "Pay Now"}
+                        <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    ) : (
+                      "Confirm Payment"
+                    )}
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </div>
             )}
@@ -745,12 +1027,12 @@ export default function BookingPage({
             {/* Chapa Redirect Info */}
             {chapaCheckoutUrl && step === "processing" && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-200 dark:border-blue-800"
               >
                 <div className="flex items-center gap-3">
-                  {/* <ChapaLogo className="w-6 h-6 text-blue-600 dark:text-blue-400" /> */}
+                  <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-pulse" />
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
                       Redirecting to Chapa
@@ -777,60 +1059,132 @@ export default function BookingPage({
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
-                      Base Fare ({passengers} × ETB {basePrice.toFixed(0)})
+                      Base Fare ({passengers} ×{" "}
+                      {formatCurrency(basePrice, bus.route.currency)})
                     </span>
                     <span className="font-medium">
-                      ETB {totalPrice.toFixed(2)}
+                      {formatCurrency(totalPrice, bus.route.currency)}
                     </span>
                   </div>
 
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-sm">
+                  {/* Service Fee */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                      <span>Service Fee</span>
+                      <span className="text-xs text-gray-400">(4%)</span>
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(serviceFee, bus.route.currency)}
+                    </span>
+                  </div>
+
+                  {/* VAT */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                      <span>VAT</span>
+                      <span className="text-xs text-gray-400">(10%)</span>
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(vat, bus.route.currency)}
+                    </span>
+                  </div>
+
+                  {/* Subtotal before discounts */}
+                  <div className="flex justify-between text-sm pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">
+                      Subtotal
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(totalBeforeDiscount, bus.route.currency)}
+                    </span>
+                  </div>
+
+                  {/* Promo Discount */}
+                  {discountAmount > 0 && promoSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-between text-sm"
+                    >
                       <span className="text-gray-600 dark:text-gray-400">
-                        <span className="text-green-600 dark:text-green-400">
-                          Promo Code
+                        <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          Promo {promoSuccess.code}
                         </span>
                       </span>
                       <span className="text-green-600 dark:text-green-400 font-medium">
-                        -ETB {discountAmount.toFixed(2)}
+                        -{formatCurrency(discountAmount, bus.route.currency)}
                       </span>
-                    </div>
+                    </motion.div>
                   )}
 
-                  {usePoints && (
-                    <div className="flex justify-between text-sm">
+                  {/* Points Discount */}
+                  {usePoints && pointsValue > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-between text-sm"
+                    >
                       <span className="text-gray-600 dark:text-gray-400">
-                        <span className="text-amber-600 dark:text-amber-400">
-                          Reward Points
+                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Star className="w-3 h-3" />
+                          Points Discount ({pointsUsed} pts)
                         </span>
                       </span>
                       <span className="text-amber-600 dark:text-amber-400 font-medium">
-                        -ETB {pointsValue.toFixed(2)}
+                        -{formatCurrency(pointsValue, bus.route.currency)}
                       </span>
-                    </div>
+                    </motion.div>
                   )}
 
-                  <Separator />
+                  <Separator className="my-2" />
 
+                  {/* Final Total */}
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Amount</span>
-                    <span className="bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                      ETB {finalAmount.toFixed(2)}
-                    </span>
+                    <div className="text-right">
+                      <span className="bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent text-2xl">
+                        {formatCurrency(finalAmount, bus.route.currency)}
+                      </span>
+                      <div className="text-xs text-gray-500 font-normal mt-1">
+                        Inclusive of all taxes
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Savings Summary */}
+                  {(discountAmount > 0 || pointsValue > 0) && (
+                    <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        You saved{" "}
+                        {formatCurrency(
+                          discountAmount + pointsValue,
+                          bus.route.currency,
+                        )}{" "}
+                        today!
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Method Preview */}
                 {step === "payment" && (
-                  <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border">
-                    <div className="text-sm text-gray-500 mb-2">
-                      Selected Payment
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border"
+                  >
+                    <div className="text-sm text-gray-500 mb-2 flex items-center justify-between">
+                      <span>Selected Payment</span>
+                      <Badge variant="outline" className="text-xs">
+                        {paymentMethod === "WALLET" ? "Instant" : "Secure"}
+                      </Badge>
                     </div>
                     <div className="flex items-center gap-3">
                       {paymentMethod === "WALLET" ? (
                         <Wallet className="w-5 h-5 text-amber-500" />
                       ) : paymentMethod === "CHAPA" ? (
-                        // <ChapaLogo className="w-5 h-5 text-blue-500" />
                         <CreditCard className="w-5 h-5 text-blue-500" />
                       ) : (
                         <Smartphone className="w-5 h-5 text-green-500" />
@@ -850,13 +1204,43 @@ export default function BookingPage({
                         </div>
                       </div>
                     </div>
-                  </div>
+                    {paymentMethod === "WALLET" && !hasEnoughBalance && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg"
+                      >
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Insufficient balance. You need{" "}
+                          {formatCurrency(finalAmount, bus.route.currency)}
+                        </p>
+                      </motion.div>
+                    )}
+                    {paymentMethod === "WALLET" && hasEnoughBalance && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg"
+                      >
+                        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Balance after payment:{" "}
+                          {formatCurrency(
+                            walletBalance - finalAmount,
+                            bus.route.currency,
+                          )}
+                        </p>
+                      </motion.div>
+                    )}
+                  </motion.div>
                 )}
 
+                {/* Secure Booking & Tax Info */}
                 <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-4 rounded-lg mt-4 border border-orange-100 dark:border-orange-800">
                   <div className="flex items-start gap-3">
                     <Shield className="w-5 h-5 text-orange-500 mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-gray-900 dark:text-white">
                         Secure Booking
                       </p>
@@ -865,17 +1249,50 @@ export default function BookingPage({
                           ? "Your payment is secured with end-to-end encryption."
                           : "All payments are processed through secure gateways."}
                       </p>
+
+                      {/* Tax Info */}
+                      <div className="mt-3 pt-3 border-t border-orange-200 dark:border-orange-800">
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-orange-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                              Tax Information
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Includes 4% service fee and 10% VAT as per
+                              Ethiopian tax regulations. A receipt will be sent
+                              to your email after booking.
+                            </p>
+                            <div className="flex gap-4 mt-2">
+                              <span className="text-xs text-gray-500">
+                                Service Fee: 4%
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                VAT: 10%
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Total Tax: 14.4%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Cancellation Policy */}
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+                  <span>Free cancellation up to 2 hours before departure</span>
                 </div>
               </div>
             </Card>
 
             {/* Journey Details */}
             <Card className="p-6">
-              <h3 className="text-xl font-bold mb-6">Journey Details</h3>
+              <h3 className="text-lg font-semibold mb-4">Journey Details</h3>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bus className="w-4 h-4 text-orange-500" />
@@ -899,18 +1316,35 @@ export default function BookingPage({
                     <Clock className="w-4 h-4 text-orange-500" />
                     <span className="text-sm">Departure</span>
                   </div>
-                  <span className="font-semibold">
-                    {format(new Date(bus.departureTime), "hh:mm a")}
-                  </span>
+                  <span className="font-semibold">{selectedTime}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm">Arrival</span>
+                  </div>
+                  <span className="font-semibold">{schedule.endTime}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm">Route</span>
+                    <span className="text-sm">Duration</span>
                   </div>
-                  <span className="font-semibold text-right">
-                    {bus.route.origin} → {bus.route.destination}
+                  <span className="font-semibold">
+                    {bus.route.estimatedTimeMin} min
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm">Driver</span>
+                  </div>
+                  <span className="font-semibold">
+                    {bus.driver.experience}+ yrs exp.
+                    {bus.driver.rating > 0 && ` • ${bus.driver.rating}⭐`}
                   </span>
                 </div>
 
@@ -926,7 +1360,7 @@ export default function BookingPage({
               <Separator className="my-4" />
 
               <div className="space-y-2">
-                <h4 className="font-semibold">Included:</h4>
+                <h4 className="font-semibold text-sm">Included:</h4>
                 <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500" />
@@ -947,6 +1381,26 @@ export default function BookingPage({
                 </ul>
               </div>
             </Card>
+
+            {/* Points Balance */}
+            {walletPoints > 0 && (
+              <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                    <div>
+                      <p className="text-sm font-medium">Reward Points</p>
+                      <p className="text-xs text-gray-500">
+                        {walletPoints} points available
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="border-amber-300">
+                    {Math.floor(walletPoints / 100) * 50} ETB value
+                  </Badge>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       </div>

@@ -14,76 +14,40 @@ import {
   Loader,
   Send,
   Sparkles,
-  Bus,
-  Wallet,
-  MapPin,
-  ChevronLeft,
-  ChevronRight,
+  CheckCircle,
+  AlertCircle,
+  Mail,
+  X,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition, useCallback } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
-import { FaApple, FaFacebook, FaTiktok } from "react-icons/fa"
+import { FaApple } from "react-icons/fa"
 import { register } from "@/services/auth.user.api"
-
-/* ---------------------------------- */
-/* Helpers */
-/* ---------------------------------- */
+import { AuthSlider } from "@/components/AuthSlider"
+import { cn } from "@/lib/utils"
 
 const COMMON_EMAIL_DOMAINS = [
   "gmail.com",
   "outlook.com",
   "yahoo.com",
+  "hotmail.com",
   "mail.com",
+  "icloud.com",
+  "protonmail.com",
+  "aol.com",
+  "yandex.com",
+  "gmx.com",
 ]
 
-/* ---------------------------------- */
-/* Slider Content – HabeshaGo */
-/* ---------------------------------- */
-
-const SLIDES = [
-  {
-    image:
-      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1600&q=60",
-    title: "Book buses across Ethiopia",
-    subtitle: "Fast & reliable transport",
-    description:
-      "Search routes, compare schedules, and reserve your seat in seconds.",
-  },
-  {
-    image:
-      "https://images.unsplash.com/photo-1502920514313-52581002a659?w=1600&q=60",
-    title: "Smart routes & schedules",
-    subtitle: "Travel with confidence",
-    description: "Live departure times, route details, and seat availability.",
-  },
-  {
-    image:
-      "https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=1600&q=60",
-    title: "Secure wallet payments",
-    subtitle: "Simple & trusted",
-    description: "Top up once, pay instantly, and manage all your bookings.",
-  },
-  {
-    image:
-      "https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=1600&q=60",
-    title: "All your trips in one place",
-    subtitle: "Easy management",
-    description:
-      "Tickets, history, notifications, and refunds—organized for you.",
-  },
-]
-
-const FEATURES = [
-  { icon: <Bus className="h-4 w-4" />, label: "Bus Booking" },
-  { icon: <MapPin className="h-4 w-4" />, label: "Live Routes" },
-  { icon: <Wallet className="h-4 w-4" />, label: "Wallet & Payments" },
-]
-
-/* ---------------------------------- */
-/* Component */
-/* ---------------------------------- */
+const EMAIL_PROVIDERS = {
+  gmail: { domain: "gmail.com", color: "text-red-500" },
+  outlook: { domain: "outlook.com", color: "text-blue-500" },
+  yahoo: { domain: "yahoo.com", color: "text-purple-500" },
+  hotmail: { domain: "hotmail.com", color: "text-blue-400" },
+  icloud: { domain: "icloud.com", color: "text-gray-500" },
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -93,29 +57,145 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("")
   const [emailError, setEmailError] = useState("")
-  const [slideIndex, setSlideIndex] = useState(0)
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isValidEmail, setIsValidEmail] = useState(false)
+  const [touched, setTouched] = useState(false)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
 
   const inputRef = useRef<HTMLInputElement>(null)
-
-  /* ---------------------------------- */
-  /* Slider logic */
-  /* ---------------------------------- */
-
-  const nextSlide = () => setSlideIndex((p) => (p + 1) % SLIDES.length)
-
-  const prevSlide = () =>
-    setSlideIndex((p) => (p === 0 ? SLIDES.length - 1 : p - 1))
-
-  useEffect(() => {
-    const interval = setInterval(nextSlide, 6000)
-    return () => clearInterval(interval)
-  }, [])
-
-  /* ---------------------------------- */
-  /* Auth */
-  /* ---------------------------------- */
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
+  // Generate email suggestions based on input
+  const generateSuggestions = useCallback((value: string) => {
+    if (!value || value.includes("@")) {
+      const [localPart, domain] = value.split("@")
+
+      // If user started typing domain, filter domains
+      if (domain) {
+        const filtered = COMMON_EMAIL_DOMAINS.filter((d) =>
+          d.toLowerCase().startsWith(domain.toLowerCase()),
+        ).map((d) => `${localPart}@${d}`)
+        return filtered.slice(0, 5) // Limit to 5 suggestions
+      }
+
+      // If no @ yet, suggest common domains with the local part
+      if (localPart && localPart.length > 1) {
+        return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5)
+      }
+    }
+    return []
+  }, [])
+
+  // Update suggestions when email changes
+  useEffect(() => {
+    if (email && !validateEmail(email) && !email.includes(" ")) {
+      const newSuggestions = generateSuggestions(email)
+      setSuggestions(newSuggestions)
+      setShowSuggestions(newSuggestions.length > 0 && !isValidEmail)
+      setIsValidEmail(validateEmail(email))
+
+      // Clear error when user starts typing
+      if (touched) setEmailError("")
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+      setIsValidEmail(validateEmail(email))
+    }
+
+    // Reset selected suggestion index
+    setSelectedSuggestionIndex(-1)
+  }, [email, generateSuggestions, isValidEmail, touched])
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions) return
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : prev,
+        )
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
+      case "Enter":
+        if (selectedSuggestionIndex >= 0) {
+          e.preventDefault()
+          handleSuggestionClick(suggestions[selectedSuggestionIndex])
+        }
+        break
+      case "Escape":
+        setShowSuggestions(false)
+        break
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setEmail(suggestion)
+    setShowSuggestions(false)
+    setTouched(true)
+
+    // Auto-validate and submit? (optional)
+    if (validateEmail(suggestion)) {
+      // You could auto-submit here if desired
+      // submitEmailWithValue(suggestion)
+    }
+  }
+
+  const handleBlur = () => {
+    setTouched(true)
+    if (email && !validateEmail(email)) {
+      setEmailError("Please enter a valid email address")
+    }
+
+    // Delay hiding suggestions to allow click on suggestion
+    setTimeout(() => {
+      if (!suggestionsRef.current?.contains(document.activeElement)) {
+        setShowSuggestions(false)
+      }
+    }, 200)
+  }
+
+  const clearEmail = () => {
+    setEmail("")
+    setEmailError("")
+    setSuggestions([])
+    setShowSuggestions(false)
+    setIsValidEmail(false)
+    inputRef.current?.focus()
+  }
+
+  const submitEmailWithValue = (emailValue: string) => {
+    startEmail(async () => {
+      const res = await register({ email: emailValue })
+      if (!res.success) return
+      toast.success("OTP sent to your email")
+      router.push(`/verify-request?email=${emailValue}`)
+    })
+  }
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,100 +204,30 @@ export default function LoginPage() {
       return
     }
 
-    startEmail(async () => {
-      const res = await register({ email })
-      if (!res.success) return
-      toast.success("OTP sent to your email")
-      router.push(`/verify-request?email=${email}`)
-    })
+    submitEmailWithValue(email)
   }
 
   const signInWithGoogle = () => {
     window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
   }
 
-  const slide = SLIDES[slideIndex]
+  // Get provider icon/color based on domain
+  const getProviderInfo = (suggestion: string) => {
+    const domain = suggestion.split("@")[1]
+    const provider = Object.values(EMAIL_PROVIDERS).find(
+      (p) => p.domain === domain,
+    )
+    return provider
+  }
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
-      {/* ---------------- LEFT SLIDER ---------------- */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <img
-          src={slide.image}
-          alt={slide.title}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/80" />
+      <AuthSlider />
 
-        {/* Navigation buttons */}
-        <button
-          onClick={prevSlide}
-          aria-label="Previous slide"
-          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/10 backdrop-blur-md p-3 text-white hover:bg-white/20 transition"
-        >
-          <ChevronLeft />
-        </button>
-
-        <button
-          onClick={nextSlide}
-          aria-label="Next slide"
-          className="absolute right-6 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/10 backdrop-blur-md p-3 text-white hover:bg-white/20 transition"
-        >
-          <ChevronRight />
-        </button>
-
-        <div className="relative z-10 p-16 flex flex-col justify-between w-full">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-              <Bus className="text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold text-white">HabeshaGo</span>
-          </div>
-
-          {/* Text */}
-          <div className="max-w-xl">
-            <h1 className="text-4xl font-bold text-white mb-3">
-              {slide.title}
-            </h1>
-            <p className="text-lg text-white/80 mb-2">{slide.subtitle}</p>
-            <p className="text-white/70">{slide.description}</p>
-
-            <div className="flex gap-3 mt-6">
-              {FEATURES.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm text-white"
-                >
-                  {f.icon}
-                  {f.label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Dots */}
-          <div className="flex gap-2">
-            {SLIDES.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setSlideIndex(i)}
-                className={`h-2 rounded-full transition-all ${
-                  i === slideIndex
-                    ? "w-8 bg-white"
-                    : "w-2 bg-white/40 hover:bg-white/70"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ---------------- RIGHT AUTH ---------------- */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6">
         <Card className="w-full max-w-md shadow-none border-none bg-background">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl">Welcome to HabeshaGo</CardTitle>
+            <CardTitle className="text-3xl ">Welcome to HabeshaGo</CardTitle>
             <CardDescription>
               Book buses, manage trips, and travel smarter
             </CardDescription>
@@ -227,7 +237,7 @@ export default function LoginPage() {
             <Button
               onClick={signInWithGoogle}
               variant="outline"
-              className="w-full h-12 cursor-pointer"
+              className="w-full h-12 cursor-pointer hover:bg-muted transition-all"
               disabled={googlePending}
             >
               <FcGoogle className="mr-3 h-5 w-5" />
@@ -235,10 +245,10 @@ export default function LoginPage() {
             </Button>
 
             <Button
-              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer"
-              onClick={() => toast.info("TikTok login coming soon")}
+              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer transition-all"
+              onClick={() => toast.info("Apple login coming soon")}
             >
-              <FaApple className="mr-3" />
+              <FaApple className="mr-3 h-5 w-5" />
               Continue with Apple
             </Button>
 
@@ -252,29 +262,138 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={submitEmail} className="space-y-4">
-              <div>
-                <Label>Email address</Label>
-                <div className="relative mt-2">
-                  <Input
-                    ref={inputRef}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="h-12 pr-10"
-                  />
-                  {email && !email.includes("@") && (
-                    <Sparkles className="absolute right-3 top-3.5 h-5 w-5 text-primary" />
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email address
+                </Label>
+                <div className="relative">
+                  <div className="relative">
+                    <Input
+                      id="email"
+                      ref={inputRef}
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onFocus={() =>
+                        suggestions.length > 0 && setShowSuggestions(true)
+                      }
+                      onBlur={handleBlur}
+                      placeholder="name@example.com"
+                      className={cn(
+                        "h-12 pr-20 transition-all",
+                        isValidEmail &&
+                          "border-green-200 focus-visible:ring-green-200",
+                        emailError &&
+                          "border-destructive focus-visible:ring-destructive",
+                      )}
+                      aria-invalid={!!emailError}
+                      aria-describedby={emailError ? "email-error" : undefined}
+                    />
+
+                    {/* Status icons */}
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {isValidEmail && (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      )}
+                      {email && (
+                        <button
+                          type="button"
+                          onClick={clearEmail}
+                          className="p-1 hover:bg-muted rounded-full transition-colors"
+                          aria-label="Clear email"
+                        >
+                          <X className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Email suggestions dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden animate-in fade-in-0 zoom-in-95"
+                    >
+                      <div className="p-2 border-b bg-muted/50">
+                        <p className="text-xs text-muted-foreground">
+                          Suggested email addresses
+                        </p>
+                      </div>
+                      {suggestions.map((suggestion, index) => {
+                        const provider = getProviderInfo(suggestion)
+                        return (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            onMouseEnter={() =>
+                              setSelectedSuggestionIndex(index)
+                            }
+                            className={cn(
+                              "w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-muted transition-colors",
+                              selectedSuggestionIndex === index && "bg-muted",
+                            )}
+                          >
+                            <Mail
+                              className={cn(
+                                "h-3 w-3",
+                                provider?.color || "text-muted-foreground",
+                              )}
+                            />
+                            <span className="flex-1 font-medium text-sm">
+                              {suggestion}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {suggestion.split("@")[1]}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   )}
                 </div>
+
+                {/* Error message */}
                 {emailError && (
-                  <p className="text-sm text-destructive mt-1">{emailError}</p>
+                  <p
+                    id="email-error"
+                    className="text-sm text-destructive flex items-center gap-1 mt-1"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    {emailError}
+                  </p>
+                )}
+
+                {/* Quick domain selectors (optional) */}
+                {!email && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <p className="text-xs text-muted-foreground w-full">
+                      Quick select:
+                    </p>
+                    {Object.entries(EMAIL_PROVIDERS).map(
+                      ([name, { domain, color }]) => (
+                        <button
+                          key={domain}
+                          type="button"
+                          onClick={() => setEmail(`yourname@${domain}`)}
+                          className={cn(
+                            "text-xs px-2 py-1 rounded-full border hover:bg-muted transition-colors",
+                            color,
+                          )}
+                        >
+                          {name}
+                        </button>
+                      ),
+                    )}
+                  </div>
                 )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12"
-                disabled={emailPending}
+                className="w-full h-12 transition-all"
+                disabled={emailPending || !isValidEmail}
               >
                 {emailPending ? (
                   <>
@@ -284,15 +403,40 @@ export default function LoginPage() {
                 ) : (
                   <>
                     <Send className="mr-2" />
-                    Continue
+                    Continue with Email
                   </>
                 )}
               </Button>
             </form>
 
-            <p className="text-xs text-muted-foreground text-center">
-              By continuing, you agree to HabeshaGo’s Terms & Privacy Policy
-            </p>
+            <div className="text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                By continuing, you agree to HabeshaGo's{" "}
+                <button
+                  onClick={() => toast.info("Terms of Service")}
+                  className="text-primary hover:underline"
+                >
+                  Terms
+                </button>{" "}
+                &{" "}
+                <button
+                  onClick={() => toast.info("Privacy Policy")}
+                  className="text-primary hover:underline"
+                >
+                  Privacy Policy
+                </button>
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                Need help?{" "}
+                <button
+                  onClick={() => toast.info("Contact support")}
+                  className="text-primary hover:underline"
+                >
+                  Contact Support
+                </button>
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -23,6 +23,10 @@ import {
   CheckCircle,
   ShieldCheck,
   Info,
+  Tag,
+  Gift,
+  Award,
+  Navigation,
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -31,12 +35,26 @@ interface TicketSheetProps {
 }
 
 export default function TicketSheet({ trip }: TicketSheetProps) {
-  const departureDate = new Date(trip.departureTime)
-  const arrivalDate = new Date(trip.arrivalTime)
+  const departureDate = new Date(trip.date)
+
+  // Estimate arrival time (you might want to calculate this based on route)
+  const arrivalDate = new Date(departureDate)
+  arrivalDate.setHours(arrivalDate.getHours() + 5) // Assuming 5 hours journey
+
   const durationMs = arrivalDate.getTime() - departureDate.getTime()
   const durationHours = Math.round(durationMs / (1000 * 60 * 60))
 
-  const qrData = `HABESHAGO:${trip.id}:${trip.seatNumber}:${departureDate.getTime()}`
+  const qrData = `HABESHAGO:${trip.id}:${trip.bookingCode}:${departureDate.getTime()}`
+
+  // Calculate fare breakdown based on actual data
+  const totalAmount = parseFloat(trip.totalAmount)
+  const amountPaid = parseFloat(trip.amountPaid)
+  const discount = parseFloat(trip.discount)
+  const pointsValue = parseFloat(trip.pointsValue)
+
+  const origin = trip.origin || trip.bus?.route?.origin || "Unknown"
+  const destination =
+    trip.destination || trip.bus?.route?.destination || "Unknown"
 
   return (
     <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-0 bg-gradient-to-b from-orange-50 to-white">
@@ -55,7 +73,8 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </SheetTitle>
                   <p className="text-amber-100 mt-1 flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4" />
-                    Booking Confirmed • ID: {trip.id.toUpperCase()}
+                    Booking Confirmed •{" "}
+                    {trip.bookingCode.slice(0, 8).toUpperCase()}
                   </p>
                 </div>
               </div>
@@ -68,20 +87,51 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
 
         {/* Ticket Content */}
         <div className="p-3 pt-6 space-y-6">
+          {/* Route Summary Card */}
+          <div className="bg-white rounded-2xl p-4 border-2 border-orange-100">
+            <div className="flex items-center justify-between mb-2">
+              <Badge
+                variant="outline"
+                className="bg-orange-50 text-orange-700 border-orange-200"
+              >
+                <Navigation className="h-3 w-3 mr-1" />
+                Route Information
+              </Badge>
+              {trip.bus?.route?.distanceKm && (
+                <span className="text-sm text-gray-500">
+                  {trip.bus.route.distanceKm} km
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500">From</p>
+                <p className="text-lg font-bold text-gray-900">{origin}</p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-orange-400 flex-shrink-0" />
+              <div className="flex-1 text-right">
+                <p className="text-xs text-gray-500">To</p>
+                <p className="text-lg font-bold text-gray-900">{destination}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Journey Card with Orange Accent */}
-          <div className="bg-white rounded-2xl p-3  relative overflow-hidden">
+          <div className="bg-white rounded-2xl p-3 relative overflow-hidden">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-8">
                 <div className="text-center flex-1">
-                  <div className="text-sm  mb-1">DEPARTURE</div>
+                  <div className="text-sm mb-1 text-orange-600 font-semibold">
+                    BOARDING
+                  </div>
                   <div className="text-3xl font-bold text-gray-900">
-                    {trip.originCity}
+                    {trip.boardingStop}
                   </div>
                   <div className="text-2xl font-black text-orange-600">
                     {format(departureDate, "hh:mm a")}
                   </div>
                   <div className="text-xs text-gray-400 mt-2">
-                    Boarding Point: Main Terminal
+                    Boarding Point: {trip.boardingStop} Terminal
                   </div>
                 </div>
 
@@ -103,15 +153,17 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 </div>
 
                 <div className="text-center flex-1">
-                  <div className="text-sm  mb-1">ARRIVAL</div>
-                  <div className="text-3xl  text-gray-900 font-bold">
-                    {trip.destinationCity}
+                  <div className="text-sm mb-1 text-amber-600 font-semibold">
+                    ALIGHTING
+                  </div>
+                  <div className="text-3xl text-gray-900 font-bold">
+                    {trip.alightingStop}
                   </div>
                   <div className="text-2xl font-black text-amber-600">
                     {format(arrivalDate, "hh:mm a")}
                   </div>
                   <div className="text-xs text-gray-400 mt-2">
-                    Drop Point: City Center
+                    Drop Point: {trip.alightingStop} Terminal
                   </div>
                 </div>
               </div>
@@ -121,7 +173,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
           {/* QR Code & Payment Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-3">
             {/* QR Code Card */}
-            <div className="lg:col-span-1 bg-gradient-to-br from-white to-orange-50 rounded-2xl p-6 border-2">
+            <div className="lg:col-span-1 bg-gradient-to-br from-white to-orange-50 rounded-2xl p-6 border-2 border-orange-100">
               <div className="text-center">
                 <h4 className="font-bold text-gray-900 text-lg mb-2">
                   Scan at Boarding
@@ -130,25 +182,14 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   Show this code to the conductor
                 </p>
 
-                {/* Orange-themed QR Code */}
-                <div className="flex justify-center mb-6 ">
+                {/* QR Code Image */}
+                <div className="flex justify-center mb-6">
                   <div className="relative">
-                    <div className="w-56 h-56 bg-gradient-to-br from-orange-50 to-white  rounded-2xl flex items-center justify-center p-2">
-                      <div className="grid grid-cols-7 gap-1.5">
-                        {Array.from({ length: 49 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={cn(
-                              "w-5 h-5 rounded",
-                              i % 4 === 0 ? "bg-orange-700" : "bg-amber-500",
-                              i % 9 === 0 && "bg-orange-800",
-                              i >= 21 && i <= 27 && "bg-orange-600",
-                            )}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white rounded-xl border-4 border-orange-300 shadow-lg"></div>
+                    <img
+                      src={trip.qrCode}
+                      alt="Ticket QR Code"
+                      className="w-56 h-56 object-contain"
+                    />
                   </div>
                 </div>
 
@@ -158,12 +199,14 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       SCAN CODE OR
                     </p>
                     <p className="text-sm font-bold text-gray-900">
-                      Show Ticket ID: {trip.id.slice(0, 12).toUpperCase()}
+                      Booking Code:{" "}
+                      {trip.bookingCode.slice(0, 12).toUpperCase()}
                     </p>
                   </div>
                   <div className="pt-4 border-t border-orange-100">
                     <p className="text-xs text-gray-500">
-                      Generated: {format(new Date(), "dd MMM, hh:mm a")}
+                      Valid Until:{" "}
+                      {format(new Date(trip.validUntil), "dd MMM, hh:mm a")}
                     </p>
                   </div>
                 </div>
@@ -173,7 +216,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
             {/* Payment & Actions Card */}
             <div className="lg:col-span-2 space-y-6">
               {/* Payment Summary */}
-              <div className="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 border-2 ">
+              <div className="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 border-2 border-amber-100">
                 <h4 className="font-bold text-gray-900 text-lg mb-6 flex items-center gap-3">
                   Payment Summary
                 </h4>
@@ -181,65 +224,60 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
                     <div>
-                      <span className="text-gray-700">Base Fare</span>
+                      <span className="text-gray-700">Total Fare</span>
                       <p className="text-xs text-gray-500">
-                        Adults: 1 × ETB {(trip.price * 0.7).toLocaleString()}
+                        {trip.currency} {totalAmount.toLocaleString()}
                       </p>
                     </div>
                     <span className="font-bold text-gray-900">
-                      ETB {(trip.price * 0.7).toLocaleString()}
+                      {trip.currency} {totalAmount.toLocaleString()}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
-                    <div>
-                      <span className="text-gray-700">Taxes & Fees</span>
-                      <p className="text-xs text-gray-500">
-                        Service + GST + Convenience
-                      </p>
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-green-600" />
+                        <span className="text-gray-700">Discount</span>
+                        <p className="text-xs text-green-600">
+                          {trip.promoCode || "Promo"} ({discount}% off)
+                        </p>
+                      </div>
+                      <span className="font-bold text-green-600">
+                        -{trip.currency}{" "}
+                        {(totalAmount - amountPaid).toLocaleString()}
+                      </span>
                     </div>
-                    <span className="font-bold text-gray-900">
-                      ETB {(trip.price * 0.15).toLocaleString()}
-                    </span>
-                  </div>
+                  )}
 
-                  <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
-                    <div>
-                      <span className="text-gray-700">Insurance</span>
-                      <p className="text-xs text-gray-500">
-                        Travel Protection Plan
-                      </p>
+                  {trip.pointsUsed > 0 && (
+                    <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-purple-600" />
+                        <span className="text-gray-700">Points Used</span>
+                        <p className="text-xs text-purple-600">
+                          {trip.pointsUsed} points
+                        </p>
+                      </div>
+                      <span className="font-bold text-purple-600">
+                        -{trip.currency} {pointsValue.toLocaleString()}
+                      </span>
                     </div>
-                    <span className="font-bold text-gray-900">
-                      ETB {(trip.price * 0.1).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-3 px-4 bg-white/50 rounded-xl">
-                    <div>
-                      <span className="text-gray-700">Promo Discount</span>
-                      <p className="text-xs text-green-600">
-                        HABESHA10 Applied
-                      </p>
-                    </div>
-                    <span className="font-bold text-green-600">
-                      - ETB {(trip.price * 0.05).toLocaleString()}
-                    </span>
-                  </div>
+                  )}
 
                   <div className="border-t-2 border-amber-200 pt-4 mt-4">
                     <div className="flex justify-between items-center">
                       <div>
                         <span className="text-lg font-bold text-gray-900">
-                          Total Amount Paid
+                          Amount Paid
                         </span>
                         <p className="text-sm text-gray-600">
-                          Paid via Credit Card
+                          Paid via {trip.payment?.method || "Wallet"}
                         </p>
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-black text-orange-600">
-                          ETB {trip.price.toLocaleString()}
+                          {trip.currency} {amountPaid.toLocaleString()}
                         </div>
                         <div className="text-sm text-green-600 font-semibold flex items-center gap-1">
                           <CheckCircle className="h-4 w-4" />
@@ -250,11 +288,45 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Bus Details */}
+              <div className="bg-gradient-to-br from-white to-orange-50 rounded-2xl p-6 border-2 border-orange-100">
+                <h4 className="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2">
+                  <Bus className="h-5 w-5 text-orange-600" />
+                  Bus Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Bus Number</p>
+                    <p className="font-bold text-gray-900">
+                      {trip.bus?.busNumber}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Capacity</p>
+                    <p className="font-bold text-gray-900">
+                      {trip.bus?.capacity} seats
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Route ID</p>
+                    <p className="font-bold text-gray-900">
+                      {trip.bus?.routeId}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Available Seats</p>
+                    <p className="font-bold text-gray-900">
+                      {trip.bus?.availableSeats}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Important Information - Orange Alert */}
-          <div className="rounded-2xl p-6 border border-border ">
+          <div className="rounded-2xl p-6 border-2 border-orange-100 bg-orange-50/50">
             <div className="flex items-start gap-4 mb-4">
               <div className="p-3 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl">
                 <AlertCircle className="h-6 w-6 text-white" />
@@ -290,10 +362,10 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">
-                      Luggage Policy
+                      Check-in Required
                     </p>
                     <p className="text-sm text-gray-600">
-                      15kg check-in + 7kg hand luggage included
+                      {trip.checkedIn ? "✓ Checked in" : "✗ Not checked in yet"}
                     </p>
                   </div>
                 </div>
@@ -322,7 +394,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       Cancellation Policy
                     </p>
                     <p className="text-sm text-gray-600">
-                      Free cancellation up to 24 hours before departure
+                      {trip.cancelledAt
+                        ? `Cancelled on ${format(new Date(trip.cancelledAt), "dd MMM yyyy")}`
+                        : "Free cancellation up to 24 hours before departure"}
                     </p>
                   </div>
                 </div>
@@ -334,7 +408,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-orange-200"
+                className="gap-2 border-orange-200 hover:bg-orange-50"
               >
                 <Phone className="h-4 w-4" />
                 Call Support
@@ -342,7 +416,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-orange-200"
+                className="gap-2 border-orange-200 hover:bg-orange-50"
               >
                 <Mail className="h-4 w-4" />
                 Email Support
@@ -350,7 +424,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-orange-200"
+                className="gap-2 border-orange-200 hover:bg-orange-50"
               >
                 <Info className="h-4 w-4" />
                 FAQ & Help
@@ -361,7 +435,8 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
           {/* Footer Note */}
           <div className="text-center pt-4">
             <p className="text-xs text-gray-500">
-              This is your official e-ticket. Please keep it safe.
+              This is your official e-ticket for {origin} to {destination}.
+              Please keep it safe.
               <span className="text-orange-600 font-semibold">
                 {" "}
                 HabeshaGo - Safe & Comfortable Journeys Across Ethiopia

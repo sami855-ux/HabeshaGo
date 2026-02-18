@@ -27,4 +27,5 @@ export interface WalletTransactionDTO {
   description?: string | null
   metadata?: Record<string, any> | null
   createdAt: string // ISO string
+  recipientName: string | null
 }

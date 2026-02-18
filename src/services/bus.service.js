@@ -626,8 +626,6 @@ export const searchBusesService = async (
               },
             })
 
-            console.log(bookings)
-
             const reservedSeats = bookedSeatsAgg._sum.seatsBooked || 0
             const availableSeats = bus.capacity - reservedSeats
             if (availableSeats < passengers) return null

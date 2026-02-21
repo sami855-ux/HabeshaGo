@@ -1,6 +1,6 @@
 // import DateTimePicker from "@react-native-community/datetimepicker"
 import { useThemeContext } from "@/context/ThemeContext"
-import { useSearchBuses } from "@/hooks/useSearchBuses"
+import { showToast } from "@/lib/showToast"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { LinearGradient } from "expo-linear-gradient"
 import {
@@ -36,60 +36,26 @@ interface City {
 }
 
 const cities: City[] = [
-  { value: "addis-ababa", label: "Addis Ababa", state: "AA" },
-  { value: "addama", label: "Addama", state: "OR" },
+  { value: "University Stop", label: "University Stop", state: "AA" },
+  { value: "addama", label: "Main Station", state: "OR" },
   { value: "bahir-dar", label: "Bahir Dar", state: "AM" },
   { value: "hawassa", label: "Hawassa", state: "SN" },
   { value: "mekelle", label: "Mekelle", state: "TI" },
   { value: "dire-dawa", label: "Dire Dawa", state: "DD" },
 ]
 
-const popularStations = [
-  { city: "Addis Ababa", station: "Autobus Tera", code: "ABT" },
-  { city: "Addis Ababa", station: "Megenagna Bus Station", code: "MGBS" },
-  { city: "Addis Ababa", station: "Kality Bus Station", code: "KBS" },
-]
-
-const trendingRoutes = [
-  {
-    from: "AA",
-    to: "Addama",
-    price: "ETB 250",
-    rating: 4.5,
-    duration: "2h",
-    passengers: "4.5K",
-  },
-  {
-    from: "AA",
-    to: "Bahir Dar",
-    price: "ETB 450",
-    rating: 4.2,
-    duration: "5h",
-    passengers: "3.2K",
-  },
-  {
-    from: "AA",
-    to: "Hawassa",
-    price: "ETB 350",
-    rating: 4.7,
-    duration: "4h",
-    passengers: "2.8K",
-  },
-  {
-    from: "Addama",
-    to: "AA",
-    price: "ETB 250",
-    rating: 4.4,
-    duration: "2h",
-    passengers: "2.1K",
-  },
-]
-
-export function SearchRoute() {
+export function SearchRoute({
+  fromValue,
+  toValue,
+  setFromValue,
+  setToValue,
+  data,
+  isFetching,
+  error,
+  refetch,
+}) {
   const { colors, actualTheme } = useThemeContext()
 
-  const [fromValue, setFromValue] = useState("")
-  const [toValue, setToValue] = useState("")
   const [date, setDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [passengers, setPassengers] = useState(1)
@@ -107,11 +73,6 @@ export function SearchRoute() {
     setAlertConfig(config)
     setAlertVisible(true)
   }
-
-  const { data, isFetching, error, refetch } = useSearchBuses(
-    fromValue,
-    toValue
-  )
 
   const dates = [
     { id: "today", label: "Today", date: new Date() },
@@ -200,6 +161,8 @@ export function SearchRoute() {
       return
     }
     refetch()
+
+    showToast("Buse search Completed")
   }
   return (
     <>

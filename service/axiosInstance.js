@@ -4,7 +4,7 @@ import { clearUser, setAccessToken } from "@/store/slices/userSlice"
 import axios from "axios"
 import * as SecureStore from "expo-secure-store"
 
-const API_URL = "http://10.18.95.32:5000/api"
+const API_URL = "https://habeshago-v1.onrender.com/api"
 
 export const axiosInstance = axios.create({
   baseURL: API_URL,

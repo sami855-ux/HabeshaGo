@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
-  ChevronRight,
   Lock,
   Wallet,
   X,
@@ -37,14 +36,14 @@ export default function PaymentPage() {
 
   // Calculate booking details
   const calculateBookingDetails = () => {
-    const baseFare = 1299
-    const taxes = 259
-    const convenienceFee = 49
-    const discount = -200
-    const travelProtection = addTravelProtection ? 99 : 0
-    const cancellationProtection = addCancellationProtection ? 149 : 0
+    const baseFare = 30
+    const taxes = 10
+    const convenienceFee = 20
+    const discount = -20
+    const travelProtection = addTravelProtection ? 0 : 0
+    const cancellationProtection = addCancellationProtection ? 0 : 0
 
-    const total =
+    let total =
       baseFare +
       taxes +
       convenienceFee +
@@ -53,11 +52,11 @@ export default function PaymentPage() {
       cancellationProtection
 
     return {
-      from: "Addis Ababa",
+      from: "univeristy stop",
       to: "Addama",
-      date: "Dec 15, 2024",
+      date: "Jan 16, 2026",
       time: "08:30 AM",
-      duration: "2h 30m",
+      duration: "1h 30m",
       bus: "Express Travels ET-7890",
       seats: ["A1", "A2"],
       operator: "Express Travels",
@@ -92,7 +91,7 @@ export default function PaymentPage() {
     setTimeout(() => {
       setProcessing(false)
       setSuccess(true)
-      //   router.push("/payment/success")
+      router.push("/(passenger)/paymentSuccess")
     }, 2000)
   }
 
@@ -448,26 +447,6 @@ export default function PaymentPage() {
 
                   {/* Route Info */}
                   <View className="space-y-4">
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-1">
-                        <Text
-                          className="font-semibold text-base font-geist"
-                          style={{ color: colors.text }}
-                        >
-                          {bookingDetails.from}
-                        </Text>
-                      </View>
-                      <ChevronRight size={16} color={colors.mutedText} />
-                      <View className="flex-1 items-end">
-                        <Text
-                          className="font-semibold text-base font-geist"
-                          style={{ color: colors.text }}
-                        >
-                          {bookingDetails.to}
-                        </Text>
-                      </View>
-                    </View>
-
                     <View className="flex-row justify-between">
                       <View>
                         <Text
@@ -588,7 +567,7 @@ export default function PaymentPage() {
                         className="text-3xl font-groteskBold"
                         style={{ color: colors.primary }}
                       >
-                        ETB {bookingDetails.total}
+                        ETB {`${bookingDetails.total}.00`}
                       </Text>
                     </View>
                   </View>

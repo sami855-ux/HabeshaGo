@@ -3,7 +3,9 @@ export interface User {
   name: string | null
   email: string | null
   phone: string | null
-  image: string | null
+  avaterUrl: string | null
+  bio: string | null
+  location: string | null
 
   role: "PASSENGER" | "DRIVER" | "ADMIN"
 
@@ -32,6 +34,16 @@ export interface Wallet {
   id: number
   balance: number
   currency: string
+  isActive?: boolean
+  isLocked?: boolean
+  points?: number
+  pinHash?: string | null
+  biometricEnabled?: boolean
+  biometricToken?: string | null
+  pinAttempts?: number
+  createdAt?: string
+  updatedAt?: string
+  userId?: string
 }
 
 export interface Session {

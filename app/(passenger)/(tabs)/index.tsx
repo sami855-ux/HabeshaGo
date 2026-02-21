@@ -1,13 +1,16 @@
 import ServiceDashboard from "@/components/passenger/ServiceDashbaord"
 import SmartSuggestions from "@/components/passenger/SmartSuggestion"
 import SystemInfoCarousel from "@/components/passenger/SystemInfo"
+import ProfileCompletionModal from "@/components/profile-completion-modal"
 import AccountCard from "@/components/utils/AccountCard"
 import { useThemeContext } from "@/context/ThemeContext"
-import { useAppSelector } from "@/store"
+import { useAppDispatch, useAppSelector } from "@/store"
+import { fetchUserWallet } from "@/store/slices/walletSlice"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { Search } from "lucide-react-native"
+import { useEffect } from "react"
 import {
   Image,
   ScrollView,
@@ -31,6 +34,13 @@ const PassengerHome = () => {
       ? ["#FFB300", "#FF9500", "#FF6F00"] // slightly warmer/darker for dark mode
       : ["#ea580c", "#f97316", "#fb923c"]
 
+  const dispatch = useAppDispatch()
+
+  useEffect(() => {
+    // Fetch wallet once when user area loads
+    dispatch(fetchUserWallet())
+  }, [dispatch])
+
   return (
     <>
       <StatusBar
@@ -39,27 +49,31 @@ const PassengerHome = () => {
         barStyle={actualTheme === "dark" ? "light-content" : "dark-content"}
       />
 
+      <ProfileCompletionModal />
+
       <View style={{ backgroundColor: colors.background, flex: 1 }}>
         {/* Gradient Header Section */}
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          className="p-6 pb-10 mb-3 h-80 pt-10"
+          className="p-6 pb-10 mb-3 h-80 pt-10 pl-8"
         >
           {/* Top Row: Profile + Search */}
-          <View className="flex-row justify-between items-center mb-9">
+          <View className="flex-row justify-between items-center mb-4">
             {/* Left: Profile + Greeting */}
             <View className="flex-row items-center">
               <Image
-                source={user?.image ? { uri: user.image } : defaultAvatar} // note difference
-                className="w-14 h-14 rounded-full border-2 border-white mr-3"
+                source={
+                  user?.avaterUrl ? { uri: user.avaterUrl } : defaultAvatar
+                }
+                className="w-14 h-14 rounded-full  mr-3"
               />
               <View>
                 <Text className="text-sm font-jakarta text-white">
                   {getGreeting()}
                 </Text>
-                <Text className="text-xl font-groteskBold text-white">
+                <Text className="text-xl font-groteskBold text-white capitalize">
                   {user?.name ? user.name : "No username"}
                 </Text>
               </View>

@@ -1,3 +1,4 @@
+import { getMe } from "@/service/auth"
 import { axiosInstance } from "@/service/axiosInstance"
 import { User } from "@/types/user"
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit"
@@ -29,7 +30,7 @@ export const logout = createAsyncThunk(
     // await axios.post("/app/auth/logout")
 
     dispatch(clearUser())
-  }
+  },
 )
 
 export const loadUserFromStorage = createAsyncThunk(
@@ -40,7 +41,7 @@ export const loadUserFromStorage = createAsyncThunk(
     return {
       user: user ? JSON.parse(user) : null,
     }
-  }
+  },
 )
 export const saveUserToStorage = createAsyncThunk(
   "user/saveToStorage",
@@ -48,7 +49,7 @@ export const saveUserToStorage = createAsyncThunk(
     await SecureStore.setItemAsync("user", JSON.stringify(user))
 
     return { user }
-  }
+  },
 )
 
 export const clearStorage = createAsyncThunk("user/clearStorage", async () => {
@@ -80,7 +81,24 @@ export const restoreSession = createAsyncThunk(
       dispatch(clearUser())
       return { success: false }
     }
-  }
+  },
+)
+
+// Async thunk to fetch current user
+export const fetchCurrentUser = createAsyncThunk(
+  "user/fetchCurrentUser",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getMe()
+
+      console.log(response)
+      return response.user
+    } catch (err: any) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch user" },
+      )
+    }
+  },
 )
 
 const userSlice = createSlice({
@@ -133,6 +151,22 @@ const userSlice = createSlice({
       .addCase(restoreSession.rejected, (state) => {
         state.isAuthenticated = false
         state.isBootstrapping = false
+      })
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(
+        fetchCurrentUser.fulfilled,
+        (state, action: PayloadAction<User>) => {
+          state.user = action.payload
+          state.isAuthenticated = true
+          state.loading = false
+        },
+      )
+      .addCase(fetchCurrentUser.rejected, (state) => {
+        state.user = null
+        state.isAuthenticated = false
+        state.loading = false
       })
   },
 })

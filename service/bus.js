@@ -2,13 +2,14 @@ import { axiosInstance } from "./axiosInstance.js"
 
 export const searchBuses = async (start, end) => {
   try {
-    const res = await axiosInstance.get("/buse/search", {
+    const res = await axiosInstance.get("/bus/search", {
       params: {
         start,
         end,
       },
     })
 
+    console.log(res.data)
     return {
       success: true,
       data: res.data.data,

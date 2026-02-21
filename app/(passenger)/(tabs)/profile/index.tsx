@@ -223,7 +223,7 @@ export default function SettingsScreen() {
         false: string
         true: string
       }
-    }[]
+    }[],
   ) => (
     <View className="mb-2">
       {title && (
@@ -446,14 +446,17 @@ export default function SettingsScreen() {
               <View className="flex-row items-center">
                 <View className="relative">
                   <Image
-                    source={user?.image ? { uri: user.image } : defaultAvatar} // note difference
+                    source={
+                      user?.avaterUrl ? { uri: user.avaterUrl } : defaultAvatar
+                    }
                     className="w-24 h-24 rounded-[34px]"
                   />
                 </View>
                 <View className="ml-5 flex-1">
                   <View className="flex-row items-center justify-between mb-1">
                     <Text
-                      className="text-2xl font-geist"
+                      className="text-2xl font-geist capitalize
+                      "
                       style={{ color: colors.text }}
                     >
                       {user?.name ? user.name : "No username"}

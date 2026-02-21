@@ -1,16 +1,32 @@
+import { BusTrackingSheet } from "@/components/passenger/map/BusTrackingSheet"
+import { MapControls } from "@/components/passenger/map/MapControls"
+import { MyTripsSheet } from "@/components/passenger/map/MyTripsSheet"
 import { useThemeContext } from "@/context/ThemeContext"
-import { Feather, Ionicons } from "@expo/vector-icons"
+import {
+  Bus,
+  mockBuses,
+  mockReports,
+  mockTrips,
+  Report,
+  Trip,
+} from "@/types/map"
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import * as Location from "expo-location"
+import {
+  Car,
+  Droplet,
+  FileText,
+  Rotate3d,
+  Shield,
+  Zap,
+} from "lucide-react-native"
 import React, { useEffect, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
-  Modal,
-  ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native"
@@ -23,145 +39,115 @@ import MapView, {
   Region,
 } from "react-native-maps"
 
-// Types
-type ReportCategory =
-  | "traffic"
-  | "power"
-  | "road"
-  | "safety"
-  | "water"
-  | "other"
-type ReportStatus = "open" | "resolved" | "in-progress"
+const { width, height } = Dimensions.get("window")
 
-interface Report {
-  id: string
-  title: string
-  description: string
-  category: ReportCategory
-  status: ReportStatus
-  timestamp: Date
-  location: LatLng
-  severity: "low" | "medium" | "high"
-  votes: number
-}
-
-interface CategoryFilter {
-  traffic: boolean
-  power: boolean
-  road: boolean
-  safety: boolean
-  water: boolean
-  other: boolean
-}
-
-// Mock data
-const mockReports: Report[] = [
-  {
-    id: "1",
-    title: "Major Traffic Jam",
-    description: "Heavy traffic on Bole Road towards airport",
-    category: "traffic",
-    status: "open",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    location: { latitude: 9.0227, longitude: 38.7468 },
-    severity: "high",
-    votes: 42,
-  },
-  {
-    id: "2",
-    title: "Power Outage",
-    description: "No electricity in Kazanchis area since morning",
-    category: "power",
-    status: "open",
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-    location: { latitude: 9.0152, longitude: 38.7618 },
-    severity: "medium",
-    votes: 28,
-  },
-  {
-    id: "3",
-    title: "Road Damage",
-    description: "Large pothole on Churchill Avenue",
-    category: "road",
-    status: "in-progress",
-    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    location: { latitude: 9.03, longitude: 38.755 },
-    severity: "medium",
-    votes: 15,
-  },
-  {
-    id: "4",
-    title: "Street Light Not Working",
-    description: "Dark stretch on Sierra Leone Street",
-    category: "safety",
-    status: "open",
-    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    location: { latitude: 9.0255, longitude: 38.7505 },
-    severity: "low",
-    votes: 8,
-  },
-  {
-    id: "5",
-    title: "Water Pipe Burst",
-    description: "Water leakage near Hilton Hotel",
-    category: "water",
-    status: "resolved",
-    timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    location: { latitude: 9.035, longitude: 38.758 },
-    severity: "high",
-    votes: 31,
-  },
-]
-
-// Category configurations
 const categoryConfig = {
-  traffic: { icon: "🚗", color: "#3b82f6", darkColor: "#1d4ed8" },
-  power: { icon: "⚡", color: "#f59e0b", darkColor: "#d97706" },
-  road: { icon: "🛣️", color: "#ef4444", darkColor: "#dc2626" },
-  safety: { icon: "👮", color: "#8b5cf6", darkColor: "#7c3aed" },
-  water: { icon: "💧", color: "#06b6d4", darkColor: "#0891b2" },
-  other: { icon: "📋", color: "#6b7280", darkColor: "#4b5563" },
+  traffic: {
+    icon: Car,
+    color: "#3b82f6",
+    darkColor: "#1d4ed8",
+  },
+  power: {
+    icon: Zap,
+    color: "#f59e0b",
+    darkColor: "#d97706",
+  },
+  road: {
+    icon: Rotate3d,
+    color: "#ef4444",
+    darkColor: "#dc2626",
+  },
+  safety: {
+    icon: Shield,
+    color: "#8b5cf6",
+    darkColor: "#7c3aed",
+  },
+  water: {
+    icon: Droplet,
+    color: "#06b6d4",
+    darkColor: "#0891b2",
+  },
+  other: {
+    icon: FileText,
+    color: "#6b7280",
+    darkColor: "#4b5563",
+  },
 }
 
-const statusConfig = {
-  open: { label: "Open", color: "#ef4444", icon: "alert-circle" },
-  resolved: { label: "Resolved", color: "#10b981", icon: "check-circle" },
-  "in-progress": { label: "In Progress", color: "#f59e0b", icon: "clock" },
-}
+// Zoom controls component
+const ZoomControls = ({
+  mapRef,
+  colors,
+}: {
+  mapRef: React.RefObject<MapView>
+  colors: any
+}) => {
+  const handleZoomIn = () => {
+    mapRef.current?.getCamera().then((camera) => {
+      camera.zoom = (camera.zoom || 12) + 1
+      mapRef.current?.animateCamera(camera, { duration: 300 })
+    })
+  }
 
-const severityConfig = {
-  high: { label: "High", color: "#ef4444" },
-  medium: { label: "Medium", color: "#f59e0b" },
-  low: { label: "Low", color: "#10b981" },
+  const handleZoomOut = () => {
+    mapRef.current?.getCamera().then((camera) => {
+      camera.zoom = (camera.zoom || 12) - 1
+      mapRef.current?.animateCamera(camera, { duration: 300 })
+    })
+  }
+
+  return (
+    <View className="absolute bottom-32 right-4 gap-2">
+      <TouchableOpacity
+        className="w-10 h-10 rounded-full items-center justify-center"
+        style={{
+          backgroundColor: colors.card,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        }}
+        onPress={handleZoomIn}
+        activeOpacity={0.7}
+      >
+        <Feather name="plus" size={20} color={colors.text} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        className="w-10 h-10 rounded-full items-center justify-center"
+        style={{
+          backgroundColor: colors.card,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        }}
+        onPress={handleZoomOut}
+        activeOpacity={0.7}
+      >
+        <Feather name="minus" size={20} color={colors.text} />
+      </TouchableOpacity>
+    </View>
+  )
 }
 
 const MapScreen: React.FC = () => {
   const { colors, actualTheme } = useThemeContext()
   const mapRef = useRef<MapView>(null)
-  const bottomSheetAnim = useRef(
-    new Animated.Value(Dimensions.get("window").height)
-  ).current
-  const filterSheetAnim = useRef(
-    new Animated.Value(Dimensions.get("window").height)
-  ).current
+  const bottomSheetAnim = useRef(new Animated.Value(height)).current
+  const tripsSheetAnim = useRef(new Animated.Value(height)).current
 
+  // Location state
   const [userLocation, setUserLocation] = useState<LatLng | null>(null)
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
-  const [reports, setReports] = useState<Report[]>(mockReports)
   const [isLoading, setIsLoading] = useState(true)
   const [mapReady, setMapReady] = useState(false)
+
+  // Reports state
+  const [reports, setReports] = useState<Report[]>(mockReports)
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [heatmapMode, setHeatmapMode] = useState(false)
-  const [newReportLocation, setNewReportLocation] = useState<LatLng | null>(
-    null
-  )
-  const [isAddingReport, setIsAddingReport] = useState(false)
-  const [reportForm, setReportForm] = useState({
-    title: "",
-    description: "",
-    category: "traffic" as ReportCategory,
-    severity: "medium" as "low" | "medium" | "high",
-  })
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>({
+  const [categoryFilter, setCategoryFilter] = useState({
     traffic: true,
     power: true,
     road: true,
@@ -170,12 +156,35 @@ const MapScreen: React.FC = () => {
     other: true,
   })
 
-  // Addis Ababa coordinates
+  // Buses state
+  const [buses, setBuses] = useState<Bus[]>(mockBuses)
+  const [selectedBus, setSelectedBus] = useState<Bus | null>(null)
+  const [nearbyBuses, setNearbyBuses] = useState<Bus[]>([])
+  const [showNearbyBuses, setShowNearbyBuses] = useState(false)
+
+  // Trips state
+  const [trips, setTrips] = useState<Trip[]>(mockTrips)
+  const [activeTracking, setActiveTracking] = useState<Trip | null>(null)
+  const [showMyTrips, setShowMyTrips] = useState(false)
+
+  // Add report state
+  const [isAddingReport, setIsAddingReport] = useState(false)
+  const [newReportLocation, setNewReportLocation] = useState<LatLng | null>(
+    null,
+  )
+  const [reportForm, setReportForm] = useState({
+    title: "",
+    description: "",
+    category: "traffic" as Report["category"],
+    severity: "medium" as "low" | "medium" | "high",
+  })
+
+  // Addis Ababa coordinates with higher zoom level
   const ADDIS_CENTER: Region = {
     latitude: 9.032,
     longitude: 38.7468,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
+    latitudeDelta: 0.01, // Increased zoom
+    longitudeDelta: 0.01, // Increased zoom
   }
 
   // Get user location
@@ -186,13 +195,19 @@ const MapScreen: React.FC = () => {
         if (status !== "granted") {
           Alert.alert(
             "Permission denied",
-            "Location permission is required for full functionality"
+            "Location permission is required for full functionality",
           )
           return
         }
 
         let location = await Location.getCurrentPositionAsync({})
         setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        })
+
+        // Find nearby buses
+        findNearbyBuses({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         })
@@ -203,49 +218,6 @@ const MapScreen: React.FC = () => {
       }
     })()
   }, [])
-
-  // Show bottom sheet
-  const showBottomSheet = (report: Report) => {
-    setSelectedReport(report)
-    Animated.spring(bottomSheetAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 7,
-    }).start()
-  }
-
-  // Hide bottom sheet
-  const hideBottomSheet = () => {
-    Animated.spring(bottomSheetAnim, {
-      toValue: Dimensions.get("window").height,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 7,
-    }).start(() => {
-      setSelectedReport(null)
-    })
-  }
-
-  // Show filter sheet
-  const showFilterSheet = () => {
-    Animated.spring(filterSheetAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 7,
-    }).start()
-  }
-
-  // Hide filter sheet
-  const hideFilterSheet = () => {
-    Animated.spring(filterSheetAnim, {
-      toValue: Dimensions.get("window").height,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 7,
-    }).start()
-  }
 
   // Handle map long press
   const handleMapLongPress = (event: MapPressEvent) => {
@@ -282,599 +254,158 @@ const MapScreen: React.FC = () => {
     Alert.alert("Success", "Report added successfully!")
   }
 
-  // Filter reports by category
-  const filteredReports = reports.filter(
-    (report) => categoryFilter[report.category]
-  )
+  // Simulate bus movement
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBuses((prevBuses) =>
+        prevBuses.map((bus) => {
+          if (bus.status === "active") {
+            // Simulate movement along a route
+            return {
+              ...bus,
+              location: {
+                latitude: bus.location.latitude + (Math.random() - 0.5) * 0.001,
+                longitude:
+                  bus.location.longitude + (Math.random() - 0.5) * 0.001,
+              },
+            }
+          }
+          return bus
+        }),
+      )
+    }, 3000)
 
-  // Calculate heatmap intensity
-  const calculateHeatmapIntensity = (location: LatLng) => {
-    const nearbyReports = reports.filter((r) => {
+    return () => clearInterval(interval)
+  }, [])
+
+  // Update nearby buses when location changes or buses move
+  useEffect(() => {
+    if (userLocation && showNearbyBuses) {
+      findNearbyBuses(userLocation)
+    }
+  }, [userLocation, buses, showNearbyBuses])
+
+  const findNearbyBuses = (location: LatLng) => {
+    const nearby = buses.filter((bus) => {
+      if (bus.status !== "active") return false
+
       const distance =
         Math.sqrt(
-          Math.pow(r.location.latitude - location.latitude, 2) +
-            Math.pow(r.location.longitude - location.longitude, 2)
-        ) * 100
-      return distance < 1 // Within 1km
+          Math.pow(bus.location.latitude - location.latitude, 2) +
+            Math.pow(bus.location.longitude - location.longitude, 2),
+        ) * 111 // Rough conversion to km
+
+      return distance < 2 // Within 2km
     })
-    return Math.min(nearbyReports.length / 10, 1)
+    setNearbyBuses(nearby)
   }
 
-  // Render markers
-  const renderMarkers = () => {
-    return filteredReports.map((report) => {
-      const config = categoryConfig[report.category]
-      const isSelected = selectedReport?.id === report.id
+  // Sheet animations
+  const showBottomSheet = (report: Report) => {
+    setSelectedReport(report)
+    Animated.spring(bottomSheetAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start()
+  }
 
-      return (
-        <Marker
-          key={report.id}
-          coordinate={report.location}
-          onPress={() => showBottomSheet(report)}
-        >
-          <View
-            className={`items-center justify-center ${isSelected ? "scale-125" : ""}`}
-          >
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center border-2"
-              style={{
-                backgroundColor:
-                  actualTheme === "dark" ? config.darkColor : config.color,
-                borderColor: colors.background,
-                transform: [{ scale: isSelected ? 1.2 : 1 }],
-                shadowColor: colors.text,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 3.84,
-                elevation: 5,
-              }}
-            >
-              <Text className="text-lg">{config.icon}</Text>
-            </View>
-            {report.severity === "high" && (
-              <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-white" />
-            )}
-          </View>
-        </Marker>
+  const hideBottomSheet = () => {
+    Animated.spring(bottomSheetAnim, {
+      toValue: height,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start(() => {
+      setSelectedReport(null)
+    })
+  }
+
+  const showTripsSheet = () => {
+    setShowMyTrips(true)
+    Animated.spring(tripsSheetAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start()
+  }
+
+  const hideTripsSheet = () => {
+    Animated.spring(tripsSheetAnim, {
+      toValue: height,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start(() => {
+      setShowMyTrips(false)
+    })
+  }
+
+  const handleStartTracking = (trip: Trip) => {
+    setActiveTracking(trip)
+    hideTripsSheet()
+
+    // Find the bus for this trip
+    const bus = buses.find((b) => b.id === trip.busId)
+    if (bus) {
+      setSelectedBus(bus)
+
+      // Animate to bus location with higher zoom
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: bus.location.latitude,
+            longitude: bus.location.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          },
+          1000,
+        )
+      }
+    }
+  }
+
+  const handleStopTracking = () => {
+    setActiveTracking(null)
+    setSelectedBus(null)
+  }
+
+  const handleBusPress = (bus: Bus) => {
+    setSelectedBus(bus)
+    showBottomSheetForBus(bus)
+  }
+
+  const showBottomSheetForBus = (bus: Bus) => {
+    Animated.spring(bottomSheetAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start()
+  }
+
+  const focusOnUserLocation = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          ...userLocation,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        },
+        1000,
       )
-    })
+
+      // Show nearby buses
+      setShowNearbyBuses(true)
+    }
   }
 
-  // Render heatmap
-  const renderHeatmap = () => {
-    if (!heatmapMode) return null
-
-    return reports.map((report, index) => {
-      const intensity = calculateHeatmapIntensity(report.location)
-      const radius = 500 + intensity * 1000 // 500m to 1500m
-
-      return (
-        <Circle
-          key={`heat-${index}`}
-          center={report.location}
-          radius={radius}
-          fillColor={`rgba(239, 68, 68, ${intensity * 0.3})`}
-          strokeColor={`rgba(239, 68, 68, ${intensity * 0.5})`}
-          strokeWidth={1}
-        />
-      )
-    })
-  }
-
-  // Render bottom sheet
-  const renderBottomSheet = () => {
-    if (!selectedReport) return null
-
-    const config = categoryConfig[selectedReport.category]
-    const status = statusConfig[selectedReport.status]
-    const severity = severityConfig[selectedReport.severity]
-    const timeAgo = Math.floor(
-      (Date.now() - selectedReport.timestamp.getTime()) / (1000 * 60 * 60)
-    )
-
-    return (
-      <Animated.View
-        style={{
-          transform: [{ translateY: bottomSheetAnim }],
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: Dimensions.get("window").height * 0.5,
-        }}
-      >
-        <View
-          className="rounded-t-3xl pt-4 px-6 h-full"
-          style={{ backgroundColor: colors.card }}
-        >
-          {/* Drag handle */}
-          <View
-            className="w-12 h-1 rounded-full self-center mb-4"
-            style={{ backgroundColor: colors.border }}
-          />
-
-          {/* Close button */}
-          <TouchableOpacity
-            onPress={hideBottomSheet}
-            className="absolute right-6 top-4 z-10"
-          >
-            <Feather name="x" size={24} color={colors.text} />
-          </TouchableOpacity>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Category header */}
-            <View className="flex-row items-center mb-4">
-              <View
-                className="w-12 h-12 rounded-xl items-center justify-center mr-4"
-                style={{
-                  backgroundColor:
-                    actualTheme === "dark" ? config.darkColor : config.color,
-                }}
-              >
-                <Text className="text-2xl">{config.icon}</Text>
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="text-xl font-bold"
-                  style={{ color: colors.text }}
-                >
-                  {selectedReport.title}
-                </Text>
-                <Text className="text-sm" style={{ color: colors.mutedText }}>
-                  {timeAgo === 0 ? "Just now" : `${timeAgo}h ago`}
-                </Text>
-              </View>
-            </View>
-
-            {/* Status & Severity */}
-            <View className="flex-row mb-6">
-              <View
-                className="px-4 py-2 rounded-full mr-3"
-                style={{ backgroundColor: status.color + "20" }}
-              >
-                <Text style={{ color: status.color }} className="font-semibold">
-                  {status.label}
-                </Text>
-              </View>
-              <View
-                className="px-4 py-2 rounded-full"
-                style={{ backgroundColor: severity.color + "20" }}
-              >
-                <Text
-                  style={{ color: severity.color }}
-                  className="font-semibold"
-                >
-                  {severity.label} Priority
-                </Text>
-              </View>
-            </View>
-
-            {/* Description */}
-            <Text
-              className="text-base mb-6 leading-6"
-              style={{ color: colors.text }}
-            >
-              {selectedReport.description}
-            </Text>
-
-            {/* Details */}
-            <View className="space-y-4 mb-6">
-              <View className="flex-row items-center">
-                <Feather
-                  name="map-pin"
-                  size={20}
-                  color={colors.mutedText}
-                  style={{ marginRight: 12 }}
-                />
-                <Text className="text-sm" style={{ color: colors.text }}>
-                  Bole, Addis Ababa
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Feather
-                  name="thumbs-up"
-                  size={20}
-                  color={colors.mutedText}
-                  style={{ marginRight: 12 }}
-                />
-                <Text className="text-sm" style={{ color: colors.text }}>
-                  {selectedReport.votes} people confirmed this
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Feather
-                  name="clock"
-                  size={20}
-                  color={colors.mutedText}
-                  style={{ marginRight: 12 }}
-                />
-                <Text className="text-sm" style={{ color: colors.text }}>
-                  Reported {timeAgo === 0 ? "just now" : `${timeAgo} hours ago`}
-                </Text>
-              </View>
-            </View>
-
-            {/* Action buttons */}
-            <View className="flex-row space-x-3 mb-8">
-              <TouchableOpacity
-                className="flex-1 py-3 rounded-xl items-center"
-                style={{ backgroundColor: colors.primary + "20" }}
-              >
-                <Text
-                  style={{ color: colors.primary }}
-                  className="font-semibold"
-                >
-                  Confirm
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="flex-1 py-3 rounded-xl items-center"
-                style={{ backgroundColor: colors.border }}
-              >
-                <Text style={{ color: colors.text }} className="font-semibold">
-                  Share
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </Animated.View>
-    )
-  }
-
-  // Render filter sheet
-  const renderFilterSheet = () => {
-    return (
-      <Animated.View
-        style={{
-          transform: [{ translateY: filterSheetAnim }],
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: Dimensions.get("window").height * 0.6,
-        }}
-      >
-        <View
-          className="rounded-t-3xl pt-4 px-6 h-full"
-          style={{ backgroundColor: colors.card }}
-        >
-          {/* Drag handle */}
-          <View
-            className="w-12 h-1 rounded-full self-center mb-4"
-            style={{ backgroundColor: colors.border }}
-          />
-
-          {/* Header */}
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-bold" style={{ color: colors.text }}>
-              Filter Reports
-            </Text>
-            <TouchableOpacity onPress={hideFilterSheet}>
-              <Feather name="x" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Categories */}
-            <Text
-              className="text-sm font-semibold mb-4"
-              style={{ color: colors.mutedText }}
-            >
-              CATEGORIES
-            </Text>
-            <View className="space-y-3 mb-8">
-              {Object.entries(categoryConfig).map(([key, config]) => (
-                <TouchableOpacity
-                  key={key}
-                  className="flex-row items-center justify-between py-3"
-                  onPress={() =>
-                    setCategoryFilter((prev) => ({
-                      ...prev,
-                      [key]: !prev[key as keyof CategoryFilter],
-                    }))
-                  }
-                >
-                  <View className="flex-row items-center">
-                    <View
-                      className="w-10 h-10 rounded-lg items-center justify-center mr-4"
-                      style={{
-                        backgroundColor:
-                          actualTheme === "dark"
-                            ? config.darkColor
-                            : config.color,
-                      }}
-                    >
-                      <Text className="text-lg">{config.icon}</Text>
-                    </View>
-                    <Text className="text-base" style={{ color: colors.text }}>
-                      {key.charAt(0).toUpperCase() + key.slice(1)}
-                    </Text>
-                  </View>
-                  <View
-                    className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                      categoryFilter[key as keyof CategoryFilter]
-                        ? "border-primary"
-                        : "border-gray-300"
-                    }`}
-                    style={{
-                      backgroundColor: categoryFilter[
-                        key as keyof CategoryFilter
-                      ]
-                        ? colors.primary
-                        : "transparent",
-                    }}
-                  >
-                    {categoryFilter[key as keyof CategoryFilter] && (
-                      <Feather name="check" size={14} color="#FFFFFF" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Heatmap Toggle */}
-            <Text
-              className="text-sm font-semibold mb-4"
-              style={{ color: colors.mutedText }}
-            >
-              MAP MODE
-            </Text>
-            <View className="flex-row items-center justify-between py-3 mb-8">
-              <View className="flex-row items-center">
-                <View
-                  className="w-10 h-10 rounded-lg items-center justify-center mr-4"
-                  style={{ backgroundColor: colors.primary + "20" }}
-                >
-                  <Ionicons name="flame" size={20} color={colors.primary} />
-                </View>
-                <View>
-                  <Text className="text-base" style={{ color: colors.text }}>
-                    Heatmap Mode
-                  </Text>
-                  <Text className="text-sm" style={{ color: colors.mutedText }}>
-                    Show high-activity areas
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setHeatmapMode(!heatmapMode)}
-                className={`w-12 h-6 rounded-full ${heatmapMode ? "bg-primary" : "bg-gray-300"}`}
-              >
-                <Animated.View
-                  className="w-6 h-6 rounded-full bg-white absolute top-0"
-                  style={{
-                    left: heatmapMode ? 24 : 0,
-                  }}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Clear All button */}
-            <TouchableOpacity
-              className="py-4 rounded-xl items-center mb-8"
-              style={{ backgroundColor: colors.border }}
-              onPress={() =>
-                setCategoryFilter({
-                  traffic: false,
-                  power: false,
-                  road: false,
-                  safety: false,
-                  water: false,
-                  other: false,
-                })
-              }
-            >
-              <Text style={{ color: colors.text }} className="font-semibold">
-                Clear All Filters
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </Animated.View>
-    )
-  }
-
-  // Render add report modal
-  const renderAddReportModal = () => {
-    if (!isAddingReport) return null
-
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isAddingReport}
-        onRequestClose={() => setIsAddingReport(false)}
-      >
-        <View
-          className="flex-1 justify-end"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <View
-            className="rounded-t-3xl pt-4 px-6 pb-8"
-            style={{
-              backgroundColor: colors.card,
-              minHeight: Dimensions.get("window").height * 0.7,
-            }}
-          >
-            {/* Drag handle */}
-            <View
-              className="w-12 h-1 rounded-full self-center mb-4"
-              style={{ backgroundColor: colors.border }}
-            />
-
-            {/* Header */}
-            <View className="flex-row justify-between items-center mb-6">
-              <Text
-                className="text-xl font-bold"
-                style={{ color: colors.text }}
-              >
-                Report an Issue
-              </Text>
-              <TouchableOpacity onPress={() => setIsAddingReport(false)}>
-                <Feather name="x" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Title */}
-              <Text
-                className="text-sm font-semibold mb-2"
-                style={{ color: colors.mutedText }}
-              >
-                TITLE
-              </Text>
-              <TextInput
-                className="rounded-xl px-4 py-3 mb-4"
-                style={{
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-                placeholder="What's the issue?"
-                placeholderTextColor={colors.mutedText}
-                value={reportForm.title}
-                onChangeText={(text) =>
-                  setReportForm((prev) => ({ ...prev, title: text }))
-                }
-              />
-
-              {/* Description */}
-              <Text
-                className="text-sm font-semibold mb-2"
-                style={{ color: colors.mutedText }}
-              >
-                DESCRIPTION
-              </Text>
-              <TextInput
-                className="rounded-xl px-4 py-3 mb-4"
-                style={{
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  height: 100,
-                  textAlignVertical: "top",
-                }}
-                placeholder="Provide more details..."
-                placeholderTextColor={colors.mutedText}
-                multiline
-                numberOfLines={4}
-                value={reportForm.description}
-                onChangeText={(text) =>
-                  setReportForm((prev) => ({ ...prev, description: text }))
-                }
-              />
-
-              {/* Category */}
-              <Text
-                className="text-sm font-semibold mb-2"
-                style={{ color: colors.mutedText }}
-              >
-                CATEGORY
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mb-4"
-              >
-                <View className="flex-row space-x-3">
-                  {Object.entries(categoryConfig).map(([key, config]) => (
-                    <TouchableOpacity
-                      key={key}
-                      className={`px-4 py-3 rounded-xl ${reportForm.category === key ? "border-2" : ""}`}
-                      style={{
-                        backgroundColor:
-                          reportForm.category === key
-                            ? actualTheme === "dark"
-                              ? config.darkColor
-                              : config.color
-                            : colors.background,
-                        borderColor:
-                          actualTheme === "dark"
-                            ? config.darkColor
-                            : config.color,
-                      }}
-                      onPress={() =>
-                        setReportForm((prev) => ({
-                          ...prev,
-                          category: key as ReportCategory,
-                        }))
-                      }
-                    >
-                      <Text
-                        className="font-semibold"
-                        style={{
-                          color:
-                            reportForm.category === key
-                              ? "#FFFFFF"
-                              : colors.text,
-                        }}
-                      >
-                        {config.icon}{" "}
-                        {key.charAt(0).toUpperCase() + key.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* Severity */}
-              <Text
-                className="text-sm font-semibold mb-2"
-                style={{ color: colors.mutedText }}
-              >
-                SEVERITY
-              </Text>
-              <View className="flex-row space-x-3 mb-8">
-                {(["low", "medium", "high"] as const).map((level) => (
-                  <TouchableOpacity
-                    key={level}
-                    className={`flex-1 py-3 rounded-xl items-center ${reportForm.severity === level ? "border-2" : ""}`}
-                    style={{
-                      backgroundColor:
-                        reportForm.severity === level
-                          ? severityConfig[level].color + "20"
-                          : colors.background,
-                      borderColor: severityConfig[level].color,
-                    }}
-                    onPress={() =>
-                      setReportForm((prev) => ({ ...prev, severity: level }))
-                    }
-                  >
-                    <Text
-                      className="font-semibold"
-                      style={{
-                        color:
-                          reportForm.severity === level
-                            ? severityConfig[level].color
-                            : colors.text,
-                      }}
-                    >
-                      {severityConfig[level].label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Submit button */}
-              <TouchableOpacity
-                className="py-4 rounded-xl items-center"
-                style={{ backgroundColor: colors.primary }}
-                onPress={handleAddReport}
-                disabled={!reportForm.title.trim()}
-              >
-                <Text className="text-white font-bold text-lg">
-                  Submit Report
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    )
-  }
+  // Filter reports by category
+  const filteredReports = reports.filter(
+    (report) => categoryFilter[report.category],
+  )
 
   if (isLoading) {
     return (
@@ -883,7 +414,7 @@ const MapScreen: React.FC = () => {
         style={{ backgroundColor: colors.background }}
       >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text className="mt-4" style={{ color: colors.text }}>
+        <Text className="mt-4 font-geist" style={{ color: colors.text }}>
           Loading map...
         </Text>
       </View>
@@ -902,12 +433,113 @@ const MapScreen: React.FC = () => {
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
-        // onLongPress={handleMapLongPress}
+        onLongPress={handleMapLongPress}
         onMapReady={() => setMapReady(true)}
         customMapStyle={actualTheme === "dark" ? darkMapStyle : []}
       >
-        {renderHeatmap()}
-        {renderMarkers()}
+        {/* Heatmap */}
+        {heatmapMode &&
+          reports.map((report, index) => {
+            const intensity = Math.min(
+              reports.filter(
+                (r) =>
+                  Math.sqrt(
+                    Math.pow(
+                      r.location.latitude - report.location.latitude,
+                      2,
+                    ) +
+                      Math.pow(
+                        r.location.longitude - report.location.longitude,
+                        2,
+                      ),
+                  ) *
+                    100 <
+                  1,
+              ).length / 10,
+              1,
+            )
+
+            return (
+              <Circle
+                key={`heat-${index}`}
+                center={report.location}
+                radius={500 + intensity * 1000}
+                fillColor={`rgba(239, 68, 68, ${intensity * 0.3})`}
+                strokeColor={`rgba(239, 68, 68, ${intensity * 0.5})`}
+                strokeWidth={1}
+              />
+            )
+          })}
+
+        {/* Report Markers - Keep emojis for reports as they're category indicators */}
+        {filteredReports.map((report) => {
+          const config = categoryConfig[report.category]
+          const IconComponent = config.icon
+          return (
+            <Marker
+              key={report.id}
+              coordinate={report.location}
+              onPress={() => showBottomSheet(report)}
+            >
+              <View className="items-center justify-center">
+                <View
+                  className="w-10 h-10 rounded-full items-center justify-center"
+                  style={{
+                    backgroundColor:
+                      actualTheme === "dark" ? config.darkColor : config.color,
+                    transform: [
+                      { scale: selectedReport?.id === report.id ? 1.2 : 1 },
+                    ],
+                    shadowColor: colors.text,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                    elevation: 5,
+                  }}
+                >
+                  <IconComponent size={30} color="#FFFFFF" />
+                </View>
+                {report.severity === "high" && (
+                  <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
+                )}
+              </View>
+            </Marker>
+          )
+        })}
+
+        {/* Bus Markers - Clean icons without background */}
+        {(showNearbyBuses ? nearbyBuses : buses).map((bus) => (
+          <Marker
+            key={bus.id}
+            coordinate={bus.location}
+            onPress={() => handleBusPress(bus)}
+          >
+            <Animated.View
+              className="items-center justify-center"
+              style={{
+                transform: [
+                  {
+                    scale: selectedBus?.id === bus.id ? 1.2 : 1,
+                  },
+                ],
+              }}
+            >
+              {/* Bus icon without background */}
+              <MaterialCommunityIcons
+                name="bus"
+                size={32}
+                color={colors.primary}
+              />
+
+              {/* Active indicator dot */}
+              {bus.status === "active" && (
+                <View className="absolute -top-1 -right-1">
+                  <View className="w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                </View>
+              )}
+            </Animated.View>
+          </Marker>
+        ))}
 
         {/* New report marker preview */}
         {newReportLocation && !isAddingReport && (
@@ -924,6 +556,17 @@ const MapScreen: React.FC = () => {
               </View>
             </View>
           </Marker>
+        )}
+
+        {/* Active Tracking Path */}
+        {activeTracking && selectedBus && (
+          <Circle
+            center={selectedBus.location}
+            radius={100}
+            fillColor={colors.primary + "20"}
+            strokeColor={colors.primary}
+            strokeWidth={2}
+          />
         )}
       </MapView>
 
@@ -944,14 +587,20 @@ const MapScreen: React.FC = () => {
             className="w-10 h-10 rounded-xl items-center justify-center mr-3"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white text-lg font-bold">AP</Text>
+            <Text className="text-white text-lg font-groteskBold">HG</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm" style={{ color: colors.mutedText }}>
+            <Text
+              className="text-sm font-geist"
+              style={{ color: colors.mutedText }}
+            >
               Welcome to
             </Text>
-            <Text className="text-lg font-bold" style={{ color: colors.text }}>
-              Addis Pulse
+            <Text
+              className="text-lg font-groteskBold"
+              style={{ color: colors.text }}
+            >
+              HabeshaGo
             </Text>
           </View>
           <TouchableOpacity
@@ -963,76 +612,50 @@ const MapScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Floating buttons */}
-      <View className="absolute bottom-6 right-6 space-y-4">
-        {/* My Location button */}
-        <TouchableOpacity
-          className="w-14 h-14 rounded-full items-center justify-center"
-          style={{
-            backgroundColor: colors.card,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-          onPress={() => {
-            if (userLocation && mapRef.current) {
-              mapRef.current.animateToRegion(
-                {
-                  ...userLocation,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                },
-                1000
-              )
-            }
-          }}
-        >
-          <Feather name="navigation" size={24} color={colors.text} />
-        </TouchableOpacity>
+      {/* Zoom Controls */}
+      <ZoomControls mapRef={mapRef} colors={colors} />
 
-        {/* Filter button */}
-        <TouchableOpacity
-          className="w-14 h-14 rounded-full items-center justify-center"
-          style={{
-            backgroundColor: colors.card,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-          onPress={showFilterSheet}
-        >
-          <Feather name="filter" size={24} color={colors.text} />
-        </TouchableOpacity>
+      {/* Map Controls */}
+      <MapControls
+        userLocation={userLocation}
+        heatmapMode={heatmapMode}
+        setHeatmapMode={setHeatmapMode}
+        showMyTrips={showMyTrips}
+        setShowMyTrips={showTripsSheet}
+        focusOnUserLocation={focusOnUserLocation}
+        colors={colors}
+      />
 
-        {/* Heatmap toggle button */}
-        <TouchableOpacity
-          className="w-14 h-14 rounded-full items-center justify-center"
-          style={{
-            backgroundColor: heatmapMode ? colors.primary : colors.card,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-          onPress={() => setHeatmapMode(!heatmapMode)}
-        >
-          <Ionicons
-            name="flame"
-            size={24}
-            color={heatmapMode ? "#FFFFFF" : colors.text}
-          />
-        </TouchableOpacity>
-      </View>
+      {/* My Trips Sheet */}
+      <MyTripsSheet
+        trips={trips}
+        activeTracking={activeTracking}
+        onStartTracking={handleStartTracking}
+        onStopTracking={handleStopTracking}
+        animValue={tripsSheetAnim}
+        colors={colors}
+        onClose={() => {
+          Animated.spring(tripsSheetAnim, {
+            toValue: height,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7,
+          }).start()
+        }}
+      />
 
-      {/* Bottom sheet */}
-      {renderBottomSheet()}
-      {renderFilterSheet()}
-      {renderAddReportModal()}
+      {/* Bus Tracking Sheet */}
+      <BusTrackingSheet
+        selectedBus={selectedBus}
+        activeTracking={activeTracking}
+        onClose={() => {
+          setSelectedBus(null)
+          hideBottomSheet()
+        }}
+        onStopTracking={handleStopTracking}
+        animValue={bottomSheetAnim}
+        colors={colors}
+      />
 
       {/* Add report hint */}
       {!isAddingReport && (
@@ -1041,9 +664,9 @@ const MapScreen: React.FC = () => {
             className="rounded-xl px-4 py-3"
             style={{ backgroundColor: colors.card }}
           >
-            <Text className="text-sm" style={{ color: colors.text }}>
-              📍 <Text className="font-semibold">Long press</Text> on map to add
-              a report
+            <Text className="text-sm font-geist" style={{ color: colors.text }}>
+              📍 <Text className="font-groteskBold">Long press</Text> on map to
+              add a report
             </Text>
           </View>
         </View>
@@ -1056,162 +679,25 @@ const MapScreen: React.FC = () => {
 const darkMapStyle = [
   {
     elementType: "geometry",
-    stylers: [
-      {
-        color: "#242f3e",
-      },
-    ],
+    stylers: [{ color: "#242f3e" }],
   },
   {
     elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#746855",
-      },
-    ],
+    stylers: [{ color: "#746855" }],
   },
   {
     elementType: "labels.text.stroke",
-    stylers: [
-      {
-        color: "#242f3e",
-      },
-    ],
-  },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#d59563",
-      },
-    ],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#d59563",
-      },
-    ],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [
-      {
-        color: "#263c3f",
-      },
-    ],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#6b9a76",
-      },
-    ],
+    stylers: [{ color: "#242f3e" }],
   },
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [
-      {
-        color: "#38414e",
-      },
-    ],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [
-      {
-        color: "#212a37",
-      },
-    ],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#9ca5b3",
-      },
-    ],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [
-      {
-        color: "#746855",
-      },
-    ],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [
-      {
-        color: "#1f2835",
-      },
-    ],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#f3d19c",
-      },
-    ],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [
-      {
-        color: "#2f3948",
-      },
-    ],
-  },
-  {
-    featureType: "transit.station",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#d59563",
-      },
-    ],
+    stylers: [{ color: "#38414e" }],
   },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [
-      {
-        color: "#17263c",
-      },
-    ],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [
-      {
-        color: "#515c6d",
-      },
-    ],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.stroke",
-    stylers: [
-      {
-        color: "#17263c",
-      },
-    ],
+    stylers: [{ color: "#17263c" }],
   },
 ]
 

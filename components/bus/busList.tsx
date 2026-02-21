@@ -12,8 +12,14 @@ import {
   Users,
   X,
 } from "lucide-react-native"
-import React, { useState } from "react"
-import { Modal, Text, TouchableOpacity, View } from "react-native"
+import React, { useEffect, useState } from "react"
+import {
+  ActivityIndicator,
+  Modal,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
 interface BusType {
   id: string
@@ -30,88 +36,176 @@ interface BusType {
   features: string[]
   routePoints: string[]
   busCondition: "excellent" | "good" | "average"
+  routeName: string
 }
 
-export function BusList() {
+export function BusList({ fromValue, toValue, data, isFetching }) {
   const router = useRouter()
   const { colors } = useThemeContext()
-  const [buses, setBuses] = useState<BusType[]>([
-    {
-      id: "1",
-      operator: "Express Travels",
-      busNumber: "ET-7890",
-      type: "AC Sleeper (2+1)",
-      departure: "08:30",
-      arrival: "13:45",
-      duration: "5h 15m",
-      totalSeats: 40,
-      availableSeats: 12,
-      rating: 4.5,
-      reviews: 245,
-      features: ["Live Tracking", "On-time", "Clean"],
-      routePoints: ["Addis Ababa", "Debre Zeit", "Ziway", "Addama"],
-      busCondition: "excellent",
-    },
-    {
-      id: "2",
-      operator: "City Connect",
-      busNumber: "CC-4567",
-      type: "Non-AC Seater (2+2)",
-      departure: "09:15",
-      arrival: "14:30",
-      duration: "5h 15m",
-      totalSeats: 45,
-      availableSeats: 25,
-      rating: 3.8,
-      reviews: 189,
-      features: [],
-      routePoints: ["Addis Ababa", "Mojo", "Addama"],
-      busCondition: "good",
-    },
-    {
-      id: "3",
-      operator: "Premium Coach",
-      busNumber: "PC-1234",
-      type: "AC Seater (2+2)",
-      departure: "10:00",
-      arrival: "15:15",
-      duration: "5h 15m",
-      totalSeats: 40,
-      availableSeats: 8,
-      rating: 4.2,
-      reviews: 312,
-      features: ["Live Tracking", "Clean"],
-      routePoints: ["Addis Ababa", "Debre Zeit", "Addama"],
-      busCondition: "excellent",
-    },
-    {
-      id: "4",
-      operator: "Metro Express",
-      busNumber: "ME-5678",
-      type: "AC Sleeper (2+1)",
-      departure: "11:30",
-      arrival: "16:45",
-      duration: "5h 15m",
-      totalSeats: 36,
-      availableSeats: 3,
-      rating: 4.7,
-      reviews: 156,
-      features: ["Live Tracking", "Clean"],
-      routePoints: ["Addis Ababa", "Dukem", "Debre Zeit", "Addama"],
-      busCondition: "excellent",
-    },
-  ])
-
+  const [buses, setBuses] = useState<BusType[]>([])
   const [sortBy, setSortBy] = useState("departure")
   const [expandedBus, setExpandedBus] = useState<string | null>(null)
   const [filterModalVisible, setFilterModalVisible] = useState(false)
+
+  // Generate dummy data based on fromValue and toValue
+  const generateDummyData = (from: string, to: string): BusType[] => {
+    if (!from || !to) return []
+
+    const operators = [
+      "Express Travels",
+      "City Connect",
+      "Premium Coach",
+      "Metro Express",
+      "Royal Transit",
+      "Blue Star",
+      "Swift Move",
+      "Comfort Rides",
+    ]
+
+    const busTypes = [
+      "AC Sleeper (2+1)",
+      "Non-AC Seater (2+2)",
+      "AC Seater (2+2)",
+      "AC Deluxe (2+2)",
+      "Semi-Sleeper (2+1)",
+      "Volvo AC (2+2)",
+    ]
+
+    const featuresList = [
+      "Live Tracking",
+      "On-time",
+      "Clean",
+      "WiFi",
+      "Charging Ports",
+      "Blanket",
+      "Water Bottle",
+      "Snacks",
+      "TV",
+      "Toilet",
+    ]
+
+    const conditions: ("excellent" | "good" | "average")[] = [
+      "excellent",
+      "good",
+      "average",
+    ]
+
+    const routeNames = [
+      `${from} - ${to} Express`,
+      `${from} to ${to} Direct`,
+      `${from}-${to} Premium`,
+      `${from} ${to} Superfast`,
+    ]
+
+    // Generate Ethiopian city names for route points
+    const ethiopianCities = [
+      "Addis Ababa",
+      "Dire Dawa",
+      "Bahir Dar",
+      "Gondar",
+      "Mekele",
+      "Hawassa",
+      "Jimma",
+      "Bishoftu",
+      "Adama",
+      "Debre Zeit",
+      "Arba Minch",
+      "Harar",
+      "Jijiga",
+      "Asella",
+      "Dessie",
+    ]
+
+    // Generate route points based on fromValue and toValue
+    const generateRoutePoints = (from: string, to: string): string[] => {
+      // Remove from and to from available cities
+      const availableCities = ethiopianCities.filter(
+        (city) =>
+          city.toLowerCase() !== from.toLowerCase() &&
+          city.toLowerCase() !== to.toLowerCase()
+      )
+
+      // Randomly select 2-3 intermediate cities
+      const intermediateCount = Math.floor(Math.random() * 2) + 2
+      const intermediateCities = [...availableCities]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, intermediateCount)
+
+      // Sort intermediate cities to make route logical
+      intermediateCities.sort()
+
+      return [from, ...intermediateCities, to]
+    }
+
+    const dummyBuses: BusType[] = []
+
+    for (let i = 1; i <= 3; i++) {
+      const departureHour = 6 + i * 2 // Starting from 6 AM
+      const durationHours = Math.floor(Math.random() * 4) + 3 // 3-6 hours
+      const arrivalHour = departureHour + durationHours
+
+      const routePoints = generateRoutePoints(from, to)
+      const availableSeats = Math.floor(Math.random() * 40) + 1
+      const totalSeats = Math.max(
+        availableSeats + Math.floor(Math.random() * 20),
+        40
+      )
+      const rating = 3.5 + Math.random() * 1.5 // 3.5 to 5.0
+      const reviews = Math.floor(Math.random() * 400) + 100
+      const features = featuresList
+        .sort(() => Math.random() - 0.5)
+        .slice(0, Math.floor(Math.random() * 6) + 1)
+
+      dummyBuses.push({
+        id: i.toString(),
+        operator: operators[Math.floor(Math.random() * operators.length)],
+        busNumber: `ET-${Math.floor(Math.random() * 9000) + 1000}`,
+        type: busTypes[Math.floor(Math.random() * busTypes.length)],
+        departure: `${departureHour}:${Math.random() > 0.5 ? "30" : "00"}`,
+        arrival: `${arrivalHour}:${Math.random() > 0.5 ? "45" : "15"}`,
+        duration: `${durationHours}h ${Math.random() > 0.5 ? "30" : "00"}m`,
+        totalSeats,
+        availableSeats,
+        rating: parseFloat(rating.toFixed(1)),
+        reviews,
+        features,
+        routePoints,
+        busCondition: conditions[Math.floor(Math.random() * conditions.length)],
+        routeName: routeNames[Math.floor(Math.random() * routeNames.length)],
+      })
+    }
+
+    return dummyBuses
+  }
+
+  // Update buses when data changes (from API) or when from/to values change
+  useEffect(() => {
+    if (data && data.length > 0) {
+      // If data comes from API, use it
+      setBuses(data)
+    } else if (fromValue && toValue && !isFetching) {
+      // If no API data but we have from/to values, generate dummy data
+      const dummyData = generateDummyData(fromValue, toValue)
+      setBuses(dummyData)
+    } else if (!fromValue || !toValue) {
+      // Clear buses if no from/to values
+      setBuses([])
+    }
+  }, [data, fromValue, toValue, isFetching])
 
   const sortedBuses = [...buses].sort((a, b) => {
     switch (sortBy) {
       case "departure":
         return a.departure.localeCompare(b.departure)
       case "duration":
-        return a.duration.localeCompare(b.duration)
+        // Extract hours and minutes from duration string
+        const parseDuration = (duration: string) => {
+          const [hours, minutes] = duration
+            .split("h")
+            .map((part) => parseInt(part.replace("m", "").trim()))
+          return (hours || 0) * 60 + (minutes || 0)
+        }
+        return parseDuration(a.duration) - parseDuration(b.duration)
       case "rating":
         return b.rating - a.rating
       case "seats":
@@ -159,78 +253,131 @@ export function BusList() {
     0
   )
 
+  // Show loading state when isFetching is true
+  if (isFetching) {
+    return (
+      <View className="flex-1 items-center justify-center py-12">
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text
+          className="mt-4 text-lg font-geist"
+          style={{ color: colors.text }}
+        >
+          Searching buses from {fromValue} to {toValue}...
+        </Text>
+      </View>
+    )
+  }
+
+  // Show initial state if no from/to values
+  if (!fromValue || !toValue) {
+    return (
+      <View className="items-center justify-center py-12 px-6">
+        <View
+          className="w-20 h-20 rounded-full items-center justify-center mb-4"
+          style={{ backgroundColor: `${colors.mutedText}15` }}
+        >
+          <MapPin size={32} style={{ color: colors.mutedText }} />
+        </View>
+        <Text
+          className="text-xl font-semibold text-center mb-2 font-geist"
+          style={{ color: colors.text }}
+        >
+          Search for Buses
+        </Text>
+        <Text className="text-center" style={{ color: colors.mutedText }}>
+          Enter departure and destination to find available buses
+        </Text>
+      </View>
+    )
+  }
+
+  // Show results or empty state
   return (
     <View
       className="space-y-6 mt-2 rounded-2xl"
       style={{ backgroundColor: colors.background }}
     >
-      {/* Header with Stats */}
-      <View
-        className="rounded-3xl p-6 px-3"
-        style={{ backgroundColor: colors.background }}
-      >
-        <View className="flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <View>
-            <Text className="text-xl font-geist" style={{ color: colors.text }}>
-              Available Buses
-            </Text>
-            <Text
-              className="mt-1 font-geist"
-              style={{ color: colors.mutedText }}
-            >
-              {buses.length} buses found • {totalAvailableSeats} seats available
-            </Text>
-          </View>
-
-          <View className="flex-row items-center gap-4">
-            {/* Sorting */}
-            <View className="flex-row items-center gap-2">
-              <ArrowUpDown size={16} style={{ color: colors.mutedText }} />
+      {/* Header with Stats - Only show if we have buses */}
+      {sortedBuses.length > 0 && (
+        <View
+          className="rounded-3xl p-6 px-3"
+          style={{ backgroundColor: colors.background }}
+        >
+          <View className="flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <View>
               <Text
-                className="text-sm font-medium font-geist"
+                className="text-xl font-geist"
                 style={{ color: colors.text }}
               >
-                Sort by:
+                {fromValue} → {toValue}
               </Text>
-              <TouchableOpacity
-                className="px-3 py-2 rounded-lg border"
-                style={{
-                  borderColor: colors.border,
-                  backgroundColor: colors.card,
-                }}
-                onPress={() => {
-                  // Implement your modal/dropdown logic here
-                }}
+              <Text
+                className="mt-1 font-geist"
+                style={{ color: colors.mutedText }}
               >
-                <Text style={{ color: colors.text }} className="font-geist">
-                  {sortBy === "departure"
-                    ? "Departure Time"
-                    : sortBy === "duration"
-                      ? "Travel Duration"
-                      : sortBy === "rating"
-                        ? "Customer Rating"
-                        : "Available Seats"}
+                {sortedBuses.length} buses found • {totalAvailableSeats} seats
+                available
+              </Text>
+            </View>
+
+            <View className="flex-row items-center gap-4">
+              {/* Sorting */}
+              <View className="flex-row items-center gap-2">
+                <ArrowUpDown size={16} style={{ color: colors.mutedText }} />
+                <Text
+                  className="text-sm font-medium font-geist"
+                  style={{ color: colors.text }}
+                >
+                  Sort by:
+                </Text>
+                <TouchableOpacity
+                  className="px-3 py-2 rounded-lg border"
+                  style={{
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                  onPress={() => {
+                    const sortOptions = [
+                      "departure",
+                      "duration",
+                      "rating",
+                      "seats",
+                    ]
+                    const currentIndex = sortOptions.indexOf(sortBy)
+                    const nextIndex = (currentIndex + 1) % sortOptions.length
+                    setSortBy(sortOptions[nextIndex])
+                  }}
+                >
+                  <Text style={{ color: colors.text }} className="font-geist">
+                    {sortBy === "departure"
+                      ? "Departure Time"
+                      : sortBy === "duration"
+                        ? "Travel Duration"
+                        : sortBy === "rating"
+                          ? "Customer Rating"
+                          : "Available Seats"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Filter Button */}
+              <TouchableOpacity
+                className="flex-row items-center gap-2 px-4 py-2 rounded-lg border"
+                style={{ borderColor: colors.border }}
+                onPress={() => setFilterModalVisible(true)}
+              >
+                <Filter size={16} style={{ color: colors.text }} />
+                <Text
+                  className="font-medium font-geist"
+                  style={{ color: colors.text }}
+                >
+                  Filters
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Filter Button */}
-            <TouchableOpacity
-              className="flex-row items-center gap-2 px-4 py-2 rounded-lg border"
-              style={{ borderColor: colors.border }}
-              onPress={() => setFilterModalVisible(true)}
-            >
-              <Filter size={16} style={{ color: colors.text }} />
-              <Text
-                className="font-medium font-geist"
-                style={{ color: colors.text }}
-              >
-                Filters
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      )}
 
       {/* Bus Cards */}
       <View className="gap-4">
@@ -284,8 +431,33 @@ export function BusList() {
                                     {bus.busNumber}
                                   </Text>
                                 </View>
+                                <View
+                                  className={`px-2 py-1 rounded-full border ${conditionColor}`}
+                                >
+                                  <Text
+                                    className={`text-xs font-medium font-geist ${conditionTextColor}`}
+                                  >
+                                    {getBusConditionText(bus.busCondition)}
+                                  </Text>
+                                </View>
                               </View>
                             </View>
+                          </View>
+
+                          {/* Bus Type and Route Name */}
+                          <View className="flex-row items-center gap-4">
+                            <Text
+                              className="font-medium font-geist"
+                              style={{ color: colors.primary }}
+                            >
+                              {bus.type}
+                            </Text>
+                            <Text
+                              className="text-sm font-geist"
+                              style={{ color: colors.mutedText }}
+                            >
+                              {bus.routeName}
+                            </Text>
                           </View>
 
                           {/* Rating */}
@@ -382,7 +554,7 @@ export function BusList() {
                               className="text-sm mt-1 font-geist"
                               style={{ color: colors.mutedText }}
                             >
-                              Departure
+                              {bus.routePoints[0]} {/* fromValue */}
                             </Text>
                           </View>
 
@@ -434,7 +606,8 @@ export function BusList() {
                               className="text-sm mt-1 font-geist"
                               style={{ color: colors.mutedText }}
                             >
-                              Arrival
+                              {bus.routePoints[bus.routePoints.length - 1]}{" "}
+                              {/* toValue */}
                             </Text>
                           </View>
                         </View>
@@ -653,8 +826,8 @@ export function BusList() {
         })}
       </View>
 
-      {/* Empty State */}
-      {sortedBuses.length === 0 && (
+      {/* Empty State - Only show if we have from/to values but no buses */}
+      {sortedBuses.length === 0 && fromValue && toValue && !isFetching && (
         <View className="items-center py-12">
           <View
             className="w-16 h-16 rounded-full items-center justify-center mb-4"
@@ -666,20 +839,14 @@ export function BusList() {
             className="text-xl font-semibold"
             style={{ color: colors.text }}
           >
-            No buses found
+            No buses found for {fromValue} to {toValue}
           </Text>
-          <Text className="mt-2" style={{ color: colors.mutedText }}>
-            Try adjusting your search criteria
-          </Text>
-          <TouchableOpacity
-            className="mt-4 px-4 py-2 rounded-lg border"
-            style={{ borderColor: colors.border }}
-            onPress={() => {
-              // Clear filters logic
-            }}
+          <Text
+            className="mt-2 text-center"
+            style={{ color: colors.mutedText }}
           >
-            <Text style={{ color: colors.text }}>Clear Filters</Text>
-          </TouchableOpacity>
+            Try adjusting your search or check back later
+          </Text>
         </View>
       )}
 
@@ -706,10 +873,13 @@ export function BusList() {
                 Filters
               </Text>
               <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                <X size={24} className="text-white" />
+                <X size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            {/* Filter options here */}
+            <Text style={{ color: colors.text }} className="mb-4">
+              Filter buses from {fromValue} to {toValue}
+            </Text>
+            {/* Add filter options here */}
             <TouchableOpacity
               className="py-3 rounded-xl items-center mt-6"
               style={{ backgroundColor: colors.primary }}

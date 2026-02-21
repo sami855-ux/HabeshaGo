@@ -3,7 +3,11 @@ import { useThemeContext } from "@/context/ThemeContext"
 import { saveRefreshToken } from "@/lib/refreshToken"
 import { continueWithEmail, getMe, verifyOtp } from "@/service/auth"
 import { useAppDispatch } from "@/store"
-import { saveUserToStorage, setAccessToken } from "@/store/slices/userSlice"
+import {
+  saveUserToStorage,
+  setAccessToken,
+  setUser,
+} from "@/store/slices/userSlice"
 import { useRouter } from "expo-router"
 import { Clock, RotateCcw, Shield } from "lucide-react-native"
 import React, { useEffect, useRef, useState } from "react"
@@ -89,7 +93,7 @@ const ContinueWithEmail = () => {
             easing: Easing.ease,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start()
     } else {
       pulseAnim.setValue(1)
@@ -279,13 +283,15 @@ Please check for typos or missing characters and try again.`,
           await new Promise((resolve) => {
             dispatch(saveUserToStorage({ user: userRes.user }))
 
-            // dispatch(setUser(userRes.user))
+            dispatch(setUser(userRes.user))
             // small delay for state to propagate
             setTimeout(resolve, 0)
           })
 
           if (userRes.user.role === "PASSENGER") {
             router.push("/(passenger)/(tabs)")
+          } else if (userRes.user.role === "DRIVER") {
+            router.push("/(driver)/tabs")
           }
         }
 

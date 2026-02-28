@@ -1,53 +1,55 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
 import {
-  motion,
-  useScroll,
-  useTransform,
-  AnimatePresence,
-} from "framer-motion";
-import { ArrowRight, Sparkles, Zap, Shield, Battery } from "lucide-react";
-import { useEffect, useState } from "react";
+  ArrowRight,
+  Sparkles,
+  Zap,
+  Shield,
+  Battery,
+  ChevronRight,
+  Gauge,
+  ShieldCheck,
+  TreePine,
+  Route,
+} from "lucide-react"
+import { useEffect, useState } from "react"
 
-/* ---------------- TYPES ---------------- */
 type Particle = {
-  left: number;
-  top: number;
-  xStart: number;
-  xEnd: number;
-  duration: number;
-};
+  left: number
+  top: number
+  xStart: number
+  xEnd: number
+  duration: number
+}
 
 export function HeroSection() {
-  /* ---------------- PARALLAX ---------------- */
-  const { scrollY } = useScroll();
-  const y = useTransform(scrollY, [0, 500], [0, 100]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const { scrollY } = useScroll()
+  const y = useTransform(scrollY, [0, 500], [0, 100])
+  const opacity = useTransform(scrollY, [0, 300], [1, 0])
 
-  /* ---------------- ROTATING TEXT ---------------- */
-  const [textIndex, setTextIndex] = useState(0);
+  const [textIndex, setTextIndex] = useState(0)
   const texts = [
     "Drive. Park. Charge. Ride — All in One",
     "Seamless Urban Mobility Solutions",
     "Your Smart City Journey Starts Here",
     "Redefining Urban Transportation",
-  ];
+  ]
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTextIndex((prev) => (prev + 1) % texts.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
+      setTextIndex((prev) => (prev + 1) % texts.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [])
 
-  /* ---------------- PARTICLES (FIXED) ---------------- */
-  const [mounted, setMounted] = useState(false);
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const [mounted, setMounted] = useState(false)
+  const [particles, setParticles] = useState<Particle[]>([])
 
   useEffect(() => {
-    setMounted(true);
+    setMounted(true)
 
     const generatedParticles: Particle[] = Array.from({ length: 20 }).map(
       () => ({
@@ -56,11 +58,11 @@ export function HeroSection() {
         xStart: Math.random() * 100,
         xEnd: Math.random() * 200,
         duration: Math.random() * 10 + 10,
-      })
-    );
+      }),
+    )
 
-    setParticles(generatedParticles);
-  }, []);
+    setParticles(generatedParticles)
+  }, [])
 
   /* ---------------- ANIMATIONS ---------------- */
   const containerVariants = {
@@ -69,7 +71,7 @@ export function HeroSection() {
       opacity: 1,
       transition: { staggerChildren: 0.2, delayChildren: 0.3 },
     },
-  };
+  }
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -78,7 +80,7 @@ export function HeroSection() {
       y: 0,
       transition: { duration: 0.6, ease: "easeOut" },
     },
-  };
+  }
 
   const featureVariants = {
     hidden: { opacity: 0, scale: 0.8 },
@@ -87,14 +89,14 @@ export function HeroSection() {
       scale: 1,
       transition: { delay: i * 0.1, duration: 0.5 },
     }),
-  };
+  }
 
   const features = [
-    { icon: Zap, text: "Fast Charging", color: "text-yellow-500" },
-    { icon: Shield, text: "Secure Parking", color: "text-blue-500" },
-    { icon: Battery, text: "EV Ready", color: "text-green-500" },
-    { icon: Sparkles, text: "Smart Routes", color: "text-purple-500" },
-  ];
+    { icon: Gauge, text: "Lightning Charge", color: "text-yellow-500" },
+    { icon: ShieldCheck, text: "Safe & Secure", color: "text-blue-500" },
+    { icon: TreePine, text: "Zero Emissions", color: "text-green-500" },
+    { icon: Route, text: "AI Navigation", color: "text-purple-500" },
+  ]
 
   return (
     <section className="relative w-full min-h-screen overflow-hidden pt-16">
@@ -148,19 +150,18 @@ export function HeroSection() {
         <motion.div variants={itemVariants} className="mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
             <Sparkles className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm font-medium text-white/90">
+            <span className="text-sm font-medium text-white/90 font-jakarta">
               Revolutionizing Urban Mobility
             </span>
           </div>
         </motion.div>
 
-        {/* Heading */}
         <motion.h1
           variants={itemVariants}
           className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-4"
         >
-          <span className="bg-gradient-to-r from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent">
-            Smart Moves for a
+          <span className="bg-gradient-to-r from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent font-grotesk">
+            Smarter Journeys for
           </span>
           <br />
           <motion.span
@@ -169,7 +170,7 @@ export function HeroSection() {
             transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
             style={{ backgroundSize: "200%" }}
           >
-            Smarter City.
+            a Connected Ethiopia.
           </motion.span>
         </motion.h1>
 
@@ -182,7 +183,7 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="text-xl md:text-2xl lg:text-3xl text-white/90"
+              className="text-lg md:text-xl lg:text-2xl text-white/90"
             >
               {texts[textIndex]}
             </motion.p>
@@ -199,8 +200,7 @@ export function HeroSection() {
               key={f.text}
               custom={i}
               variants={featureVariants}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 backdrop-blur-xs border-none"
             >
               <f.icon className={`w-8 h-8 ${f.color}`} />
               <span className="text-sm text-white/80">{f.text}</span>
@@ -211,15 +211,15 @@ export function HeroSection() {
         {/* CTA */}
         <motion.div variants={itemVariants} className="flex gap-5 flex-wrap">
           <Link href="/login">
-            <Button className="px-12 py-7 text-lg rounded-2xl bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-              Join Us <ArrowRight className="ml-2 w-5 h-5" />
+            <Button className="px-16 w-38 py-6 text-lg rounded-xl  bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
+              Join Us <ChevronRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
 
           <Link href="/learn-more">
             <Button
               variant="outline"
-              className="px-12 py-7 text-lg rounded-2xl text-white border-white/30 bg-white/5"
+              className="px-12 py-6 text-lg rounded-2xl text-white border-white/30 bg-white/5"
             >
               Learn More
             </Button>
@@ -227,5 +227,5 @@ export function HeroSection() {
         </motion.div>
       </motion.div>
     </section>
-  );
+  )
 }

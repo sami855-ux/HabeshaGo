@@ -43,6 +43,7 @@ import {
   Ticket,
   Download,
   RefreshCw,
+  Headset,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -231,15 +232,18 @@ export default function TripsPage() {
       {/* Page Header with Stats */}
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-              My Trips
-            </h1>
-            <p className="text-gray-600 mt-2 flex items-center gap-2">
-              <Ticket className="h-4 w-4" />
-              Manage your upcoming journeys and view past travels
-            </p>
-          </div>
+          <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase font-semibold text-muted-foreground">
+                Travel
+              </p>
+              <h1 className="text-3xl font-bold">My Trips</h1>
+              <p className="text-sm text-muted-foreground">
+                View upcoming journeys, manage bookings, and track your travel
+                history.
+              </p>
+            </div>
+          </header>
 
           {/* Quick Stats */}
           <div className="flex gap-3">

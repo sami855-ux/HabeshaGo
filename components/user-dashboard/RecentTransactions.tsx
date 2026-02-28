@@ -81,6 +81,7 @@ import {
   TransactionType,
   TransactionStatus,
 } from "@/types/transaction"
+import { useRouter } from "next/navigation"
 
 // API Service - now uses actual API types
 const fetchTransactions = async (): Promise<{
@@ -215,222 +216,6 @@ const isPositiveTransaction = (type: TransactionType) => {
   return positiveTypes.includes(type)
 }
 
-// Define columns
-const createColumns = (
-  onViewDetails: (transaction: WalletTransactionDTO) => void,
-): ColumnDef<WalletTransactionDTO>[] => [
-  {
-    accessorKey: "type",
-    header: ({ column }) => (
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="hover:bg-transparent p-0 font-medium"
-        >
-          Type
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-2 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-2 h-4 w-4" />
-          ) : (
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          )}
-        </Button>
-      </div>
-    ),
-    cell: ({ row }) => {
-      const type = row.getValue("type") as TransactionType
-      const config = getTypeConfig(type)
-      const Icon = config.icon
-      return (
-        <div className="flex items-center gap-2">
-          <div className={cn("p-1.5 rounded-lg", config.color)}>
-            <Icon className="h-4 w-4" />
-          </div>
-          <span className="font-medium text-foreground">{config.label}</span>
-        </div>
-      )
-    },
-    filterFn: (row, columnId, filterValue) => {
-      if (!filterValue || filterValue === "all") return true
-      return row.getValue(columnId) === filterValue
-    },
-  },
-  {
-    accessorKey: "description",
-    header: "Description",
-    cell: ({ row }) => {
-      const transaction = row.original
-      return (
-        <div className="space-y-1 min-w-[200px]">
-          <div className="font-medium text-foreground line-clamp-1">
-            {transaction.description || "No description"}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
-              {transaction.reference}
-            </span>
-            {transaction.metadata && <FileText className="h-3 w-3" />}
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "recipientName",
-    header: "Recipient Name",
-    cell: ({ row }) => {
-      const recipientName = row.getValue("recipientName") as string | null
-      return <p>{recipientName ?? "No recipient name"}</p>
-    },
-    filterFn: (row, columnId, filterValue) => {
-      if (!filterValue || filterValue === "all") return true
-      return row.getValue(columnId) === filterValue
-    },
-  },
-  {
-    accessorKey: "amount",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="hover:bg-transparent p-0 font-medium"
-      >
-        Amount
-        {column.getIsSorted() === "asc" ? (
-          <ChevronUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ChevronDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("amount") as string)
-      const type = row.original.type
-      const isPositive = isPositiveTransaction(type)
-
-      return (
-        <div
-          className={cn(
-            "font-semibold flex items-center gap-1",
-            isPositive
-              ? "text-green-600 dark:text-green-400"
-              : "text-red-600 dark:text-red-400",
-          )}
-        >
-          {isPositive ? (
-            <Plus className="h-4 w-4" />
-          ) : (
-            <Minus className="h-4 w-4" />
-          )}
-          {formatCurrency(Math.abs(amount).toFixed(2))}
-        </div>
-      )
-    },
-    sortingFn: (rowA, rowB, columnId) => {
-      const a = parseFloat(rowA.getValue(columnId) as string)
-      const b = parseFloat(rowB.getValue(columnId) as string)
-      return a - b
-    },
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as TransactionStatus
-      const config = getStatusConfig(status)
-      const Icon = config.icon
-      return (
-        <Badge
-          variant="outline"
-          className={cn("font-normal gap-1.5 px-2.5 py-0.5", config.color)}
-        >
-          <Icon className="h-3 w-3" />
-          {config.label}
-        </Badge>
-      )
-    },
-    filterFn: (row, columnId, filterValue) => {
-      if (!filterValue || filterValue === "all") return true
-      return row.getValue(columnId) === filterValue
-    },
-  },
-
-  {
-    accessorKey: "balanceAfter",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="hover:bg-transparent p-0 font-medium"
-      >
-        Balance After
-        {column.getIsSorted() === "asc" ? (
-          <ChevronUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ChevronDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const balance = row.getValue("balanceAfter") as string
-      return <div className="font-medium">{formatCurrency(balance)}</div>
-    },
-  },
-  {
-    accessorKey: "createdAt",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="hover:bg-transparent p-0 font-medium"
-      >
-        Date & Time
-        {column.getIsSorted() === "asc" ? (
-          <ChevronUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ChevronDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const dateString = row.getValue("createdAt") as string
-      return (
-        <div className="space-y-1">
-          <div className="text-sm">{formatDate(dateString)}</div>
-          <div className="text-xs text-muted-foreground">
-            {new Date(dateString).toLocaleDateString()}
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const transaction = row.original
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 hover:bg-muted"
-          onClick={() => onViewDetails(transaction)}
-          title="View details"
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-      )
-    },
-  },
-]
-
 // Loading Skeleton
 const LoadingSkeleton = () => (
   <div className="space-y-4">
@@ -453,6 +238,7 @@ const LoadingSkeleton = () => (
 
 export default function RecentTransactions() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState("")
@@ -501,6 +287,223 @@ export default function RecentTransactions() {
 
     return filtered
   }, [transactionsData?.transactions, dateRange])
+
+  // Define columns
+  const createColumns = (
+    onViewDetails: (transaction: WalletTransactionDTO) => void,
+  ): ColumnDef<WalletTransactionDTO>[] => [
+    {
+      accessorKey: "type",
+      header: ({ column }) => (
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="hover:bg-transparent p-0 font-medium"
+          >
+            Type
+            {column.getIsSorted() === "asc" ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const type = row.getValue("type") as TransactionType
+        const config = getTypeConfig(type)
+        const Icon = config.icon
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn("p-1.5 rounded-lg", config.color)}>
+              <Icon className="h-4 w-4" />
+            </div>
+            <span className="font-medium text-foreground">{config.label}</span>
+          </div>
+        )
+      },
+      filterFn: (row, columnId, filterValue) => {
+        if (!filterValue || filterValue === "all") return true
+        return row.getValue(columnId) === filterValue
+      },
+    },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => {
+        const transaction = row.original
+        return (
+          <div className="space-y-1 min-w-[200px]">
+            <div className="font-medium text-foreground line-clamp-1">
+              {transaction.description || "No description"}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-mozilla bg-muted px-1.5 py-0.5 rounded">
+                {transaction.reference}
+              </span>
+              {transaction.metadata && <FileText className="h-3 w-3" />}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "recipientName",
+      header: "Recipient Name",
+      cell: ({ row }) => {
+        const recipientName = row.getValue("recipientName") as string | null
+        return <p>{recipientName ?? "No recipient name"}</p>
+      },
+      filterFn: (row, columnId, filterValue) => {
+        if (!filterValue || filterValue === "all") return true
+        return row.getValue(columnId) === filterValue
+      },
+    },
+    {
+      accessorKey: "amount",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="hover:bg-transparent p-0 font-medium"
+        >
+          Amount
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-2 h-4 w-4" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          )}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue("amount") as string)
+        const type = row.original.type
+        const isPositive = isPositiveTransaction(type)
+
+        return (
+          <div
+            className={cn(
+              "font-semibold flex items-center gap-1 font-grotesk ",
+              isPositive
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400",
+            )}
+          >
+            {isPositive ? (
+              <Plus className="h-4 w-4" />
+            ) : (
+              <Minus className="h-4 w-4" />
+            )}
+            {formatCurrency(Math.abs(amount).toFixed(2))}
+          </div>
+        )
+      },
+      sortingFn: (rowA, rowB, columnId) => {
+        const a = parseFloat(rowA.getValue(columnId) as string)
+        const b = parseFloat(rowB.getValue(columnId) as string)
+        return a - b
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as TransactionStatus
+        const config = getStatusConfig(status)
+        const Icon = config.icon
+        return (
+          <Badge
+            variant="outline"
+            className={cn("font-normal gap-1.5 px-2.5 py-0.5", config.color)}
+          >
+            <Icon className="h-3 w-3" />
+            {config.label}
+          </Badge>
+        )
+      },
+      filterFn: (row, columnId, filterValue) => {
+        if (!filterValue || filterValue === "all") return true
+        return row.getValue(columnId) === filterValue
+      },
+    },
+
+    {
+      accessorKey: "balanceAfter",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="hover:bg-transparent p-0 font-medium"
+        >
+          Balance After
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-2 h-4 w-4" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          )}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const balance = row.getValue("balanceAfter") as string
+        return <div className="font-medium">{formatCurrency(balance)}</div>
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="hover:bg-transparent p-0 font-medium"
+        >
+          Date & Time
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-2 h-4 w-4" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          )}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const dateString = row.getValue("createdAt") as string
+        return (
+          <div className="space-y-1">
+            <div className="text-sm">{formatDate(dateString)}</div>
+            <div className="text-xs text-muted-foreground">
+              {new Date(dateString).toLocaleDateString()}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const transaction = row.original
+        return (
+          <Button
+            variant={"default"}
+            className=" cursor-pointer"
+            onClick={() =>
+              router.push(`/user/wallet/transaction/${transaction.id}`)
+            }
+            title="View details"
+          >
+            <Eye className="h-4 w-4" /> View
+          </Button>
+        )
+      },
+    },
+  ]
 
   // Create table with actual data
   const columns = useMemo(() => createColumns(handleViewDetails), [])

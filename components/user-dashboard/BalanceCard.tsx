@@ -90,51 +90,6 @@ export function WalletBalanceCard({
 
       {/* Content card */}
       <Card className="relative rounded-2xl border-none bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-2xl overflow-hidden">
-        <CardHeader className="">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-orange-100 dark:bg-orange-900/50">
-                <Wallet className="size-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Wallet & Rewards
-                </CardTitle>
-                <div className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                  {currency} • Real-time updates
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "px-3 py-1 text-xs font-medium backdrop-blur-sm",
-                  isLocked
-                    ? "border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30"
-                    : "border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 bg-green-50/80 dark:bg-green-900/30",
-                )}
-              >
-                {isLocked ? (
-                  <>
-                    <Lock className="size-3 mr-1.5" />
-                    Locked
-                  </>
-                ) : (
-                  <>
-                    <Shield className="size-3 mr-1.5" />
-                    Active
-                  </>
-                )}
-              </Badge>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
         <CardContent className="space-y-4">
           {/* Balances Row */}
           <div className="grid grid-cols-2 gap-4">
@@ -167,14 +122,14 @@ export function WalletBalanceCard({
 
               <div className="space-y-1">
                 <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white font-grotesk">
                     {showBalance ? formattedBalance : "••••••"}
                   </div>
                   <div className="text-lg font-medium text-orange-600 dark:text-orange-400">
                     {currency}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium font-mozilla">
                   <TrendingUp className="size-3" />
                   +$45.20 today
                 </div>
@@ -214,7 +169,7 @@ export function WalletBalanceCard({
 
               <div className="space-y-1">
                 <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white font-grotesk">
                     {showPoints ? formattedPoints : "••••••"}
                   </div>
                   <div className="flex items-center gap-1 text-lg font-medium text-purple-600 dark:text-purple-400">
@@ -222,7 +177,7 @@ export function WalletBalanceCard({
                     Points
                   </div>
                 </div>
-                <div className="text-xs font-medium text-purple-600 dark:text-purple-400">
+                <div className="text-xs font-medium text-purple-600 dark:text-purple-400 font-mozilla">
                   ≈ {(habeshaPoints * 0.01).toFixed(2)} {currency} value
                 </div>
               </div>

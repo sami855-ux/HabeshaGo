@@ -1,8 +1,46 @@
 import "./globals.css"
-
 import type { Metadata } from "next"
 import "mapbox-gl/dist/mapbox-gl.css"
 import AppProvider from "./Provider"
+
+import {
+  Mozilla_Headline,
+  Plus_Jakarta_Sans,
+  Space_Grotesk,
+  Geist,
+} from "next/font/google"
+
+// 🔹 Mozilla Headline
+const mozilla = Mozilla_Headline({
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700"],
+  variable: "--font-mozilla",
+  display: "swap",
+})
+
+// 🔹 Plus Jakarta Sans
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
+})
+
+// 🔹 Space Grotesk
+const grotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-grotesk",
+  display: "swap",
+})
+
+// 🔹 Geist
+const geist = Geist({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-geist",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "HabeshaGo",
@@ -16,7 +54,11 @@ export default function RootLayout({
   session?: any
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${mozilla.variable} ${jakarta.variable} ${grotesk.variable} ${geist.variable} font-geist`}
+    >
       <body>
         <AppProvider>{children}</AppProvider>
       </body>

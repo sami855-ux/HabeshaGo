@@ -18,10 +18,10 @@ export const useRequireRole = (allowedRoles: string[]) => {
 
   useEffect(() => {
     // Fetch user if not loaded yet
-    // if (!user && !loading) {
-    //   dispatch(fetchCurrentUser())
-    //   return
-    // }
+    if (!user && !loading) {
+      dispatch(fetchCurrentUser())
+      return
+    }
 
     // While loading, do nothing
     if (loading) return
@@ -34,7 +34,13 @@ export const useRequireRole = (allowedRoles: string[]) => {
 
     // Logged in but role not allowed
     if (!allowedRoles.includes(user.role)) {
-      router.replace("/user") // redirect to default user page
+      if (user.role === "PASSENGER") {
+        router.replace("/user") 
+      } else if (user.role === "DRIVER") {
+        router.replace("/login")
+      } else if (user.role === "ADMIN") {
+        router.replace("/admin")
+      }
     }
   }, [isAuthenticated, allowedRoles, dispatch])
 }

@@ -227,7 +227,9 @@ export default function LoginPage() {
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6">
         <Card className="w-full max-w-md shadow-none border-none bg-background">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl ">Welcome to HabeshaGo</CardTitle>
+            <CardTitle className="text-3xl font-mozilla">
+              Welcome to HabeshaGo
+            </CardTitle>
             <CardDescription>
               Book buses, manage trips, and travel smarter
             </CardDescription>

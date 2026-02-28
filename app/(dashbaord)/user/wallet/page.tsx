@@ -289,15 +289,21 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header with Refresh */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Wallet</h1>
-          <p className="text-muted-foreground">
-            Manage your digital wallet and transactions
-          </p>
-        </div>
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase font-semibold text-muted-foreground">
+              Payments
+            </p>
+            <h1 className="text-3xl font-bold">My Wallet</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage your balance, review transactions, and pay for trips
+              seamlessly.
+            </p>
+          </div>
+        </header>
         {hasWallet && (
           <div className="flex gap-2">
             <Button

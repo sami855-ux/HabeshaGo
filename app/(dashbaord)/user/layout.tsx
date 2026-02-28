@@ -1,15 +1,17 @@
 "use client"
 
 import React, { useEffect } from "react"
+
+import { SidebarProvider, useSidebar } from "@/context/sidebar-context"
+import { fetchUserWallet } from "@/store/slices/walletSlice"
 import Sidebar from "@/components/user-dashboard/Sidebar"
 import Header from "@/components/user-dashboard/Header"
 import { useRequireRole } from "@/hooks/useRequireRole"
-import { SidebarProvider, useSidebar } from "@/context/sidebar-context"
+import IntroOverlay from "@/components/IntroOverlay"
+import { useAppDispatch } from "@/store/store"
 import { cn } from "@/lib/utils"
-import { useAppDispatch, useAppSelector } from "@/store/store"
-import { fetchUserWallet } from "@/store/slices/walletSlice"
 
-function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+function UserLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
   const dispatch = useAppDispatch()
 
@@ -39,14 +41,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   )
 }
 
-function AdminLayout({ children }: { children: React.ReactNode }) {
-  // useRequireRole(["ADMIN"])
+function UserLayout({ children }: { children: React.ReactNode }) {
+  useRequireRole(["PASSENGER"])
 
   return (
     <SidebarProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
+       <IntroOverlay/>
+      <UserLayoutContent>{children}</UserLayoutContent>
     </SidebarProvider>
   )
 }
 
-export default AdminLayout
+export default UserLayout

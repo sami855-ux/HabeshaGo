@@ -31,8 +31,10 @@ const AppProvider: FC<AppProviderProps> = ({ children }) => {
             classNames: {
               toast:
                 "flex items-start gap-4 py-4 px-6 w-[420px] rounded-lg bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-800 shadow-lg",
-              title: "text-sm font-semibold ml-3 text-gray-900 dark:text-white",
-              description: "text-sm ml-3 !text-gray-900 dark:!text-gray-300",
+              title:
+                "text-sm font-semibold ml-3 text-gray-900 dark:text-white font-geist",
+              description:
+                "text-sm ml-3 !text-gray-900 dark:!text-gray-300 font-jakarta",
             },
           }}
           icons={{

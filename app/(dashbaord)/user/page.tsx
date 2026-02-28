@@ -4,26 +4,17 @@ import { RootState } from "@/store"
 import {
   Bus,
   ParkingCircle,
-  Zap,
-  Briefcase,
   Wallet,
-  History,
-  TrendingUp,
   Star,
+  TrendingUp,
   Heart,
   Home,
   Building,
   School,
   ShoppingBag,
-  Bell,
   Settings,
-  ChevronRight,
   Clock,
-  CheckCircle,
-  MoreVertical,
   UserCircle,
-  MapPin,
-  Plus,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSelector } from "react-redux"
@@ -38,8 +29,6 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import {
   Tooltip,
@@ -47,7 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { toast } from "sonner"
+import { QuickActions } from "@/components/user-dashboard/dashboard/QuickActions"
 
 // Favorite destination interface
 interface FavoriteDestination {
@@ -60,7 +49,7 @@ interface FavoriteDestination {
   isFavorite: boolean
 }
 
-function Page() {
+export default function UserDashboard() {
   const { user } = useSelector((state: RootState) => state.user)
   const router = useRouter()
 
@@ -112,61 +101,6 @@ function Page() {
     },
   ])
 
-  const quickActions = [
-    {
-      id: "bus",
-      title: "Book a Bus",
-      description: "Instantly book or check schedules",
-      icon: Bus,
-      color: "bg-gradient-to-br from-orange-500 to-amber-500",
-      iconColor: "text-white",
-    },
-    {
-      id: "charging",
-      title: "EV Charging",
-      description: "Find stations & start charging",
-      icon: Zap,
-      color: "bg-gradient-to-br from-orange-400 to-amber-400",
-      iconColor: "text-white",
-    },
-    {
-      id: "parking",
-      title: "Parking",
-      description: "Reserve & pay for parking",
-      icon: ParkingCircle,
-      color: "bg-gradient-to-br from-orange-600 to-amber-600",
-      iconColor: "text-white",
-    },
-    {
-      id: "employment",
-      title: "Shuttle Jobs",
-      description: "View job openings",
-      icon: Briefcase,
-      color: "bg-gradient-to-br from-orange-700 to-amber-700",
-      iconColor: "text-white",
-    },
-    {
-      id: "wallet",
-      title: "Digital Wallet",
-      description: "Balance & add funds",
-      icon: Wallet,
-      color: "bg-gradient-to-br from-amber-500 to-yellow-500",
-      iconColor: "text-white",
-    },
-    {
-      id: "history",
-      title: "Trip History",
-      description: "View past trips & receipts",
-      icon: History,
-      color: "bg-gradient-to-br from-orange-600 to-red-500",
-      iconColor: "text-white",
-    },
-  ]
-
-  const handleAction = (actionId: string) => {
-    router.push(`/user/${actionId}`)
-  }
-
   const toggleFavorite = (id: string) => {
     setFavorites(
       favorites.map((fav) =>
@@ -192,13 +126,13 @@ function Page() {
     <div className="min-h-screen bg-background p-2 md:p-6 rounded-2xl">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="">
+        <div id="welcome">
           <h1 className="text-2xl font-bold text-foreground flex gap-2">
             Welcome back, <p className="capitalize">{user?.name || "User"}</p>!
             👋
           </h1>
           <p className="text-muted-foreground">
-            Here's what's happening with your transportation services today
+            Here &apos;s what&apos;s happening with your transportation services today
           </p>
         </div>
 
@@ -237,7 +171,7 @@ function Page() {
       {/* Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - 2/3 width */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6" id="stats-section">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Bus Transport */}
@@ -251,7 +185,7 @@ function Page() {
                         TOTAL BUS TRIPS
                       </h1>
                     </div>
-                    <p className="text-3xl font-bold py-1">248</p>
+                    <p className="text-3xl font-bold py-1 font-grotesk">248</p>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge
                         variant="secondary"
@@ -279,7 +213,7 @@ function Page() {
                         MONTHLY SAVINGS
                       </h1>
                     </div>
-                    <p className="text-3xl font-bold text-foreground py-1">
+                    <p className="text-3xl font-bold text-foreground py-1 font-grotesk">
                       ETB 124
                     </p>
                     <div className="flex items-center gap-2 mt-2">
@@ -304,7 +238,7 @@ function Page() {
                         WALLET BALANCE
                       </h1>
                     </div>
-                    <p className="text-3xl font-bold text-foreground py-1">
+                    <p className="text-3xl font-bold text-foreground py-1 font-grotesk">
                       ETB 85.50
                     </p>
                     <Button
@@ -319,56 +253,8 @@ function Page() {
             </Card>
           </div>
 
-          {/* Quick Actions with Tabs */}
-          <Card className="border-none bg-gradient-to-br from-white to-orange-50 dark:from-gray-800 dark:to-orange-950/30 shadow-lg">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <CardTitle className="text-xl">Quick Actions</CardTitle>
-                    <CardDescription>
-                      Everything you need, one tap away
-                    </CardDescription>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                {quickActions.map((action) => (
-                  <div
-                    key={action.id}
-                    onClick={() => handleAction(action.id)}
-                    className="group relative cursor-pointer"
-                  >
-                    <div className="relative rounded-xl border-none bg-card p-4  transition-all duration-300 ">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`${action.color} p-2.5 rounded-lg group-hover:scale-110 transition-transform duration-300`}
-                        >
-                          <action.icon className="size-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold  text-foreground mb-1">
-                            {action.title}
-                          </h3>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {action.description}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-xs text-muted-foreground">
-                          Tap to access
-                        </span>
-                        <ChevronRight className="size-3 text-muted-foreground group-hover:text-orange-500 transition-colors" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Quick Actions Component */}
+          <QuickActions />
         </div>
 
         {/* Right Column - 1/3 width */}
@@ -383,9 +269,6 @@ function Page() {
                     Quick access to frequent locations
                   </CardDescription>
                 </div>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="size-4" />
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -479,5 +362,3 @@ function Page() {
     </div>
   )
 }
-
-export default Page

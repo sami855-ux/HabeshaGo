@@ -160,7 +160,7 @@ function Sidebar() {
       id: "payment",
       label: "Payment",
       icon: <Receipt className="h-5 w-5" />,
-      path: "/payment",
+      path: "/user-payment",
     },
     {
       id: "trips",

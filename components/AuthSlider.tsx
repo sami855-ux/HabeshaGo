@@ -204,7 +204,9 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             <div className="absolute -inset-1 bg-gradient-to-br from-primary/50 to-transparent rounded-2xl blur-xl -z-10" />
           </div>
           <div>
-            <span className="text-3xl font-bold text-white">HabeshaGo</span>
+            <span className="text-3xl font-bold text-white font-grotesk">
+              HabeshaGo
+            </span>
             <span className="block text-xs text-white/60 mt-1">
               Travel smarter
             </span>
@@ -226,12 +228,14 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
               <div
                 className={`w-2 h-2 rounded-full bg-${slide.accent} animate-pulse`}
               />
-              <span className={`text-xs font-medium text-${slide.accent}`}>
+              <span
+                className={`text-xs font-medium text-${slide.accent} font-jakarta`}
+              >
                 New Feature
               </span>
             </div>
 
-            <h1 className="text-5xl font-bold text-white mb-4 leading-tight">
+            <h1 className="text-5xl font-bold text-white mb-4 leading-tight font-mozilla">
               {slide.title}
             </h1>
 
@@ -255,7 +259,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
               <div key={i} className="group relative">
                 <div className="flex items-center gap-2 rounded-full bg-white/5 backdrop-blur-xl borde-none px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-default">
                   <span className={`text-${f.color}-400`}>{f.icon}</span>
-                  <span>{f.label}</span>
+                  <span className="font-jakarta">{f.label}</span>
                 </div>
                 <div
                   className={`absolute -inset-0.5 bg-gradient-to-r from-${f.color}-500/20 to-transparent rounded-full blur opacity-0 group-hover:opacity-100 transition-opacity -z-10`}

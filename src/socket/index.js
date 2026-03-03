@@ -3,6 +3,7 @@ import { getLatestVehicleLocation } from "../services/redisService.service.js"
 
 let io = null
 
+// Initialize socket
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
@@ -13,60 +14,19 @@ export const initSocket = (server) => {
   })
 
   io.on("connection", (socket) => {
-    console.log("🔌 Connected:", socket.id)
+    console.log("Connected:", socket.id)
 
-    // vehicle live tracking
+    // Join vehicle room
     socket.on("joinVehicle", async (vehicleId) => {
       socket.join(`vehicle-${vehicleId}`)
 
       try {
-        // fetch latest cached location from Redis
         const latest = await getLatestVehicleLocation(vehicleId)
-
         if (latest) {
-          // immediately send latest to this client
           socket.emit("vehicle:location", latest)
         }
       } catch (error) {
-        console.error(
-          `Failed to send latest location to client ${socket.id} for vehicle ${vehicleId}`,
-          error,
-        )
-      }
-    })
-
-    // user notifications
-
-    socket.on("joinUserNotification", (userId) => {
-      if (!userId) return
-      socket.join(`user-${userId}`)
-      console.log(`👤 User ${userId} joined room user-${userId}`)
-    })
-
-    socket.on("joinAdminNotification", (adminId) => {
-      socket.join(`admin-${adminId}`)
-      console.log(`🛡 Admin ${socket.id} joined admins room`)
-    })
-
-    // Join the map room to receive all vehicle updates
-    socket.on("joinMap", async (vehicleIds) => {
-      socket.join("map")
-
-      try {
-        // send latest cached locations of all vehicles immediately
-        if (Array.isArray(vehicleIds) && vehicleIds.length > 0) {
-          const latestLocations = await Promise.all(
-            vehicleIds.map(getLatestVehicleLocation),
-          )
-          // filter out nulls
-          const validLocations = latestLocations.filter(Boolean)
-          socket.emit("map:init", validLocations)
-        }
-      } catch (error) {
-        console.error(
-          `Failed to send initial map locations to client ${socket.id}`,
-          error,
-        )
+        console.error("Vehicle location error", error)
       }
     })
 
@@ -74,31 +34,138 @@ export const initSocket = (server) => {
       socket.leave(`vehicle-${vehicleId}`)
     })
 
+    // Join map room
+    socket.on("joinMap", async (vehicleIds) => {
+      socket.join("map")
+
+      try {
+        if (Array.isArray(vehicleIds) && vehicleIds.length > 0) {
+          const latestLocations = await Promise.all(
+            vehicleIds.map(getLatestVehicleLocation)
+          )
+
+          socket.emit("map:init", latestLocations.filter(Boolean))
+        }
+      } catch (error) {
+        console.error("Map init error", error)
+      }
+    })
+
+    // Join charging session
+    socket.on("joinSession", (sessionId) => {
+      socket.join(`session-${sessionId}`)
+    })
+
+    socket.on("leaveSession", (sessionId) => {
+      socket.leave(`session-${sessionId}`)
+    })
+
+    // Join station room
+    socket.on("joinStation", (stationId) => {
+      socket.join(`station-${stationId}`)
+    })
+
+    socket.on("leaveStation", (stationId) => {
+      socket.leave(`station-${stationId}`)
+    })
+
+    // Join user notification room
+    socket.on("joinUserNotification", (userId) => {
+      if (!userId) return
+      console.log("Joining user notification room:", userId)
+      socket.join(`user-${userId}`)
+    })
+
+    // Join admin notification room (fixed)
+    socket.on("joinAdminRoom", (adminId) => {
+      if (!adminId) return
+      socket.join(`admin-${adminId}`)
+    })
+
     socket.on("disconnect", () => {
-      console.log("❌ Disconnected:", socket.id)
+      console.log("Disconnected:", socket.id)
     })
   })
 
   return io
 }
 
+// Get socket instance
 export const getIO = () => {
   if (!io) {
-    throw new Error("Socket.io not initialized. Call initSocket(server) first.")
+    throw new Error("Socket not initialized")
   }
   return io
 }
 
-// Helper emitters (clean API)
-// Use these everywhere instead of io.to(...)
-export const emitToVehicle = (vehicleId, event, payload) => {
-  io.to(`vehicle-${vehicleId}`).emit(event, payload)
+// Emit vehicle location
+export const emitToVehicle = (vehicleId, payload) => {
+  if (!io) return
+  io.to(`vehicle-${vehicleId}`).emit("vehicle:location", payload)
 }
 
-export const emitToUserNotification = (userId, payload) => {
-  io.to(`user-${userId}`).emit("notification:new", payload)
+// Emit session update
+export const emitSessionUpdate = (sessionId, payload) => {
+  if (!io) return
+  io.to(`session-${sessionId}`).emit("session:update", payload)
 }
 
-export const emitToAdminNotification = (adminId, payload) => {
-  io.to(`admin-${adminId}`).emit("notification:new", payload)
+// Emit charging point status
+export const emitPointStatusUpdate = (stationId, pointData) => {
+  if (!io) return
+
+  io.to(`station-${stationId}`).emit("point:statusChanged", pointData)
+
+  io.to("map").emit("station:availabilityUpdate", {
+    stationId,
+    point: pointData,
+  })
+}
+
+// Emit wallet transaction
+export const emitWalletTransaction = (userId, transaction) => {
+  if (!io) return
+  io.to(`user-${userId}`).emit("wallet:transaction", transaction)
+}
+
+// Emit reservation events
+export const emitReservationExpiring = (userId, reservation) => {
+  if (!io) return
+  io.to(`user-${userId}`).emit("reservation:expiring", reservation)
+}
+
+export const emitReservationConfirmed = (userId, reservation) => {
+  if (!io) return
+  io.to(`user-${userId}`).emit("reservation:confirmed", reservation)
+}
+
+// Emit admin telemetry
+export const emitAdminTelemetry = (payload) => {
+  if (!io) return
+  io.to("admin-dashboard").emit("telemetry:update", payload)
+}
+
+// Emit charger fault
+export const emitChargerFault = (stationId, faultData) => {
+  if (!io) return
+  io.emit("charger:fault", {
+    stationId,
+    ...faultData,
+  })
+}
+
+// Emit user notification (fixed structure)
+export const emitToUserNotification = (userId, notification) => {
+  if (!io) return
+  io.to(`user-${userId}`).emit("notification:new", {
+    notification,
+  })
+}
+
+// Emit admin notification (fixed room)
+export const emitToAdminNotification = (adminId, notification) => {
+  if (!io) return
+  io.to(`admin-${adminId}`).emit("notification:new", {
+    notification,
+  })
 }

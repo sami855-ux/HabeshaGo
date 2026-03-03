@@ -29,6 +29,14 @@ import auditRoute from "./routes/audit.route.js"
 import midPointRoute from "./routes/midpoint.routes.js"
 import promoCodeRoute from "./routes/promoCode.route.js"
 
+// Ev charging routes
+import stationRoutes from "./routes/evStation.route.js"
+import pointRoutes from "./routes/chargingPoint.route.js"
+import sessionRoutes from "./routes/chargingSession.route.js"
+import reservationRoutes from "./routes/evReservations.route.js"
+import tariffRoutes from "./routes/evTariffs.route.js"
+import ratingRoutes from "./routes/ratings.route.js"
+
 const app = express()
 
 app.use(cookieParser())
@@ -81,6 +89,15 @@ app.use("/api/vehicles", vehicleRoute)
 app.use("/api/minibus-reservation", minibusReservationRoutes)
 app.use("/api/minibus", minibusRoute)
 app.use("/api/audit", auditRoute)
+
+// Ev charging routes
+app.use("/api/ev/station", stationRoutes);
+app.use("/api/ev/point", pointRoutes);
+app.use("/api/ev/session", sessionRoutes);
+app.use("/api/ev/reservation", reservationRoutes);
+app.use("/api/ev/tariff", tariffRoutes);
+
+app.use("/api/rating", ratingRoutes);
 
 const server = http.createServer(app)
 

@@ -1,0 +1,40 @@
+[
+  {
+    "name": "Depot A",
+    "address": "123 Main St",
+    "city": "Addis Ababa",
+    "lat": 9.03,
+    "lng": 38.74,
+    "status": "ACTIVE",
+    "chargingPoints": {
+      "create": [
+        { "connectorType": "CCS", "powerKw": 150 },
+        { "connectorType": "TYPE2", "powerKw": 22 }
+      ]
+    },
+    "tariffs": {
+      "create": [
+        { "pricePerKwh": 5.5, "validFrom": "2026-02-27T00:00:00.000Z" }
+      ]
+    }
+  },
+  {
+    "name": "Depot B",
+    "address": "456 Secondary Rd",
+    "city": "Addis Ababa",
+    "lat": 9.05,
+    "lng": 38.76,
+    "status": "ACTIVE",
+    "chargingPoints": {
+      "create": [
+        { "connectorType": "CHADEMO", "powerKw": 100 },
+        { "connectorType": "TYPE2", "powerKw": 22 }
+      ]
+    },
+    "tariffs": {
+      "create": [
+        { "pricePerKwh": 6.0, "validFrom": "2026-02-27T00:00:00.000Z" }
+      ]
+    }
+  }
+]

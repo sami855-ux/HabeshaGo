@@ -1,0 +1,20 @@
+[
+  {
+    "plateNumber": "ABC123",
+    "vin": "VIN0001",
+    "type": "TRUCK",
+    "model": "Model X",
+    "capacity": 5,
+    "ownerName": "Alice",
+    "ownerPhone": "+251911000001"
+  },
+  {
+    "plateNumber": "DEF456",
+    "vin": "VIN0002",
+    "type": "TRUCK",
+    "model": "Model Y",
+    "capacity": 4,
+    "ownerName": "Bob",
+    "ownerPhone": "+251911000002"
+  }
+]

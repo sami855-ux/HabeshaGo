@@ -25,22 +25,24 @@ export const createNotification = async (req, res) => {
     })
 
     const unreadCount = await prisma.notification.count({
-    where: {
-      userId,
-      isRead: false,
-    },
-  })
+      where: {
+        userId,
+        isRead: false,
+      },
+    })
 
-  // 3️⃣ Emit real-time event
-  emitToUserNotification(userId, {
-    notification,
-    unreadCount,
-  })
+    // 3️⃣ Emit real-time event
+    emitToUserNotification(userId, {
+      notification,
+      unreadCount,
+    })
 
-    res.status(201).json(notification)
+    res.status(201).json({ notification, success: true })
   } catch (error) {
     console.error("Create notification error:", error)
-    res.status(500).json({ message: "Failed to create notification" })
+    res
+      .status(500)
+      .json({ message: "Failed to create notification", success: false })
   }
 }
 

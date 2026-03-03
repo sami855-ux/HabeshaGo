@@ -43,20 +43,9 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true)
-
-      const allowedOrigins = [
-        "http://localhost:3000",
-        "https://your-web-domain.com",
-      ]
-
-      if (allowedOrigins.includes(origin)) return callback(null, true)
-
-      return callback(new Error("Not allowed by CORS"))
-    },
+    origin: true,
     credentials: true,
-  }),
+  })
 )
 
 app.use(express.json())

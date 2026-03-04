@@ -1,4 +1,4 @@
-import prisma from "../prisma/client.js"
+import prisma from "../prisma/client.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 /**
@@ -6,27 +6,59 @@ import { successResponse, errorResponse } from "../utils/apiResponse.js";
  */
 export const createReservationService = async (data) => {
   try {
-    const { vehicleId, chargingPointId, startTime, endTime, userId, isPrepaid, prepaidAmount } = data;
+    const {
+      vehicleId,
+      chargingPointId,
+      startTime,
+      endTime,
+      userId,
+      targetBatteryPercentage,
+      targetKwh,
+    } = data;
 
+    const now = new Date();
     const start = new Date(startTime);
     const end = new Date(endTime);
+
+    // 0. Validate timeframe
+    const oneWeekFromNow = new Date(now);
+    oneWeekFromNow.setDate(now.getDate() + 7);
+
+    if (start < now) {
+      return errorResponse("Reservation cannot start in the past", 400);
+    }
+    if (start > oneWeekFromNow || end > oneWeekFromNow) {
+      return errorResponse(
+        "Reservation cannot be more than 1 week from now",
+        400
+      );
+    }
+    if (end <= start) {
+      return errorResponse(
+        "Reservation end time must be after start time",
+        400
+      );
+    }
 
     // 1. Check for overlapping reservations at the same charging point
     const overlappingReservation = await prisma.eVReservation.findFirst({
       where: {
         chargingPointId,
-        status: { not: "CANCELLED" }, // only consider active/pending reservations
+        status: { not: "CANCELLED" },
         OR: [
           {
             startTime: { lte: end },
-            endTime: { gte: start }
-          }
-        ]
-      }
+            endTime: { gte: start },
+          },
+        ],
+      },
     });
 
     if (overlappingReservation) {
-      return errorResponse("This charging point is already reserved during the selected time", 400);
+      return errorResponse(
+        "This charging point is already reserved during the selected time",
+        400
+      );
     }
 
     // 2. Optional: Check if the vehicle already has a reservation at the same time
@@ -37,20 +69,30 @@ export const createReservationService = async (data) => {
         OR: [
           {
             startTime: { lte: end },
-            endTime: { gte: start }
-          }
-        ]
-      }
+            endTime: { gte: start },
+          },
+        ],
+      },
     });
 
     if (vehicleOverlap) {
-      return errorResponse("This vehicle already has a reservation during the selected time", 400);
+      return errorResponse(
+        "This vehicle already has a reservation during the selected time",
+        400
+      );
     }
 
     // 3. Generate unique reservation code
     const reservationCode = `RES-${Date.now()}`;
 
-    // 4. Create reservation
+    // 4. Calculate reservation cost
+    const calculatedAmount = calculateTariff({
+      targetBatteryPercentage,
+      targetKwh,
+      chargingPointId,
+    });
+
+    // 5. Create reservation
     const reservation = await prisma.eVReservation.create({
       data: {
         vehicleId,
@@ -58,9 +100,13 @@ export const createReservationService = async (data) => {
         startTime: start,
         endTime: end,
         userId,
-        isPrepaid: isPrepaid ?? false,
-        prepaidAmount: prepaidAmount ?? null,
+        targetBatteryPercentage: targetBatteryPercentage ?? null,
+        targetKwh: targetKwh ?? null,
+        calculatedAmount,
+        paymentStatus: "PENDING",
+        preAuthorizedAmount: calculatedAmount,
         reservationCode,
+        isConnectorLocked: true,
       },
       include: {
         vehicle: true,
@@ -69,12 +115,28 @@ export const createReservationService = async (data) => {
       },
     });
 
-    return successResponse("Reservation created successfully", reservation, 201);
+    return successResponse(
+      "Reservation created successfully",
+      reservation,
+      201
+    );
   } catch (error) {
     console.error("Error creating reservation:", error);
     return errorResponse("Failed to create reservation", 500);
   }
 };
+
+// Example tariff calculation function (replace with real logic)
+function calculateTariff({
+  targetBatteryPercentage,
+  targetKwh,
+  chargingPointId,
+}) {
+  const pricePerKwh = 0.5; // placeholder
+  const kwh =
+    targetKwh ?? (targetBatteryPercentage ? targetBatteryPercentage * 0.5 : 1); // placeholder logic
+  return kwh * pricePerKwh;
+}
 
 /**
  * Get all reservations
@@ -96,7 +158,11 @@ export const getAllReservationsService = async (filters) => {
         createdAt: "desc",
       },
     });
-    return successResponse("Reservations retrieved successfully", reservations, 200);
+    return successResponse(
+      "Reservations retrieved successfully",
+      reservations,
+      200
+    );
   } catch (error) {
     console.error("Error fetching reservations:", error);
     return errorResponse("Failed to fetch reservations", 500);
@@ -119,7 +185,11 @@ export const getReservationByIdService = async (id) => {
 
     if (!reservation) return errorResponse("Reservation not found", 404);
 
-    return successResponse("Reservation retrieved successfully", reservation, 200);
+    return successResponse(
+      "Reservation retrieved successfully",
+      reservation,
+      200
+    );
   } catch (error) {
     console.error("Error fetching reservation:", error);
     return errorResponse("Failed to fetch reservation", 500);
@@ -158,7 +228,8 @@ export const updateReservationService = async (id, data) => {
       const overlapPoint = await prisma.eVReservation.findFirst({
         where: {
           id: { not: reservationId },
-          chargingPointId: chargingPointId ?? existingReservation.chargingPointId,
+          chargingPointId:
+            chargingPointId ?? existingReservation.chargingPointId,
           status: { not: "CANCELLED" },
           OR: [
             {
@@ -244,7 +315,11 @@ export const getReservationsByVehicleService = async (vehicleId) => {
       include: { vehicle: true, user: true, chargingPoint: true },
       orderBy: { startTime: "desc" },
     });
-    return successResponse("Reservations retrieved successfully", reservations, 200);
+    return successResponse(
+      "Reservations retrieved successfully",
+      reservations,
+      200
+    );
   } catch (error) {
     console.error("Error fetching reservations by vehicle:", error);
     return errorResponse("Failed to fetch reservations", 500);
@@ -261,7 +336,11 @@ export const getReservationsByPointService = async (pointId) => {
       include: { vehicle: true, user: true, chargingPoint: true },
       orderBy: { startTime: "desc" },
     });
-    return successResponse("Reservations retrieved successfully", reservations, 200);
+    return successResponse(
+      "Reservations retrieved successfully",
+      reservations,
+      200
+    );
   } catch (error) {
     console.error("Error fetching reservations by point:", error);
     return errorResponse("Failed to fetch reservations", 500);
@@ -278,7 +357,11 @@ export const getReservationsByUserService = async (userId) => {
       include: { vehicle: true, user: true, chargingPoint: true },
       orderBy: { startTime: "desc" },
     });
-    return successResponse("Reservations retrieved successfully", reservations, 200);
+    return successResponse(
+      "Reservations retrieved successfully",
+      reservations,
+      200
+    );
   } catch (error) {
     console.error("Error fetching reservations by user:", error);
     return errorResponse("Failed to fetch reservations", 500);

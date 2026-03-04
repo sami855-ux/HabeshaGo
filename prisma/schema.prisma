@@ -29,10 +29,6 @@ model User {
   suspendedBy      String?
   suspensionReason String?
 
-  // 2FA
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret  String?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -271,6 +267,9 @@ model Booking {
   amountPaid  Decimal?
   totalAmount Decimal?
   currency    String   @default("ETB")
+
+  reminder24Sent Boolean @default(false)
+  reminder2hSent Boolean @default(false)
 
   // Points
   pointsUsed           Int? // number of points user spent for this booking
@@ -537,61 +536,62 @@ model Rating {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([userId, stationId])
   @@index([userId])
   @@index([stationId])
-  @@unique([userId, stationId])
   @@map("ratings")
 }
 
 // Represents a physical charging depot
 model ChargingStation {
-  id          Int      @id @default(autoincrement())
-  name        String
-  address     String?
-  city        String?
-  lat         Float
-  lng         Float
-  status      StationStatus @default(ACTIVE)
-  isVerified  Boolean  @default(false)
+  id         Int           @id @default(autoincrement())
+  name       String
+  address    String?
+  city       String?
+  lat        Float
+  lng        Float
+  status     StationStatus @default(ACTIVE)
+  isVerified Boolean       @default(false)
 
   chargingPoints ChargingPoint[]
   tariffs        Tariff[]
   sessions       ChargingSession[]
   ratings        Rating[]
   documents      StationDocument[]
-  images         StationImage[] 
+  images         StationImage[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([name, lat, lng])
   @@map("charging_stations")
 }
-model StationDocument {
-  id          Int      @id @default(autoincrement())
-  stationId   Int
-  type        DocumentType
-  url         String
-  verified    Boolean  @default(false)
-  uploadedAt  DateTime @default(now())
 
-  station     ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+model StationDocument {
+  id         Int          @id @default(autoincrement())
+  stationId  Int
+  type       DocumentType
+  url        String
+  verified   Boolean      @default(false)
+  uploadedAt DateTime     @default(now())
+
+  station ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
 
   @@map("station_documents")
 }
 
 model StationImage {
   id        Int             @id @default(autoincrement())
-  url       String          // URL of the image
-  caption   String?         // optional description
+  url       String // URL of the image
+  caption   String? // optional description
   stationId Int
-  station   ChargingStation  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  station   ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("station_images")
   @@index([stationId])
+  @@map("station_images")
 }
 
 // Each station has multiple connectors
@@ -601,16 +601,16 @@ model ChargingPoint {
   stationId     Int
   connectorType ConnectorType
   powerKw       Int
-  
-  status ChargingPointStatus @default(AVAILABLE)
+
+  status                 ChargingPointStatus @default(AVAILABLE)
   averageSessionDuration Int?
 
   // Physical location
-  slotNumber  String?
+  slotNumber String?
 
   // Charging specifications
-  maxVoltage  Int?
-  maxCurrent  Int?
+  maxVoltage    Int?
+  maxCurrent    Int?
   chargingSpeed ChargingSpeed @default(SLOW)
 
   station      ChargingStation   @relation(fields: [stationId], references: [id], onDelete: Cascade)
@@ -684,8 +684,9 @@ model ChargingSession {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  EVReservation EVReservation[]
 
   @@index([vehicleId])
   @@index([stationId])
@@ -710,29 +711,39 @@ model EnergyMeterLog {
   @@map("energy_meter_logs")
 }
 
-// Update about the gap and overalap of time
 model EVReservation {
   id Int @id @default(autoincrement())
 
+  // Vehicle & Connector
   vehicleId       Int
+  vehicleVin      String? @db.VarChar(17) //cached VIN for fast verification
   chargingPointId Int
 
+  // Reservation time
   startTime DateTime
   endTime   DateTime
 
-  reservationCode String? @unique
+  // Reservation reference
+  reservationCode String?           @unique
+  status          ReservationStatus @default(PENDING)
 
-  status ReservationStatus @default(PENDING)
+  // User input: target charge
+  targetBatteryPercentage Int? // e.g., 80% battery
+  targetKwh               Decimal? @db.Decimal(12, 2) // alternative input
 
-  isPrepaid Boolean @default(false)
-  prepaidAmount Decimal? @db.Decimal(12,2)
+  // Cost & payment
+  calculatedAmount    Decimal?      @db.Decimal(12, 2) // cost calculated by tariff rules
+  paymentStatus       PaymentStatus @default(PENDING) // PENDING, AUTHORIZED, COMPLETED, REFUNDED
+  preAuthorizedAmount Decimal?      @db.Decimal(12, 2) // for pre-auth if non-prepaid session
 
-  // walletTransactionId Int? 
-  // walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id], name: "ReservationTransaction")
+  // Connector / session enforcement
+  isConnectorLocked Boolean          @default(true) // connector locked until verification & payment
+  chargingSessionId Int?
+  chargingSession   ChargingSession? @relation(fields: [chargingSessionId], references: [id])
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
+  // User & relationships
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
   vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
   chargingPoint ChargingPoint @relation(fields: [chargingPointId], references: [id])
 
@@ -1001,6 +1012,7 @@ enum NotificationType {
   BUS
   WALLET
   ALERT
+  REMINDER
 }
 
 enum IdType {

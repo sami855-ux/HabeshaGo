@@ -73,11 +73,11 @@ export function LogoutModal({
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-white" />
                   Logging out...
                 </span>
               ) : (
-                <span className="flex items-center gap-2 cursor-pointer">
+                <span className="flex items-center gap-2 cursor-pointer text-white">
                   <LogOut className="h-4 w-4" />
                   {confirmText}
                 </span>

@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import {
   Bus,
@@ -8,16 +8,16 @@ import {
   Wallet,
   History,
   ChevronRight,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
+} from "lucide-react"
+import { useRouter } from "next/navigation"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+} from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 const quickActions = [
   {
@@ -30,7 +30,7 @@ const quickActions = [
     shadow: "shadow-orange-500/20",
   },
   {
-    id: "charging",
+    id: "ev-charging",
     title: "EV Charging",
     description: "Find stations & start charging",
     icon: Zap,
@@ -74,14 +74,14 @@ const quickActions = [
     lightColor: "bg-orange-100 dark:bg-orange-500/20",
     shadow: "shadow-orange-600/20",
   },
-];
+]
 
 export function QuickActions() {
-  const router = useRouter();
+  const router = useRouter()
 
   const handleAction = (actionId: string) => {
-    router.push(`/user/${actionId}`);
-  };
+    router.push(`/user/${actionId}`)
+  }
 
   return (
     <Card className="border-0 bg-transparent shadow-none py-0">
@@ -168,5 +168,5 @@ export function QuickActions() {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

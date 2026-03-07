@@ -262,7 +262,7 @@ model Booking {
   validUntil  DateTime?
 
   // Pricing
-  discount    Decimal? @default(0)
+  discount    Decimal? @default(0)                                                                                                                                                              
   promoCode   String?
   amountPaid  Decimal?
   totalAmount Decimal?

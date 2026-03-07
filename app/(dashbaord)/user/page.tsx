@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { RootState } from "@/store"
+import { RootState } from "@/store";
 import {
   Bus,
   ParkingCircle,
@@ -15,43 +15,38 @@ import {
   Settings,
   Clock,
   UserCircle,
-} from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useSelector } from "react-redux"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { QuickActions } from "@/components/user-dashboard/dashboard/QuickActions"
+} from "@/components/ui/tooltip";
+import { QuickActions } from "@/components/user-dashboard/dashboard/QuickActions";
+import { PromoCarousel } from "@/components/user-dashboard/PromoCarousel";
+import UpcomingSchedules from "@/components/user-dashboard/upcoming-schedules";
 
 // Favorite destination interface
 interface FavoriteDestination {
-  id: string
-  name: string
-  type: "home" | "work" | "school" | "other"
-  address: string
-  travelTime: string
-  distance: string
-  isFavorite: boolean
+  id: string;
+  name: string;
+  type: "home" | "work" | "school" | "other";
+  address: string;
+  travelTime: string;
+  distance: string;
+  isFavorite: boolean;
 }
 
 export default function UserDashboard() {
-  const { user } = useSelector((state: RootState) => state.user)
-  const router = useRouter()
+  const { user } = useSelector((state: RootState) => state.user);
+  const router = useRouter();
 
   const [favorites, setFavorites] = useState<FavoriteDestination[]>([
     {
@@ -99,28 +94,28 @@ export default function UserDashboard() {
       distance: "2.7 mi",
       isFavorite: false,
     },
-  ])
+  ]);
 
   const toggleFavorite = (id: string) => {
     setFavorites(
       favorites.map((fav) =>
         fav.id === id ? { ...fav, isFavorite: !fav.isFavorite } : fav,
       ),
-    )
-  }
+    );
+  };
 
   const getFavoriteIcon = (type: string) => {
     switch (type) {
       case "home":
-        return <Home className="size-5" />
+        return <Home className="size-5" />;
       case "work":
-        return <Building className="size-5" />
+        return <Building className="size-5" />;
       case "school":
-        return <School className="size-5" />
+        return <School className="size-5" />;
       default:
-        return <ShoppingBag className="size-5" />
+        return <ShoppingBag className="size-5" />;
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background p-2 md:p-6 rounded-2xl">
@@ -132,7 +127,8 @@ export default function UserDashboard() {
             👋
           </h1>
           <p className="text-muted-foreground">
-            Here &apos;s what&apos;s happening with your transportation services today
+            Here &apos;s what&apos;s happening with your transportation services
+            today
           </p>
         </div>
 
@@ -161,7 +157,7 @@ export default function UserDashboard() {
             className="cursor-pointer"
           >
             <AvatarImage src={user?.avaterUrl} />
-            <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-500">
+            <AvatarFallback className="bg-linear-to-br from-orange-500 to-amber-500">
               <UserCircle className="size-5 text-white" />
             </AvatarFallback>
           </Avatar>
@@ -175,7 +171,7 @@ export default function UserDashboard() {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Bus Transport */}
-            <Card className="border-none bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg">
+            <Card className="border-none bg-linear-to-br from-orange-500 to-amber-500 text-white shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -201,7 +197,7 @@ export default function UserDashboard() {
             </Card>
 
             {/* Parking Card */}
-            <Card className="border shadow-sm">
+            <Card className="border shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -228,7 +224,7 @@ export default function UserDashboard() {
             </Card>
 
             {/* Wallet Balance */}
-            <Card className="border shadow-sm">
+            <Card className="border shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -253,112 +249,15 @@ export default function UserDashboard() {
             </Card>
           </div>
 
-          {/* Quick Actions Component */}
-          <QuickActions />
+          <PromoCarousel />
         </div>
 
         {/* Right Column - 1/3 width */}
         <div className="space-y-6">
-          {/* Favorite Destinations */}
-          <Card className="border-none bg-gradient-to-br from-background to-accent/50">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Favorite Destinations</CardTitle>
-                  <CardDescription>
-                    Quick access to frequent locations
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {favorites.map((destination) => (
-                  <div
-                    key={destination.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleFavorite(destination.id)
-                              }}
-                            >
-                              <Heart
-                                className={`size-4 ${
-                                  destination.isFavorite
-                                    ? "fill-red-500 text-red-500"
-                                    : "text-muted-foreground"
-                                }`}
-                              />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              {destination.isFavorite
-                                ? "Remove from favorites"
-                                : "Add to favorites"}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                        {getFavoriteIcon(destination.type)}
-                      </div>
-                      <div>
-                        <h3 className="font-medium">{destination.name}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {destination.address}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{destination.travelTime}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {destination.distance}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Settings */}
-          <Card className="border shadow-sm">
-            <CardHeader>
-              <CardTitle>Quick Settings</CardTitle>
-              <CardDescription>Manage your preferences</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Auto-renew passes</span>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Parking reminders</span>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Bus arrival alerts</span>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Low balance alerts</span>
-                <Switch defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
+          <QuickActions />
         </div>
       </div>
+      <UpcomingSchedules />
     </div>
-  )
+  );
 }

@@ -1,7 +1,6 @@
-// components/Header.tsx
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Bell,
   ChevronDown,
@@ -11,9 +10,9 @@ import {
   Sun,
   LogOut,
   Search,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,57 +20,58 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { ThemeToggle } from "../themeToggle"
-import { RootState } from "@/store"
-import { useDispatch, useSelector } from "react-redux"
-import { useRouter } from "next/navigation"
-import { LogoutModal } from "../logout-modal"
-import { clearUser } from "@/store/slices/userSlice"
-import { logoutUser } from "@/services/auth.user.api"
-import NotificationSheet from "./NotificationSheet"
-import { Skeleton } from "@/components/ui/skeleton"
-import SearchDialog from "./SearchDialog"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { ThemeToggle } from "../themeToggle";
+import { RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import { LogoutModal } from "../logout-modal";
+import { clearUser } from "@/store/slices/userSlice";
+import { logoutUser } from "@/services/auth.user.api";
+import NotificationSheet from "./NotificationSheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import SearchDialog from "./SearchDialog";
+import { CompactPromoCarousel, PromoCarousel } from "./PromoCarousel";
 
 function Header({ className }: { className?: string }) {
-  const router = useRouter()
-  const dispatch = useDispatch()
-  const { user, loading } = useSelector((state: RootState) => state.user)
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { user, loading } = useSelector((state: RootState) => state.user);
 
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false)
-  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
 
   // Mock unread count - you can update this based on your notification state
-  const [unreadNotificationCount] = useState(3)
+  const [unreadNotificationCount] = useState(3);
 
   const handleLogout = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      router.push("/")
-      await logoutUser()
-      dispatch(clearUser())
+      router.push("/");
+      await logoutUser();
+      dispatch(clearUser());
     } catch (error) {
-      console.error("Logout failed:", error)
+      console.error("Logout failed:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleSearch = (query: string) => {
-    console.log("Searching for:", query)
+    console.log("Searching for:", query);
     // Handle search logic here
-  }
+  };
 
   return (
     <>
@@ -81,7 +81,7 @@ function Header({ className }: { className?: string }) {
           className,
         )}
       >
-        <div className="container mx-auto w-full h-full">
+        <div className=" w-full h-full">
           <div className="flex items-center justify-end h-full">
             {/* Right Section */}
             <div className="flex items-center gap-2">
@@ -136,6 +136,8 @@ function Header({ className }: { className?: string }) {
               >
                 <Search className="w-5 h-5" />
               </Button>
+
+              <ThemeToggle />
 
               {/* Notifications Bell Button */}
               <TooltipProvider>
@@ -207,18 +209,11 @@ function Header({ className }: { className?: string }) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
-                      router.push("/user/Profile")
+                      router.push("/user/Profile");
                     }}
                   >
                     <User className="w-4 h-4 mr-2" />
                     <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center justify-between w-full cursor-default">
-                    <div className="flex items-center">
-                      <Sun className="w-4 h-4 mr-2" />
-                      <span>Theme</span>
-                    </div>
-                    <ThemeToggle />
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -255,7 +250,7 @@ function Header({ className }: { className?: string }) {
         isLoading={isLoading}
       />
     </>
-  )
+  );
 }
 
-export default Header
+export default Header;

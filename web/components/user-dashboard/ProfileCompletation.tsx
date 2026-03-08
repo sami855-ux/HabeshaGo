@@ -24,6 +24,8 @@ import {
   Target,
   Clock,
   Award,
+  Mail,
+  Camera,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -52,9 +54,9 @@ export function ProfileCompletionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogOverlay className="bg-black/40 backdrop-blur-sm" />
+      <DialogOverlay className="bg-black/20 backdrop-blur-sm z-100" />
 
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden p-0 border-0 rounded-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden p-0 border-0 rounded-2xl z-100">
         {/* Modern orange gradient header */}
         <div className="relative w-full h-48 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 overflow-hidden">
           <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
@@ -104,25 +106,25 @@ export function ProfileCompletionModal({
                   time: "1 min",
                 },
                 {
-                  icon: FileText,
-                  title: "ID Verification",
-                  desc: "Upload valid ID document",
+                  icon: Mail,
+                  title: "Email Verification",
+                  desc: "Verify your email to secure your account",
                   color: "from-orange-500 to-amber-500",
                   completed: false,
-                  time: "2 min",
+                  time: "1 min",
                 },
                 {
-                  icon: MapPin,
-                  title: "Address Proof",
-                  desc: "Verify your location",
+                  icon: Smartphone,
+                  title: "Phone Verification",
+                  desc: "Verify your phone to receive booking updates & OTPs",
                   color: "from-amber-500 to-orange-500",
                   completed: false,
                   time: "1 min",
                 },
                 {
-                  icon: ShieldCheck,
-                  title: "Security Setup",
-                  desc: "2FA & privacy settings",
+                  icon: Camera,
+                  title: "Profile Picture",
+                  desc: "Upload a profile photo so staff and other users recognize you",
                   color: "from-orange-600 to-amber-600",
                   completed: false,
                   time: "1 min",

@@ -1,180 +1,292 @@
-import { Phone, Mail, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
+"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog"
-import { CountdownCircleTimer } from "react-countdown-circle-timer"
-import { VerificationState } from "@/types/user"
+import { Button } from "@/components/ui/button"
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+import { VerificationState } from "@/types/Profile"
+import {
+  Loader2,
+  Mail,
+  Phone,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface VerificationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   verification: VerificationState
-  onVerifyCode: () => void
-  onResendCode: () => void
-  onVerificationCodeChange: (code: string) => void
+  onVerify: () => void
+  onResend: () => void
+  onCodeChange: (code: string) => void
+  countdown: number
+  isSending?: boolean
 }
 
 export default function VerificationDialog({
   open,
   onOpenChange,
   verification,
-  onVerifyCode,
-  onResendCode,
-  onVerificationCodeChange,
+  onVerify,
+  onResend,
+  onCodeChange,
+  countdown,
+  isSending = false,
 }: VerificationDialogProps) {
-  const getTitle = () => {
-    if (verification.currentVerificationType === "phone") {
-      return "Verify Phone Number"
-    } else if (verification.currentVerificationType === "email") {
-      return "Verify Email Address"
+  const isPhoneVerification = verification.currentVerificationType === "phone"
+  const [inputValue, setInputValue] = useState("")
+  const autoSubmitRef = useRef(false)
+
+  // Sync with parent state - only when dialog opens or verification changes
+  useEffect(() => {
+    if (open) {
+      setInputValue(verification.verificationCode)
     }
-    return "Verify"
-  }
+  }, [open, verification.verificationCode])
 
-  const getIcon = () => {
-    if (verification.currentVerificationType === "phone") {
-      return <Phone className="size-5 text-orange-500" />
-    } else if (verification.currentVerificationType === "email") {
-      return <Mail className="size-5 text-orange-500" />
-    }
-    return null
-  }
+  // Handle auto-submit separately
+  useEffect(() => {
+    if (!open) return
 
-  const handleCodeInput = (index: number, value: string) => {
-    const newCode = verification.verificationCode.split("")
-    newCode[index] = value
-    onVerificationCodeChange(newCode.join(""))
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      const nextInput = document.querySelector(
-        `input:nth-child(${index + 2})`,
-      ) as HTMLInputElement
-      nextInput?.focus()
-    }
-  }
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (
-      e.key === "Backspace" &&
-      !verification.verificationCode[index] &&
-      index > 0
+      inputValue.length === 6 &&
+      !verification.isVerifying &&
+      !autoSubmitRef.current &&
+      !verification.attempts &&
+      !isSending
     ) {
-      const prevInput = document.querySelector(
-        `input:nth-child(${index})`,
-      ) as HTMLInputElement
-      prevInput?.focus()
+      console.log("Auto-submitting verification code:", inputValue)
+      autoSubmitRef.current = true
+
+      // Use setTimeout to avoid state conflicts
+      setTimeout(() => {
+        onVerify()
+        // Reset auto-submit flag after verification
+        setTimeout(() => {
+          autoSubmitRef.current = false
+        }, 1000)
+      }, 300)
     }
+  }, [
+    inputValue,
+    verification.isVerifying,
+    verification.attempts,
+    isSending,
+    onVerify,
+    open,
+  ])
+
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setInputValue(value)
+      onCodeChange(value)
+    },
+    [onCodeChange],
+  )
+
+  const handleVerifyClick = () => {
+    autoSubmitRef.current = true
+    onVerify()
+    setTimeout(() => {
+      autoSubmitRef.current = false
+    }, 1000)
   }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const getAttemptsMessage = () => {
+    if (verification.attempts === 0) return null
+    const remaining = 3 - verification.attempts
+    if (remaining === 0)
+      return "No attempts remaining. Please request a new code."
+    return `${remaining} attempt${remaining > 1 ? "s" : ""} remaining`
+  }
+
+  const isComplete = inputValue.length === 6
+  const isDisabled =
+    verification.isVerifying || autoSubmitRef.current || isSending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-none bg-gradient-to-br from-white to-orange-50/50 dark:from-gray-900 dark:to-gray-800/50">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-            {getIcon()}
-            {getTitle()}
-          </DialogTitle>
-          <DialogDescription className="text-gray-600 dark:text-gray-400">
-            Enter the 6-digit verification code sent to {verification.tempValue}
-          </DialogDescription>
+      <DialogContent className="sm:max-w-md z-[100] p-0 overflow-hidden gap-0">
+        {/* Simple header with icon */}
+        <DialogHeader className="p-6 pb-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "p-2 rounded-full",
+                isPhoneVerification
+                  ? "bg-blue-100 dark:bg-blue-900/30"
+                  : "bg-purple-100 dark:bg-purple-900/30",
+              )}
+            >
+              {isPhoneVerification ? (
+                <Phone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <Mail className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              )}
+            </div>
+            <div>
+              <DialogTitle className="text-lg">
+                Verify your{" "}
+                {isPhoneVerification ? "phone number" : "email address"}
+              </DialogTitle>
+              <DialogDescription className="mt-1">
+                Enter the 6-digit code sent to
+              </DialogDescription>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-foreground bg-muted rounded-lg px-3 py-1.5 mt-2 break-all">
+            {verification.tempValue}
+          </p>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Timer */}
-          <div className="flex justify-center">
-            <CountdownCircleTimer
-              isPlaying={verification.timerActive}
-              duration={120}
-              colors={["#f97316", "#fbbf24", "#ef4444"]}
-              colorsTime={[120, 60, 0]}
-              size={80}
-              strokeWidth={6}
-              onComplete={() => {
-                // Timer completion handled in parent
-                return { shouldRepeat: false }
-              }}
-            >
-              {({ remainingTime }) => (
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {Math.floor(remainingTime / 60)}:
-                    {remainingTime % 60 < 10 ? "0" : ""}
-                    {remainingTime % 60}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    seconds
-                  </div>
+        <div className="p-6 pt-0 space-y-5">
+          {/* Sending indicator */}
+          {isSending && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">
+                Sending verification code...
+              </span>
+            </div>
+          )}
+
+          {/* OTP Input Group - only show when not sending */}
+          {!isSending && (
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-foreground/80">
+                Verification code
+              </label>
+              <InputOTP
+                value={inputValue}
+                onChange={handleInputChange}
+                maxLength={6}
+                disabled={isDisabled}
+                className="w-full justify-center"
+                autoFocus
+              >
+                <InputOTPGroup className="gap-2 w-full justify-center">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <InputOTPSlot
+                      key={index}
+                      index={index}
+                      className={cn(
+                        "w-11 h-12 text-lg font-semibold rounded-md border transition-all",
+                        "focus-visible:ring-1 focus-visible:ring-ring",
+                        "data-[active]:border-primary data-[active]:shadow-sm",
+                        isComplete &&
+                          !isDisabled &&
+                          "border-green-500 dark:border-green-500",
+                        isDisabled && "opacity-50 cursor-not-allowed",
+                      )}
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+
+              {/* Status indicator */}
+              {verification.isVerifying && (
+                <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verifying code...</span>
                 </div>
               )}
-            </CountdownCircleTimer>
-          </div>
 
-          {/* OTP Input */}
-          <div className="space-y-4">
-            <div className="flex justify-center gap-2">
-              {[0, 1, 2, 3, 4, 5].map((index) => (
-                <input
-                  key={index}
-                  type="text"
-                  maxLength={1}
-                  value={verification.verificationCode[index] || ""}
-                  onChange={(e) => handleCodeInput(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-12 text-center text-2xl font-bold border-2 border-orange-200 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-orange-800 dark:focus:border-orange-500 bg-white dark:bg-gray-800"
-                />
-              ))}
+              {isComplete &&
+                !verification.isVerifying &&
+                !autoSubmitRef.current && (
+                  <div className="flex items-center justify-center gap-1.5 text-sm text-green-600 dark:text-green-500">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Code entered - click verify</span>
+                  </div>
+                )}
+
+              {autoSubmitRef.current && (
+                <div className="flex items-center justify-center gap-1.5 text-sm text-blue-600 dark:text-blue-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Auto-submitting...</span>
+                </div>
+              )}
             </div>
+          )}
 
-            {verification.attempts > 0 && (
-              <p className="text-center text-sm text-red-600 dark:text-red-400">
-                Invalid code. {3 - verification.attempts} attempts remaining.
-              </p>
-            )}
-          </div>
-
-          {/* Resend Options */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Didn't receive the code?
+          {/* Timer and Resend - always show */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>Code expires in</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-mono font-medium tabular-nums">
+                {formatTime(countdown)}
               </span>
               <Button
                 variant="link"
                 size="sm"
-                onClick={onResendCode}
-                disabled={!verification.canResend}
-                className="text-orange-600 dark:text-orange-400"
+                onClick={onResend}
+                disabled={verification.timerActive || isDisabled || isSending}
+                className="h-auto p-0 text-sm font-medium text-primary hover:text-primary/80"
               >
-                {verification.canResend ? "Resend Code" : "Wait for timer"}
+                Resend
               </Button>
             </div>
           </div>
-        </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="flex-1 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={onVerifyCode}
-            disabled={verification.verificationCode.length !== 6}
-            className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-          >
-            <Check className="mr-2 size-4" />
-            Verify
-          </Button>
-        </DialogFooter>
+          {/* Error Message */}
+          {verification.attempts > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-destructive font-medium">
+                  Invalid code
+                </p>
+                <p className="text-xs text-destructive/80 mt-0.5">
+                  {getAttemptsMessage()}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Manual Verify Button */}
+          {!isSending &&
+            isComplete &&
+            !verification.isVerifying &&
+            !autoSubmitRef.current && (
+              <Button onClick={handleVerifyClick} className="w-full">
+                Verify Code
+              </Button>
+            )}
+
+          {/* Help Text */}
+          <p className="text-xs text-center text-muted-foreground">
+            Didn't receive the code? Check your spam folder or{" "}
+            <button
+              onClick={onResend}
+              disabled={verification.timerActive || isDisabled || isSending}
+              className="text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+            >
+              request a new one
+            </button>
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   )

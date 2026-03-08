@@ -33,8 +33,8 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
       >
         <Header />
 
-        <main className="flex-1 overflow-auto p-1 md:p-3 bg-card">
-          <div className="bg-card p-2">{children}</div>
+        <main className="flex-1 overflow-auto p-1 md:p-3 bg-background">
+          <div className="bg-background p-2">{children}</div>
         </main>
       </div>
     </div>
@@ -46,7 +46,7 @@ function UserLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-       <IntroOverlay/>
+      <IntroOverlay />
       <UserLayoutContent>{children}</UserLayoutContent>
     </SidebarProvider>
   )

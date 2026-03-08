@@ -431,6 +431,8 @@ export default function WalletPage() {
             toast.warning("Profile completion required", {
               description: "Please complete your profile to continue",
             })
+
+            router.back()
           }}
         />
       )}

@@ -18,16 +18,31 @@ const initialState: UserState = {
   error: undefined,
 }
 
-// Async thunk to fetch current user
 export const fetchCurrentUser = createAsyncThunk(
   "user/fetchCurrentUser",
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
-      const response = await getMe()
+      // 1️. Load cached user
+      const cachedUser = localStorage.getItem("habeshagoUser")
+      if (cachedUser) {
+        // dispatch immediately for instant UI
+        dispatch(setUser({ user: JSON.parse(cachedUser) }))
+      }
 
-      console.log(response)
-      return response.user
+      // 2. Fetch from backend
+      const response = await getMe()
+      const backendUser = response.user
+
+      // 3. Compare and update if different
+      if (!cachedUser || JSON.stringify(backendUser) !== cachedUser) {
+        dispatch(setUser({ user: backendUser }))
+        localStorage.setItem("habeshagoUser", JSON.stringify(backendUser))
+      }
+
+      return backendUser
     } catch (err: any) {
+      // Clear localStorage if fetch fails
+      localStorage.removeItem("habeshagoUser")
       return rejectWithValue(
         err.response?.data || { message: "Failed to fetch user" },
       )

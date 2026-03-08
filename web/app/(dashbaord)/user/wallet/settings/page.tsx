@@ -67,6 +67,7 @@ export default function WalletSettingsPage() {
   const [isChangingPin, setIsChangingPin] = useState(false)
   const [isUpdatingBiometric, setIsUpdatingBiometric] = useState(false)
   const [pinChangeError, setPinChangeError] = useState("")
+  const [isSendingOTP, setIsSendingOTP] = useState(false)
 
   // OTP Verification states
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
@@ -80,8 +81,8 @@ export default function WalletSettingsPage() {
     currentVerificationType: "email",
     tempValue: user?.email || "",
   })
-  const [isSendingOTP, setIsSendingOTP] = useState(false)
-  const [isVerifyingOTP, setIsVerifyingOTP] = useState(false)
+  const [countdown, setCountdown] = useState(60)
+  const [pendingPinChange, setPendingPinChange] = useState(false)
 
   // Load wallet data and initialize states
   useEffect(() => {
@@ -92,16 +93,45 @@ export default function WalletSettingsPage() {
     }
   }, [wallet, dispatch])
 
+  // Countdown timer effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (verification.timerActive && countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+    } else if (countdown === 0 && verification.timerActive) {
+      setVerification((prev) => ({
+        ...prev,
+        timerActive: false,
+        canResend: true,
+      }))
+      setCountdown(60)
+    }
+    return () => clearTimeout(timer)
+  }, [verification.timerActive, countdown])
+
+  // Reset verification when dialog closes
+  useEffect(() => {
+    if (!showVerificationDialog) {
+      setVerification((prev) => ({
+        ...prev,
+        verificationCode: "",
+        isVerifying: false,
+        timerActive: false,
+        canResend: false,
+        attempts: 0,
+      }))
+      setCountdown(60)
+    }
+  }, [showVerificationDialog])
+
   // Handle biometric toggle
   const handleBiometricToggle = async (enabled: boolean) => {
     try {
       setIsUpdatingBiometric(true)
 
-      // Call API to update biometric setting
       const response = await updateBiometricAPI(enabled)
 
       if (response.success) {
-        // Update local state
         setIsBiometricEnabled(enabled)
 
         toast.success(
@@ -120,15 +150,12 @@ export default function WalletSettingsPage() {
         )
       }
     } catch (error: any) {
-      // Revert toggle on error
       setIsBiometricEnabled(!enabled)
 
       toast.error("Failed to update biometric settings", {
         description:
           error?.response?.data?.message || error.message || "Please try again",
       })
-
-      console.error("Biometric update error:", error)
     } finally {
       setIsUpdatingBiometric(false)
     }
@@ -146,32 +173,40 @@ export default function WalletSettingsPage() {
     try {
       setIsSendingOTP(true)
 
-      // Show verification dialog
-      setShowVerificationDialog(true)
-      setVerification((prev) => ({
-        ...prev,
-        isVerifying: true,
-        currentVerificationType: "email",
-        tempValue: user.email || "",
+      // Reset verification state completely
+      setVerification({
+        isVerifying: false,
+        verificationCode: "",
         timerActive: true,
         canResend: false,
         attempts: 0,
-        verificationCode: "",
-      }))
+        verificationMethod: "email",
+        currentVerificationType: "email",
+        tempValue: user.email || "",
+      })
+      setCountdown(60)
+      setShowVerificationDialog(true)
 
-      // Call API to send verification email
+      console.log("Sending verification email to:", user.email)
+
       const response = await sendVerificationEmailAPI()
 
-      if (response.success) {
+      console.log("Send verification response:", response)
+
+      if (response?.success) {
         toast.success("Verification code sent", {
           description: `A 6-digit code has been sent to ${user.email}`,
         })
       } else {
-        throw new Error(response.message || "Failed to send verification code")
+        throw new Error(response?.message || "Failed to send verification code")
       }
     } catch (error: any) {
+      console.error("Send OTP error:", error)
       toast.error("Failed to send verification code", {
-        description: error?.response?.data?.message || "Please try again",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Please try again",
       })
       setShowVerificationDialog(false)
     } finally {
@@ -181,51 +216,81 @@ export default function WalletSettingsPage() {
 
   // Verify OTP code
   const handleVerifyOTP = async () => {
+    console.log(
+      "handleVerifyOTP called with code:",
+      verification.verificationCode,
+    )
+
     if (verification.verificationCode.length !== 6) {
+      console.log("Invalid code length:", verification.verificationCode.length)
       toast.error("Invalid code", {
         description: "Please enter the complete 6-digit code",
       })
       return
     }
 
-    try {
-      setIsVerifyingOTP(true)
+    // Set verifying state
+    setVerification((prev) => ({ ...prev, isVerifying: true }))
 
-      // Call the actual API to verify the OTP
+    try {
+      console.log("Calling verifyCodeAPI with:", {
+        code: verification.verificationCode,
+        type: "email",
+      })
+
       const response = await verifyCodeAPI(
         verification.verificationCode,
         "email",
       )
 
-      // Check if verification was successful
-      if (response.success) {
+      console.log("verifyCodeAPI response:", response)
+
+      if (response?.success) {
+        console.log("Verification successful")
+
         toast.success("Identity verified", {
           description:
             "Your identity has been verified. You can now change your PIN.",
         })
 
+        // Close dialog
         setShowVerificationDialog(false)
-        setVerification((prev) => ({
-          ...prev,
-          timerActive: false,
-          attempts: 0, // Reset attempts on success
-        }))
 
         // Proceed with PIN change after successful verification
-        await proceedWithPinChange()
+        if (pendingPinChange) {
+          console.log("Proceeding with PIN change")
+          await proceedWithPinChange()
+          setPendingPinChange(false)
+        }
+
+        // Reset verification state after a delay
+        setTimeout(() => {
+          setVerification({
+            isVerifying: false,
+            verificationCode: "",
+            timerActive: false,
+            canResend: false,
+            attempts: 0,
+            verificationMethod: "email",
+            currentVerificationType: "email",
+            tempValue: user?.email || "",
+          })
+        }, 500)
       } else {
-        // Handle verification failure
+        console.log("Verification failed:", response)
+
         const newAttempts = verification.attempts + 1
 
         setVerification((prev) => ({
           ...prev,
           attempts: newAttempts,
-          verificationCode: "", // Clear the input on failure
+          verificationCode: "",
+          isVerifying: false,
         }))
 
         if (newAttempts >= 3) {
           toast.error("Too many attempts", {
-            description: response.message || "Please request a new code",
+            description: response?.message || "Please request a new code",
           })
           setVerification((prev) => ({
             ...prev,
@@ -234,20 +299,20 @@ export default function WalletSettingsPage() {
           }))
         } else {
           toast.error("Invalid code", {
-            description: response.message || `Attempt ${newAttempts} of 3`,
+            description: response?.message || `Attempt ${newAttempts} of 3`,
           })
         }
       }
     } catch (error: any) {
-      console.error("OTP verification error:", error)
+      console.error("Verification error:", error)
 
-      // Handle network or other errors
       const newAttempts = verification.attempts + 1
 
       setVerification((prev) => ({
         ...prev,
         attempts: newAttempts,
         verificationCode: "",
+        isVerifying: false,
       }))
 
       if (newAttempts >= 3) {
@@ -261,14 +326,14 @@ export default function WalletSettingsPage() {
         }))
       } else {
         toast.error("Verification failed", {
-          description: error?.response?.data?.message || "Please try again",
+          description:
+            error?.response?.data?.message ||
+            error?.message ||
+            "Please try again",
         })
       }
-    } finally {
-      setIsVerifyingOTP(false)
     }
   }
-
   // Resend OTP code
   const handleResendOTP = async () => {
     try {
@@ -276,9 +341,10 @@ export default function WalletSettingsPage() {
         ...prev,
         canResend: false,
         timerActive: true,
+        verificationCode: "",
       }))
+      setCountdown(60)
 
-      // Call API to resend verification email
       const response = await sendVerificationEmailAPI()
 
       if (response.success) {
@@ -290,43 +356,23 @@ export default function WalletSettingsPage() {
       toast.error("Failed to resend code", {
         description: "Please try again",
       })
+      setVerification((prev) => ({
+        ...prev,
+        timerActive: false,
+        canResend: true,
+      }))
     }
   }
 
   // Proceed with PIN change after OTP verification
   const proceedWithPinChange = async () => {
-    // Validate inputs
-    if (!newPin || !confirmPin) {
-      setPinChangeError("All fields are required")
-      return
-    }
-
-    if (newPin.length !== 6 || confirmPin.length !== 6) {
-      setPinChangeError("PIN must be 6 digits")
-      return
-    }
-
-    if (!/^\d+$/.test(newPin) || !/^\d+$/.test(confirmPin)) {
-      setPinChangeError("PIN must contain only numbers")
-      return
-    }
-
-    if (newPin !== confirmPin) {
-      setPinChangeError("PINs do not match")
-      return
-    }
-
     try {
       setIsChangingPin(true)
       setPinChangeError("")
 
-      // Call API to change PIN (passing current pin as empty since OTP was verified)
       const response = await changePinAPI("", newPin)
 
-      console.log(response)
-
       if (response.success) {
-        // Clear form
         setNewPin("")
         setConfirmPin("")
 
@@ -334,7 +380,6 @@ export default function WalletSettingsPage() {
           description: "Your wallet PIN has been updated",
         })
 
-        // Refresh wallet data
         dispatch(setWallet(response?.wallet))
       } else {
         throw new Error(response.message || "Failed to change PIN")
@@ -349,8 +394,6 @@ export default function WalletSettingsPage() {
       toast.error("Failed to change PIN", {
         description: error?.response?.data?.message || "Please try again",
       })
-
-      console.error("PIN change error:", error)
     } finally {
       setIsChangingPin(false)
     }
@@ -381,8 +424,11 @@ export default function WalletSettingsPage() {
       return
     }
 
-    // Start OTP verification process
+    // Set pending pin change flag
+    setPendingPinChange(true)
     setPinChangeError("")
+
+    // Start OTP verification process
     await handleSendOTP()
   }
 
@@ -655,7 +701,7 @@ export default function WalletSettingsPage() {
                       }}
                       placeholder="Enter new 6-digit PIN"
                       className="pr-10"
-                      disabled={isChangingPin || isSendingOTP}
+                      disabled={isChangingPin}
                     />
                     <Button
                       type="button"
@@ -663,7 +709,7 @@ export default function WalletSettingsPage() {
                       size="icon"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 h-7 w-7"
                       onClick={() => setShowNewPin(!showNewPin)}
-                      disabled={isChangingPin || isSendingOTP}
+                      disabled={isChangingPin}
                     >
                       {showNewPin ? (
                         <EyeOff className="h-4 w-4" />
@@ -691,7 +737,7 @@ export default function WalletSettingsPage() {
                       }}
                       placeholder="Confirm new 6-digit PIN"
                       className="pr-10"
-                      disabled={isChangingPin || isSendingOTP}
+                      disabled={isChangingPin}
                     />
                     <Button
                       type="button"
@@ -699,7 +745,7 @@ export default function WalletSettingsPage() {
                       size="icon"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 h-7 w-7"
                       onClick={() => setShowConfirmPin(!showConfirmPin)}
-                      disabled={isChangingPin || isSendingOTP}
+                      disabled={isChangingPin}
                     >
                       {showConfirmPin ? (
                         <EyeOff className="h-4 w-4" />
@@ -734,16 +780,9 @@ export default function WalletSettingsPage() {
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-                  disabled={
-                    isChangingPin || isSendingOTP || !newPin || !confirmPin
-                  }
+                  disabled={isChangingPin || !newPin || !confirmPin}
                 >
-                  {isSendingOTP ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sending Verification...
-                    </>
-                  ) : isChangingPin ? (
+                  {isChangingPin ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Changing PIN...
@@ -882,7 +921,6 @@ export default function WalletSettingsPage() {
                   variant="outline"
                   className="w-full justify-start border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400"
                   onClick={() => {
-                    // Add unlock wallet functionality
                     toast.info("Wallet unlock feature coming soon")
                   }}
                 >
@@ -912,11 +950,13 @@ export default function WalletSettingsPage() {
         open={showVerificationDialog}
         onOpenChange={setShowVerificationDialog}
         verification={verification}
-        onVerifyCode={handleVerifyOTP}
-        onResendCode={handleResendOTP}
-        onVerificationCodeChange={(code) =>
+        onVerify={handleVerifyOTP}
+        onResend={handleResendOTP}
+        onCodeChange={(code) =>
           setVerification((prev) => ({ ...prev, verificationCode: code }))
         }
+        countdown={countdown}
+        isSending={isSendingOTP} // Add this prop
       />
     </div>
   )

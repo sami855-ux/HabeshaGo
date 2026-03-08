@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,50 +19,50 @@ import {
   Rocket,
   Target,
   Clock,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import Image from "next/image";
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface PromoCarouselProps {
-  className?: string;
-  autoPlayInterval?: number;
-  variant?: "default" | "compact" | "featured";
-  showThumbnails?: boolean;
+  className?: string
+  autoPlayInterval?: number
+  variant?: "default" | "compact" | "featured"
+  showThumbnails?: boolean
 }
 
 interface PromoItem {
-  id: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  cta: string;
-  gradient: string;
-  lightGradient: string;
-  accentColor: string;
-  badge?: string;
+  id: string
+  icon: React.ReactNode
+  title: string
+  description: string
+  cta: string
+  gradient: string
+  lightGradient: string
+  accentColor: string
+  badge?: string
   badgeVariant?:
     | "default"
     | "secondary"
     | "destructive"
     | "outline"
     | "success"
-    | "warning";
-  image: string;
-  prize?: string;
-  metric?: string;
-  metricLabel?: string;
+    | "warning"
+  image: string
+  prize?: string
+  metric?: string
+  metricLabel?: string
 }
 
-const promoItems: PromoItem[] = [
+export const promoItems: PromoItem[] = [
   {
     id: "1",
     icon: <Users className="w-6 h-6" />,
-    title: "Games are Fun with Friends!",
-    description: "Get 500 Coins by Referring",
-    cta: "Refer a friend",
+    title: "Travel Discoveries in Addis!",
+    description: "Get ETB 100 off when you invite friends!",
+    cta: "Invite Friends",
     gradient:
       "dark:from-violet-600 dark:via-purple-600 dark:to-pink-600 from-violet-500 via-purple-500 to-pink-500",
     lightGradient: "from-violet-50 to-pink-50",
@@ -70,34 +70,34 @@ const promoItems: PromoItem[] = [
     badge: "Limited",
     badgeVariant: "destructive",
     image:
-      "https://images.unsplash.com/photo-1511882150382-421056c89033?q=80&w=2070&auto=format&fit=crop",
-    prize: "500 Coins",
-    metric: "2.5k",
-    metricLabel: "Referred",
+      "https://images.unsplash.com/photo-1756723701257-46513cd36fc1?q=80&w=1031&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Addis lifestyle city photo :contentReference[oaicite:3]{index=3}
+    prize: "ETB 100",
+    metric: "1.2k",
+    metricLabel: "Trips Shared",
   },
   {
     id: "2",
     icon: <Trophy className="w-6 h-6" />,
-    title: "Venture to get better and win more!",
-    description: "Get 1,000 Coins to play!",
-    cta: "Try Practice Leagues",
+    title: "Weekly HabeshaGo Ride Challenge",
+    description: "Win ETB 200 credits!",
+    cta: "Join Now",
     gradient:
       "dark:from-blue-600 dark:via-cyan-600 dark:to-teal-600 from-blue-500 via-cyan-500 to-teal-500",
     lightGradient: "from-blue-50 to-cyan-50",
     accentColor: "bg-blue-500",
     image:
-      "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=2071&auto=format&fit=crop",
-    prize: "1,000 Coins",
+      "https://images.unsplash.com/photo-1662894312546-667d7698a1f7?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D?q=80&w=2070&auto=format&fit=crop", // Ethiopian urban transport scene :contentReference[oaicite:4]{index=4}
+    prize: "ETB 200",
     badge: "Popular",
     badgeVariant: "default",
-    metric: "10k+",
-    metricLabel: "Players",
+    metric: "3k+",
+    metricLabel: "Participants",
   },
   {
-    id: "4",
+    id: "3",
     icon: <Crown className="w-6 h-6" />,
-    title: "Shubh Festival Contest - Edition 1",
-    description: "Results Announced",
+    title: "Meskel Holiday Special",
+    description: "Top 50 get ETB 500 credits!",
     cta: "View Winners",
     gradient:
       "dark:from-emerald-600 dark:via-green-600 dark:to-teal-600 from-emerald-500 via-green-500 to-teal-500",
@@ -106,15 +106,15 @@ const promoItems: PromoItem[] = [
     badge: "Results",
     badgeVariant: "success",
     image:
-      "https://images.unsplash.com/photo-1533228876829-65c94e7b5025?q=80&w=2070&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1642505367898-cab7a3542cb3?q=80&w=1033&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D?q=80&w=2070&auto=format&fit=crop", // Ethiopian festival vibe :contentReference[oaicite:5]{index=5}
     metric: "50",
     metricLabel: "Winners",
   },
   {
-    id: "5",
+    id: "4",
     icon: <Gamepad2 className="w-6 h-6" />,
-    title: "Are you a candy crush player?",
-    description: "Candy Bust is now available",
+    title: "HabeshaGo Trivia Night",
+    description: "Test your travel knowledge & win ETB 50",
     cta: "Play Now",
     gradient:
       "dark:from-rose-600 dark:via-pink-600 dark:to-fuchsia-600 from-rose-500 via-pink-500 to-fuchsia-500",
@@ -123,30 +123,31 @@ const promoItems: PromoItem[] = [
     badge: "New",
     badgeVariant: "secondary",
     image:
-      "https://images.unsplash.com/photo-1551103782-8ab07afd45c1?q=80&w=2070&auto=format&fit=crop",
-    metric: "5k",
-    metricLabel: "Playing",
+      "https://images.unsplash.com/photo-1580828343064-fde4fc206bc6?q=80&w=871&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Ethiopian local fun scene :contentReference[oaicite:6]{index=6}
+    prize: "ETB 50",
+    metric: "500",
+    metricLabel: "Players",
   },
   {
-    id: "6",
+    id: "5",
     icon: <Rocket className="w-6 h-6" />,
-    title: "Shubh Festival Contest is here!",
-    description: "Join now with friends!",
-    cta: "Join Now",
+    title: "Festive Travel Deals",
+    description: "Get special discounts on buses & EV tickets!",
+    cta: "Check Offers",
     gradient:
       "dark:from-amber-600 dark:via-orange-600 dark:to-red-600 from-amber-500 via-orange-500 to-red-500",
     lightGradient: "from-amber-50 to-orange-50",
     accentColor: "bg-amber-500",
     image:
-      "https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?q=80&w=2070&auto=format&fit=crop",
-    metric: "100+",
-    metricLabel: "Joined",
+      "https://images.unsplash.com/photo-1515476084989-0c8f073ea169?q=80&w=847&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Historic Ethiopian street view :contentReference[oaicite:7]{index=7}
+    metric: "200+",
+    metricLabel: "Users",
   },
   {
-    id: "7",
+    id: "6",
     icon: <Target className="w-6 h-6" />,
-    title: "Shubh Festival Contest - Edition 2",
-    description: "Lucky winners get ₹50",
+    title: "Lucky Trip Draw",
+    description: "Win ETB 100 for your next HabeshaGo ride!",
     cta: "Join Now",
     gradient:
       "dark:from-yellow-600 dark:via-amber-600 dark:to-orange-600 from-yellow-500 via-amber-500 to-orange-500",
@@ -155,16 +156,16 @@ const promoItems: PromoItem[] = [
     badge: "Cash",
     badgeVariant: "warning",
     image:
-      "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2070&auto=format&fit=crop",
-    prize: "₹50",
+      "https://images.unsplash.com/photo-1752119663529-b41ea2b1df84?q=80&w=872&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Addis Ababa market photo :contentReference[oaicite:8]{index=8}
+    prize: "ETB 100",
     metric: "500",
     metricLabel: "Prizes",
   },
   {
-    id: "8",
+    id: "7",
     icon: <Medal className="w-6 h-6" />,
-    title: "What's the Best Game in MCPL App?",
-    description: "Vote for your fav Game!",
+    title: "Vote Best Ethiopian Destination",
+    description: "Help choose top travel spots!",
     cta: "Vote Now",
     gradient:
       "dark:from-indigo-600 dark:via-purple-600 dark:to-pink-600 from-indigo-500 via-purple-500 to-pink-500",
@@ -173,11 +174,11 @@ const promoItems: PromoItem[] = [
     badge: "Poll",
     badgeVariant: "secondary",
     image:
-      "https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?q=80&w=2070&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1573403092240-26095e118918?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Ethiopian landscape photo :contentReference[oaicite:9]{index=9}
     metric: "2.5k",
     metricLabel: "Votes",
   },
-];
+]
 
 export function PromoCarousel({
   className,
@@ -185,85 +186,85 @@ export function PromoCarousel({
   variant = "default",
   showThumbnails = true,
 }: PromoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout>();
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [touchStart, setTouchStart] = useState(0)
+  const [touchEnd, setTouchEnd] = useState(0)
+  const [isHovered, setIsHovered] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const progressIntervalRef = useRef<NodeJS.Timeout>()
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % promoItems.length);
-    setProgress(0);
-  }, []);
+    setCurrentIndex((prev) => (prev + 1) % promoItems.length)
+    setProgress(0)
+  }, [])
 
   const prevSlide = useCallback(() => {
     setCurrentIndex(
       (prev) => (prev - 1 + promoItems.length) % promoItems.length,
-    );
-    setProgress(0);
-  }, []);
+    )
+    setProgress(0)
+  }, [])
 
   const goToSlide = (index: number) => {
-    setCurrentIndex(index);
-    setProgress(0);
-    setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 100);
-  };
+    setCurrentIndex(index)
+    setProgress(0)
+    setIsAutoPlaying(false)
+    setTimeout(() => setIsAutoPlaying(true), 100)
+  }
 
   // Progress animation
   useEffect(() => {
     if (isAutoPlaying && !isHovered) {
-      const startTime = Date.now();
+      const startTime = Date.now()
       const updateProgress = () => {
-        const elapsed = Date.now() - startTime;
-        const newProgress = (elapsed / autoPlayInterval) * 100;
-        setProgress(Math.min(newProgress, 100));
+        const elapsed = Date.now() - startTime
+        const newProgress = (elapsed / autoPlayInterval) * 100
+        setProgress(Math.min(newProgress, 100))
 
         if (elapsed < autoPlayInterval) {
-          progressIntervalRef.current = setTimeout(updateProgress, 16);
+          progressIntervalRef.current = setTimeout(updateProgress, 16)
         }
-      };
+      }
 
-      progressIntervalRef.current = setTimeout(updateProgress, 16);
+      progressIntervalRef.current = setTimeout(updateProgress, 16)
 
       return () => {
         if (progressIntervalRef.current) {
-          clearTimeout(progressIntervalRef.current);
+          clearTimeout(progressIntervalRef.current)
         }
-      };
+      }
     }
-  }, [currentIndex, isAutoPlaying, isHovered, autoPlayInterval]);
+  }, [currentIndex, isAutoPlaying, isHovered, autoPlayInterval])
 
   // Auto-play timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: NodeJS.Timeout
     if (isAutoPlaying && !isHovered) {
-      interval = setInterval(nextSlide, autoPlayInterval);
+      interval = setInterval(nextSlide, autoPlayInterval)
     }
-    return () => clearInterval(interval);
-  }, [isAutoPlaying, isHovered, nextSlide, autoPlayInterval]);
+    return () => clearInterval(interval)
+  }, [isAutoPlaying, isHovered, nextSlide, autoPlayInterval])
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
+    setTouchStart(e.targetTouches[0].clientX)
+  }
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
 
   const handleTouchEnd = () => {
     if (touchStart - touchEnd > 75) {
-      nextSlide();
+      nextSlide()
     }
     if (touchStart - touchEnd < -75) {
-      prevSlide();
+      prevSlide()
     }
-  };
+  }
 
-  const currentPromo = promoItems[currentIndex];
+  const currentPromo = promoItems[currentIndex]
 
   if (variant === "compact") {
     return (
@@ -331,7 +332,7 @@ export function PromoCarousel({
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   return (
@@ -565,5 +566,5 @@ export function PromoCarousel({
         )}
       </div>
     </div>
-  );
+  )
 }

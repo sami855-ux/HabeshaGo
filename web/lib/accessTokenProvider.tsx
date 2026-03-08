@@ -16,15 +16,31 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const restoreSession = async () => {
       dispatch(setLoading(true))
+
       try {
+        // 1. Load cached user from localStorage
+        const cachedUser = localStorage.getItem("habeshagoUser")
+        if (cachedUser) {
+          dispatch(setUser({ user: JSON.parse(cachedUser) }))
+        }
+
+        // 2. Refresh session from backend
         const res = await axiosInstance.post("/auth/refresh", {
           withCredentials: true,
         })
 
-        dispatch(setUser({ user: res.data.user }))
+        const backendUser = res.data.user
+
+        // 3. Compare with cached user
+        if (!cachedUser || JSON.stringify(backendUser) !== cachedUser) {
+          dispatch(setUser({ user: backendUser }))
+          localStorage.setItem("habeshagoUser", JSON.stringify(backendUser))
+        }
+
         dispatch(setAccessToken({ accessToken: res.data.accessToken }))
       } catch (error) {
         dispatch(clearUser())
+        localStorage.removeItem("habeshagoUser")
       } finally {
         setLoading(false)
       }

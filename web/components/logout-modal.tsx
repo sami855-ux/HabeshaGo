@@ -8,6 +8,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogOverlay,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
@@ -41,7 +42,8 @@ export function LogoutModal({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-background text-foreground border-none">
+      <AlertDialogOverlay className="bg-black/20 backdrop-blur-sm z-100" />
+      <AlertDialogContent className="bg-background text-foreground border-none z-100">
         <AlertDialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-full bg-destructive/10 dark:bg-destructive/20">

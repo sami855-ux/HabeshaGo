@@ -172,7 +172,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
           const exists = old.some((n) => n.id === notification.id)
           if (exists) return old
           return [notification, ...old]
-        }
+        },
       )
 
       const style = typeStyles[notification.type as NotificationType]
@@ -185,7 +185,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
             exit={{ opacity: 0, scale: 0.95 }}
             className={cn(
               "flex items-start gap-3 p-4 rounded-lg shadow-lg border bg-white dark:bg-gray-950",
-              style.border
+              style.border,
             )}
           >
             <div className={cn("p-2 rounded-full", style.lightBadge)}>
@@ -199,7 +199,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
             </div>
           </motion.div>
         ),
-        { duration: 4000 }
+        { duration: 4000 },
       )
     }
 
@@ -286,7 +286,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
     const now = new Date()
     const notifDate = new Date(date)
     const diffInMinutes = Math.floor(
-      (now.getTime() - notifDate.getTime()) / 60000
+      (now.getTime() - notifDate.getTime()) / 60000,
     )
 
     if (diffInMinutes < 1) return "Just now"
@@ -334,7 +334,6 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                   variant="destructive"
                   className="rounded-full px-2.5 gap-1"
                 >
-                  <Sparkles className="h-3 w-3" />
                   {unreadCount} new
                 </Badge>
               </motion.div>
@@ -440,9 +439,9 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                         layout: { type: "spring", bounce: 0.2, duration: 0.3 },
                       }}
                       className={cn(
-                        "relative px-6 py-4 transition-all duration-200 my-1 bg-accent",
+                        "relative px-6 py-4 transition-all duration-200 my-1 bg-background",
                         !isDeleting &&
-                          "cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-900/50"
+                          "cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-900/50",
                       )}
                       onClick={() =>
                         !isDeleting && handleActionClick(notification)
@@ -464,7 +463,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                             "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all",
                             !notification.isRead
                               ? cn(style.lightBadge, "shadow-sm")
-                              : "bg-gray-100 dark:bg-gray-800"
+                              : "bg-gray-100 dark:bg-gray-800",
                           )}
                         >
                           <TypeIcon
@@ -472,7 +471,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                               "h-4 w-4",
                               !notification.isRead
                                 ? style.iconColor
-                                : "text-gray-500"
+                                : "text-gray-500",
                             )}
                           />
                         </motion.div>
@@ -486,7 +485,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                                 "text-sm font-medium leading-none",
                                 !notification.isRead
                                   ? "text-foreground"
-                                  : "text-muted-foreground"
+                                  : "text-muted-foreground",
                               )}
                             >
                               {notification.title}
@@ -502,7 +501,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                                     e.stopPropagation()
                                     window.open(
                                       notification.actionUrl,
-                                      "_blank"
+                                      "_blank",
                                     )
                                   }}
                                 >
@@ -536,10 +535,11 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
                                 "px-2 py-0 h-5 text-[10px] font-medium border-0",
                                 !notification.isRead
                                   ? style.badge
-                                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
                               )}
                             >
-                              {notification.type}
+                              {`${notification.type}`.charAt(0) +
+                                `${notification.type}`.slice(1).toLowerCase()}
                             </Badge>
 
                             {/* Timestamp with icon */}

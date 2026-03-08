@@ -1,0 +1,1050 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  password  String?
+  phone     String?  @unique
+  role      UserRole @default(PASSENGER)
+  avaterUrl String?
+  location  String?
+  bio       String?
+
+  emailVerified Boolean @default(false)
+  phoneVerified Boolean @default(false)
+  googleId      String? @unique
+  appleId       String? @unique
+
+  // SECURITY / CONTROL
+  isSuspended      Boolean   @default(false)
+  suspendedAt      DateTime?
+  suspendedBy      String?
+  suspensionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  passengerCategory PassengerCategory @default(NORMAL) //ONly relevant for passengers
+
+  // AUTH RELATIONS
+  sessions Session[]
+  otpCodes OtpCode[]
+
+  // RELATIONS 
+  wallet         Wallet?
+  bookings       Booking[] @relation("UserBookings") // tickets owned
+  sharedBookings Booking[] @relation("BookingSharedTo") // tickets shared to this user
+  payments       Payment[]
+  driver         Driver?
+
+  chargingSessions ChargingSession[]
+  reservations     EVReservation[]
+  vehicles         Vehicle[]
+
+  ratingsGiven Rating[]
+
+  minibusReservations MinibusReservation[]
+  parkingReservations ParkingReservation[]
+
+  notifications Notification[]
+
+  @@map("user")
+}
+
+model Session {
+  id     String @id @default(cuid())
+  userId String
+
+  // Internal refresh token 
+  refreshTokenHash String   @unique
+  expiresAt        DateTime
+  revoked          Boolean  @default(false)
+
+  // Device info
+  ipAddress    String?
+  userAgent    String?
+  lastActiveAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model OtpCode {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  email       String?
+  phone       String?
+  code        String? // optional if using hashed code only
+  codeHash    String? // store hashed OTP here
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp_code")
+}
+
+model Notification {
+  id     Int    @id @default(autoincrement())
+  userId String
+
+  title   String
+  message String
+  type    NotificationType
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // optional navigation or action
+  actionUrl String?
+
+  // flexible extra data (bookingId, busId, routeId, etc.)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+//Digital ticketing
+model Wallet {
+  id     Int    @id @default(autoincrement())
+  userId String @unique
+
+  // Money
+  balance  Decimal @default(0)
+  currency String  @default("ETB")
+
+  // Points system
+  points Int @default(0) // reward points balance
+
+  // Security
+  pinHash     String?
+  pinAttempts Int     @default(0)
+  isLocked    Boolean @default(false)
+
+  biometricToken   String?
+  biometricEnabled Boolean @default(false)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                 User                @relation(fields: [userId], references: [id])
+  sentTransactions     WalletTransaction[] @relation("SenderWallet")
+  receivedTransactions WalletTransaction[] @relation("RecipientWallet")
+  payments             Payment[]
+  pointLogs            PointTransaction[]
+}
+
+model PointTransaction {
+  id       Int @id @default(autoincrement())
+  walletId Int
+
+  amount Int // +earned, -spent
+  type   PointTransactionType
+  reason String? // "Ticket purchase", "Promo", etc.
+
+  createdAt DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+}
+
+//WalletTransaction = internal money movement
+model WalletTransaction {
+  id Int @id @default(autoincrement())
+
+  walletId          Int // sender or primary wallet
+  recipientWalletId Int? // receiver wallet (for transfers)
+
+  amount       Decimal
+  type         TransactionType
+  status       TransactionStatus @default(PENDING)
+  balanceAfter Decimal
+
+  reference   String  @unique
+  description String?
+  metadata    Json? // store sessionId, reservationId, or extra info
+
+  createdAt DateTime @default(now())
+
+  wallet          Wallet  @relation("SenderWallet", fields: [walletId], references: [id])
+  recipientWallet Wallet? @relation("RecipientWallet", fields: [recipientWalletId], references: [id])
+
+  // Back-relations
+  // chargingSession ChargingSession? @relation(name: "SessionTransaction")
+  // reservation     EVReservation?  @relation(name: "ReservationTransaction")
+
+  @@index([walletId])
+  @@index([recipientWalletId])
+}
+
+//Payment = interaction with external gateways (Chapa, Telebirr, CBE)
+//User tops up wallet → Payment (SUCCESS) → WalletTransaction (CREDIT)
+// User pays directly with Telebirr → Payment (SUCCESS) → no wallet transaction
+// User pays from wallet → WalletTransaction (DEBIT) → Payment (optional record)
+
+model Payment {
+  id       Int     @id @default(autoincrement())
+  userId   String
+  amount   Decimal
+  currency String  @default("ETB")
+
+  method  PaymentMethod
+  gateway PaymentGateway @default(CHAPA)
+  flow    PaymentFlow
+
+  pointsUsed  Int?
+  pointsValue Decimal?
+
+  status PaymentStatus @default(PENDING)
+
+  gatewayRef String? // From Chapa / Telebirr
+  reference  String  @unique
+  metadata   Json?
+
+  walletId             Int?
+  minibusReservationId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user               User                @relation(fields: [userId], references: [id])
+  wallet             Wallet?             @relation(fields: [walletId], references: [id])
+  bookings           Booking[] // One payment → many bookings
+  minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  userId        String
+  busId         Int
+  date          DateTime
+  status        BookingStatus @default(CONFIRMED)
+  boardingStop  String?
+  alightingStop String?
+  bookingCode   String        @unique @default(uuid())
+  seatsBooked   Int           @default(0)
+  cancelledAt   DateTime?
+  payNow        Boolean       @default(false)
+
+  // Ticket sharing
+  sharedToId       String?
+  sharedTo         User?     @relation("BookingSharedTo", fields: [sharedToId], references: [id])
+  sharedAt         DateTime?
+  sharedTicketUsed Boolean   @default(false)
+
+  // Check-in / ticket usage
+  qrCode      String?
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
+  validUntil  DateTime?
+
+  // Pricing
+  discount    Decimal? @default(0)                                                                                                                                                              
+  promoCode   String?
+  amountPaid  Decimal?
+  totalAmount Decimal?
+  currency    String   @default("ETB")
+
+  reminder24Sent Boolean @default(false)
+  reminder2hSent Boolean @default(false)
+
+  // Points
+  pointsUsed           Int? // number of points user spent for this booking
+  pointsValue          Decimal? // monetary equivalent of pointsUsed
+  pointsConversionRate Decimal? // rate used to convert points to money
+
+  // Relations
+  scheduleId Int?
+  paymentId  Int?
+  payment    Payment?     @relation(fields: [paymentId], references: [id])
+  bus        Bus          @relation(fields: [busId], references: [id])
+  user       User         @relation("UserBookings", fields: [userId], references: [id])
+  schedule   BusSchedule? @relation(fields: [scheduleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bus {
+  id        Int       @id @default(autoincrement())
+  busNumber String    @unique
+  capacity  Int
+  status    BusStatus @default(ACTIVE)
+
+  driverId String? @unique
+  routeId  Int?
+
+  currentStop     String?
+  nextDestination String?
+  isActive        Boolean @default(true)
+
+  departureTime    DateTime?
+  estimatedArrival DateTime?
+  delayMinutes     Int       @default(0)
+
+  lastServiceDate DateTime?
+  nextServiceDate DateTime?
+
+  vehicleId Int?          @unique
+  vehicle   Vehicle?      @relation(fields: [vehicleId], references: [id])
+  driver    Driver?       @relation(fields: [driverId], references: [id])
+  route     Route?        @relation(fields: [routeId], references: [id])
+  bookings  Booking[]
+  positions BusPosition[]
+  seats     Seat[]
+
+  schedules BusSchedule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BusSchedule {
+  id        Int               @id @default(autoincrement())
+  busId     Int
+  startTime String
+  endTime   String
+  direction ScheduleDirection @default(FORWARD)
+  isActive  Boolean           @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bus      Bus       @relation(fields: [busId], references: [id])
+  bookings Booking[]
+
+  @@unique([busId, startTime, direction]) // only one schedule per bus per startTime + direction
+}
+
+model Seat {
+  id         Int          @id @default(autoincrement())
+  busId      Int
+  category   SeatCategory @default(NORMAL)
+  isReserved Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+
+  bus Bus @relation(fields: [busId], references: [id])
+
+  @@unique([busId])
+}
+
+model BusPosition {
+  id        Int      @id @default(autoincrement())
+  busId     Int
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+  bus       Bus      @relation(fields: [busId], references: [id])
+
+  @@index([busId, timestamp])
+}
+
+model Vehicle {
+  id Int @id @default(autoincrement())
+
+  plateNumber     String      @unique
+  vin             String?     @unique
+  type            VehicleType
+  model           String
+  manufacturer    String?
+  year            Int?
+  capacity        Int
+  vehicleImageUrl String?     @default("")
+
+  status  VehicleStatus @default(ACTIVE)
+  mileage Int           @default(0)
+
+  ownerId     String?
+  owner       User?   @relation(fields: [ownerId], references: [id])
+  ownerName   String?
+  ownerPhone  String?
+  gpsDeviceId String?
+
+  // relations
+  driverAssignments DriverAssignment[]
+  buses             Bus[]
+  minibuses         Minibus[]
+
+  locations VehicleLocation[]
+
+  chargingSessions ChargingSession[]
+  reservations     EVReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([ownerId])
+  @@map("vehicles")
+}
+
+model VehicleLocation {
+  id Int @id @default(autoincrement())
+
+  vehicleId  Int
+  lat        Float
+  lng        Float
+  speed      Float?
+  heading    Float?
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, recordedAt])
+}
+
+model Driver {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  licenseNo  String
+  experience Int?
+  status     Status @default(ACTIVE)
+
+  driverLicenseUrl String
+  licenseStatus    VerificationStatus @default(PENDING)
+
+  idType     IdType
+  idFrontUrl String
+  idBackUrl  String
+  idStatus   VerificationStatus @default(PENDING)
+
+  verifiedById    String?
+  verifiedAt      DateTime?
+  rejectionReason String?
+
+  isOnDuty     Boolean   @default(false)
+  lastActiveAt DateTime?
+
+  rating          Float @default(0)
+  totalTrips      Int   @default(0)
+  complaintsCount Int   @default(0)
+
+  // ✅ relation
+  assignments DriverAssignment[]
+  buses       Bus[]
+  minibuses   Minibus[]
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model DriverAssignment {
+  id Int @id @default(autoincrement())
+
+  vehicleId Int
+  driverId  String
+
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver  @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId])
+  @@index([driverId])
+}
+
+model Route {
+  id               Int      @id @default(autoincrement())
+  name             String   @unique
+  origin           String
+  destination      String
+  distanceKm       Float?
+  estimatedTimeMin Int?
+  price            Decimal?
+  currency         String   @default("ETB") // optional
+  isActive         Boolean  @default(true)
+  isSuspended      Boolean  @default(false) // System Management
+  createdBy        Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  buses     Bus[]
+  minibuses Minibus[]
+  midPoints RouteMidPoint[]
+}
+
+model RouteMidPoint {
+  id      Int    @id @default(autoincrement())
+  route   Route  @relation(fields: [routeId], references: [id])
+  routeId Int
+  name    String
+  lat     Float
+  lng     Float
+  order   Int    @default(0)
+
+  @@index([routeId]) // optional index for faster searches
+}
+
+model PromoCode {
+  id        Int          @id @default(autoincrement())
+  code      String       @unique
+  type      DiscountType
+  value     Float
+  maxUsage  Int?
+  usedCount Int          @default(0)
+  minAmount Float?
+  expiresAt DateTime?
+  isActive  Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Rating {
+  id Int @id @default(autoincrement())
+
+  // Who is giving the rating
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  stationId Int?
+  station   ChargingStation? @relation(fields: [stationId], references: [id])
+
+  // Rating value & feedback
+  score   Int     @db.SmallInt // 1 to 5
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, stationId])
+  @@index([userId])
+  @@index([stationId])
+  @@map("ratings")
+}
+
+// Represents a physical charging depot
+model ChargingStation {
+  id         Int           @id @default(autoincrement())
+  name       String
+  address    String?
+  city       String?
+  lat        Float
+  lng        Float
+  status     StationStatus @default(ACTIVE)
+  isVerified Boolean       @default(false)
+
+  chargingPoints ChargingPoint[]
+  tariffs        Tariff[]
+  sessions       ChargingSession[]
+  ratings        Rating[]
+  documents      StationDocument[]
+  images         StationImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, lat, lng])
+  @@map("charging_stations")
+}
+
+model StationDocument {
+  id         Int          @id @default(autoincrement())
+  stationId  Int
+  type       DocumentType
+  url        String
+  verified   Boolean      @default(false)
+  uploadedAt DateTime     @default(now())
+
+  station ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@map("station_documents")
+}
+
+model StationImage {
+  id        Int             @id @default(autoincrement())
+  url       String // URL of the image
+  caption   String? // optional description
+  stationId Int
+  station   ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stationId])
+  @@map("station_images")
+}
+
+// Each station has multiple connectors
+model ChargingPoint {
+  id Int @id @default(autoincrement())
+
+  stationId     Int
+  connectorType ConnectorType
+  powerKw       Int
+
+  status                 ChargingPointStatus @default(AVAILABLE)
+  averageSessionDuration Int?
+
+  // Physical location
+  slotNumber String?
+
+  // Charging specifications
+  maxVoltage    Int?
+  maxCurrent    Int?
+  chargingSpeed ChargingSpeed @default(SLOW)
+
+  station      ChargingStation   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  sessions     ChargingSession[]
+  reservations EVReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stationId])
+  @@index([status])
+  @@map("charging_points")
+}
+
+// The pricing rule for charging at a station
+model Tariff {
+  id Int @id @default(autoincrement())
+
+  stationId Int
+
+  pricePerKwh      Decimal  @db.Decimal(10, 4)
+  pricePerMinute   Decimal? @db.Decimal(10, 4)
+  idleFeePerMinute Decimal? @db.Decimal(10, 4)
+
+  currency String @default("ETB")
+
+  validFrom DateTime
+  validTo   DateTime?
+
+  station ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([stationId])
+  @@map("tariffs")
+}
+
+// One charging event from start → stop.
+model ChargingSession {
+  id Int @id @default(autoincrement())
+
+  vehicleId       Int
+  stationId       Int
+  chargingPointId Int
+
+  startTime DateTime
+  endTime   DateTime?
+
+  meterStart Decimal? @db.Decimal(10, 3)
+  meterEnd   Decimal? @db.Decimal(10, 3)
+
+  energyConsumedKwh Decimal? @db.Decimal(10, 3)
+  durationMinutes   Int?
+
+  energyCost Decimal? @db.Decimal(12, 2)
+  timeCost   Decimal? @db.Decimal(12, 2)
+  idleFee    Decimal? @db.Decimal(12, 2)
+  totalCost  Decimal? @db.Decimal(12, 2)
+
+  status SessionStatus @default(ACTIVE)
+
+  // walletTransactionId Int? 
+  // walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id], name: "SessionTransaction")
+
+  vehicle       Vehicle         @relation(fields: [vehicleId], references: [id])
+  station       ChargingStation @relation(fields: [stationId], references: [id])
+  chargingPoint ChargingPoint   @relation(fields: [chargingPointId], references: [id])
+
+  meterLogs EnergyMeterLog[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  EVReservation EVReservation[]
+
+  @@index([vehicleId])
+  @@index([stationId])
+  @@index([status])
+  @@map("charging_sessions")
+}
+
+// Simulates real charger telemetry. Track real-time energy consumption... Example: 10:00 → 5 kWh
+model EnergyMeterLog {
+  id Int @id @default(autoincrement())
+
+  sessionId Int
+
+  meterValue Decimal  @db.Decimal(10, 3)
+  powerKw    Decimal? @db.Decimal(6, 2)
+
+  recordedAt DateTime @default(now())
+
+  session ChargingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, recordedAt])
+  @@map("energy_meter_logs")
+}
+
+model EVReservation {
+  id Int @id @default(autoincrement())
+
+  // Vehicle & Connector
+  vehicleId       Int
+  vehicleVin      String? @db.VarChar(17) //cached VIN for fast verification
+  chargingPointId Int
+
+  // Reservation time
+  startTime DateTime
+  endTime   DateTime
+
+  // Reservation reference
+  reservationCode String?           @unique
+  status          ReservationStatus @default(PENDING)
+
+  // User input: target charge
+  targetBatteryPercentage Int? // e.g., 80% battery
+  targetKwh               Decimal? @db.Decimal(12, 2) // alternative input
+
+  // Cost & payment
+  calculatedAmount    Decimal?      @db.Decimal(12, 2) // cost calculated by tariff rules
+  paymentStatus       PaymentStatus @default(PENDING) // PENDING, AUTHORIZED, COMPLETED, REFUNDED
+  preAuthorizedAmount Decimal?      @db.Decimal(12, 2) // for pre-auth if non-prepaid session
+
+  // Connector / session enforcement
+  isConnectorLocked Boolean          @default(true) // connector locked until verification & payment
+  chargingSessionId Int?
+  chargingSession   ChargingSession? @relation(fields: [chargingSessionId], references: [id])
+
+  // User & relationships
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
+  chargingPoint ChargingPoint @relation(fields: [chargingPointId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([chargingPointId])
+  @@map("reservations")
+}
+
+model Minibus {
+  id          Int      @id @default(autoincrement())
+  plateNumber String   @unique
+  capacity    Int
+  driverId    String?  @unique
+  routeId     Int?
+  createdAt   DateTime @default(now())
+
+  vehicleId    Int?                 @unique
+  vehicle      Vehicle?             @relation(fields: [vehicleId], references: [id])
+  updatedAt    DateTime             @updatedAt
+  driver       Driver?              @relation(fields: [driverId], references: [id])
+  route        Route?               @relation(fields: [routeId], references: [id])
+  reservations MinibusReservation[]
+}
+
+model MinibusReservation {
+  id        Int               @id @default(autoincrement())
+  userId    String
+  minibusId Int
+  seat      Int
+  date      DateTime
+  status    ReservationStatus @default(PENDING)
+
+  paymentId Int?
+  payment   Payment[]
+
+  createdAt DateTime @default(now())
+
+  minibus Minibus @relation(fields: [minibusId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([minibusId, seat, date])
+}
+
+model ParkingLot {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  location     String
+  totalSlots   Int
+  occupied     Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  reservations ParkingReservation[]
+}
+
+model ParkingReservation {
+  id         Int        @id @default(autoincrement())
+  userId     String
+  lotId      Int
+  slotNumber Int
+  startTime  DateTime
+  endTime    DateTime
+  createdAt  DateTime   @default(now())
+  lot        ParkingLot @relation(fields: [lotId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  action     AuditAction
+  entityType EntityType
+  entityId   String
+
+  actorId   String?
+  actorRole UserRole?
+
+  targetUserId String?
+
+  oldValue Json?
+  newValue Json?
+
+  reason    String?
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
+
+enum DocumentType {
+  LICENSE
+  PERMIT
+  TAX_CERTIFICATE
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  VERIFY
+  REJECT
+  ACTIVATE
+  DEACTIVATE
+  DELETE
+}
+
+enum EntityType {
+  DRIVER
+  VEHICLE
+  BUS
+  USER
+  WALLET
+}
+
+enum PassengerCategory {
+  NORMAL
+  ELDERLY
+  DISABLED
+}
+
+enum PointTransactionType {
+  EARN
+  SPEND
+  EXPIRE
+  ADJUSTMENT
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+  CHARGING_MANAGER
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum ScheduleDirection {
+  FORWARD // Origin -> Destination
+  REVERSE // Destination -> Origin
+}
+
+//Digital ticketing enums
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+  REFUND
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  PAYMENT_OUT
+  PAYMENT_IN
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  WALLET
+  TELEBIRR
+  CBE
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentGateway {
+  CHAPA
+  INTERNAL
+}
+
+enum PaymentFlow {
+  WALLET_TOPUP
+  WALLET_PAYMENT
+  DIRECT_PAYMENT
+}
+
+enum SeatType {
+  NORMAL
+  DISABLED
+}
+
+enum StationStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum ChargingPointStatus {
+  AVAILABLE
+  OCCUPIED
+  FAULTED
+  OFFLINE
+}
+
+enum ChargingSpeed {
+  SLOW
+  FAST
+  SUPER_FAST
+}
+
+enum ConnectorType {
+  CCS
+  TYPE2
+  CHADEMO
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+enum BusStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum SeatCategory {
+  NORMAL
+  DISABLED
+  ELDERLY
+}
+
+enum NotificationType {
+  SYSTEM
+  BOOKING
+  PAYMENT
+  ROUTE
+  BUS
+  WALLET
+  ALERT
+  REMINDER
+}
+
+enum IdType {
+  PASSPORT
+  NATIONAL_ID
+  KEBELE_ID
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum VehicleType {
+  BUS
+  MINIBUS
+  TAXI
+  VAN
+  TRUCK
+}
+
+enum VehicleStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ON_LEAVE
+}

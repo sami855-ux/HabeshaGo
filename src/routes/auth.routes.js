@@ -1,4 +1,4 @@
-import express from "express";
+import express from "express"
 import {
   register,
   verifyOTP,
@@ -10,38 +10,38 @@ import {
   resendOTP,
   getMe,
   googleCallback,
-  appleCallback,
   verifyOTPApp,
   refreshTokenApp,
   verifyOtpPhone,
-} from "../controllers/auth.controller.js";
-import { authenticate } from "../middlewares/authenticate.js";
-import passport from "passport";
+  appleAuth,
+} from "../controllers/auth.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
+import passport from "passport"
 
-const router = express.Router();
+const router = express.Router()
 
 // Registration & verification
-router.post("/register", register);
-router.post("/register/phone/verify", verifyOtpPhone);
-router.post("/verify-otp", verifyOTP);
-router.post("/resend-otp", resendOTP);
+router.post("/register", register)
+router.post("/register/phone/verify", verifyOtpPhone)
+router.post("/verify-otp", verifyOTP)
+router.post("/resend-otp", resendOTP)
 
 //App
-router.post("/app/verify-otp", verifyOTPApp);
-router.post("/app/refresh", refreshTokenApp);
+router.post("/app/verify-otp", verifyOTPApp)
+router.post("/app/refresh", refreshTokenApp)
 
-router.post("/refresh", refreshToken);
-router.post("/logout", authenticate, logout);
-router.post("/logout-all", authenticate, logoutAll);
+router.post("/refresh", refreshToken)
+router.post("/logout", authenticate, logout)
+router.post("/logout-all", authenticate, logoutAll)
 
 // Get authenticated user data
-router.get("/me", authenticate, getMe);
+router.get("/me", authenticate, getMe)
 
 // Social login
 router.get(
   "/google",
   passport.authenticate("google", { scope: ["profile", "email"] }),
-);
+)
 
 router.get(
   "/google/callback",
@@ -49,18 +49,13 @@ router.get(
     failureRedirect: "http://localhost:3000/login",
   }),
   googleCallback,
-);
+)
 
-router.get("/apple", passport.authenticate("apple"));
-
-router.post(
-  "/apple/callback",
-  passport.authenticate("apple", { failureRedirect: "/login" }),
-  appleCallback,
-);
+// Contniue with Apple
+router.post("/apple", appleAuth)
 
 // Sessions
-router.get("/sessions", getSessions);
-router.delete("/sessions/:sessionId", revokeSession);
+router.get("/sessions", getSessions)
+router.delete("/sessions/:sessionId", revokeSession)
 
-export default router;
+export default router

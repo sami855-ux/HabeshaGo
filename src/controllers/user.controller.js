@@ -248,3 +248,95 @@ export const getUsersByPhone = async (req, res) => {
     })
   }
 }
+
+export const verifyOtpPhone = async (req, res) => {
+  try {
+    const { idToken } = req.body
+
+    if (!idToken) return errorResponse(res, "ID token is required", 400)
+
+    // 1. Verify the Firebase OTP token
+    const decoded = await admin.auth().verifyIdToken(idToken)
+    const phone = decoded.phone_number
+
+    if (!phone) return errorResponse(res, "Invalid phone number", 400)
+
+    return res.json({
+      message: "OTP verified successfully",
+      verified: true,
+      data: result,
+    })
+  } catch (err) {
+    console.error("verifyOtp error:", err)
+    return errorResponse(res, "OTP verification failed", 401)
+  }
+}
+
+export const getTransportStats = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const now = new Date()
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+    const [
+      totalBusTrips,
+      thisMonthTrips,
+      lastMonthTrips,
+      evReservations,
+      parkingReservations,
+      wallet,
+    ] = await Promise.all([
+      prisma.booking.count({
+        where: { userId, status: "CONFIRMED" },
+      }),
+
+      prisma.booking.count({
+        where: {
+          userId,
+          createdAt: { gte: startOfThisMonth },
+        },
+      }),
+
+      prisma.booking.count({
+        where: {
+          userId,
+          createdAt: {
+            gte: startOfLastMonth,
+            lt: startOfThisMonth,
+          },
+        },
+      }),
+
+      prisma.eVReservation.count({
+        where: { userId, status: "CONFIRMED" },
+      }),
+
+      prisma.parkingReservation.count({
+        where: { userId },
+      }),
+
+      prisma.wallet.findUnique({
+        where: { userId },
+        select: { balance: true, currency: true },
+      }),
+    ])
+
+    const trend = thisMonthTrips - lastMonthTrips
+
+    const stats = {
+      totalBusTrips,
+      busTrend: trend >= 0 ? `+${trend} this month` : `${trend} this month`,
+      activeReservations: evReservations + parkingReservations,
+      reservationMessage: `${evReservations} EV charging, ${parkingReservations} parking session`,
+      walletBalance: wallet ? Number(wallet.balance) : 0,
+      currency: wallet?.currency || "ETB",
+    }
+
+    res.json(stats)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "Failed to fetch transport stats" })
+  }
+}

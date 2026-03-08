@@ -1,6 +1,5 @@
 import passport from "passport"
 import { Strategy as GoogleStrategy } from "passport-google-oauth20"
-import AppleStrategy from "passport-apple"
 import prisma from "../prisma/client.js"
 
 //  GOOGLE STRATEGY
@@ -54,62 +53,6 @@ passport.use(
     },
   ),
 )
-
-// APPLE STRATEGY
-// passport.use(
-//   new AppleStrategy(
-//     {
-//       clientID: process.env.APPLE_CLIENT_ID,
-//       teamID: process.env.APPLE_TEAM_ID,
-//       keyID: process.env.APPLE_KEY_ID,
-//       privateKeyString: process.env.APPLE_PRIVATE_KEY,
-//       callbackURL: process.env.APPLE_CALLBACK_URL,
-//       scope: ["name", "email"],
-//     },
-//     async (accessToken, refreshToken, idToken, profile, done) => {
-//       try {
-//         const appleId = profile.id
-//         const email = profile.email // only on FIRST login
-
-//         let user = await prisma.user.findUnique({
-//           where: { appleId },
-//         })
-
-//         if (!user && email) {
-//           const existingUser = await prisma.user.findUnique({
-//             where: { email },
-//           })
-
-//           if (existingUser) {
-//             user = await prisma.user.update({
-//               where: { email },
-//               data: { appleId },
-//             })
-//           }
-//         }
-
-//         if (!user) {
-//           user = await prisma.user.create({
-//             data: {
-//               name:
-//                 profile.name?.firstName && profile.name?.lastName
-//                   ? `${profile.name.firstName} ${profile.name.lastName}`
-//                   : "Apple User",
-//               email: email || null,
-//               appleId,
-//               role: "PASSENGER",
-//               emailVerified: true,
-//             },
-//           })
-//         }
-
-//         done(null, user)
-//       } catch (err) {
-//         done(err, null)
-//       }
-//     },
-//   ),
-// )
 
 //  SESSION HANDLING
 passport.serializeUser((user, done) => done(null, user.id))

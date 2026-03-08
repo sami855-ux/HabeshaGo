@@ -1,22 +1,22 @@
-"use client";
+"use client"
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
   InputOTPSeparator,
-} from "@/components/ui/input-otp";
+} from "@/components/ui/input-otp"
 import {
   Phone,
   Loader,
@@ -27,46 +27,51 @@ import {
   ChevronLeft,
   Clock,
   AlertCircle,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, useRef, useTransition, useEffect } from "react";
-import { toast } from "sonner";
-import { auth } from "@/lib/firebase";
-import { AuthSlider } from "@/components/AuthSlider";
-import { cn } from "@/lib/utils";
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState, useRef, useTransition, useEffect } from "react"
+import { toast } from "sonner"
+import { auth } from "@/lib/firebase"
+import { AuthSlider } from "@/components/AuthSlider"
+import { cn } from "@/lib/utils"
 
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   ConfirmationResult,
-} from "firebase/auth";
+} from "firebase/auth"
+import { axiosInstance } from "@/services/axiosInstance"
+import { useAppDispatch } from "@/store/store"
+import { setAccessToken, setUser } from "@/store/slices/userSlice"
+import { getMe } from "@/services/auth.user.api"
 
 export default function PhoneLoginPage() {
-  const router = useRouter();
+  const router = useRouter()
+  const dispatch = useAppDispatch()
 
-  const [sendOtpPending, startSendOtp] = useTransition();
-  const [verifyOtpPending, startVerifyOtp] = useTransition();
+  const [sendOtpPending, startSendOtp] = useTransition()
+  const [verifyOtpPending, startVerifyOtp] = useTransition()
 
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneError, setPhoneError] = useState("")
+  const [otp, setOtp] = useState("")
+  const [otpError, setOtpError] = useState("")
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpVerified, setOtpVerified] = useState(false)
+  const [countdown, setCountdown] = useState(0)
 
-  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null)
 
-  const countryCode = "+251";
+  const countryCode = "+251"
 
   // Handle countdown timer for resend
   useEffect(() => {
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+      return () => clearTimeout(timer)
     }
-  }, [countdown]);
+  }, [countdown])
 
   useEffect(() => {
     if (!recaptchaRef.current) {
@@ -76,168 +81,180 @@ export default function PhoneLoginPage() {
         {
           size: "invisible",
         },
-      );
+      )
     }
 
     // Cleanup
     return () => {
       if (recaptchaRef.current) {
-        recaptchaRef.current.clear();
+        recaptchaRef.current.clear()
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Format Ethiopian phone number
   const formatEthiopianPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6)
-      return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 9)}`;
-  };
+    const cleaned = value.replace(/\D/g, "")
+    if (cleaned.length <= 3) return cleaned
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`
+    return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 9)}`
+  }
 
   // Validate Ethiopian phone number
   const validateEthiopianPhone = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length !== 9) return "Phone number must be 9 digits";
+    const cleaned = phone.replace(/\D/g, "")
+    if (cleaned.length !== 9) return "Phone number must be 9 digits"
     if (!cleaned.startsWith("7") && !cleaned.startsWith("9")) {
-      return "Phone number must start with 7 or 9";
+      return "Phone number must start with 7 or 9"
     }
-    return "";
-  };
+    return ""
+  }
 
   // Handle phone number change
   const handlePhoneChange = (value: string) => {
-    const formatted = formatEthiopianPhone(value);
-    setPhoneNumber(formatted);
-    setPhoneError(validateEthiopianPhone(value));
-  };
+    const formatted = formatEthiopianPhone(value)
+    setPhoneNumber(formatted)
+    setPhoneError(validateEthiopianPhone(value))
+  }
 
   const sendOtp = async () => {
-    const phone = countryCode + phoneNumber.replace(/\D/g, "");
-    const error = validateEthiopianPhone(phoneNumber);
+    const phone = countryCode + phoneNumber.replace(/\D/g, "")
+    const error = validateEthiopianPhone(phoneNumber)
 
     if (error) {
-      setPhoneError(error);
-      return;
+      setPhoneError(error)
+      return
     }
 
     startSendOtp(async () => {
       try {
-        if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready");
+        if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready")
 
         const confirmation = await signInWithPhoneNumber(
           auth,
           phone,
           recaptchaRef.current,
-        );
+        )
 
-        confirmationResultRef.current = confirmation;
+        confirmationResultRef.current = confirmation
 
-        setOtpSent(true);
-        setCountdown(60); // Start 60 second countdown for resend
+        setOtpSent(true)
+        setCountdown(60) // Start 60 second countdown for resend
 
         toast.success("OTP sent successfully", {
           description: `Verification code sent to ${phone}`,
-        });
+        })
       } catch (error: any) {
-        console.error(error);
+        console.error(error)
         toast.error("Failed to send OTP", {
           description:
             error.message || "Please check your phone number and try again",
-        });
+        })
       }
-    });
-  };
+    })
+  }
 
   const verifyOtp = async () => {
     if (!confirmationResultRef.current) {
-      setOtpError("Please request an OTP first");
-      return;
+      setOtpError("Please request an OTP first")
+      return
     }
 
     if (otp.length !== 6) {
-      setOtpError("Please enter all 6 digits");
-      return;
+      setOtpError("Please enter all 6 digits")
+      return
     }
 
     startVerifyOtp(async () => {
       try {
-        const result = await confirmationResultRef.current!.confirm(otp);
-        const idToken = await result.user.getIdToken();
+        const result = await confirmationResultRef.current!.confirm(otp)
+        const idToken = await result.user.getIdToken()
 
-        const res = await fetch("/api/auth/verify-otp", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ idToken }),
-        });
+        const res = await axiosInstance.post("/auth/register/phone/verify", {
+          idToken,
+        })
 
-        const data = await res.json();
+        const data = res.data
 
-        if (!res.ok) throw new Error(data.message);
+        if (!res.status || res.status !== 200) {
+          throw new Error(data.message)
+        }
 
-        setOtpVerified(true);
-        toast.success("Phone verified successfully", {
-          description: "Redirecting to your account...",
-        });
+        if (data.success) {
+          setOtpVerified(true)
 
-        setTimeout(() => {
-          router.push("/");
-        }, 1500);
+          toast.success("Phone verified successfully", {
+            description: "Redirecting to your account...",
+          })
+
+          dispatch(setAccessToken(res.data?.accessToken))
+
+          const userRes = await getMe()
+
+          if (userRes.success) {
+            console.log(userRes.user.role)
+            dispatch(setUser({ user: userRes.user }))
+
+            setTimeout(() => {
+              if (userRes.user.role === "PASSENGER") {
+                router.push("/user")
+              }
+              if (userRes.user.role === "ADMIN") {
+                router.push("/admin")
+              }
+            }, 1000)
+          }
+        }
       } catch (error: any) {
-        console.error(error);
-        setOtpError("Invalid verification code");
         toast.error("Verification failed", {
-          description: error.message || "Please check the code and try again",
-        });
+          description: error.response?.data?.message || error.message,
+        })
       }
-    });
-  };
+    })
+  }
 
   const resendOtp = async () => {
-    if (countdown > 0) return;
+    if (countdown > 0) return
 
-    const phone = countryCode + phoneNumber.replace(/\D/g, "");
+    const phone = countryCode + phoneNumber.replace(/\D/g, "")
 
     try {
-      if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready");
+      if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready")
 
       const confirmation = await signInWithPhoneNumber(
         auth,
         phone,
         recaptchaRef.current,
-      );
+      )
 
-      confirmationResultRef.current = confirmation;
-      setCountdown(60);
-      setOtp(""); // Clear OTP input
-      setOtpError(""); // Clear any errors
+      confirmationResultRef.current = confirmation
+      setCountdown(60)
+      setOtp("") // Clear OTP input
+      setOtpError("") // Clear any errors
 
       toast.success("New OTP sent", {
         description: "Please check your messages",
-      });
+      })
     } catch (error: any) {
-      console.error(error);
+      console.error(error)
       toast.error("Failed to resend OTP", {
         description: error.message || "Please try again",
-      });
+      })
     }
-  };
+  }
 
   const clearPhone = () => {
-    setPhoneNumber("");
-    setPhoneError("");
-  };
+    setPhoneNumber("")
+    setPhoneError("")
+  }
 
   const resetForm = () => {
-    setOtp("");
-    setOtpError("");
-    setOtpSent(false);
-    setOtpVerified(false);
-    setCountdown(0);
-  };
+    setOtp("")
+    setOtpError("")
+    setOtpSent(false)
+    setOtpVerified(false)
+    setCountdown(0)
+  }
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
@@ -386,8 +403,8 @@ export default function PhoneLoginPage() {
                       maxLength={6}
                       value={otp}
                       onChange={(value) => {
-                        setOtp(value.replace(/\D/g, ""));
-                        setOtpError("");
+                        setOtp(value.replace(/\D/g, ""))
+                        setOtpError("")
                       }}
                       disabled={verifyOtpPending || otpVerified}
                     >
@@ -517,5 +534,5 @@ export default function PhoneLoginPage() {
       {/* reCAPTCHA container */}
       <div id="recaptcha-container"></div>
     </div>
-  );
+  )
 }

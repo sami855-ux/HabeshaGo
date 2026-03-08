@@ -32,7 +32,6 @@ export const register = async (payload: RegisterPayload) => {
     }
   }
 }
-
 //    Verify OTP
 export interface VerifyOTPPayload {
   email: string
@@ -72,6 +71,19 @@ export const verifyOTP = async (
         error?.response?.data?.message ||
         error?.message ||
         "OTP verification failed",
+    }
+  }
+}
+
+// Continue with apple
+export const continueWithApple = async (idToken: string) => {
+  try {
+    await axiosInstance.post("/auth/apple", { idToken })
+  } catch (error: any) {
+    console.error("Register failed:", error)
+    return {
+      success: false,
+      message: error?.response?.data?.message || error.message || "Failed",
     }
   }
 }

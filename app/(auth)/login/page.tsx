@@ -1,15 +1,15 @@
-"use client";
+"use client"
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Loader,
   Send,
@@ -19,15 +19,17 @@ import {
   Mail,
   X,
   Phone,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, useCallback } from "react";
-import { toast } from "sonner";
-import { FcGoogle } from "react-icons/fc";
-import { FaApple } from "react-icons/fa";
-import { register } from "@/services/auth.user.api";
-import { AuthSlider } from "@/components/AuthSlider";
-import { cn } from "@/lib/utils";
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState, useTransition, useCallback } from "react"
+import { toast } from "sonner"
+import { FcGoogle } from "react-icons/fc"
+import { FaApple } from "react-icons/fa"
+import { continueWithApple, register } from "@/services/auth.user.api"
+import { AuthSlider } from "@/components/AuthSlider"
+import { cn } from "@/lib/utils"
+import { OAuthProvider, signInWithRedirect } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 const COMMON_EMAIL_DOMAINS = [
   "gmail.com",
@@ -40,7 +42,7 @@ const COMMON_EMAIL_DOMAINS = [
   "aol.com",
   "yandex.com",
   "gmx.com",
-];
+]
 
 const EMAIL_PROVIDERS = {
   gmail: { domain: "gmail.com", color: "text-red-500" },
@@ -48,67 +50,69 @@ const EMAIL_PROVIDERS = {
   yahoo: { domain: "yahoo.com", color: "text-purple-500" },
   hotmail: { domain: "hotmail.com", color: "text-blue-400" },
   icloud: { domain: "icloud.com", color: "text-gray-500" },
-};
+}
+
+const appleProvider = new OAuthProvider("apple.com")
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router = useRouter()
 
-  const [googlePending, startGoogle] = useTransition();
-  const [emailPending, startEmail] = useTransition();
+  const [googlePending, startGoogle] = useTransition()
+  const [emailPending, startEmail] = useTransition()
 
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isValidEmail, setIsValidEmail] = useState(false);
-  const [touched, setTouched] = useState(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [email, setEmail] = useState("")
+  const [emailError, setEmailError] = useState("")
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isValidEmail, setIsValidEmail] = useState(false)
+  const [touched, setTouched] = useState(false)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
   // Generate email suggestions based on input
   const generateSuggestions = useCallback((value: string) => {
     if (!value || value.includes("@")) {
-      const [localPart, domain] = value.split("@");
+      const [localPart, domain] = value.split("@")
 
       // If user started typing domain, filter domains
       if (domain) {
         const filtered = COMMON_EMAIL_DOMAINS.filter((d) =>
           d.toLowerCase().startsWith(domain.toLowerCase()),
-        ).map((d) => `${localPart}@${d}`);
-        return filtered.slice(0, 5); // Limit to 5 suggestions
+        ).map((d) => `${localPart}@${d}`)
+        return filtered.slice(0, 5) // Limit to 5 suggestions
       }
 
       // If no @ yet, suggest common domains with the local part
       if (localPart && localPart.length > 1) {
-        return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5);
+        return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5)
       }
     }
-    return [];
-  }, []);
+    return []
+  }, [])
 
   // Update suggestions when email changes
   useEffect(() => {
     if (email && !validateEmail(email) && !email.includes(" ")) {
-      const newSuggestions = generateSuggestions(email);
-      setSuggestions(newSuggestions);
-      setShowSuggestions(newSuggestions.length > 0 && !isValidEmail);
-      setIsValidEmail(validateEmail(email));
+      const newSuggestions = generateSuggestions(email)
+      setSuggestions(newSuggestions)
+      setShowSuggestions(newSuggestions.length > 0 && !isValidEmail)
+      setIsValidEmail(validateEmail(email))
 
       // Clear error when user starts typing
-      if (touched) setEmailError("");
+      if (touched) setEmailError("")
     } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setIsValidEmail(validateEmail(email));
+      setSuggestions([])
+      setShowSuggestions(false)
+      setIsValidEmail(validateEmail(email))
     }
 
     // Reset selected suggestion index
-    setSelectedSuggestionIndex(-1);
-  }, [email, generateSuggestions, isValidEmail, touched]);
+    setSelectedSuggestionIndex(-1)
+  }, [email, generateSuggestions, isValidEmail, touched])
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -119,107 +123,118 @@ export default function LoginPage() {
         inputRef.current &&
         !inputRef.current.contains(event.target as Node)
       ) {
-        setShowSuggestions(false);
+        setShowSuggestions(false)
       }
-    };
+    }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showSuggestions) return;
+    if (!showSuggestions) return
 
     switch (e.key) {
       case "ArrowDown":
-        e.preventDefault();
+        e.preventDefault()
         setSelectedSuggestionIndex((prev) =>
           prev < suggestions.length - 1 ? prev + 1 : prev,
-        );
-        break;
+        )
+        break
       case "ArrowUp":
-        e.preventDefault();
-        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        break;
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
       case "Enter":
         if (selectedSuggestionIndex >= 0) {
-          e.preventDefault();
-          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+          e.preventDefault()
+          handleSuggestionClick(suggestions[selectedSuggestionIndex])
         }
-        break;
+        break
       case "Escape":
-        setShowSuggestions(false);
-        break;
+        setShowSuggestions(false)
+        break
     }
-  };
+  }
 
   const handleSuggestionClick = (suggestion: string) => {
-    setEmail(suggestion);
-    setShowSuggestions(false);
-    setTouched(true);
+    setEmail(suggestion)
+    setShowSuggestions(false)
+    setTouched(true)
 
     // Auto-validate and submit? (optional)
     if (validateEmail(suggestion)) {
       // You could auto-submit here if desired
       // submitEmailWithValue(suggestion)
     }
-  };
+  }
 
   const handleBlur = () => {
-    setTouched(true);
+    setTouched(true)
     if (email && !validateEmail(email)) {
-      setEmailError("Please enter a valid email address");
+      setEmailError("Please enter a valid email address")
     }
 
     // Delay hiding suggestions to allow click on suggestion
     setTimeout(() => {
       if (!suggestionsRef.current?.contains(document.activeElement)) {
-        setShowSuggestions(false);
+        setShowSuggestions(false)
       }
-    }, 200);
-  };
+    }, 200)
+  }
 
   const clearEmail = () => {
-    setEmail("");
-    setEmailError("");
-    setSuggestions([]);
-    setShowSuggestions(false);
-    setIsValidEmail(false);
-    inputRef.current?.focus();
-  };
+    setEmail("")
+    setEmailError("")
+    setSuggestions([])
+    setShowSuggestions(false)
+    setIsValidEmail(false)
+    inputRef.current?.focus()
+  }
 
   const submitEmailWithValue = (emailValue: string) => {
     startEmail(async () => {
-      const res = await register({ email: emailValue });
-      if (!res.success) return;
-      toast.success("OTP sent to your email");
-      router.push(`/verify-request?email=${emailValue}`);
-    });
-  };
+      const res = await register({ email: emailValue })
+      if (!res.success) return
+      toast.success("OTP sent to your email")
+      router.push(`/verify-request?email=${emailValue}`)
+    })
+  }
 
   const submitEmail = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!validateEmail(email)) {
-      setEmailError("Enter a valid email address");
-      return;
+      setEmailError("Enter a valid email address")
+      return
     }
 
-    submitEmailWithValue(email);
-  };
+    submitEmailWithValue(email)
+  }
 
   const signInWithGoogle = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`;
-  };
+    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
+  }
+
+  const signInWithApple = async () => {
+    const result = await signInWithRedirect(auth, appleProvider)
+
+    const user = result.user
+
+    const idToken = await user.getIdToken()
+
+    // send token to backend
+    continueWithApple(idToken)
+  }
 
   // Get provider icon/color based on domain
   const getProviderInfo = (suggestion: string) => {
-    const domain = suggestion.split("@")[1];
+    const domain = suggestion.split("@")[1]
     const provider = Object.values(EMAIL_PROVIDERS).find(
       (p) => p.domain === domain,
-    );
-    return provider;
-  };
+    )
+    return provider
+  }
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
@@ -249,7 +264,7 @@ export default function LoginPage() {
 
             <Button
               className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer transition-all"
-              onClick={() => toast.info("Apple login coming soon")}
+              onClick={signInWithApple}
             >
               <FaApple className="mr-3 h-5 w-5" />
               Continue with Apple
@@ -334,7 +349,7 @@ export default function LoginPage() {
                         </p>
                       </div>
                       {suggestions.map((suggestion, index) => {
-                        const provider = getProviderInfo(suggestion);
+                        const provider = getProviderInfo(suggestion)
                         return (
                           <button
                             key={suggestion}
@@ -361,7 +376,7 @@ export default function LoginPage() {
                               {suggestion.split("@")[1]}
                             </span>
                           </button>
-                        );
+                        )
                       })}
                     </div>
                   )}
@@ -454,5 +469,5 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
-  );
+  )
 }

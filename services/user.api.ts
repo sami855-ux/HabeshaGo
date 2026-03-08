@@ -165,3 +165,22 @@ export const getUserByPhoneNumber = async (
     }
   }
 }
+export interface TransportStats {
+  totalBusTrips: number
+  busTrend: string
+  activeReservations: number
+  reservationMessage: string
+  walletBalance: number
+  currency: string
+}
+
+export const getTransportStats = async (): Promise<TransportStats | null> => {
+  try {
+    const response = await axiosInstance.get("/users/transport-stats")
+
+    return response.data
+  } catch (error) {
+    console.error("Error fetching transport stats:", error)
+    return null
+  }
+}

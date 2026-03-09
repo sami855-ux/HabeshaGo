@@ -3,6 +3,7 @@ import {
   payFromWalletService,
   getTransactionHistoryService,
   verifyWalletPinService,
+  getWalletTransactionByIdService,
 } from "../services/transaction.service.js"
 
 /**
@@ -72,6 +73,35 @@ export const verifyWalletPin = async (req, res) => {
       success: false,
       statusCode: 500,
       message: "Internal server error during wallet PIN verification",
+      data: null,
+    })
+  }
+}
+
+//Get a single transaction
+export const getWalletTransactionById = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: "Transaction id is required",
+        data: null,
+      })
+    }
+
+    const result = await getWalletTransactionByIdService(id)
+
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get transaction controller error:", error)
+
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching transaction",
       data: null,
     })
   }

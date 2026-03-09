@@ -9,6 +9,10 @@ import {
   signInWithPhoneNumber,
   ConfirmationResult,
 } from "firebase/auth"
+import { sendVerificationEmailAPI, verifyCodeAPI } from "@/services/user.api"
+import { useAppDispatch } from "@/store/store"
+import { fetchCurrentUser } from "@/store/slices/userSlice"
+import { axiosInstance } from "@/services/axiosInstance"
 
 interface UseProfileVerificationProps {
   onVerificationSuccess: (type: "phone" | "email") => void
@@ -17,6 +21,9 @@ interface UseProfileVerificationProps {
 export function useProfileVerification({
   onVerificationSuccess,
 }: UseProfileVerificationProps) {
+  const dispatch = useAppDispatch()
+
+  const [isSending, setSending] = useState(false)
   const [verification, setVerification] = useState<VerificationState>({
     isVerifying: false,
     verificationCode: "",
@@ -31,7 +38,7 @@ export function useProfileVerification({
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
   const [countdown, setCountdown] = useState(60)
 
-  // Firebase confirmation result
+  // Firebase confirmation result (only for phone)
   const [confirmationResult, setConfirmationResult] =
     useState<ConfirmationResult | null>(null)
 
@@ -55,17 +62,48 @@ export function useProfileVerification({
   }
 
   const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
+    try {
+      // Clear any existing verifier
+      if ((window as any).recaptchaVerifier) {
+        try {
+          ;(window as any).recaptchaVerifier.clear()
+        } catch (e) {
+          // Ignore clear error
+        }
+        ;(window as any).recaptchaVerifier = null
+      }
+
+      // Check if container exists, if not create it
+      let container = document.getElementById("recaptcha-container")
+      if (!container) {
+        container = document.createElement("div")
+        container.id = "recaptcha-container"
+        container.style.position = "fixed"
+        container.style.bottom = "0"
+        container.style.right = "0"
+        container.style.zIndex = "9999"
+        document.body.appendChild(container)
+      }
+
+      // Create new verifier
       ;(window as any).recaptchaVerifier = new RecaptchaVerifier(
         auth,
         "recaptcha-container",
         {
           size: "invisible",
+          callback: () => {
+            // reCAPTCHA solved
+          },
+          "expired-callback": () => {
+            // reCAPTCHA expired
+          },
         },
       )
-    }
 
-    return (window as any).recaptchaVerifier
+      return (window as any).recaptchaVerifier
+    } catch (error) {
+      throw error
+    }
   }
 
   const formatPhone = (phone: string) => {
@@ -76,7 +114,7 @@ export function useProfileVerification({
   }
 
   const handleSendVerificationCode = async (
-    method: "sms" | "call" | "email" = "sms",
+    method: "sms" | "email" = "sms",
     value: string,
     type: "phone" | "email",
   ) => {
@@ -92,12 +130,14 @@ export function useProfileVerification({
     }))
 
     setShowVerificationDialog(true)
-
+    setSending(true)
     try {
-      // FIREBASE SMS
+      // PHONE VERIFICATION - Use Firebase
       if (type === "phone") {
-        const recaptcha = setupRecaptcha()
+        // Small delay to ensure dialog is rendered
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
+        const recaptcha = setupRecaptcha()
         const formattedPhone = formatPhone(value)
 
         const result = await signInWithPhoneNumber(
@@ -105,8 +145,12 @@ export function useProfileVerification({
           formattedPhone,
           recaptcha,
         )
-
         setConfirmationResult(result)
+      }
+      // EMAIL VERIFICATION - Use your API
+      else if (type === "email") {
+        // Call your API to send verification email
+        await sendVerificationEmailAPI()
       }
 
       startCountdown()
@@ -115,6 +159,8 @@ export function useProfileVerification({
         description: `Enter the 6-digit code sent to ${value}`,
       })
     } catch (error: any) {
+      console.error("Send verification error:", error)
+
       toast.error("Failed to send code", {
         description: error?.message || "Please try again",
       })
@@ -124,11 +170,25 @@ export function useProfileVerification({
         timerActive: false,
         canResend: true,
       }))
+    } finally {
+      setSending(false)
     }
   }
 
   const handleVerifyCode = async () => {
+    console.log("🔵 [VERIFY] Starting verification process", {
+      verificationCode: verification.verificationCode,
+      currentVerificationType: verification.currentVerificationType,
+      tempValue: verification.tempValue,
+      attempts: verification.attempts,
+      hasConfirmationResult: !!confirmationResult,
+    })
+
     if (verification.verificationCode.length !== 6) {
+      console.warn(
+        "⚠️ [VERIFY] Invalid code length:",
+        verification.verificationCode.length,
+      )
       toast.error("Invalid code!", {
         description: "Please enter the complete 6-digit code",
       })
@@ -138,30 +198,104 @@ export function useProfileVerification({
     setVerification((prev) => ({ ...prev, isVerifying: true }))
 
     try {
-      // FIREBASE VERIFY
-      if (
-        verification.currentVerificationType === "phone" &&
-        confirmationResult
-      ) {
-        await confirmationResult.confirm(verification.verificationCode)
+      const { currentVerificationType, tempValue, verificationCode } =
+        verification
 
-        setVerification((prev) => ({
-          ...prev,
-          timerActive: false,
-          isVerifying: false,
-        }))
+      console.log("🟢 [VERIFY] Verification data:", {
+        type: currentVerificationType,
+        value: tempValue,
+        code: verificationCode,
+        timestamp: new Date().toISOString(),
+      })
 
-        toast.success(
-          `${verification.currentVerificationType} verified successfully!`,
-        )
+      // PHONE VERIFICATION - Use Firebase
+      if (currentVerificationType === "phone") {
+        console.log("📱 [VERIFY] Starting phone verification")
 
-        onVerificationSuccess(verification.currentVerificationType!)
-        setShowVerificationDialog(false)
+        if (!confirmationResult) {
+          setVerification((prev) => ({
+            ...prev,
+            timerActive: false,
+            canResend: true,
+            isVerifying: false,
+          }))
+          return
+        }
 
-        return
+        try {
+          const result = await confirmationResult.confirm(verificationCode)
+
+          const idToken = await result.user.getIdToken()
+          console.log("✅ [VERIFY] ID token obtained", {
+            tokenLength: idToken.length,
+          })
+
+          console.log("📱 [VERIFY] Sending verification to backend...")
+          const res = await axiosInstance.post("/users/me/phone/verify", {
+            idToken,
+          })
+
+          console.log("✅ [VERIFY] Backend verification response:", {
+            status: res.status,
+            data: res.data,
+          })
+
+          const data = res.data
+        } catch (firebaseError: any) {
+          console.error("❌ [VERIFY] Firebase confirmation error:", {
+            code: firebaseError.code,
+            message: firebaseError.message,
+            stack: firebaseError.stack,
+          })
+          return
+        }
       }
+      // EMAIL VERIFICATION - Use your API
+      else if (currentVerificationType === "email") {
+        try {
+          await verifyCodeAPI(verificationCode, "email")
+
+          console.log("✅ [VERIFY] Email verification successful")
+        } catch (emailError: any) {
+          console.error("❌ [VERIFY] Email verification error:", {
+            message: emailError.message,
+            response: emailError.response?.data,
+            status: emailError.response?.status,
+          })
+          return
+        }
+      }
+
+      setVerification((prev) => ({
+        ...prev,
+        timerActive: false,
+        isVerifying: false,
+      }))
+
+      toast.success(`${currentVerificationType} verified successfully!`)
+
+      onVerificationSuccess(currentVerificationType!)
+
+      setShowVerificationDialog(false)
+
+      dispatch(fetchCurrentUser())
     } catch (error: any) {
+      console.error(
+        "❌ [VERIFY] Verification error caught in main try-catch:",
+        {
+          error,
+          message: error.message,
+          code: error.code,
+          response: error.response?.data,
+          stack: error.stack,
+        },
+      )
+
       const newAttempts = verification.attempts + 1
+      console.warn("⚠️ [VERIFY] Incrementing attempts:", {
+        oldAttempts: verification.attempts,
+        newAttempts,
+      })
 
       setVerification((prev) => ({
         ...prev,
@@ -171,6 +305,8 @@ export function useProfileVerification({
       }))
 
       if (newAttempts >= 3) {
+        console.warn("⚠️ [VERIFY] Max attempts reached (3), requiring new code")
+
         toast.error("Too many attempts!", {
           description: "Please request a new code",
         })
@@ -181,10 +317,33 @@ export function useProfileVerification({
           canResend: true,
         }))
       } else {
-        toast.error("Invalid code!", {
-          description: `Attempt ${newAttempts} of 3`,
+        console.log(`🟡 [VERIFY] Failed attempt ${newAttempts} of 3`)
+
+        // More specific error messages based on error type
+        let errorMessage = "Invalid code!"
+        let errorDescription = `Attempt ${newAttempts} of 3`
+
+        if (error.code === "auth/invalid-verification-code") {
+          errorDescription = "The code you entered is incorrect"
+        } else if (error.code === "auth/code-expired") {
+          errorDescription = "This code has expired. Please request a new one"
+          // Reset timer for expired code
+          setVerification((prev) => ({
+            ...prev,
+            timerActive: false,
+            canResend: true,
+          }))
+        } else if (error.response?.status === 400) {
+          errorDescription =
+            error.response.data?.message || "Verification failed"
+        }
+
+        toast.error(errorMessage, {
+          description: errorDescription,
         })
       }
+    } finally {
+      console.log("🏁 [VERIFY] Verification process completed")
     }
   }
 
@@ -205,5 +364,6 @@ export function useProfileVerification({
     handleResendCode,
     setVerification,
     countdown,
+    isSending,
   }
 }

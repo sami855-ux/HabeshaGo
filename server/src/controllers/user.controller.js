@@ -5,6 +5,8 @@ import {
   updateProfileService,
   verifyOtpService,
 } from "../services/user.service.js"
+import admin from "../config/firebaseAdmin.js"
+import { errorResponse } from "../utils/apiResponse.js"
 
 /**
  * Controller: Get all users
@@ -253,21 +255,44 @@ export const verifyOtpPhone = async (req, res) => {
   try {
     const { idToken } = req.body
 
-    if (!idToken) return errorResponse(res, "ID token is required", 400)
+    if (!idToken) {
+      return errorResponse(res, "ID token is required", 400)
+    }
 
-    // 1. Verify the Firebase OTP token
+    // Verify Firebase OTP token
     const decoded = await admin.auth().verifyIdToken(idToken)
+
     const phone = decoded.phone_number
 
-    if (!phone) return errorResponse(res, "Invalid phone number", 400)
+    if (!phone) {
+      return errorResponse(res, "Invalid phone number", 400)
+    }
+
+    // Find user by phone
+    const user = await prisma.user.findUnique({
+      where: { phone },
+    })
+
+    console.log(user, phone)
+    if (!user) {
+      return errorResponse(res, "User not found", 404)
+    }
+
+    // Update phone verification
+    const updatedUser = await prisma.user.update({
+      where: { phone },
+      data: {
+        phoneVerified: true,
+      },
+    })
 
     return res.json({
-      message: "OTP verified successfully",
+      message: "Phone verified successfully",
       verified: true,
-      data: result,
+      data: updatedUser,
     })
   } catch (err) {
-    console.error("verifyOtp error:", err)
+    console.error("verifyOtpPhone error:", err)
     return errorResponse(res, "OTP verification failed", 401)
   }
 }

@@ -71,6 +71,8 @@ export default function VerificationDialog({
       console.log("Auto-submitting verification code:", inputValue)
       autoSubmitRef.current = true
 
+      onCodeChange(inputValue)
+      console.log(inputValue)
       // Use setTimeout to avoid state conflicts
       setTimeout(() => {
         onVerify()
@@ -87,6 +89,7 @@ export default function VerificationDialog({
     isSending,
     onVerify,
     open,
+    onCodeChange,
   ])
 
   const handleInputChange = useCallback(

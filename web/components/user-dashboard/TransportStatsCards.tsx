@@ -6,6 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Bus, TrendingUp, ParkingCircle, Star, Wallet } from "lucide-react"
 import { formatCurrencyIntl } from "@/lib/utils"
 
+const formatCurrencyAbbr = (amount) => {
+  if (!amount && amount !== 0) return "0 ETB"
+  if (amount >= 1e6) return (amount / 1e6).toFixed(1) + "M ETB"
+  if (amount >= 1e3) return (amount / 1e3).toFixed(1) + "K ETB"
+  return amount.toLocaleString() + " ETB"
+}
+
 interface TransportStats {
   totalBusTrips: number
   busTrend: string
@@ -170,7 +177,7 @@ const TransportStatsCards: React.FC<TransportStatsCardsProps> = ({
                 </h1>
               </div>
               <p className="text-3xl font-bold text-foreground py-1 font-grotesk">
-                {formatCurrencyIntl(data.walletBalance)}
+                {formatCurrencyAbbr(data.walletBalance)}
               </p>
               <Button
                 variant="link"

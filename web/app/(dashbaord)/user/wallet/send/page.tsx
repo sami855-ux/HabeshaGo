@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Send, Shield, CheckCircle } from "lucide-react"
+import { ArrowLeft, Send, Shield, CheckCircle, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -152,7 +152,7 @@ export default function SendMoneyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b rounded-2xl from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-4 md:p-6">
+    <div className="min-h-screen  rounded-2xl p-4 md:p-6">
       <div className="">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -162,7 +162,7 @@ export default function SendMoneyPage() {
             onClick={() => router.back()}
             className="rounded-full hover:bg-gray-200 dark:hover:bg-gray-800"
           >
-            <ArrowLeft className="size-5" />
+            <ChevronLeft className="size-5" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">

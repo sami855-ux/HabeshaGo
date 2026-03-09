@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { FaMapMarkedAlt } from "react-icons/fa"
 
 export type MenuItem = {
   id: string
@@ -149,6 +150,12 @@ function Sidebar() {
       label: "Home",
       icon: <Home className="h-5 w-5" />,
       path: "/",
+    },
+    {
+      id: "map-section",
+      label: "Map",
+      icon: <FaMapMarkedAlt className="h-5 w-5" />,
+      path: "/map-view",
     },
     {
       id: "wallet",

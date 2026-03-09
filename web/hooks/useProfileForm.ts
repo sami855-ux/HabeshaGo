@@ -55,6 +55,8 @@ export function useProfileForm() {
     handleVerifyCode,
     handleResendCode,
     countdown,
+    setVerification,
+    isSending,
   } = useProfileVerification({
     onVerificationSuccess: handleVerificationSuccess,
   })
@@ -177,6 +179,13 @@ export function useProfileForm() {
 
     return true
   }
+  const phoneVerify = async () => {
+    await handleSendVerificationCode("sms", profile.phone, "phone")
+  }
+
+  const emailVerify = async () => {
+    await handleSendVerificationCode("email", profile.email, "email")
+  }
 
   const handleSave = async () => {
     if (!validateProfile()) return
@@ -195,7 +204,7 @@ export function useProfileForm() {
 
     // Start verification process
     if (needsPhoneVerification) {
-      await handleSendVerificationCode("email", profile.phone, "phone")
+      await handleSendVerificationCode("sms", profile.phone, "phone")
       if (needsEmailVerification) {
         setVerification((prev) => ({ ...prev, pendingEmailVerification: true }))
       }
@@ -210,7 +219,7 @@ export function useProfileForm() {
     try {
       const formData = new FormData()
       formData.append("email", profile.email)
-      formData.append("phone", profile.phone.replace(/\D/g, ""))
+      formData.append("phone", profile.phone)
       formData.append("name", profile.name)
       formData.append("bio", profile.bio || "")
       formData.append("location", profile.location || "")
@@ -218,6 +227,8 @@ export function useProfileForm() {
       if (avatarFile) {
         formData.append("avatar", avatarFile)
       }
+
+      console.log(profile.phone)
 
       const res = await updateMyProfileAPI(formData)
 
@@ -299,5 +310,10 @@ export function useProfileForm() {
     handleVerifyCode,
     handleResendCode,
     countdown,
+    user,
+    setVerification,
+    phoneVerify,
+    emailVerify,
+    isSending,
   }
 }

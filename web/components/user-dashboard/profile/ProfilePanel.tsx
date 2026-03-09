@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef } from "react"
-import { Edit2, X, Loader2 } from "lucide-react"
+import { Edit2, X, Loader2, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ProfileCard from "./ProfileCard"
 import ProfileForm from "./ProfileForm"
@@ -9,9 +9,11 @@ import VerificationDialog from "./VerificationDialog"
 import { useProfileForm } from "@/hooks/useProfileForm"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 export default function ProfilePanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
 
   const {
     profile,
@@ -34,6 +36,11 @@ export default function ProfilePanel() {
     handleVerifyCode,
     handleResendCode,
     countdown,
+    user,
+    setVerification,
+    phoneVerify,
+    emailVerify,
+    isSending,
   } = useProfileForm()
 
   const handleAvatarUpload = async (file: File) => {
@@ -88,13 +95,23 @@ export default function ProfilePanel() {
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                My Profile
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Manage your account information and verification
-              </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.back()}
+                className="rounded-full hover:bg-gray-400 bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
+              >
+                <ChevronLeft className="size-5" />
+              </Button>
+              <div className="">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  My Profile
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  Manage your account information and verification
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -167,6 +184,9 @@ export default function ProfilePanel() {
                 isEditing={isEditing}
                 onProfileChange={setProfile}
                 onPhoneChange={handlePhoneChange}
+                user={user}
+                phoneVerify={phoneVerify}
+                emailVerify={emailVerify}
               />
             </div>
           </div>
@@ -182,6 +202,7 @@ export default function ProfilePanel() {
               setVerification((prev) => ({ ...prev, verificationCode: code }))
             }
             countdown={countdown}
+            isSending={isSending}
           />
         </div>
       </div>

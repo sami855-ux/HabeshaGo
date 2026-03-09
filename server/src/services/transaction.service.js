@@ -255,3 +255,36 @@ export const verifyWalletPinService = async (userId, body) => {
     return errorResponse("Failed to verify wallet PIN", 500)
   }
 }
+
+export const getWalletTransactionByIdService = async (id) => {
+  try {
+    const transaction = await prisma.walletTransaction.findUnique({
+      where: { id: Number(id) },
+      include: {
+        wallet: {
+          include: {
+            user: true,
+          },
+        },
+        recipientWallet: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    })
+
+    if (!transaction) {
+      return errorResponse("Transaction not found", 404)
+    }
+
+    return successResponse(
+      "Transaction retrieved successfully",
+      transaction,
+      200,
+    )
+  } catch (error) {
+    console.error("Error fetching transaction:", error)
+    return errorResponse("Failed to fetch transaction", 500)
+  }
+}

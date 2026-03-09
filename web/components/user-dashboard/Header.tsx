@@ -75,7 +75,7 @@ function Header({ className }: { className?: string }) {
         dispatch(clearUser())
       }, 2000)
 
-      localStorage.clear()
+      localStorage.removeItem("habeshagoUser")
     } catch (error) {
       console.error("Logout failed:", error)
     } finally {

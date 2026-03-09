@@ -1,3 +1,4 @@
+import { NumberColorFormat } from "@faker-js/faker"
 import { axiosInstance } from "./axiosInstance"
 
 export const transferFunds = async (
@@ -34,6 +35,23 @@ export const transferFunds = async (
       success: false,
       message:
         error?.response?.data?.message || error.message || "Unknown error",
+    }
+  }
+}
+
+export const getWalletTransactionById = async (id: number | undefined) => {
+  try {
+    const response = await axiosInstance.get(`/transactions/${id}`)
+    return response.data.data // { success, statusCode, message, data }
+  } catch (error: any) {
+    console.error("Error fetching wallet transaction:", error)
+
+    // Return a consistent structure even on error
+    return {
+      success: false,
+      statusCode: error.response?.status || 500,
+      message: error.response?.data?.message || "Failed to fetch transaction",
+      data: null,
     }
   }
 }

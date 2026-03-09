@@ -1,7 +1,6 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   ArrowDownCircle,
@@ -20,115 +19,8 @@ import {
   ArrowLeft,
   Printer,
 } from "lucide-react"
-
-// Mock transaction data
-const MOCK_TRANSACTIONS = [
-  {
-    id: 31,
-    walletId: 1001,
-    recipientWalletId: null,
-    amount: "500.00",
-    type: "CREDIT",
-    status: "COMPLETED",
-    balanceAfter: "2500.00",
-    reference: "REF_ABC123XYZ",
-    description: "Salary deposit for March",
-    metadata: {
-      department: "Engineering",
-      approvedBy: "John Manager",
-      batchId: "BATCH_001",
-    },
-    createdAt: "2024-03-15T10:30:00Z",
-    wallet: {
-      id: 1001,
-      user: {
-        name: "Alice Johnson",
-        email: "alice@example.com",
-      },
-    },
-    recipientWallet: null,
-  },
-  {
-    id: 2,
-    walletId: 1001,
-    recipientWalletId: 1002,
-    amount: "150.00",
-    type: "TRANSFER",
-    status: "COMPLETED",
-    balanceAfter: "2350.00",
-    reference: "REF_DEF456UVW",
-    description: "Payment for dinner",
-    metadata: {
-      note: "Thanks for dinner!",
-      category: "Food",
-    },
-    createdAt: "2024-03-14T19:45:00Z",
-    wallet: {
-      id: 1001,
-      user: {
-        name: "Alice Johnson",
-        email: "alice@example.com",
-      },
-    },
-    recipientWallet: {
-      id: 1002,
-      user: {
-        name: "Bob Smith",
-        email: "bob@example.com",
-      },
-    },
-  },
-  {
-    id: 3,
-    walletId: 1001,
-    recipientWalletId: null,
-    amount: "75.50",
-    type: "DEBIT",
-    status: "PENDING",
-    balanceAfter: "2274.50",
-    reference: "REF_GHI789RST",
-    description: "Online purchase - Amazon",
-    metadata: {
-      merchant: "Amazon.com",
-      items: ["Book", "Headphones"],
-      paymentMethod: "Visa ending in 4242",
-    },
-    createdAt: "2024-03-14T14:20:00Z",
-    wallet: {
-      id: 1001,
-      user: {
-        name: "Alice Johnson",
-        email: "alice@example.com",
-      },
-    },
-    recipientWallet: null,
-  },
-  {
-    id: 4,
-    walletId: 1001,
-    recipientWalletId: null,
-    amount: "1000.00",
-    type: "DEBIT",
-    status: "FAILED",
-    balanceAfter: "2350.00",
-    reference: "REF_JKL012MNO",
-    description: "Wire transfer to savings",
-    metadata: {
-      error: "Insufficient funds",
-      attemptedAt: "2024-03-13T09:15:00Z",
-      retryCount: 2,
-    },
-    createdAt: "2024-03-13T09:15:00Z",
-    wallet: {
-      id: 1001,
-      user: {
-        name: "Alice Johnson",
-        email: "alice@example.com",
-      },
-    },
-    recipientWallet: null,
-  },
-]
+import { useQuery } from "@tanstack/react-query"
+import { getWalletTransactionById } from "@/services/transaction"
 
 // Helper functions
 function getStatusIcon(status: string) {
@@ -183,7 +75,7 @@ function getTypeColor(type: string) {
   }
 }
 
-function formatCurrency(amount: string | number) {
+function formatCurrency(amount: string | number | { toString: () => string }) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -244,10 +136,12 @@ function LoadingSkeleton() {
 
 // Not found component
 function NotFound() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen py-20 px-4">
       <div className="max-w-md mx-auto text-center">
-        <div className="bg-white rounded-xl  border border-gray-200 p-8">
+        <div className="bg-white rounded-xl border border-gray-200 p-8">
           <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Transaction Not Found
@@ -256,13 +150,44 @@ function NotFound() {
             The transaction you're looking for doesn't exist or has been
             removed.
           </p>
-          <Link
-            href="/user/wallet"
+          <button
+            onClick={() => router.push("/user/wallet")}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Transactions
-          </Link>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Error component
+function ErrorState({ error, refetch }: { error: Error; refetch: () => void }) {
+  return (
+    <div className="min-h-screen py-20 px-4">
+      <div className="max-w-md mx-auto text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-8">
+          <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Failed to Load Transaction
+          </h2>
+          <p className="text-gray-500 mb-4">{error.message}</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={refetch}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.history.back()}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -272,48 +197,29 @@ function NotFound() {
 export default function TransactionDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [transaction, setTransaction] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  //TransactionId
+  // Get transaction ID from params
   const transactionId = Number(params.Id as string)
 
-  useEffect(() => {
-    // Simulate API call
-    const fetchTransaction = async () => {
-      try {
-        setLoading(true)
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 800))
+  // Fetch transaction using React Query
+  const {
+    data: transaction,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["walletTransaction", transactionId],
+    queryFn: () => getWalletTransactionById(transactionId),
+    enabled: !isNaN(transactionId) && transactionId > 0,
+    retry: 1,
+  })
 
-        const foundTransaction = MOCK_TRANSACTIONS.find(
-          (t) => t.id == transactionId,
-        )
-
-        if (foundTransaction) {
-          setTransaction(foundTransaction)
-          setError(null)
-        } else {
-          setError("Transaction not found")
-        }
-      } catch (err) {
-        setError("Failed to load transaction")
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTransaction()
-  }, [transactionId])
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingSkeleton />
   }
 
   if (error || !transaction) {
-    return <NotFound />
+    return <ErrorState error={error as Error} refetch={refetch} />
   }
 
   return (

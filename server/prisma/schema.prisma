@@ -38,6 +38,10 @@ model User {
   sessions Session[]
   otpCodes OtpCode[]
 
+  //SHARING TICKET
+  sharedBookingsSent     BookingShare[] @relation("ShareOwner")
+  sharedBookingsReceived BookingShare[] @relation("ShareReceiver")
+
   // RELATIONS 
   wallet         Wallet?
   bookings       Booking[] @relation("UserBookings") // tickets owned
@@ -262,7 +266,7 @@ model Booking {
   validUntil  DateTime?
 
   // Pricing
-  discount    Decimal? @default(0)                                                                                                                                                              
+  discount    Decimal? @default(0)
   promoCode   String?
   amountPaid  Decimal?
   totalAmount Decimal?
@@ -277,15 +281,35 @@ model Booking {
   pointsConversionRate Decimal? // rate used to convert points to money
 
   // Relations
+  shares     BookingShare[]
   scheduleId Int?
   paymentId  Int?
-  payment    Payment?     @relation(fields: [paymentId], references: [id])
-  bus        Bus          @relation(fields: [busId], references: [id])
-  user       User         @relation("UserBookings", fields: [userId], references: [id])
-  schedule   BusSchedule? @relation(fields: [scheduleId], references: [id])
+  payment    Payment?       @relation(fields: [paymentId], references: [id])
+  bus        Bus            @relation(fields: [busId], references: [id])
+  user       User           @relation("UserBookings", fields: [userId], references: [id])
+  schedule   BusSchedule?   @relation(fields: [scheduleId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model BookingShare {
+  id           String @id @default(uuid())
+  bookingId    Int
+  ownerId      String
+  targetUserId String
+
+  status ShareStatus @default(PENDING)
+
+  sharedAt    DateTime  @default(now())
+  respondedAt DateTime?
+
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  owner      User    @relation("ShareOwner", fields: [ownerId], references: [id])
+  targetUser User    @relation("ShareReceiver", fields: [targetUserId], references: [id])
+
+  @@index([bookingId])
+  @@index([targetUserId])
 }
 
 model Bus {
@@ -903,6 +927,12 @@ enum TransactionType {
   PAYMENT_IN
 }
 
+enum ShareStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 enum TransactionStatus {
   PENDING
   SUCCESS
@@ -1013,6 +1043,8 @@ enum NotificationType {
   WALLET
   ALERT
   REMINDER
+  BOOKING_SHARE
+  BOOKING_SHARE_ACCEPTED
 }
 
 enum IdType {

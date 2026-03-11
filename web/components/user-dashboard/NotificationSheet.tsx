@@ -60,6 +60,14 @@ interface NotificationSheetProps {
 
 // Colorful type styles inspired by modern apps
 const typeStyles = {
+  DEFAULT: {
+    icon: Info,
+    gradient: "from-gray-500/20 via-gray-400/10 to-transparent",
+    border: "border-gray-200 dark:border-gray-800",
+    badge: "bg-gray-500 hover:bg-gray-600 text-white",
+    lightBadge: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    iconColor: "text-gray-600 dark:text-gray-400",
+  },
   SYSTEM: {
     icon: Settings,
     gradient: "from-blue-500/20 via-blue-400/10 to-transparent",
@@ -176,7 +184,8 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
         },
       )
 
-      const style = typeStyles[notification.type as NotificationType]
+      const style =
+        typeStyles[notification.type as NotificationType] || typeStyles.DEFAULT
 
       toast.custom(
         () => (
@@ -190,7 +199,9 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
             )}
           >
             <div className={cn("p-2 rounded-full", style.lightBadge)}>
-              {React.createElement(style.icon, { className: "h-4 w-4" })}
+              {React.createElement(style?.icon || Info, {
+                className: "h-4 w-4",
+              })}
             </div>
             <div className="flex-1">
               <p className="font-medium text-sm">{notification.title}</p>
@@ -423,8 +434,9 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
               <AnimatePresence initial={false} mode="poplayout">
                 {filteredNotifications.map((notification, index) => {
                   const style =
-                    typeStyles[notification.type as NotificationType]
-                  const TypeIcon = style.icon
+                    typeStyles[notification.type as NotificationType] ||
+                    typeStyles.DEFAULT
+                  const TypeIcon = style?.icon || Info
                   const isDeleting = deletingIds.has(notification.id)
                   const isHovered = hoveredId === notification.id
 

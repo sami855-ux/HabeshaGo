@@ -298,7 +298,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-56 rounded-xl"
+                      className="w-64 rounded-xl"
                     >
                       <DropdownMenuItem
                         onClick={() =>
@@ -307,7 +307,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                         className="gap-3 cursor-pointer"
                       >
                         <Button className="w-full mx-0 cursor-pointer">
-                          <UsersRound className="h-4 w-4" /> Share with frineds
+                          <UsersRound className="h-4 w-4" /> Share with Friends
                         </Button>
                       </DropdownMenuItem>
 

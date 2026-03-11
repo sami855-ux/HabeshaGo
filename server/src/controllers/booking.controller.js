@@ -91,6 +91,28 @@ export const shareBooking = async (req, res) => {
   }
 }
 
+export const shareBookingResponse = async (req, res) => {
+  try {
+    const { id: bookingId } = req.params
+    const userId = req.user.id
+    // req.user.id
+
+    const result = await bookingService.acceptSharedTicket(
+      parseInt(bookingId),
+      userId,
+    )
+    return res.status(result.statusCode).json(result)
+  } catch (err) {
+    console.error("Share booking controller error:", err)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while accepting ticket",
+      data: null,
+    })
+  }
+}
+
 export const cancelBooking = async (req, res) => {
   try {
     const result = await bookingService.cancelBookingService(

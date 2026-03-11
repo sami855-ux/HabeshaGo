@@ -38,6 +38,8 @@ import {
   Clock3,
   History,
   Ban,
+  Gift,
+  ExternalLink,
 } from "lucide-react"
 import {
   format,
@@ -72,6 +74,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
 
 interface TripCardProps {
   trip: Trip
@@ -92,6 +95,8 @@ export default function TripCard({
   onShare,
   onDownload,
 }: TripCardProps) {
+  const router = useRouter()
+
   const [open, setOpen] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -124,11 +129,11 @@ export default function TripCard({
   const isExpired = validUntilDate ? isBefore(validUntilDate, now) : false
 
   // Check if ticket is shared and used
-  const isShared = trip.sharedAt !== null
+  const isShared = trip.sharedAt
   const isSharedTicketUsed = trip.sharedTicketUsed || false
 
   // Card is disabled if shared and used
-  const isDisabled = isShared && isSharedTicketUsed
+  const isDisabled = isShared || isSharedTicketUsed
 
   // Calculate time differences
   const daysSinceCreated = differenceInDays(now, createdAt)
@@ -140,7 +145,7 @@ export default function TripCard({
     : false
 
   // Format shared info
-  const sharedWith = trip.sharedTo
+  const sharedWith = trip?.sharedTo?.name
   const sharedAtDate = trip.sharedAt ? new Date(trip.sharedAt) : null
 
   const statusConfig = {
@@ -223,17 +228,117 @@ export default function TripCard({
             "bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-900/95",
             "rounded-3xl border border-gray-100 dark:border-gray-800",
             "shadow-lg hover:shadow-xl transition-all duration-300",
-            (isExpired || isDisabled) && "opacity-50 grayscale-[0.3]",
-            isDisabled && "cursor-not-allowed pointer-events-none",
+            isExpired && "opacity-50 grayscale-[0.3]",
           )}
         >
-          {/* Disabled overlay for shared used tickets */}
-          {isDisabled && (
-            <div className="absolute inset-0 rounded-3xl bg-gray-500/5 backdrop-blur-[1px] z-20 flex items-center justify-center">
-              <Badge className="bg-gray-800 text-white border-0 px-3 py-1.5 rounded-full shadow-lg">
-                <Ban className="h-3 w-3 mr-1" /> Ticket Used by{" "}
-                {sharedTo || "Recipient"}
-              </Badge>
+          {isShared && !isSharedTicketUsed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 rounded-3xl bg-gradient-to-br from-gray-900/60 via-gray-900/40 to-gray-900/30 backdrop-blur-[1px] z-20 flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching the underlying ticket
+            >
+              <motion.div
+                initial={{ scale: 0.8, y: 20, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                transition={{
+                  type: "spring",
+                  bounce: 0.4,
+                  duration: 0.5,
+                  delay: 0.1,
+                }}
+                whileHover={{
+                  scale: 1.05,
+                  boxShadow:
+                    "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center gap-3 bg-white dark:bg-gray-900 px-5 py-3 rounded-2xl shadow-2xl border-2 border-orange-200 dark:border-orange-800 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // Handle click action - you can replace this with your navigation logic
+                  // if (onViewSharedTicket) {
+                  //   onViewSharedTicket(ticketId);
+                  // } else {
+                  //   // Default action: navigate to ticket details
+                  //   window.location.href = `/tickets/${ticketId}/shared`;
+                  // }
+                }}
+              >
+                {/* Animated icon with glow effect */}
+                <div className="relative">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.5, 1],
+                      opacity: [0.5, 0.8, 0.5],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute inset-0 bg-orange-400 rounded-full blur-md -z-10"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-gray-900"
+                  />
+                </div>
+
+                {/* Text content */}
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Ticket shared with{" "}
+                    <span className="font-bold text-orange-600 dark:text-orange-400">
+                      {sharedWith || "Recipient"}
+                    </span>
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Click to view sharing details
+                  </span>
+                </div>
+
+                {/* Clickable button with arrow */}
+                <motion.div className="ml-2">
+                  <Button
+                    size="sm"
+                    className=" text-white rounded-md px-4 h-8 gap-1.5 shadow-md cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push("/user/booking/share/shared-ticket")
+                    }}
+                  >
+                    <span className="text-xs">View Status</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {isSharedTicketUsed && (
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-gray-900/60 via-gray-900/40 to-gray-900/30 backdrop-blur-[1px] z-20 flex items-center justify-center">
+              {/* Subtle overlay */}
+              <div className="absolute inset-0 bg-gray-900/10 backdrop-blur-[2px] rounded-3xl" />
+
+              {/* Centered badge */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-white dark:bg-gray-900 px-4 py-2.5 rounded-full shadow-xl border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                      <CheckCircle2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Used by{" "}
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {sharedWith || "Recipient"}
+                      </span>
+                    </span>
+                  </div>
+                </motion.div>
+              </div>
             </div>
           )}
 
@@ -365,7 +470,7 @@ export default function TripCard({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          Shared with {sharedTo || "recipient"} on{" "}
+                          Shared with {sharedWith || "recipient"} on{" "}
                           {format(sharedAtDate, "MMM d, yyyy 'at' h:mm a")}
                         </p>
                       </TooltipContent>

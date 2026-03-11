@@ -285,28 +285,142 @@ export const checkInBookingService = async (bookingId, userId) => {
  */
 export const shareBookingService = async (bookingId, ownerId, targetUserId) => {
   try {
+    // 1 Fetch the booking
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
     })
     if (!booking) return errorResponse("Booking not found", 404)
+
+    // 2 Check ownership
     if (booking.userId !== ownerId)
-      return errorResponse("Only owner can share", 403)
-    if (booking.sharedToId) return errorResponse("Ticket already shared", 400)
+      return errorResponse("Only the owner can share this ticket", 403)
+
+    // 3 Check if booking has expired
     if (booking.validUntil && new Date() > new Date(booking.validUntil))
       return errorResponse("Cannot share expired ticket", 400)
 
-    const shared = await prisma.booking.update({
-      where: { id: bookingId },
-      data: { sharedToId: targetUserId, sharedAt: new Date() },
+    // 4 Prevent sharing to yourself
+    if (ownerId === targetUserId)
+      return errorResponse("Cannot share ticket to yourself", 400)
+
+    const senderUser = await prisma.user.findUnique({
+      where: { id: ownerId },
+    })
+    // 5 Check that the target user exists
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+    })
+    if (!targetUser) return errorResponse("Target user not found", 404)
+
+    // 6 Check for duplicate share
+    const existingShare = await prisma.bookingShare.findFirst({
+      where: {
+        bookingId,
+        targetUserId,
+      },
+    })
+    if (existingShare)
+      return errorResponse("Ticket already shared to this user", 400)
+
+    // 7 Create the share record
+    const sharedRecord = await prisma.bookingShare.create({
+      data: {
+        bookingId,
+        ownerId,
+        targetUserId,
+        status: "PENDING",
+      },
     })
 
-    return successResponse("Ticket shared successfully", shared)
+    const res = await prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        sharedAt: new Date(),
+        sharedToId: targetUserId,
+      },
+    })
+
+    // 8 Create a notification for the receiver
+    await prisma.notification.create({
+      data: {
+        userId: targetUserId,
+        title: "New Ticket Shared",
+        message: `A ticket has been shared with you by user ${senderUser?.name}.`,
+        type: "BOOKING_SHARE",
+        metadata: { bookingId, ownerId },
+        actionUrl: `/user/bookings/shared/${sharedRecord.id}`,
+      },
+    })
+
+    return successResponse("Ticket shared successfully", sharedRecord)
   } catch (err) {
     console.error("Share booking service error:", err)
     return errorResponse("Failed to share booking", 500)
   }
 }
 
+/**
+ * Accept shared ticket
+ */
+export const acceptSharedTicket = async (bookingId, userId) => {
+  try {
+    // 1. Find the pending share for this booking and the current user
+    const share = await prisma.bookingShare.findFirst({
+      where: {
+        bookingId,
+        targetUserId: userId,
+        status: "PENDING",
+      },
+    })
+
+    if (!share) {
+      return errorResponse(
+        "No pending shared ticket found for this booking",
+        404,
+      )
+    }
+
+    // 2. Fetch receiver info (optional, for notification message)
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    // 3. Perform atomic transaction: update share status, update booking, create notification
+    const [updatedShare] = await prisma.$transaction([
+      prisma.bookingShare.update({
+        where: { id: share.id },
+        data: {
+          status: "ACCEPTED",
+          respondedAt: new Date(),
+        },
+      }),
+      prisma.booking.update({
+        where: { id: share.bookingId },
+        data: {
+          sharedToId: userId,
+          sharedAt: new Date(),
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: share.ownerId,
+          title: "Ticket Accepted",
+          message: `Your shared ticket has been accepted by user ${targetUser?.name}.`,
+          type: "BOOKING_SHARE_ACCEPTED",
+          metadata: { bookingId: share.bookingId, shareId: share.id },
+          actionUrl: `/user/bookings/${share.bookingId}`,
+        },
+      }),
+    ])
+
+    // 4. Return success response
+    return successResponse("Ticket accepted successfully", updatedShare)
+  } catch (err) {
+    console.error("Accept shared ticket error:", err)
+    // 5. Return generic error response
+    return errorResponse("Failed to accept ticket", 500)
+  }
+}
 /**
  * Cancel a booking
  */
@@ -462,5 +576,69 @@ export const adminBookingStatsService = async () => {
   } catch (err) {
     console.error("Admin booking stats service error:", err)
     return errorResponse("Failed to fetch booking statistics", 500)
+  }
+}
+
+export const getAllSharedTickets = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    // 1. Get tickets the user shared with others
+    const sentShares = await prisma.bookingShare.findMany({
+      where: {
+        ownerId: userId,
+      },
+      include: {
+        booking: true,
+        targetUser: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        sharedAt: "desc",
+      },
+    })
+
+    // 2. Get tickets shared with the user
+    const receivedShares = await prisma.bookingShare.findMany({
+      where: {
+        targetUserId: userId,
+      },
+      include: {
+        booking: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        sharedAt: "desc",
+      },
+    })
+
+    // 3. Return grouped result
+    return res.status(200).json({
+      success: true,
+      data: {
+        sent: sentShares,
+        received: receivedShares,
+      },
+    })
+  } catch (error) {
+    console.error("Error fetching shared tickets:", error)
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch shared tickets",
+    })
   }
 }

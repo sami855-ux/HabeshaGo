@@ -108,6 +108,16 @@ export function ShareFlow({
   const phoneInputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
 
+  const bus = ticketData.bus
+  const route = bus?.route
+
+  const origin =
+    route?.origin || ticketData.boardingStop.split(" ")[0] || "Origin"
+  const destination =
+    route?.destination ||
+    ticketData.alightingStop.split(" ")[0] ||
+    "Destination"
+
   // Load favorite contacts from localStorage
   useEffect(() => {
     loadFavoriteContacts()
@@ -862,6 +872,15 @@ function Step3Confirm({
   onGoBack,
   onOpenShareDialog,
 }: any) {
+  const bus = ticketData.bus
+  const route = bus?.route
+
+  const origin =
+    route?.origin || ticketData.boardingStop.split(" ")[0] || "Origin"
+  const destination =
+    route?.destination ||
+    ticketData.alightingStop.split(" ")[0] ||
+    "Destination"
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -883,7 +902,7 @@ function Step3Confirm({
             <div className="flex-1">
               <p className="text-xs text-gray-500">Ticket</p>
               <p className="font-medium">
-                {ticketData.route.origin} → {ticketData.route.destination}
+                {origin} → {destination}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 {ticketData.date} • {ticketData.departureTime}

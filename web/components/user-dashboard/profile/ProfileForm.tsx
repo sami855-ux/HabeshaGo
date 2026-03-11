@@ -22,6 +22,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ProfileData, User as UserType } from "@/types/user"
+import { ethiopiaRegions } from "@/data/ethiopian-regions"
+import { LocationSelector } from "@/components/ui/LocationSelector"
 
 interface ProfileFormProps {
   profile: ProfileData
@@ -97,7 +99,7 @@ export default function ProfileForm({
   }
 
   return (
-    <Card className="border shadow-sm bg-card">
+    <Card className="border shadow-sm bg-card border-none rounded-lg">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -258,18 +260,19 @@ export default function ProfileForm({
               )}
             </div>
 
-            {/* Location */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
                 Location
               </label>
+
               {isEditing ? (
-                <Input
-                  name="location"
-                  value={profile.location || ""}
-                  onChange={handleChange}
-                  placeholder="City, Country"
+                <LocationSelector
+                  locationString={profile.location || ""}
+                  onChange={(newLocation) => {
+                    // newLocation is a string like "Region, Zone, City"
+                    onProfileChange({ ...profile, location: newLocation })
+                  }}
                 />
               ) : (
                 <div className="px-3 py-2 text-sm rounded-md border bg-muted/50">

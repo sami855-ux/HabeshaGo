@@ -1,10 +1,13 @@
 import { io, Socket } from "socket.io-client"
 
-// Replace with your actual backend URL
-const SOCKET_URL = "http://localhost:5000"
+let socket: Socket | null = null
 
-export const socket: Socket = io(SOCKET_URL, {
-  autoConnect: false,
-  transports: ["websocket"],
-  withCredentials: true,
-})
+export const getSocket = () => {
+  if (!socket) {
+    socket = io("http://localhost:5000", {
+      transports: ["websocket"],
+      autoConnect: false,
+    })
+  }
+  return socket
+}

@@ -31,6 +31,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { FaMapMarkedAlt } from "react-icons/fa"
+import { MdOutlinePayments } from "react-icons/md"
+import { PiTicketLight } from "react-icons/pi"
 
 export type MenuItem = {
   id: string
@@ -166,13 +168,13 @@ function Sidebar() {
     {
       id: "payment",
       label: "Payment",
-      icon: <Receipt className="h-5 w-5" />,
+      icon: <MdOutlinePayments className="h-5 w-5" />,
       path: "/user-payment",
     },
     {
       id: "trips",
-      label: "My Trips",
-      icon: <Ticket className="h-5 w-5" />,
+      label: "My Tickets",
+      icon: <PiTicketLight className="h-5 w-5" />,
       path: "/trips",
     },
   ]

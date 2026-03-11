@@ -91,7 +91,7 @@ export default function ProfilePanel() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-b from-orange-50/30 via-white to-orange-50/20 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-4 md:p-6">
+      <div className="min-h-screen  p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">

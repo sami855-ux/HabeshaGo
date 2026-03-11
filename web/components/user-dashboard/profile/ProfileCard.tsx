@@ -55,7 +55,7 @@ export default function ProfileCard({
   }
 
   return (
-    <Card className="border-none shadow-xl bg-gradient-to-br from-white to-orange-50/50 dark:from-gray-900 dark:to-gray-800/50">
+    <Card className="border-none shadow-xl pt-0 rounded-xl">
       <div className="h-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600" />
 
       <CardHeader className="pb-4">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { axiosInstance } from "@/services/axiosInstance"
-import { socket } from "@/services/socket"
+import { getSocket } from "@/services/socket"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -148,6 +148,7 @@ const NotificationSheet: React.FC<NotificationSheetProps> = ({
   useEffect(() => {
     if (!user?.id) return
 
+    const socket = getSocket()
     const joinRoom = () => {
       console.log("Connected. Joining room for:", user.id)
       socket.emit("joinUserNotification", user.id)

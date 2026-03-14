@@ -10,6 +10,7 @@ import {
   Sun,
   LogOut,
   Search,
+  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,8 @@ import NotificationSheet from "./NotificationSheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import SearchDialog from "./SearchDialog"
 import { motion } from "framer-motion"
+import { PiGearSix } from "react-icons/pi"
+import { MdSupportAgent } from "react-icons/md"
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
@@ -283,29 +286,99 @@ function Header({ className }: { className?: string }) {
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-72 bg-background/80 backdrop-blur-xl border-white/20 dark:border-white/10"
-                >
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-72">
+                  {/* User Info - Enhanced layout */}
+                  <div className="flex items-start gap-3 p-3">
+                    <Avatar className="h-10 w-10 border-2 border-muted">
+                      <AvatarImage src={user?.avaterUrl} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {user?.name?.charAt(0) || "PAS"}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold leading-none truncate capitalize">
+                          {user?.name || "Citizen"}
+                        </p>
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-100"
+                        >
+                          Citizen
+                        </Badge>
+                      </div>
+                      {user?.email && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      router.push("/user/Profile")
-                    }}
-                    className="hover:bg-white/10 dark:hover:bg-white/5 cursor-pointer"
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
+
+                  {/* Account Section Header */}
+                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-3 pt-2">
+                    Account
+                  </DropdownMenuLabel>
+
+                  {/* Menu Items - Grouped with consistent styling */}
+                  <div className="px-1 py-1">
+                    <DropdownMenuItem
+                      onClick={() => router.push("/user/Profile")}
+                      className="cursor-pointer gap-3 py-2"
+                    >
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => router.push("/user/trips")}
+                      className="cursor-pointer gap-3 py-2"
+                    >
+                      <Zap className="w-4 h-4 text-muted-foreground" />
+                      <span>My Trips</span>
+                    </DropdownMenuItem>
+                  </div>
+
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer"
-                    onClick={() => setIsLogoutModalOpen(true)}
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
+
+                  {/* Settings & Support Section */}
+                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-3 pt-2">
+                    Settings & Support
+                  </DropdownMenuLabel>
+
+                  <div className="px-1 py-1">
+                    <DropdownMenuItem
+                      onClick={() => router.push("/ev-owner/settings")}
+                      className="cursor-pointer gap-3 py-2"
+                    >
+                      <PiGearSix className="w-4 h-4 text-muted-foreground" />
+                      <span>Account Settings</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => router.push("/ev-owner/support")}
+                      className="cursor-pointer gap-3 py-2"
+                    >
+                      <MdSupportAgent className="w-4 h-4 text-muted-foreground" />
+                      <span>Support Center</span>
+                    </DropdownMenuItem>
+                  </div>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Logout - With warning style */}
+                  <div className="px-1 py-1">
+                    <DropdownMenuItem
+                      className="cursor-pointer gap-3 py-2 text-destructive focus:text-destructive"
+                      onClick={() => setIsLogoutModalOpen(true)}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="font-medium">Log out</span>
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

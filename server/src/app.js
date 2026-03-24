@@ -3,15 +3,21 @@ dotenv.config();
 
 import http from "http";
 import express from "express";
+import path from "path";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import passport from "passport";
 import cors from "cors";
+import { Server } from "socket.io";
 
+// Passport config
 import "./config/passport.js";
-import { initSocket } from "./socket/index.js";
 
-// Cron
+// Socket modules
+import { initSocket } from "./socket/index.js";
+import { initSupportChatSocket } from "./socket/supportChat.js";
+
+// Cron jobs
 import "./cron/cron.js";
 
 // Routes
@@ -32,7 +38,7 @@ import auditRoute from "./routes/audit.route.js";
 import midPointRoute from "./routes/midpoint.routes.js";
 import promoCodeRoute from "./routes/promoCode.route.js";
 
-// Ev charging routes
+// EV charging routes
 import stationRoutes from "./routes/evStation.route.js";
 import pointRoutes from "./routes/chargingPoint.route.js";
 import sessionRoutes from "./routes/chargingSession.route.js";
@@ -40,22 +46,29 @@ import reservationRoutes from "./routes/evReservations.route.js";
 import tariffRoutes from "./routes/evTariffs.route.js";
 import ratingRoutes from "./routes/ratings.route.js";
 
+// Support Chat
+import supportChatRoutes from "./routes/supportChat.routes.js";
+
 const app = express();
 
+/* ---------------- MIDDLEWARE ---------------- */
 app.use(cookieParser());
 
 app.use(
   cors({
-    origin: true,
+    origin: "http://localhost:3000", // frontend URL
     credentials: true,
   }),
 );
 
 app.use(express.json());
 
+// ✅ Serve uploads
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 app.use(
   session({
-    secret: "secretkey",
+    secret: process.env.SESSION_SECRET || "secretkey",
     resave: false,
     saveUninitialized: false,
   }),
@@ -64,7 +77,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// routes
+/* ---------------- API ROUTES ---------------- */
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/wallet", walletRoutes);
@@ -82,21 +95,34 @@ app.use("/api/minibus-reservation", minibusReservationRoutes);
 app.use("/api/minibus", minibusRoute);
 app.use("/api/audit", auditRoute);
 
-// Ev charging routes
+// EV charging
 app.use("/api/ev/station", stationRoutes);
 app.use("/api/ev/point", pointRoutes);
 app.use("/api/ev/session", sessionRoutes);
 app.use("/api/ev/reservation", reservationRoutes);
 app.use("/api/ev/tariff", tariffRoutes);
-
 app.use("/api/rating", ratingRoutes);
 
+// Support chat
+app.use("/api/support-chat", supportChatRoutes);
+
+/* ---------------- SERVER ---------------- */
 const server = http.createServer(app);
 
-initSocket(server);
+/* ---------------- SOCKET.IO ---------------- */
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    credentials: true,
+  },
+});
 
+// Initialize sockets
+initSocket(io);
+initSupportChatSocket(io);
+
+/* ---------------- START SERVER ---------------- */
 const PORT = process.env.PORT || 5000;
-
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -1,5 +1,11 @@
 import { AuditLog, AuditAction, EntityType } from "@/types/audit-log"
 
+import {
+  ChargingSession,
+  ChartDataPoint,
+  StationPerformance,
+} from "@/types/charging"
+
 export enum UserRole {
   ADMIN = "ADMIN",
   PASSENGER = "PASSENGER",
@@ -136,3 +142,91 @@ export const mockUsers = [
     friends: false,
   },
 ]
+
+export const generateMockSessions = (): ChargingSession[] => {
+  const stations = [
+    "Central Station",
+    "North Hub",
+    "South Park",
+    "East Plaza",
+    "West End",
+  ]
+  const chargers = ["DC-001", "DC-002", "AC-101", "AC-102", "DC-003"]
+  const users = [
+    "Tesla Model 3",
+    "Nissan Leaf",
+    "Ford Mustang",
+    "BMW i4",
+    "VW ID.4",
+  ]
+  const names = ["John D.", "Sarah M.", "Mike R.", "Emma W.", "David L."]
+
+  return Array.from({ length: 50 }, (_, i) => {
+    const status =
+      Math.random() > 0.7
+        ? "in_progress"
+        : Math.random() > 0.8
+          ? "failed"
+          : "completed"
+    const startTime = new Date(Date.now() - Math.random() * 86400000 * 7)
+    const endTime = new Date(startTime.getTime() + Math.random() * 3600000 * 2)
+    const durationHours = (endTime.getTime() - startTime.getTime()) / 3600000
+
+    return {
+      id: `session-${i}`,
+      sessionId: `SESS-${String(i + 1000).padStart(4, "0")}`,
+      stationName: stations[Math.floor(Math.random() * stations.length)],
+      chargerId: chargers[Math.floor(Math.random() * chargers.length)],
+      userName: `${names[Math.floor(Math.random() * names.length)]} - ${users[Math.floor(Math.random() * users.length)]}`,
+      vehicleModel: users[Math.floor(Math.random() * users.length)],
+      startTime: startTime.toISOString(),
+      endTime: status === "in_progress" ? "In Progress" : endTime.toISOString(),
+      duration:
+        status === "in_progress"
+          ? "45 min"
+          : `${Math.round(durationHours * 10) / 10} hrs`,
+      energyDelivered: Math.round(Math.random() * 50 * 10) / 10,
+      revenue: Math.round(Math.random() * 25 * 10) / 10,
+      status: status as "completed" | "in_progress" | "failed",
+    }
+  })
+}
+
+export const generateTrendData = (): ChartDataPoint[] => {
+  return Array.from({ length: 30 }, (_, i) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (29 - i))
+    const revenue = Math.round((Math.random() * 1500 + 500) * 10) / 10
+    const energy = Math.round((Math.random() * 2000 + 800) * 10) / 10
+
+    return {
+      date: date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      revenue,
+      energy,
+      sessions: Math.floor(Math.random() * 25 + 10),
+      peakDemand: Math.floor(Math.random() * 12 + 3),
+      avgCostPerKwh: Number((revenue / energy).toFixed(2)),
+    }
+  })
+}
+
+export const generateStationPerformance = (): StationPerformance[] => {
+  const stations = [
+    "Central Station",
+    "North Hub",
+    "South Park",
+    "East Plaza",
+    "West End",
+  ]
+
+  return stations.map((station) => ({
+    stationName: station,
+    sessions: Math.floor(Math.random() * 150 + 50),
+    revenue: Math.floor(Math.random() * 5000 + 1000),
+    energy: Math.floor(Math.random() * 8000 + 2000),
+    utilization: Math.floor(Math.random() * 40 + 40),
+  }))
+}

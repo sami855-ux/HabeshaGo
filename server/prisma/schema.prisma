@@ -23,7 +23,6 @@ model User {
   googleId      String? @unique
   appleId       String? @unique
 
-  // SECURITY / CONTROL
   isSuspended      Boolean   @default(false)
   suspendedAt      DateTime?
   suspendedBy      String?
@@ -34,13 +33,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  passengerCategory PassengerCategory @default(NORMAL) //ONly relevant for passengers
+  passengerCategory PassengerCategory @default(NORMAL)
 
-  // AUTH RELATIONS
   sessions Session[]
   otpCodes OtpCode[]
 
-  //SHARING TICKET
   sharedBookingsSent     BookingShare[] @relation("ShareOwner")
   sharedBookingsReceived BookingShare[] @relation("ShareReceiver")
 
@@ -73,12 +70,10 @@ model Session {
   id     String @id @default(cuid())
   userId String
 
-  // Internal refresh token 
   refreshTokenHash String   @unique
   expiresAt        DateTime
   revoked          Boolean  @default(false)
 
-  // Device info
   ipAddress    String?
   userAgent    String?
   lastActiveAt DateTime @default(now())
@@ -97,8 +92,8 @@ model OtpCode {
   userId      String
   email       String?
   phone       String?
-  code        String? // optional if using hashed code only
-  codeHash    String? // store hashed OTP here
+  code        String?
+  codeHash    String?
   attempts    Int      @default(0)
   maxAttempts Int      @default(3)
   expiresAt   DateTime
@@ -122,11 +117,8 @@ model Notification {
   isRead Boolean   @default(false)
   readAt DateTime?
 
-  // optional navigation or action
   actionUrl String?
-
-  // flexible extra data (bookingId, busId, routeId, etc.)
-  metadata Json?
+  metadata  Json?
 
   createdAt DateTime @default(now())
 
@@ -134,6 +126,138 @@ model Notification {
 
   @@index([userId])
   @@index([isRead])
+}
+
+////////////////////////////////////////////////////////////
+//////////////////// SUPPORT CHAT MODELS ///////////////////
+////////////////////////////////////////////////////////////
+
+model SupportChatSession {
+  id String @id @default(cuid())
+
+  userId  String
+  agentId String?
+
+  status   ChatSessionStatus @default(OPEN)
+  subject  String?
+  priority ChatPriority      @default(NORMAL)
+
+  lastMessageAt DateTime?
+  closedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User  @relation("UserSupportChats", fields: [userId], references: [id])
+  agent User? @relation("AgentSupportChats", fields: [agentId], references: [id])
+
+  messages SupportMessage[]
+  typing   ChatTypingStatus[]
+
+  @@index([userId])
+  @@index([agentId])
+  @@index([status])
+  @@map("support_chat_sessions")
+}
+
+model SupportMessage {
+  id String @id @default(cuid())
+
+  sessionId String
+
+  senderType MessageSenderType
+  senderId   String?
+
+  message String @db.Text
+
+  attachmentUrl  String?
+  attachmentType AttachmentType?
+  attachmentName String?
+  attachmentSize Int?
+
+  status MessageStatus @default(SENT)
+
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  session SupportChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([senderType])
+  @@index([createdAt])
+  @@map("support_messages")
+}
+
+model ChatTypingStatus {
+  id String @id @default(cuid())
+
+  sessionId String
+  userId    String
+
+  isTyping Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  session SupportChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@map("chat_typing_status")
+}
+
+model SupportAgentStatus {
+  id String @id @default(cuid())
+
+  agentId String @unique
+
+  isOnline Boolean @default(false)
+
+  activeChats Int @default(0)
+
+  lastSeen DateTime?
+
+  agent User @relation(fields: [agentId], references: [id])
+
+  @@index([isOnline])
+  @@map("support_agent_status")
+}
+
+enum ChatSessionStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  CLOSED
+}
+
+enum MessageSenderType {
+  USER
+  AGENT
+  BOT
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum ChatPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AttachmentType {
+  IMAGE
+  PDF
+  FILE
 }
 
 //Digital ticketing

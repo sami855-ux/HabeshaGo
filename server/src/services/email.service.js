@@ -4,7 +4,7 @@ dotenv.config()
 import { Resend } from "resend"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 
-const resend = new Resend("re_Fsm1xGsT_2gSKwnZWB31nZ81mjhHf2iFy")
+const resend = new Resend("re_YHfGHR6o_5XFxC378P47Fm8NqFxPrioKX");
 
 export const sendEmail = async ({ to, subject, html }) => {
   try {

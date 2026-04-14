@@ -47,7 +47,7 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: true,
+    origin: "http://localhost:3000", // frontend URL
     credentials: true,
   }),
 )
@@ -56,7 +56,7 @@ app.use(express.json())
 
 app.use(
   session({
-    secret: "secretkey",
+    secret: process.env.SESSION_SECRET || "secretkey",
     resave: false,
     saveUninitialized: false,
   }),

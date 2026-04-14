@@ -6,6 +6,8 @@ import bookingReducer from "./slices/booking.Slice"
 import paymentReducer from "./slices/paymentSlice"
 import routeReducer from "./slices/routeslice"
 import { setupAxiosInterceptors } from "@/services/setupAxiosInterceptors"
+import supportAgentReducer from "./slices/supportAgentSlice";
+import supportCustomerReducer from "./slices/supportCustomerSlice"
 
 export const store = configureStore({
   reducer: {
@@ -15,8 +17,10 @@ export const store = configureStore({
     booking: bookingReducer,
     payment: paymentReducer,
     route: routeReducer,
+    supportChat: supportAgentReducer,
+    supportCustomer: supportCustomerReducer,
   },
-})
+});
 
 // ✅ SAFE: store is fully initialized now
 setupAxiosInterceptors(store)

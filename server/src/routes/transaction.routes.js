@@ -6,6 +6,7 @@ import {
   getWalletTransactionById,
 } from "../controllers/transaction.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
+import { getUserFinancialHistory } from "../services/transaction.service.js"
 
 const router = express.Router()
 
@@ -17,6 +18,8 @@ router.post("/pay", authenticate, payFromWallet)
 
 //Get A single trasnaction based on the id
 router.get("/:id", getWalletTransactionById)
+
+router.get("/finance/history", authenticate, getUserFinancialHistory)
 
 // Get internal wallet transaction history
 router.get("/history", authenticate, getTransactionHistory)

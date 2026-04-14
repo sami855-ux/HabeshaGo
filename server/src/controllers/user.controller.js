@@ -1,5 +1,9 @@
 import prisma from "../prisma/client.js"
 import {
+  getDailyRevenueService,
+  getFormattedPassengersService,
+  getProviderRevenueService,
+  getRevenueOverview,
   getUsersByPhoneService,
   sendOtpService,
   updateProfileService,
@@ -24,7 +28,6 @@ export const getAllUsers = async (req, res) => {
         role: true,
         emailVerified: true,
         phoneVerified: true,
-        twoFactorEnabled: true,
         isSuspended: true,
         suspendedAt: true,
         suspendedBy: true,
@@ -116,17 +119,17 @@ export const deleteUser = async (req, res) => {
   const { id } = req.params
 
   try {
-    // Check if user exists
+    // 1️⃣ Check if user exists
     const user = await prisma.user.findUnique({
       where: { id },
     })
 
     if (!user || user.isDeleted) {
-      return res.status(404).json({ success: false, message: "User not found" })
+      return res.status(404).json(errorResponse("User not found"))
     }
 
-    // Soft delete user
-    await prisma.user.update({
+    // 2️⃣ Soft delete user
+    const deletedUser = await prisma.user.update({
       where: { id },
       data: {
         isDeleted: true,
@@ -134,27 +137,20 @@ export const deleteUser = async (req, res) => {
       },
     })
 
-    // // Optional: soft delete related bookings and wallet
-    // await prisma.booking.updateMany({
-    //   where: { userId: id },
-    //   data: { isDeleted: true, deletedAt: new Date() },
-    // })
-
-    // await prisma.wallet.updateMany({
-    //   where: { userId: id },
-    //   data: { isDeleted: true, deletedAt: new Date() },
-    // })
-
-    return res.status(200).json({
-      success: true,
-      message: "User deleted (soft) successfully",
-    })
+    // 3️⃣ Return consistent response
+    return res.status(200).json(
+      successResponse("User deleted successfully", {
+        id: deletedUser.id,
+        isDeleted: deletedUser.isDeleted,
+        deletedAt: deletedUser.deletedAt,
+      }),
+    )
   } catch (error) {
     console.error("Soft delete user error:", error)
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Server error",
-    })
+
+    return res
+      .status(500)
+      .json(errorResponse(error.message || "Failed to delete user"))
   }
 }
 
@@ -363,5 +359,71 @@ export const getTransportStats = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: "Failed to fetch transport stats" })
+  }
+}
+
+export const getformattedUsers = async (req, res) => {
+  try {
+    const result = await getFormattedPassengersService()
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get wallet controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching wallet",
+      data: null,
+    })
+  }
+}
+
+export const getRevenueOverviewController = async (req, res) => {
+  try {
+    const result = await getRevenueOverview()
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get wallet controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching wallet",
+      data: null,
+    })
+  }
+}
+/**
+ * GET /api/admin/finance/revenue-overview/daily
+ */
+export const getDailyRevenueController = async (req, res) => {
+  try {
+    const days = Number(req.query.days) || 30
+    const result = await getDailyRevenueService(days)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get daily revenue controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching daily revenue",
+      data: null,
+    })
+  }
+}
+
+/**
+ * GET /api/admin/finance/revenue-overview/providers
+ */
+export const getProviderRevenueController = async (req, res) => {
+  try {
+    const result = await getProviderRevenueService()
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get provider revenue controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching provider revenue",
+      data: null,
+    })
   }
 }

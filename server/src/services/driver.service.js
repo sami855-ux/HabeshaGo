@@ -79,16 +79,92 @@ export const getAllDriversService = async () => {
   }
 }
 
+export const getFormattedDriversService = async (query) => {
+  try {
+    const search = query?.search || ""
+
+    const drivers = await prisma.driver.findMany({
+      where: {
+        status: "ACTIVE",
+        user: {
+          isDeleted: false,
+          isSuspended: false,
+
+          // search filter
+          ...(search && {
+            OR: [
+              {
+                name: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+              {
+                email: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+              {
+                phone: {
+                  contains: search,
+                },
+              },
+            ],
+          }),
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            avaterUrl: true,
+            emailVerified: true,
+            location: true,
+          },
+        },
+      },
+    })
+
+    const formattedDrivers = drivers.map((driver) => ({
+      id: driver.user.id,
+      name: driver.user.name,
+      email: driver.user.email,
+      phone: driver.user.phone,
+      avatarUrl: driver.user.avaterUrl || null,
+      emailVerified: driver.user.emailVerified,
+      location: driver.user.location,
+    }))
+
+    return successResponse(
+      "Drivers retrieved successfully",
+      formattedDrivers,
+      200,
+    )
+  } catch (error) {
+    console.error("Get all drivers error:", error)
+    return errorResponse("Failed to fetch drivers", 500)
+  }
+}
+
 // GET DRIVER BY ID
 export const getDriverByIdService = async (driverId) => {
   try {
     const driver = await prisma.driver.findUnique({
       where: { id: driverId },
       include: {
-        user: true,
-        vehicle: true,
-        assignedBus: true,
-        assignedMinibus: true,
+        user: true, // driver user info
+        assignments: {
+          // driver assignments
+          include: {
+            vehicle: true, // vehicle details in assignment
+          },
+        },
+        buses: true, // buses assigned to driver
+        minibuses: true, // minibuses assigned to driver
       },
     })
 

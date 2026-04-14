@@ -41,7 +41,7 @@ export const initSocket = (server) => {
       try {
         if (Array.isArray(vehicleIds) && vehicleIds.length > 0) {
           const latestLocations = await Promise.all(
-            vehicleIds.map(getLatestVehicleLocation)
+            vehicleIds.map(getLatestVehicleLocation),
           )
 
           socket.emit("map:init", latestLocations.filter(Boolean))

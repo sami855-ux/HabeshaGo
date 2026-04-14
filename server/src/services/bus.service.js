@@ -1,155 +1,207 @@
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import prisma from "../prisma/client.js"
 
-const MIN_INTERVAL = 45
+const MIN_INTERVAL = 35 // minutes
+
+const formatTo12Hour = (date) => {
+  let hours = date.getHours()
+  const minutes = date.getMinutes()
+  const ampm = hours >= 12 ? "PM" : "AM"
+
+  hours = hours % 12
+  hours = hours ? hours : 12
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")} ${ampm}`
+}
+// Format Date to Ethiopian time in "HH:MM AM/PM"
+const formatToEthiopianTime = (utcDateString) => {
+  const date = new Date(utcDateString)
+
+  // Add 3 hours for Ethiopian Time
+  date.setHours(date.getHours() + 3)
+
+  let hours = date.getHours()
+  const minutes = date.getMinutes()
+  const ampm = hours >= 12 ? "PM" : "AM"
+  hours = hours % 12
+  hours = hours ? hours : 12 // convert 0 → 12
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")} ${ampm}`
+}
 
 export const createBusService = async (data) => {
   try {
-    // Extract and validate form data
     const {
-      busNumber, // String Required — must be unique (e.g., "BUS-101")
-      capacity, // Int Required — number of seats
-      routeId, // Int Optional at creation — but recommended to assign a route
-      driverId, // String Optional — assign later or at creation if driver exists
-      currentStop, // String Optional — where the bus is currently located
-      nextDestination, // String Optional — next stop or final destination
-      departureTime, // DateTime Optional — initial departure time
-      estimatedArrival, // DateTime Optional — calculated from route
-      delayMinutes = 0, // Int Optional — default 0
-      availableSeats, // Int Optional — can default to capacity if not provided
-      vehicleId, // Int Optional — if this bus is linked to a vehicle
-      lastServiceDate, // DateTime Optional — for maintenance tracking
-      nextServiceDate, // DateTime Optional — next maintenance date
-      status = "ACTIVE", // BusStatus Optional — default ACTIVE
-      isActive = true, // Boolean Optional — default true
+      busNumber,
+      capacity,
+      routeId,
+      driverId,
+      currentStop,
+      nextDestination,
+      departureTime,
+      estimatedArrival,
+      delayMinutes = 0,
+      vehicleId,
+      lastServiceDate,
+      nextServiceDate,
+      status = "ACTIVE",
+      isActive = true,
+      schedules = [],
     } = data
 
-    // Validate required fields
     if (!busNumber || !capacity) {
       return errorResponse("Bus number and capacity are required", 400)
     }
 
-    // Check if bus number already exists
-    const existingBus = await prisma.bus.findUnique({
-      where: { busNumber },
+    const result = await prisma.$transaction(async (tx) => {
+      // ✅ Uniqueness
+      const existingBus = await tx.bus.findUnique({ where: { busNumber } })
+      if (existingBus) throw new Error("Bus number already exists")
+
+      // ✅ Relations
+      if (routeId) {
+        const route = await tx.route.findUnique({
+          where: { id: parseInt(routeId) },
+        })
+        if (!route) throw new Error("Route not found")
+      }
+
+      if (driverId) {
+        const driver = await tx.driver.findUnique({ where: { id: driverId } })
+        if (!driver) throw new Error("Driver not found")
+
+        const assignedBus = await tx.bus.findUnique({ where: { driverId } })
+        if (assignedBus)
+          throw new Error("Driver is already assigned to another bus")
+      }
+
+      if (vehicleId) {
+        const vehicle = await tx.vehicle.findUnique({
+          where: { id: parseInt(vehicleId) },
+        })
+        if (!vehicle) throw new Error("Vehicle not found")
+
+        const assignedBus = await tx.bus.findUnique({
+          where: { vehicleId: parseInt(vehicleId) },
+        })
+        if (assignedBus)
+          throw new Error("Vehicle is already assigned to another bus")
+      }
+
+      // Normalize to hour
+      const toHourDate = (input) => {
+        const d = new Date(input)
+        d.setMinutes(0, 0, 0)
+        return d
+      }
+
+      // Prepare bus data
+      const busData = {
+        busNumber,
+        capacity: parseInt(capacity),
+        status,
+        isActive,
+        delayMinutes: parseInt(delayMinutes),
+      }
+
+      if (routeId) busData.routeId = parseInt(routeId)
+      if (driverId) busData.driverId = driverId
+      if (currentStop) busData.currentStop = currentStop
+      if (nextDestination) busData.nextDestination = nextDestination
+      if (vehicleId) busData.vehicleId = parseInt(vehicleId)
+      if (departureTime) busData.departureTime = toHourDate(departureTime)
+      if (estimatedArrival) busData.estimatedArrival = estimatedArrival
+      if (lastServiceDate) busData.lastServiceDate = new Date(lastServiceDate)
+      if (nextServiceDate) busData.nextServiceDate = new Date(nextServiceDate)
+
+      // ✅ Create bus
+      const bus = await tx.bus.create({ data: busData })
+
+      // ✅ Handle schedules
+      if (schedules.length > 0) {
+        if (!estimatedArrival) {
+          throw new Error(
+            "estimatedArrival is required when schedules are provided",
+          )
+        }
+
+        // 🔥 Sort schedules first (VERY IMPORTANT)
+        const normalizedTimes = schedules
+          .map((s) => ({ ...s, start: toHourDate(s.startTime) }))
+          .sort((a, b) => a.start.getTime() - b.start.getTime())
+
+        const schedulesToCreate = []
+
+        for (let i = 0; i < normalizedTimes.length; i++) {
+          const s = normalizedTimes[i]
+          const start = s.start
+          const end = new Date(start.getTime() + estimatedArrival * 60000)
+
+          // ✅ Validate optional endTime
+          if (s.endTime) {
+            const providedEnd = toHourDate(s.endTime)
+            if (providedEnd.getTime() !== end.getTime()) {
+              throw new Error(
+                `Schedule ${i + 1}: endTime must equal startTime + estimatedArrival`,
+              )
+            }
+          }
+
+          // 🔥 Interval check (WORKS for before/after/middle)
+          for (const existingSchedule of schedulesToCreate) {
+            const sStart = new Date(existingSchedule.startTime).getTime()
+            const sEnd = new Date(existingSchedule.endTime).getTime()
+
+            const gapBefore = start.getTime() - sEnd
+            const gapAfter = sStart - end.getTime()
+
+            if (
+              (gapBefore >= 0 && gapBefore < MIN_INTERVAL * 60000) ||
+              (gapAfter >= 0 && gapAfter < MIN_INTERVAL * 60000)
+            ) {
+              throw new Error(
+                `Schedule ${i + 1} (${formatTo12Hour(start)}) violates ${MIN_INTERVAL} minute interval rule`,
+              )
+            }
+          }
+
+          // ✅ Alternate direction
+          let direction = "FORWARD"
+          if (schedulesToCreate.length > 0) {
+            const last =
+              schedulesToCreate[schedulesToCreate.length - 1].direction
+            direction = last === "FORWARD" ? "REVERSE" : "FORWARD"
+          }
+
+          schedulesToCreate.push({
+            busId: bus.id,
+            startTime: formatTo12Hour(start),
+            endTime: formatTo12Hour(end),
+            direction,
+          })
+        }
+
+        await tx.busSchedule.createMany({ data: schedulesToCreate })
+      }
+
+      return bus
     })
-    if (existingBus) {
-      return errorResponse("Bus number already exists", 400)
-    }
 
-    // Validate relations if provided
-    if (routeId) {
-      const route = await prisma.route.findUnique({
-        where: { id: parseInt(routeId) },
-      })
-      if (!route) {
-        return errorResponse("Route not found", 404)
-      }
-    }
-
-    if (driverId) {
-      const driver = await prisma.driver.findUnique({
-        where: { id: driverId },
-      })
-      if (!driver) {
-        return errorResponse("Driver not found", 404)
-      }
-
-      // Check if driver is already assigned to another bus
-      const assignedBus = await prisma.bus.findUnique({
-        where: { driverId },
-      })
-      if (assignedBus) {
-        return errorResponse("Driver is already assigned to another bus", 400)
-      }
-    }
-
-    if (vehicleId) {
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id: parseInt(vehicleId) },
-      })
-      if (!vehicle) {
-        return errorResponse("Vehicle not found", 404)
-      }
-
-      // Check if vehicle is already assigned to another bus
-      const assignedBus = await prisma.bus.findUnique({
-        where: { vehicleId: parseInt(vehicleId) },
-      })
-      if (assignedBus) {
-        return errorResponse("Vehicle is already assigned to another bus", 400)
-      }
-    }
-
-    // Prepare bus data for creation
-    const busData = {
-      busNumber,
-      capacity: parseInt(capacity),
-      status,
-      isActive,
-      delayMinutes: parseInt(delayMinutes),
-      reservedSeats: 0, // Default to 0 for new bus
-      availableSeats: availableSeats
-        ? parseInt(availableSeats)
-        : parseInt(capacity),
-    }
-
-    // Add optional fields if provided
-    if (routeId) busData.routeId = parseInt(routeId)
-    if (driverId) busData.driverId = driverId
-    if (currentStop) busData.currentStop = currentStop
-    if (nextDestination) busData.nextDestination = nextDestination
-    if (vehicleId) busData.vehicleId = parseInt(vehicleId)
-
-    // Handle datetime fields
-    if (departureTime) {
-      busData.departureTime = new Date(departureTime)
-    }
-    if (estimatedArrival) {
-      busData.estimatedArrival = new Date(estimatedArrival)
-    }
-    if (lastServiceDate) {
-      busData.lastServiceDate = new Date(lastServiceDate)
-    }
-    if (nextServiceDate) {
-      busData.nextServiceDate = new Date(nextServiceDate)
-    }
-
-    // Create the bus with relations
-    const bus = await prisma.bus.create({
-      data: busData,
-      include: {
-        route: true,
-        driver: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        vehicle: true,
-        schedules: true,
-      },
-    })
-
-    return successResponse("Bus created successfully", bus, 201)
+    return successResponse("Bus created successfully", result, 201)
   } catch (error) {
     console.error("Create bus error:", error)
 
-    // Handle Prisma specific errors
-    if (error.code === "P2002") {
+    if (error.code === "P2002")
       return errorResponse("Bus number must be unique", 400)
-    }
-    if (error.code === "P2003") {
-      return errorResponse("Invalid reference to related record", 400)
-    }
 
-    return errorResponse("Failed to create bus", 500)
+    if (error.code === "P2003")
+      return errorResponse("Invalid reference to related record", 400)
+
+    return errorResponse(error.message || "Failed to create bus", 500)
   }
 }
 
@@ -280,65 +332,71 @@ const isValidTime = (t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t)
 const addMinutesToTime = (timeStr, minutesToAdd) => {
   return minutesToTime(timeToMinutes(timeStr) + minutesToAdd)
 }
+const toHourDate = (input) => {
+  const d = new Date(input)
+  d.setMinutes(0, 0, 0)
+  return d
+}
+
 export const createBusScheduleService = async (busId, startTime) => {
   try {
     const bus = await prisma.bus.findUnique({
       where: { id: busId },
-      include: {
-        route: {
-          select: { estimatedTimeMin: true },
-        },
+      select: {
+        id: true,
+        estimatedArrival: true,
       },
     })
 
-    if (!bus || !bus.route) return errorResponse("Bus or route not found", 404)
+    if (!bus) return errorResponse("Bus not found", 404)
 
-    const duration = bus.route.estimatedTimeMin || 0
-    const newStartMin = timeToMinutes(startTime)
-    const newEndMin = newStartMin + duration
+    if (!bus.estimatedArrival) {
+      return errorResponse(
+        "Bus must have estimatedArrival before adding schedules",
+        400,
+      )
+    }
 
-    // 🔹 Get existing schedules
+    const start = toHourDate(startTime)
+
+    // Compute endTime exactly like original
+    const end = new Date(start.getTime() + bus.estimatedArrival * 60000)
+
+    // 🔹 Get existing schedules (ordered)
     const existing = await prisma.busSchedule.findMany({
       where: { busId },
       orderBy: { startTime: "asc" },
     })
 
-    // 🔹 Interval validation (your existing logic)
-    for (const s of existing) {
-      const sStart = timeToMinutes(s.startTime)
-      const sEnd = timeToMinutes(s.endTime)
+    // Interval validation (MATCHES your original logic)
+    if (existing.length > 0) {
+      const last = existing[existing.length - 1]
 
-      const gapBefore = newStartMin - sEnd
-      const gapAfter = sStart - newEndMin
+      const lastEnd = new Date(last.endTime)
+      const minStart = new Date(lastEnd.getTime() + MIN_INTERVAL * 60000)
 
-      if (
-        newStartMin === sStart ||
-        (gapBefore >= 0 && gapBefore < MIN_INTERVAL) ||
-        (gapAfter >= 0 && gapAfter < MIN_INTERVAL)
-      ) {
+      if (start.getTime() < minStart.getTime()) {
         return errorResponse(
-          `Minimum ${MIN_INTERVAL} minutes interval required between schedules`,
+          `Schedule must start at least ${MIN_INTERVAL} minutes after the previous one`,
           400,
         )
       }
     }
 
-    // 🔥 Direction Logic
+    //  Direction toggle (same as your logic)
     let direction = "FORWARD"
 
     if (existing.length > 0) {
-      const lastSchedule = existing[existing.length - 1]
-
-      direction = lastSchedule.direction === "FORWARD" ? "REVERSE" : "FORWARD"
+      const last = existing[existing.length - 1]
+      direction = last.direction === "FORWARD" ? "REVERSE" : "FORWARD"
     }
 
-    const endTime = minutesToTime(newEndMin)
-
+    //  Create schedule (formatted like original)
     const schedule = await prisma.busSchedule.create({
       data: {
         busId,
-        startTime,
-        endTime,
+        startTime: formatTo12Hour(start),
+        endTime: formatTo12Hour(end),
         direction,
       },
     })
@@ -346,110 +404,139 @@ export const createBusScheduleService = async (busId, startTime) => {
     return successResponse("Bus schedule created successfully", schedule, 201)
   } catch (error) {
     console.error("Create bus schedule error:", error)
-    return errorResponse("Failed to create schedule", 500)
+    return errorResponse(error.message || "Failed to create schedule", 500)
   }
 }
 
 export const bulkCreateBusSchedulesService = async (busId, startTimes) => {
   try {
-    if (!Array.isArray(startTimes) || !startTimes.length)
+    if (!Array.isArray(startTimes) || startTimes.length === 0)
       return errorResponse("startTimes must be a non-empty array", 400)
 
-    const bus = await prisma.bus.findUnique({
-      where: { id: busId },
-      include: {
-        route: {
-          select: { estimatedTimeMin: true },
-        },
-      },
-    })
-
-    if (!bus || !bus.route) return errorResponse("Bus or route not found", 404)
-
-    const duration = bus.route.estimatedTimeMin || 0
-
-    // Validate time format
-    for (const t of startTimes) {
-      if (!isValidTime(t))
-        return errorResponse(`Invalid time format: ${t}`, 400)
-    }
-
-    // Remove duplicates + sort
-    const uniqueTimes = [...new Set(startTimes)].sort(
-      (a, b) => timeToMinutes(a) - timeToMinutes(b),
-    )
-
-    // Get existing schedules sorted by time
-    const existing = await prisma.busSchedule.findMany({
-      where: { busId },
-      orderBy: { startTime: "asc" },
-    })
-
-    const existingRanges = existing.map((s) => ({
-      start: timeToMinutes(s.startTime),
-      end: timeToMinutes(s.endTime),
-    }))
-
-    const newSchedules = []
-
-    for (const time of uniqueTimes) {
-      const start = timeToMinutes(time)
-      const end = start + duration
-
-      const conflicts = [...existingRanges, ...newSchedules].some((s) => {
-        const gapBefore = start - s.end
-        const gapAfter = s.start - end
-
-        return (
-          start === s.start ||
-          (gapBefore >= 0 && gapBefore < MIN_INTERVAL) ||
-          (gapAfter >= 0 && gapAfter < MIN_INTERVAL)
-        )
-      })
-
-      if (conflicts) {
-        return errorResponse(
-          `Schedule ${time} violates ${MIN_INTERVAL} minute interval rule`,
-          400,
-        )
-      }
-
-      newSchedules.push({ start, end })
-    }
-
-    // 🔥 Direction logic
-
-    let nextDirection = "FORWARD"
-
-    if (existing.length > 0) {
-      const lastExisting = existing[existing.length - 1]
-
-      nextDirection =
-        lastExisting.direction === "FORWARD" ? "REVERSE" : "FORWARD"
-    }
-
-    const schedulesWithDirection = newSchedules.map((s) => {
-      const schedule = {
-        busId,
-        startTime: minutesToTime(s.start),
-        endTime: minutesToTime(s.end),
-        direction: nextDirection,
-      }
-
-      // Alternate for next one
-      nextDirection = nextDirection === "FORWARD" ? "REVERSE" : "FORWARD"
-
-      return schedule
-    })
-
     const created = await prisma.$transaction(
-      schedulesWithDirection.map((data) => prisma.busSchedule.create({ data })),
+      async (tx) => {
+        // Step 1: Fetch bus
+        const bus = await tx.bus.findUnique({
+          where: { id: busId },
+          select: { id: true, routeId: true },
+        })
+        if (!bus) throw new Error("Bus not found")
+
+        // Step 2: Fetch route
+        const route = await tx.route.findUnique({
+          where: { id: bus.routeId },
+          select: { estimatedTimeMin: true },
+        })
+        if (!route) throw new Error("Route not found")
+
+        const duration = route.estimatedTimeMin || 0
+
+        const normalizedTimes = startTimes.map((t) => new Date(t))
+
+        // Step 3: Fetch existing schedules (only once)
+        const existing = await tx.busSchedule.findMany({
+          where: { busId },
+          orderBy: { startTime: "asc" },
+          select: {
+            startTime: true,
+            endTime: true,
+            direction: true,
+          },
+        })
+
+        const schedulesToCreate = []
+
+        // Pre-sort existing once
+        const allExistingSorted = [...existing].sort(
+          (a, b) =>
+            new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+        )
+
+        for (let i = 0; i < normalizedTimes.length; i++) {
+          const start = normalizedTimes[i]
+          const end = new Date(start.getTime() + duration * 60000)
+
+          // Conflict check with existing schedules
+          for (const s of allExistingSorted) {
+            const existingStart = new Date(s.startTime)
+            const existingEnd = new Date(s.endTime)
+
+            const gapBefore = start.getTime() - existingEnd.getTime()
+            const gapAfter = existingStart.getTime() - end.getTime()
+
+            if (
+              start.getTime() === existingStart.getTime() ||
+              (gapBefore >= 0 && gapBefore < MIN_INTERVAL * 60000) ||
+              (gapAfter >= 0 && gapAfter < MIN_INTERVAL * 60000)
+            ) {
+              throw new Error(
+                `Schedule ${formatToEthiopianTime(start)} conflicts with existing schedule ${formatToEthiopianTime(existingStart)}`,
+              )
+            }
+          }
+
+          // Determine direction - Optimized
+          let nextDirection = "FORWARD"
+
+          if (allExistingSorted.length > 0 || schedulesToCreate.length > 0) {
+            const allSchedulesSoFar = [
+              ...allExistingSorted,
+              ...schedulesToCreate,
+            ]
+
+            // Find the closest schedule
+            let closest = allSchedulesSoFar[0]
+            let minDiff = Math.abs(
+              start.getTime() - new Date(closest.startTime).getTime(),
+            )
+
+            for (const s of allSchedulesSoFar) {
+              const diff = Math.abs(
+                start.getTime() - new Date(s.startTime).getTime(),
+              )
+              if (diff < minDiff) {
+                minDiff = diff
+                closest = s
+              }
+            }
+
+            nextDirection =
+              closest.direction === "FORWARD" ? "REVERSE" : "FORWARD"
+          }
+
+          schedulesToCreate.push({
+            busId,
+            startTime: formatToEthiopianTime(start),
+            endTime: formatToEthiopianTime(end),
+            direction: nextDirection,
+          })
+        }
+
+        // Step 4: Create all schedules
+        const createdSchedules = await Promise.all(
+          schedulesToCreate.map((data) => tx.busSchedule.create({ data })),
+        )
+
+        return createdSchedules
+      },
+      {
+        timeout: 10000, // Increased from default 5000ms to 10 seconds
+        maxWait: 20000, // Maximum time to wait for a transaction slot
+      },
     )
 
     return successResponse("Bus schedules created successfully", created, 201)
   } catch (error) {
     console.error("Bulk create bus schedules error:", error)
-    return errorResponse("Failed to create schedules", 500)
+
+    if (error.code === "P2002") {
+      return errorResponse(
+        "Duplicate schedule detected (busId + startTime + direction must be unique)",
+        400,
+      )
+    }
+
+    return errorResponse(error.message || "Failed to create schedules", 500)
   }
 }
 
@@ -605,29 +692,22 @@ export const searchBusesService = async (
             // Only future schedules within 2 hours
             if (timeDifference <= 0 || timeDifference > 120) return null
 
-            const bookedSeatsAgg = await prisma.booking.aggregate({
-              _sum: { seatsBooked: true },
+            const reservedSeats = await prisma.ticket.count({
               where: {
-                scheduleId: s.id,
-                date: {
-                  gte: bookingDateStart,
-                  lt: bookingDateEnd,
+                booking: {
+                  scheduleId: s.id,
+                  date: {
+                    gte: bookingDateStart,
+                    lt: bookingDateEnd,
+                  },
                 },
+                cancelledAt: null,
               },
             })
 
-            const bookings = await prisma.booking.findMany({
-              where: {
-                scheduleId: s.id,
-                date: {
-                  gte: bookingDateStart,
-                  lt: bookingDateEnd,
-                },
-              },
-            })
-
-            const reservedSeats = bookedSeatsAgg._sum.seatsBooked || 0
             const availableSeats = bus.capacity - reservedSeats
+
+            console.log(availableSeats, reservedSeats)
             if (availableSeats < passengers) return null
 
             const startDate = new Date(bookingDateStart)

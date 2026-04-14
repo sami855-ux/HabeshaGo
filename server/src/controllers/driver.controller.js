@@ -7,6 +7,7 @@ import {
   assignVehicleToDriverService,
   toggleDriverDutyService,
   blockDriverService,
+  getFormattedDriversService,
 } from "../services/driver.service.js"
 
 import { uploadToCloudinary } from "../services/cloudinary.service.js"
@@ -73,6 +74,22 @@ export const createDriver = async (req, res) => {
 export const getAllDrivers = async (_req, res) => {
   try {
     const result = await getAllDriversService()
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get all drivers controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching drivers",
+      data: null,
+    })
+  }
+}
+
+// GET Formatted DRIVERS
+export const getFormattedDrivers = async (req, res) => {
+  try {
+    const result = await getFormattedDriversService(req.query)
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get all drivers controller error:", error)

@@ -3,6 +3,8 @@ import {
   initiatePayment,
   paymentCallback,
   getPaymentHistory,
+  topUpMpesa,
+  mpesaCallback,
 } from "../controllers/payment.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 
@@ -16,5 +18,13 @@ router.post("/callback", paymentCallback)
 
 // Get user payment history
 router.get("/history", getPaymentHistory)
+
+// Mepesa
+router.post("/mpesa/topup", topUpMpesa)
+router.post("/mpesa/callback", mpesaCallback)
+
+//Telebirr
+// router.post("/telebirr/topup", authenticate, topUpTelebirr);
+// router.post("/telebirr/callback", telebirrCallback);
 
 export default router

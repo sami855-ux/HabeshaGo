@@ -1,8 +1,13 @@
+import { validateBooking } from "../controllers/booking.controller.js"
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import { generateQRCode } from "../utils/qrcode.js"
 
-export const POINTS_CONVERSION_RATE = 0.1
+export const POINTS_CONVERSION_RATE = 0.5
+const ADMIN_WALLET_ID = 6
+const COMMISSION_RATE = 0.1
+const DEFAULT_DRIVER_ID = "cmmhx2xt70000bpqgk6bb1kbq"
+const MAX_TICKETS_PER_USER = 5
 
 /**
  * Create a new booking
@@ -24,115 +29,100 @@ export const createBookingService = async ({
   currency = "ETB",
 }) => {
   try {
-    // Pre-generate QR code outside transaction
-    const qrPayload = JSON.stringify({ bookingCode: "TEMP", userId })
+    // 0️⃣ Pre-generate QR code
+    const qrPayload = JSON.stringify({ userId, temp: true })
     const qrCode = await generateQRCode(qrPayload)
 
-    return await prisma.$transaction(async (tx) => {
-      // 1️⃣ Find bus with route & schedules
-      const bus = await tx.bus.findUnique({
-        where: { id: busId },
-        include: {
-          route: { include: { midPoints: { orderBy: { id: "asc" } } } },
-          schedules: true,
-        },
-      })
-      if (!bus) return errorResponse("Bus not found", 404)
-      if (!bus.route) return errorResponse("Bus route not found", 404)
+    // 1️⃣ Fetch bus & schedule in a short transaction
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId },
+      include: {
+        route: { include: { midPoints: { orderBy: { id: "asc" } } } },
+        schedules: true,
+        vehicle: true,
+      },
+    })
+    if (!bus) return errorResponse("Bus not found", 404)
+    if (!bus.route) return errorResponse("Bus route not found", 404)
 
-      // 2️⃣ Find schedule (startTime only, no date)
-      const schedule = bus.schedules.find(
-        (s) => s.startTime === scheduleStartTime && s.isActive,
-      )
-      if (!schedule) return errorResponse("Schedule not found", 404)
+    const schedule = bus.schedules.find(
+      (s) => s.startTime === scheduleStartTime && s.isActive,
+    )
+    if (!schedule) return errorResponse("Schedule not found", 404)
 
-      // 3️⃣ Auto-fill boarding/alighting stops
-      const midPoints = bus.route.midPoints.map((mp) => mp.name)
-      if (!boardingStop) boardingStop = midPoints[0] || null
-      if (!alightingStop)
-        alightingStop = midPoints[midPoints.length - 1] || null
-      if (!boardingStop || !alightingStop)
-        return errorResponse("Route does not have valid midPoints", 400)
+    const midPoints = bus.route.midPoints.map((mp) => mp.name)
+    if (!boardingStop) boardingStop = midPoints[0] || null
+    if (!alightingStop) alightingStop = midPoints[midPoints.length - 1] || null
+    if (!boardingStop || !alightingStop)
+      return errorResponse("Route does not have valid midPoints", 400)
 
-      // Ensure we get a Date object
-      const bookingDate = new Date(date) // `date` comes from frontend ISO string
+    const bookingDate = new Date(date)
+    if (isNaN(bookingDate.getTime()))
+      return errorResponse("Invalid date provided", 400)
 
-      // Ensure valid Date
-      if (isNaN(bookingDate.getTime())) {
-        return errorResponse("Invalid date provided", 400)
-      }
-      // Start of day
-      const bookingDateStart = new Date(bookingDate)
-      bookingDateStart.setHours(0, 0, 0, 0)
+    const bookingDateStart = new Date(bookingDate)
+    bookingDateStart.setHours(0, 0, 0, 0)
+    const bookingDateEnd = new Date(bookingDate)
+    bookingDateEnd.setHours(23, 59, 59, 999)
 
-      // End of day
-      const bookingDateEnd = new Date(bookingDate)
-      bookingDateEnd.setHours(23, 59, 59, 999)
-
-      // 4️⃣ Check max tickets per user for this schedule + date
-      const userBookings = await tx.booking.findMany({
-        where: {
-          userId,
-          scheduleId: schedule.id,
-          date: {
-            gte: bookingDateStart,
-            lt: bookingDateEnd,
+    // 2️⃣ Check user booking limits & bus capacity
+    const existingTickets = await prisma.ticket.count({
+      where: {
+        userId,
+        cancelledAt: null, // exclude cancelled tickets
+        sharedToId: null, // exclude shared tickets
+        validUntil: { gte: new Date() }, // only valid tickets
+        booking: {
+          is: {
+            scheduleId: schedule.id,
+            date: { gte: bookingDateStart, lt: bookingDateEnd },
           },
         },
-        select: { seatsBooked: true },
-      })
-      const seatsAlreadyBooked = userBookings.reduce(
-        (total, b) => total + (b.seatsBooked || 0),
-        0,
+      },
+    })
+
+    if (existingTickets > MAX_TICKETS_PER_USER)
+      return errorResponse(
+        `Booking limit exceeded: max ${MAX_TICKETS_PER_USER} seats per schedule`,
+        400,
       )
-      const MAX_TICKETS_PER_USER = 5
-      if (seatsAlreadyBooked + seats > MAX_TICKETS_PER_USER) {
-        return errorResponse(
-          `Booking limit exceeded: max ${MAX_TICKETS_PER_USER} seats per schedule`,
-          400,
-        )
-      }
 
-      // Aggregate booked seats for that schedule and date
-      const bookedSeatsAgg = await tx.booking.aggregate({
-        _sum: { seatsBooked: true },
-        where: {
+    const bookedTickets = await prisma.ticket.count({
+      where: {
+        booking: {
           scheduleId: schedule.id,
-          date: {
-            gte: bookingDateStart,
-            lt: bookingDateEnd,
-          },
+          date: { gte: bookingDateStart, lt: bookingDateEnd },
         },
-      })
-      const reservedSeats = bookedSeatsAgg._sum.seatsBooked || 0
-      const availableSeats = bus.capacity - reservedSeats
-      if (seats > availableSeats) {
-        return errorResponse(
-          `Not enough seats: requested ${seats}, only ${availableSeats} left`,
-          400,
-        )
-      }
+      },
+    })
+    const availableSeats = bus.capacity - bookedTickets
+    if (seats > availableSeats)
+      return errorResponse(
+        `Not enough seats: requested ${seats}, only ${availableSeats} left`,
+        400,
+      )
 
-      // 6️⃣ Points & final amount
-      const pointsValue = isPointUsed ? pointsUsed * POINTS_CONVERSION_RATE : 0
-      const finalAmount =
-        Number(totalAmount) - Number(discount) - Number(pointsValue)
-      if (finalAmount < 0)
-        return errorResponse(
-          `Invalid payment: discount + points exceed total`,
-          400,
-        )
+    // 3️⃣ Calculate points and final amount
+    const pointsValue = isPointUsed ? pointsUsed * POINTS_CONVERSION_RATE : 0
+    const finalAmount =
+      Number(totalAmount) - (Number(discount) + Number(pointsValue))
+    if (finalAmount < 0)
+      return errorResponse(
+        `Invalid payment: discount + points exceed total`,
+        400,
+      )
 
-      // 7️⃣ Wallet payment
+    // 4️⃣ Wallet payment & Payment record (atomic)
+    const payment = await prisma.$transaction(async (tx) => {
       let walletId = null
       if (paymentMethod === "WALLET") {
         const wallet = await tx.wallet.findUnique({ where: { userId } })
-        if (!wallet) return errorResponse("Wallet not found", 404)
-        if (!wallet.isActive) return errorResponse("Wallet inactive", 403)
+        if (!wallet) throw new Error("Wallet not found")
+        if (!wallet.isActive) throw new Error("Wallet inactive")
         if (isPointUsed && pointsUsed > wallet.points)
-          return errorResponse(`Insufficient points`, 400)
+          throw new Error("Insufficient points")
         if (wallet.balance < finalAmount)
-          return errorResponse(`Insufficient balance`, 400)
+          throw new Error("Insufficient balance")
 
         await tx.wallet.update({
           where: { userId },
@@ -144,8 +134,7 @@ export const createBookingService = async ({
         walletId = wallet.id
       }
 
-      // 8️⃣ Payment record
-      const payment = await tx.payment.create({
+      return tx.payment.create({
         data: {
           userId,
           amount: finalAmount,
@@ -160,21 +149,19 @@ export const createBookingService = async ({
           pointsValue: isPointUsed ? pointsValue : 0,
         },
       })
+    })
 
-      // 9️⃣ Create booking
+    // 5️⃣ Create booking + tickets (atomic)
+    const booking = await prisma.$transaction(async (tx) => {
       const validUntil = new Date(date)
-      validUntil.setHours(validUntil.getHours() + 4) // add 4 hours
+      validUntil.setHours(validUntil.getHours() + 4)
 
-      const booking = await tx.booking.create({
+      const newBooking = await tx.booking.create({
         data: {
           userId,
           busId,
           scheduleId: schedule.id,
           date,
-          boardingStop,
-          alightingStop,
-          seatsBooked: seats,
-          payNow: true,
           discount,
           promoCode,
           totalAmount,
@@ -184,18 +171,113 @@ export const createBookingService = async ({
           pointsValue: isPointUsed ? pointsValue : 0,
           pointsConversionRate: isPointUsed ? POINTS_CONVERSION_RATE : 0,
           paymentId: payment.id,
-          qrCode,
-          validUntil,
         },
-        include: { payment: true, bus: true },
       })
 
-      // ✅ No need to update schedule.reservedSeats anymore
-      return successResponse("Booking created successfully", {
-        booking,
-        payment,
-        availableSeats: availableSeats - seats,
+      const ticketsData = Array.from({ length: seats }).map((index) => ({
+        bookingId: newBooking.id,
+        userId,
+        seatNumber: index + 1,
+        boardingStop,
+        alightingStop,
+        qrCode,
+        validUntil,
+      }))
+      await tx.ticket.createMany({ data: ticketsData })
+
+      return newBooking
+    })
+
+    const tickets = await prisma.ticket.findMany({
+      where: { bookingId: booking.id },
+    })
+
+    // 6️⃣ Calculate commission & provider amount
+    const commission = totalAmount * COMMISSION_RATE
+    const providerAmount = totalAmount - commission
+    const providerId = bus.vehicle.ownerId || DEFAULT_DRIVER_ID
+    const providerWallet = await prisma.wallet.findUnique({
+      where: { userId: providerId },
+    })
+    if (!providerWallet) throw new Error("Provider wallet not found")
+
+    // 7️⃣ Ledger & payouts (atomic)
+    await prisma.$transaction(async (tx) => {
+      // a) TransactionLedger
+      await tx.transactionLedger.create({
+        data: {
+          userId,
+          providerId,
+          paymentId: payment.id,
+          totalAmount: finalAmount,
+          commission,
+          providerAmount,
+          serviceType: "BUS_TICKET",
+          referenceId: String(booking.id),
+          referenceType: "BOOKING",
+          paymentMethod,
+          currency,
+          status: payment.status === "SUCCESS" ? "COMPLETED" : "PENDING",
+          isSettled: payment.status === "SUCCESS",
+          externalRef: `LEDGER-${Date.now()}`,
+          description: "Bus ticket booking",
+          metadata: {
+            busId,
+            scheduleId: schedule.id,
+            seats,
+            boardingStop,
+            alightingStop,
+          },
+        },
       })
+
+      if (payment.status === "SUCCESS") {
+        // b) Provider wallet
+        const updatedProvider = await tx.wallet.update({
+          where: { id: providerWallet.id },
+          data: { balance: { increment: providerAmount } },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: ADMIN_WALLET_ID,
+            recipientWalletId: providerWallet.id,
+            amount: providerAmount,
+            type: "PAYMENT_OUT",
+            status: "SUCCESS",
+            balanceAfter: updatedProvider.balance,
+            reference: `TX-${Date.now()}`,
+            serviceType: "BUS_TICKET",
+            description: "Bus ticket payout to provider",
+          },
+        })
+
+        // c) Admin commission
+        const updatedAdmin = await tx.wallet.update({
+          where: { id: ADMIN_WALLET_ID },
+          data: { balance: { increment: commission } },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: ADMIN_WALLET_ID,
+            amount: commission,
+            type: "COMMISSION",
+            status: "SUCCESS",
+            balanceAfter: updatedAdmin.balance,
+            reference: `TX-${Date.now()}`,
+            serviceType: "BUS_TICKET",
+            description: "Bus ticket commission retained by admin",
+          },
+        })
+      }
+    })
+
+    return successResponse("Booking created successfully", {
+      booking,
+      tickets,
+      payment,
+      availableSeats: availableSeats - seats,
     })
   } catch (err) {
     console.error("Booking error:", err)
@@ -213,19 +295,120 @@ export const getUserBookingsService = async (userId) => {
       include: {
         bus: {
           include: {
-            route: true, // this brings origin & destination
+            vehicle: true,
+            driver: {
+              include: {
+                user: true,
+              },
+            },
+            route: true,
           },
         },
         payment: true,
-        sharedTo: true,
+        tickets: {
+          include: {
+            sharedTo: true,
+          },
+        },
       },
       orderBy: { date: "desc" },
     })
 
     const formattedBookings = bookings.map((booking) => ({
-      ...booking,
+      id: booking.id,
+      bookingCode: booking.bookingCode,
+      date: booking.date,
+      status: booking.status,
+      totalAmount: booking.totalAmount,
+      amountPaid: booking.amountPaid,
+      currency: booking.currency,
+
       origin: booking.bus?.route?.origin || null,
       destination: booking.bus?.route?.destination || null,
+      bookedAt: booking.createdAt,
+
+      bus: booking.bus
+        ? {
+            // 🚌 Basic Bus Info
+            id: booking.bus.id,
+            busNumber: booking.bus.busNumber,
+            capacity: booking.bus.capacity,
+            status: booking.bus.status,
+            isActive: booking.bus.isActive,
+
+            // 📍 Trip Info
+            currentStop: booking.bus.currentStop,
+            nextDestination: booking.bus.nextDestination,
+            departureTime: booking.bus.departureTime,
+            estimatedArrival: booking.bus.estimatedArrival,
+            delayMinutes: booking.bus.delayMinutes,
+
+            // 🚗 Vehicle Details
+            vehicle: booking.bus.vehicle
+              ? {
+                  id: booking.bus.vehicle.id,
+                  plateNumber: booking.bus.vehicle.plateNumber,
+                  model: booking.bus.vehicle.model,
+                  manufacturer: booking.bus.vehicle.manufacturer,
+                  year: booking.bus.vehicle.year,
+                  type: booking.bus.vehicle.type,
+                  capacity: booking.bus.vehicle.capacity,
+                  image: booking.bus.vehicle.vehicleImageUrl,
+                  mileage: booking.bus.vehicle.mileage,
+                  status: booking.bus.vehicle.status,
+                }
+              : null,
+
+            // 👨‍✈️ Driver Details
+            driver: booking.bus.driver
+              ? {
+                  id: booking.bus.driver.id,
+                  name: booking.bus.driver.user?.name,
+                  phone: booking.bus.driver.user?.phone,
+                  licenseNo: booking.bus.driver.licenseNo,
+                  experience: booking.bus.driver.experience,
+                  rating: booking.bus.driver.rating,
+                  totalTrips: booking.bus.driver.totalTrips,
+                  isOnDuty: booking.bus.driver.isOnDuty,
+                  status: booking.bus.driver.status,
+                }
+              : null,
+
+            // // 🛣 Route (optional but powerful)
+            // route: booking.bus.route
+            //   ? {
+            //       id: booking.bus.route.id,
+            //       name: booking.bus.route.name,
+            //       // add origin/destination if exists
+            //     }
+            //   : null,
+          }
+        : null,
+
+      payment: booking.payment,
+
+      tickets: booking.tickets.map((ticket) => ({
+        id: ticket.id,
+        seatNumber: ticket.seatNumber,
+        qrCode: ticket.qrCode,
+        boardingStop: ticket.boardingStop,
+        alightingStop: ticket.alightingStop,
+        checkedIn: ticket.checkedIn,
+        validUntil: ticket.validUntil,
+        checkedInAt: ticket.checkedInAt,
+        cancelledAt: ticket.cancelledAt,
+        sharedAt: ticket.sharedAt,
+        sharedTicketUsed: ticket.sharedTicketUsed,
+        sharedTo: ticket.sharedTo
+          ? {
+              id: ticket.sharedTo.id,
+              name: ticket.sharedTo.name,
+              phone: ticket.sharedTo.phone,
+              email: ticket.sharedTo.email,
+              avaterUrl: ticket.sharedTo.avaterUrl,
+            }
+          : null,
+      })),
     }))
 
     return successResponse("Bookings retrieved", formattedBookings)
@@ -241,11 +424,19 @@ export const getUserBookingsService = async (userId) => {
 export const getBookingByIdService = async (userId, bookingId) => {
   try {
     const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, OR: [{ userId }, { sharedToId: userId }] },
-      include: { bus: true, payment: true, sharedTo: true },
+      where: {
+        id: bookingId,
+        userId: userId,
+      },
+      include: {
+        bus: true,
+        payment: true,
+        tickets: true,
+      },
     })
 
     if (!booking) return errorResponse("Booking not found", 404)
+
     return successResponse("Booking retrieved", booking)
   } catch (err) {
     console.error("Get booking by ID service error:", err)
@@ -283,93 +474,148 @@ export const checkInBookingService = async (bookingId, userId) => {
 /**
  * Share a booking with another user
  */
-export const shareBookingService = async (bookingId, ownerId, targetUserId) => {
+export const shareBookingService = async (
+  bookingId,
+  ownerId,
+  targetUserId,
+  ticketIds,
+) => {
   try {
-    // 1 Fetch the booking
+    // 1️⃣ Fetch booking with tickets
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { tickets: true },
     })
+
     if (!booking) return errorResponse("Booking not found", 404)
 
-    // 2 Check ownership
-    if (booking.userId !== ownerId)
-      return errorResponse("Only the owner can share this ticket", 403)
+    // 2️⃣ Ownership check
+    if (booking.userId !== ownerId) {
+      return errorResponse("Only the owner can share tickets", 403)
+    }
 
-    // 3 Check if booking has expired
-    if (booking.validUntil && new Date() > new Date(booking.validUntil))
-      return errorResponse("Cannot share expired ticket", 400)
+    // 3️⃣ Prevent self share
+    if (ownerId === targetUserId) {
+      return errorResponse("Cannot share tickets to yourself", 400)
+    }
 
-    // 4 Prevent sharing to yourself
-    if (ownerId === targetUserId)
-      return errorResponse("Cannot share ticket to yourself", 400)
+    // 4️⃣ Validate ticketIds
+    if (!ticketIds || !ticketIds.length) {
+      return errorResponse("No tickets selected", 400)
+    }
 
-    const senderUser = await prisma.user.findUnique({
-      where: { id: ownerId },
+    const now = new Date()
+
+    // 5️⃣ Filter tickets that belong to booking
+    const selectedTickets = booking.tickets.filter((t) =>
+      ticketIds.includes(t.id),
+    )
+
+    if (selectedTickets.length !== ticketIds.length) {
+      return errorResponse("Some tickets are invalid", 400)
+    }
+
+    // 6️⃣ Validate each ticket
+    for (const ticket of selectedTickets) {
+      if (ticket.cancelledAt) {
+        return errorResponse(`Ticket ${ticket.id} is cancelled`, 400)
+      }
+
+      if (ticket.validUntil && ticket.validUntil < now) {
+        return errorResponse(`Ticket ${ticket.id} is expired`, 400)
+      }
+
+      if (ticket.sharedToId) {
+        return errorResponse(`Ticket ${ticket.id} already shared`, 400)
+      }
+
+      if (ticket.checkedIn) {
+        return errorResponse(`Ticket ${ticket.id} already used`, 400)
+      }
+    }
+
+    // 7️⃣ Verify users
+    const [senderUser, targetUser] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, name: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true, name: true },
+      }),
+    ])
+
+    if (!targetUser) {
+      return errorResponse("Target user not found", 404)
+    }
+
+    // 8️⃣ Transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Update all tickets at once
+      await tx.ticket.updateMany({
+        where: {
+          id: { in: ticketIds },
+        },
+        data: {
+          sharedToId: targetUserId,
+          sharedAt: new Date(),
+        },
+      })
+
+      // Create ONE share record (grouped share)
+      const sharedRecord = await tx.bookingShare.create({
+        data: {
+          bookingId,
+          ownerId,
+          targetUserId,
+          status: "PENDING",
+        },
+      })
+
+      // Notification
+      await tx.notification.create({
+        data: {
+          userId: targetUserId,
+          title: "Tickets Shared",
+          message: `${selectedTickets.length} ticket(s) shared by ${senderUser?.name}`,
+          type: "BOOKING_SHARE",
+          metadata: {
+            bookingId,
+            ticketIds,
+            ownerId,
+          },
+          actionUrl: `/user/bookings/shared/${sharedRecord.id}`,
+        },
+      })
+
+      return sharedRecord
     })
-    // 5 Check that the target user exists
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
-    })
-    if (!targetUser) return errorResponse("Target user not found", 404)
 
-    // 6 Check for duplicate share
-    const existingShare = await prisma.bookingShare.findFirst({
-      where: {
-        bookingId,
-        targetUserId,
-      },
-    })
-    if (existingShare)
-      return errorResponse("Ticket already shared to this user", 400)
-
-    // 7 Create the share record
-    const sharedRecord = await prisma.bookingShare.create({
-      data: {
-        bookingId,
-        ownerId,
-        targetUserId,
-        status: "PENDING",
-      },
-    })
-
-    const res = await prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        sharedAt: new Date(),
-        sharedToId: targetUserId,
-      },
-    })
-
-    // 8 Create a notification for the receiver
-    await prisma.notification.create({
-      data: {
-        userId: targetUserId,
-        title: "New Ticket Shared",
-        message: `A ticket has been shared with you by user ${senderUser?.name}.`,
-        type: "BOOKING_SHARE",
-        metadata: { bookingId, ownerId },
-        actionUrl: `/user/bookings/shared/${sharedRecord.id}`,
-      },
-    })
-
-    return successResponse("Ticket shared successfully", sharedRecord)
+    return successResponse("Tickets shared successfully", result)
   } catch (err) {
     console.error("Share booking service error:", err)
-    return errorResponse("Failed to share booking", 500)
+    return errorResponse("Failed to share tickets", 500)
   }
 }
-
 /**
  * Accept shared ticket
  */
 export const acceptSharedTicket = async (bookingId, userId) => {
   try {
-    // 1. Find the pending share for this booking and the current user
+    // 1️⃣ Find the pending share
     const share = await prisma.bookingShare.findFirst({
       where: {
         bookingId,
         targetUserId: userId,
         status: "PENDING",
+      },
+      include: {
+        booking: {
+          include: {
+            tickets: true,
+          },
+        },
       },
     })
 
@@ -380,44 +626,57 @@ export const acceptSharedTicket = async (bookingId, userId) => {
       )
     }
 
-    // 2. Fetch receiver info (optional, for notification message)
+    // 2️⃣ Fetch receiver info for notification
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, name: true },
     })
 
-    // 3. Perform atomic transaction: update share status, update booking, create notification
-    const [updatedShare] = await prisma.$transaction([
-      prisma.bookingShare.update({
+    // 3️⃣ Transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Accept share
+      const updatedShare = await tx.bookingShare.update({
         where: { id: share.id },
         data: {
           status: "ACCEPTED",
           respondedAt: new Date(),
         },
-      }),
-      prisma.booking.update({
-        where: { id: share.bookingId },
+      })
+
+      // Assign tickets to the new user (receiver)
+      await tx.ticket.updateMany({
+        where: {
+          bookingId: share.bookingId,
+          cancelledAt: null,
+        },
         data: {
           sharedToId: userId,
           sharedAt: new Date(),
         },
-      }),
-      prisma.notification.create({
+      })
+
+      // Notify owner
+      await tx.notification.create({
         data: {
           userId: share.ownerId,
           title: "Ticket Accepted",
-          message: `Your shared ticket has been accepted by user ${targetUser?.name}.`,
+          message: `Your shared ticket has been accepted by ${targetUser?.name}.`,
           type: "BOOKING_SHARE_ACCEPTED",
-          metadata: { bookingId: share.bookingId, shareId: share.id },
+          metadata: {
+            bookingId: share.bookingId,
+            shareId: share.id,
+          },
           actionUrl: `/user/bookings/${share.bookingId}`,
         },
-      }),
-    ])
+      })
 
-    // 4. Return success response
-    return successResponse("Ticket accepted successfully", updatedShare)
+      return updatedShare
+    })
+
+    return successResponse("Ticket accepted successfully", result)
   } catch (err) {
     console.error("Accept shared ticket error:", err)
-    // 5. Return generic error response
+
     return errorResponse("Failed to accept ticket", 500)
   }
 }
@@ -583,62 +842,230 @@ export const getAllSharedTickets = async (req, res) => {
   try {
     const userId = req.user.id
 
-    // 1. Get tickets the user shared with others
+    // 1️⃣ Tickets the user shared with others
     const sentShares = await prisma.bookingShare.findMany({
       where: {
         ownerId: userId,
-      },
-      include: {
-        booking: true,
-        targetUser: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            email: true,
-          },
+        status: {
+          not: "CANCELLED",
         },
       },
-      orderBy: {
-        sharedAt: "desc",
+      include: {
+        booking: {
+          include: {
+            bus: { include: { route: true } },
+            tickets: true,
+          },
+        },
+        targetUser: {
+          select: { id: true, name: true, phone: true, email: true },
+        },
       },
+      orderBy: { sharedAt: "desc" },
     })
 
-    // 2. Get tickets shared with the user
+    // 2️⃣ Tickets shared with the user
     const receivedShares = await prisma.bookingShare.findMany({
       where: {
         targetUserId: userId,
-      },
-      include: {
-        booking: true,
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            email: true,
-          },
+        status: {
+          not: "CANCELLED",
         },
       },
-      orderBy: {
-        sharedAt: "desc",
+      include: {
+        booking: {
+          include: {
+            bus: { include: { route: true } },
+            tickets: true,
+          },
+        },
+        owner: {
+          select: { id: true, name: true, phone: true, email: true },
+        },
       },
+      orderBy: { sharedAt: "desc" },
     })
 
-    // 3. Return grouped result
-    return res.status(200).json({
-      success: true,
-      data: {
-        sent: sentShares,
-        received: receivedShares,
-      },
-    })
+    //  Helper: format tickets
+    const formatTickets = (share, isSent = true) => {
+      const tickets = share.booking.tickets.filter((t) =>
+        isSent ? t.sharedToId === share.targetUserId : t.sharedToId === userId,
+      )
+
+      return tickets.map((t) => ({
+        shareId: share.id,
+        ticketId: t.id,
+        seatNumber: t.seatNumber,
+        boardingStop: t.boardingStop,
+        alightingStop: t.alightingStop,
+        qrCode: t.qrCode,
+        checkedIn: t.checkedIn,
+        validUntil: t.validUntil,
+        status: share.status,
+        sharedAt: share.sharedAt,
+
+        booking: {
+          id: share.booking.id,
+          bookingCode: share.booking.bookingCode,
+          createdAt: share.booking.createdAt,
+        },
+
+        ...(isSent ? { receiver: share.targetUser } : { owner: share.owner }),
+
+        bus: {
+          id: share.booking.bus?.id,
+          busNumber: share.booking.bus?.busNumber,
+          origin: share.booking.bus?.route?.origin || null,
+          destination: share.booking.bus?.route?.destination || null,
+        },
+      }))
+    }
+
+    // 🔥 Deduplication helper
+    const uniqueByTicketId = (tickets) => {
+      const map = new Map()
+
+      tickets.forEach((t) => {
+        if (!map.has(t.ticketId)) {
+          map.set(t.ticketId, t)
+        }
+      })
+
+      return Array.from(map.values())
+    }
+
+    // 3️⃣ Process tickets
+    const sentTicketsRaw = sentShares.flatMap((share) =>
+      formatTickets(share, true),
+    )
+
+    const receivedTicketsRaw = receivedShares.flatMap((share) =>
+      formatTickets(share, false),
+    )
+
+    // 4️⃣ Remove duplicates
+    const sentTickets = uniqueByTicketId(sentTicketsRaw)
+    const receivedTickets = uniqueByTicketId(receivedTicketsRaw)
+
+    return res.status(200).json(
+      successResponse("Shared tickets fetched successfully", {
+        sent: sentTickets,
+        received: receivedTickets,
+      }),
+    )
   } catch (error) {
     console.error("Error fetching shared tickets:", error)
+    return res.status(500).json(errorResponse("Failed to fetch shared tickets"))
+  }
+}
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch shared tickets",
+export const cancelSharedTicket = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { shareId } = req.params
+    const { ticketId } = req.body
+
+    if (!ticketId) {
+      return res.status(400).json(errorResponse("ticketId is required"))
+    }
+
+    // 1️⃣ Find share
+    const share = await prisma.bookingShare.findUnique({
+      where: { id: shareId },
+      include: {
+        booking: {
+          include: {
+            bus: { include: { route: true } },
+            tickets: true,
+          },
+        },
+        owner: { select: { id: true, name: true } },
+        targetUser: { select: { id: true, name: true } },
+      },
     })
+
+    if (!share) {
+      return res.status(404).json(errorResponse("Share not found"))
+    }
+
+    // 2️⃣ Authorization
+    if (share.ownerId !== userId && share.targetUserId !== userId) {
+      return res.status(403).json(errorResponse("Not authorized"))
+    }
+
+    // 3️⃣ Only pending shares
+    if (share.status !== "PENDING") {
+      return res
+        .status(400)
+        .json(errorResponse("This share cannot be cancelled"))
+    }
+
+    // 4️⃣ Find the ticket to cancel
+    const ticket = share.booking.tickets.find((t) => t.id === Number(ticketId))
+
+    if (!ticket) {
+      return res.status(404).json(errorResponse("Ticket not found"))
+    }
+
+    if (ticket.sharedToId !== share.targetUserId) {
+      return res
+        .status(400)
+        .json(errorResponse("Ticket not shared with this user"))
+    }
+
+    if (ticket.checkedIn || ticket.sharedTicketUsed) {
+      return res
+        .status(400)
+        .json(errorResponse("Ticket already used or consumed"))
+    }
+
+    // 5️⃣ Transaction: reset ticket and update share
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          sharedToId: null,
+          sharedAt: null,
+        },
+      })
+
+      // If all tickets are cancelled, update share status
+      const remainingSharedTickets = share.booking.tickets.filter(
+        (t) => t.sharedToId === share.targetUserId && t.id !== ticket.id,
+      )
+
+      console.log(remainingSharedTickets)
+
+      if (remainingSharedTickets.length === 0) {
+        await tx.bookingShare.update({
+          where: { id: shareId },
+          data: { status: "CANCELLED", respondedAt: new Date() },
+        })
+      }
+
+      // Optional: notify the other user
+      const notifyUserId =
+        userId === share.ownerId ? share.targetUserId : share.ownerId
+
+      await tx.notification.create({
+        data: {
+          userId: notifyUserId,
+          title: "Shared Ticket Cancelled",
+          message: `A shared ticket (${ticket.seatNumber}) has been cancelled.`,
+          type: "BOOKING_SHARE_CANCELLED",
+          metadata: { shareId, ticketId: ticket.id },
+        },
+      })
+    })
+
+    return res.status(200).json(
+      successResponse("Shared ticket cancelled successfully", {
+        ticketId: ticket.id,
+        shareId,
+      }),
+    )
+  } catch (error) {
+    console.error("Cancel shared ticket error:", error)
+    return res.status(500).json(errorResponse("Failed to cancel shared ticket"))
   }
 }

@@ -28,6 +28,8 @@ model User {
   suspendedAt      DateTime?
   suspendedBy      String?
   suspensionReason String?
+  isDeleted        Boolean   @default(false)
+  deletedAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,11 +45,14 @@ model User {
   sharedBookingsReceived BookingShare[] @relation("ShareReceiver")
 
   // RELATIONS 
-  wallet         Wallet?
-  bookings       Booking[] @relation("UserBookings") // tickets owned
-  sharedBookings Booking[] @relation("BookingSharedTo") // tickets shared to this user
-  payments       Payment[]
-  driver         Driver?
+  wallet   Wallet?
+  bookings Booking[] @relation("UserBookings") // tickets owned
+
+  sharedTickets Ticket[] @relation("TicketSharedTo")
+  tickets       Ticket[] @relation("UserTickets") // TICKETS OWNED BY USER (1 seat = 1 ticket)
+
+  payments Payment[]
+  driver   Driver?
 
   chargingSessions ChargingSession[]
   reservations     EVReservation[]
@@ -58,7 +63,8 @@ model User {
   minibusReservations MinibusReservation[]
   parkingReservations ParkingReservation[]
 
-  notifications Notification[]
+  notifications     Notification[]
+  TransactionLedger TransactionLedger[]
 
   @@map("user")
 }
@@ -184,6 +190,7 @@ model WalletTransaction {
   amount       Decimal
   type         TransactionType
   status       TransactionStatus @default(PENDING)
+  serviceType  ServiceType       @default(NULL)
   balanceAfter Decimal
 
   reference   String  @unique
@@ -238,32 +245,64 @@ model Payment {
   wallet             Wallet?             @relation(fields: [walletId], references: [id])
   bookings           Booking[] // One payment → many bookings
   minibusReservation MinibusReservation? @relation(fields: [minibusReservationId], references: [id])
+  TransactionLedger  TransactionLedger[]
+}
+
+model TransactionLedger {
+  id Int @id @default(autoincrement())
+
+  // Who paid and who earned
+  userId     String
+  providerId String?
+  paymentId  Int?
+
+  // Money breakdown
+  totalAmount    Decimal
+  commission     Decimal
+  providerAmount Decimal
+
+  // Service tracking
+  serviceType ServiceType
+
+  // Business reference
+  referenceId   String
+  referenceType ReferenceType?
+
+  paymentMethod PaymentMethod? // WALLET, TELEBIRR, CHAPA
+  currency      String         @default("ETB")
+
+  // Flow control
+  status    LedgerStatus @default(PENDING)
+  isSettled Boolean      @default(false)
+
+  // Safety / idempotency
+  externalRef String? @unique
+
+  // Extra info
+  description String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([referenceId])
+  @@index([serviceType])
 }
 
 model Booking {
-  id            Int           @id @default(autoincrement())
-  userId        String
-  busId         Int
-  date          DateTime
-  status        BookingStatus @default(CONFIRMED)
-  boardingStop  String?
-  alightingStop String?
-  bookingCode   String        @unique @default(uuid())
-  seatsBooked   Int           @default(0)
-  cancelledAt   DateTime?
-  payNow        Boolean       @default(false)
+  id     Int           @id @default(autoincrement())
+  userId String
+  busId  Int
+  date   DateTime
+  status BookingStatus @default(CONFIRMED)
 
-  // Ticket sharing
-  sharedToId       String?
-  sharedTo         User?     @relation("BookingSharedTo", fields: [sharedToId], references: [id])
-  sharedAt         DateTime?
-  sharedTicketUsed Boolean   @default(false)
-
-  // Check-in / ticket usage
-  qrCode      String?
-  checkedIn   Boolean   @default(false)
-  checkedInAt DateTime?
-  validUntil  DateTime?
+  bookingCode String @unique @default(uuid())
 
   // Pricing
   discount    Decimal? @default(0)
@@ -272,22 +311,59 @@ model Booking {
   totalAmount Decimal?
   currency    String   @default("ETB")
 
+  // reminders
   reminder24Sent Boolean @default(false)
   reminder2hSent Boolean @default(false)
 
   // Points
-  pointsUsed           Int? // number of points user spent for this booking
-  pointsValue          Decimal? // monetary equivalent of pointsUsed
-  pointsConversionRate Decimal? // rate used to convert points to money
+  pointsUsed           Int?
+  pointsValue          Decimal?
+  pointsConversionRate Decimal?
 
   // Relations
-  shares     BookingShare[]
+  tickets Ticket[]
+  shares  BookingShare[]
+
   scheduleId Int?
   paymentId  Int?
-  payment    Payment?       @relation(fields: [paymentId], references: [id])
-  bus        Bus            @relation(fields: [busId], references: [id])
-  user       User           @relation("UserBookings", fields: [userId], references: [id])
-  schedule   BusSchedule?   @relation(fields: [scheduleId], references: [id])
+
+  payment  Payment?     @relation(fields: [paymentId], references: [id])
+  bus      Bus          @relation(fields: [busId], references: [id])
+  user     User         @relation("UserBookings", fields: [userId], references: [id])
+  schedule BusSchedule? @relation(fields: [scheduleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ticket {
+  id        Int    @id @default(autoincrement())
+  bookingId Int
+  userId    String
+
+  // seat informatio
+  seatNumber Int?
+
+  boardingStop  String?
+  alightingStop String?
+
+  // ticket usage
+  qrCode      String?
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
+  validUntil  DateTime?
+
+  // sharing
+  sharedToId       String?
+  sharedTo         User?     @relation("TicketSharedTo", fields: [sharedToId], references: [id])
+  sharedAt         DateTime?
+  sharedTicketUsed Boolean   @default(false)
+
+  // cancellation
+  cancelledAt DateTime?
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  user    User    @relation("UserTickets", fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -326,7 +402,7 @@ model Bus {
   isActive        Boolean @default(true)
 
   departureTime    DateTime?
-  estimatedArrival DateTime?
+  estimatedArrival Int?
   delayMinutes     Int       @default(0)
 
   lastServiceDate DateTime?
@@ -902,7 +978,8 @@ enum UserRole {
   PASSENGER
   DRIVER
   ADMIN
-  CHARGING_MANAGER
+  EV_CHARGER_MANAGER
+  PARKING_MANAGER
 }
 
 enum DiscountType {
@@ -911,8 +988,8 @@ enum DiscountType {
 }
 
 enum ScheduleDirection {
-  FORWARD // Origin -> Destination
-  REVERSE // Destination -> Origin
+  FORWARD
+  REVERSE
 }
 
 //Digital ticketing enums
@@ -925,12 +1002,14 @@ enum TransactionType {
   TRANSFER_IN
   PAYMENT_OUT
   PAYMENT_IN
+  COMMISSION
 }
 
 enum ShareStatus {
   PENDING
   ACCEPTED
   REJECTED
+  CANCELLED
 }
 
 enum TransactionStatus {
@@ -954,11 +1033,14 @@ enum PaymentMethod {
   CBE
   BANK_TRANSFER
   CASH
+  MOBILE_MONEY
 }
 
 enum PaymentGateway {
   CHAPA
   INTERNAL
+  MPESA
+  TELEBIRR
 }
 
 enum PaymentFlow {
@@ -1003,6 +1085,26 @@ enum ReservationStatus {
   CANCELLED
 }
 
+enum LedgerStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ServiceType {
+  BUS_TICKET
+  PARKING
+  EV_CHARGING
+  NULL
+}
+
+enum ReferenceType {
+  BOOKING
+  PARKING_RESERVATION
+  EV_CHARGING_SESSION
+}
+
 enum SessionStatus {
   ACTIVE
   COMPLETED
@@ -1045,6 +1147,7 @@ enum NotificationType {
   REMINDER
   BOOKING_SHARE
   BOOKING_SHARE_ACCEPTED
+  BOOKING_SHARE_CANCELLED
 }
 
 enum IdType {

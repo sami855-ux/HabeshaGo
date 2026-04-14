@@ -8,6 +8,7 @@ import {
   assignVehicleToDriver,
   toggleDutyStatus,
   blockDriver,
+  getFormattedDrivers,
 } from "../controllers/driver.controller.js"
 import { authenticate, requireAdmin } from "../middlewares/authenticate.js"
 import { upload } from "../config/multer.js"
@@ -29,6 +30,11 @@ router.post(
 
 // Get drivers
 router.get("/", getAllDrivers)
+
+// Get formatted drivers data
+router.get("/formatted-drivers", getFormattedDrivers)
+
+//Get A single drivers
 router.get("/:id", authenticate, getDriverById)
 
 // Update driver basic info

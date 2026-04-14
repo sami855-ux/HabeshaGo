@@ -1,4 +1,5 @@
-import prisma from "../prisma/client.js";
+import prisma from "../prisma/client.js"
+import { emitToUserNotification } from "../socket/index.js"
 
 /**
  * Get all upcoming trips for all users
@@ -6,33 +7,45 @@ import prisma from "../prisma/client.js";
  */
 export const getUpcomingTrips = async () => {
   try {
-    const now = new Date();
+    const now = new Date()
 
     const trips = await prisma.booking.findMany({
       where: {
-        status: "CONFIRMED", // only confirmed bookings
-        cancelledAt: null, // not cancelled
+        status: "CONFIRMED",
         date: {
-          gte: now, // date in the future
+          gte: now,
+        },
+        tickets: {
+          some: {
+            cancelledAt: null,
+          },
         },
       },
+
       include: {
         bus: true,
         user: true,
         schedule: true,
         payment: true,
+
+        tickets: {
+          where: {
+            cancelledAt: null,
+          },
+        },
       },
+
       orderBy: {
         date: "asc",
       },
-    });
+    })
 
-    return trips;
+    return trips
   } catch (err) {
-    console.error("Error fetching upcoming trips:", err);
-    throw err;
+    console.error("Error fetching upcoming trips:", err)
+    throw err
   }
-};
+}
 
 /**
  * Send a passenger reminder by creating a Notification record
@@ -41,48 +54,54 @@ export const getUpcomingTrips = async () => {
  */
 export const sendPassengerReminder = async (booking, type) => {
   try {
-    if (!booking?.userId) throw new Error("Booking has no associated user.");
+    if (!booking?.userId) throw new Error("Booking has no associated user.")
 
+    console.log("first")
     // Prepare notification content
     const title =
       type === "24h"
         ? "Upcoming Trip Reminder (24 hours)"
-        : "Upcoming Trip Reminder (2 hours)";
+        : "Upcoming Trip Reminder (2 hours)"
 
-    const message = `Hello ${booking.user.name || "Passenger"}, your trip on ${booking.date.toLocaleString()} for bus ${booking.bus.name} is coming up soon.`;
+    const message = `Hello ${booking.user.name || "Passenger"}, your trip on ${booking.date.toLocaleString()} for bus ${booking.bus.busNumber} is coming up soon.`
 
     // Create a notification record in the database
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: booking.userId,
         title,
         message,
-        type: "REMINDER", // Assuming NotificationType enum has REMINDER
+        type: "REMINDER",
         metadata: {
           bookingId: booking.id,
           busId: booking.busId,
           scheduleId: booking.scheduleId,
         },
       },
-    });
+    })
+
+    // 3️⃣ Emit real-time event
+    emitToUserNotification(booking.userId, {
+      notification,
+    })
 
     // Optionally update booking to mark that reminder has been sent
     if (type === "24h") {
       await prisma.booking.update({
         where: { id: booking.id },
         data: { reminder24Sent: true },
-      });
+      })
     } else if (type === "2h") {
       await prisma.booking.update({
         where: { id: booking.id },
         data: { reminder2hSent: true },
-      });
+      })
     }
 
     console.log(
       `✅ Passenger reminder (${type}) sent for booking ${booking.id}`,
-    );
+    )
   } catch (err) {
-    console.error("❌ Failed to send passenger reminder:", err);
+    console.error("❌ Failed to send passenger reminder:", err)
   }
-};
+}

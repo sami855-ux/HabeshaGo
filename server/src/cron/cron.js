@@ -1,7 +1,6 @@
-import cron from "node-cron";
+import cron from "node-cron"
 
-// Import your service functions
-import { getUpcomingTrips, sendPassengerReminder } from "./cron-services.js";
+import { getUpcomingTrips, sendPassengerReminder } from "./cron-services.js"
 
 // Passenger reminders (24h & 2h before departure)
 // Run every 15 mins
@@ -9,27 +8,29 @@ cron.schedule(
   "*/15 * * * *",
   async () => {
     try {
-      console.log("🕒 Running passenger reminders...");
-      const trips = await getUpcomingTrips();
-      console.log("🕒 Upcoming trips:", trips.length);
+      console.log("🕒 Running passenger reminders...")
+      const trips = await getUpcomingTrips()
+      console.log("🕒 Upcoming trips:", trips.length)
 
-      const now = new Date();
+      const now = new Date()
       trips.forEach(async (trip) => {
-        const diffMins = (new Date(trip.departureTime) - now) / (1000 * 60); // minutes
+        const validDateTrip = trip.tickets[0]?.validUntil
+        const diffMins = (new Date(validDateTrip) - now) / (1000 * 60)
 
+        console.log(diffMins)
         if (diffMins <= 1440 && !trip.reminder24Sent) {
-          await sendPassengerReminder(trip, "24h");
+          await sendPassengerReminder(trip, "24h")
         }
         if (diffMins <= 120 && !trip.reminder2hSent) {
-          await sendPassengerReminder(trip, "2h");
+          await sendPassengerReminder(trip, "2h")
         }
-      });
+      })
     } catch (err) {
-      console.error("❌ Passenger reminders failed:", err);
+      console.error("❌ Passenger reminders failed:", err)
     }
   },
   { timezone: "Africa/Addis_Ababa" },
-);
+)
 
 // Daily revenue calculation
 // Run daily at 2:00 AM
@@ -37,14 +38,14 @@ cron.schedule(
   "0 2 * * *",
   async () => {
     try {
-      console.log("🕒 Calculating daily revenue...");
-      await calculateDailyRevenue();
+      console.log("🕒 Calculating daily revenue...")
+      await calculateDailyRevenue()
     } catch (err) {
-      console.error("❌ Daily revenue calculation failed:", err);
+      console.error("❌ Daily revenue calculation failed:", err)
     }
   },
   { timezone: "Africa/Addis_Ababa" },
-);
+)
 
 // Trip updates & driver notifications
 // Run every 10 mins
@@ -91,4 +92,4 @@ cron.schedule(
 //   }
 // }, { timezone: "Africa/Addis_Ababa" });
 
-console.log("✅ HabeshaGo cron scheduler started");
+console.log("✅ HabeshaGo cron scheduler started")

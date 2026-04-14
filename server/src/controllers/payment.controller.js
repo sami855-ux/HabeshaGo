@@ -1,5 +1,7 @@
 import {
   initiatePaymentService,
+  mpesaCallbackService,
+  mpesaTopUpService,
   paymentCallbackService,
   // getPaymentHistoryService,
   // verifyPaymentService,
@@ -151,3 +153,83 @@ export const getPaymentHistory = async (req, res) => {
     })
   }
 }
+
+/**
+ * M-PESA Top-up
+ */
+export const topUpMpesa = async (req, res) => {
+  try {
+    const { amount, phone } = req.body
+    const userId = "cmknyr7sc00005zku6ti238bw"
+
+    const result = await mpesaTopUpService({ amount, phone, userId })
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("M-Pesa Top-up controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error during M-Pesa top-up",
+      data: null,
+    })
+  }
+}
+
+/**
+ * M-PESA Callback
+ */
+export const mpesaCallback = async (req, res) => {
+  try {
+    console.log("Received M-Pesa callback:", req.body)
+    const result = await mpesaCallbackService(req.body)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("M-Pesa callback controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error during M-Pesa callback",
+      data: null,
+    })
+  }
+}
+
+/**
+ * Telebirr Top-up
+ */
+// export const topUpTelebirr = async (req, res) => {
+//   try {
+//     const { amount, phone } = req.body;
+//     const userId = req.user.id;
+
+//     const result = await telebirrTopUpService({ amount, phone, userId });
+//     return res.status(result.statusCode).json(result);
+//   } catch (error) {
+//     console.error("Telebirr Top-up controller error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       statusCode: 500,
+//       message: "Internal server error during Telebirr top-up",
+//       data: null,
+//     });
+//   }
+// };
+
+/**
+ * Telebirr Callback
+ */
+// export const telebirrCallback = async (req, res) => {
+//   try {
+//     console.log("Received Telebirr callback:", req.body);
+//     const result = await telebirrCallbackService(req.body);
+//     return res.status(result.statusCode).json(result);
+//   } catch (error) {
+//     console.error("Telebirr callback controller error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       statusCode: 500,
+//       message: "Internal server error during Telebirr callback",
+//       data: null,
+//     });
+//   }
+// };

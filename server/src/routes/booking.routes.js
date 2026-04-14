@@ -18,20 +18,23 @@ import {
 } from "../controllers/booking.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import { authorizeAdmin } from "../middlewares/authorizeAdmin.js"
-import { getAllSharedTickets } from "../services/booking.service.js"
+import {
+  cancelSharedTicket,
+  getAllSharedTickets,
+} from "../services/booking.service.js"
 
 const router = express.Router()
 
 // USER ROUTES
 
 // Create a new booking (purchase ticket)
-router.post("/", createBooking)
+router.post("/", authenticate, createBooking)
 
 //Get shared booking
 router.get("/shared-tickets", authenticate, getAllSharedTickets)
 
 // List all bookings for logged-in user
-router.get("/", getUserBookings)
+router.get("/", authenticate, getUserBookings)
 
 // Get a single booking by ID (owned or shared)
 router.get("/:id", authenticate, getBookingById)
@@ -41,6 +44,9 @@ router.patch("/:id/check-in", authenticate, checkInBooking)
 
 // Share a booking with another user => request from the sender
 router.patch("/:id/share/request", authenticate, shareBooking)
+
+//Cancel the shared ticket
+router.patch("/share/:shareId/cancel", authenticate, cancelSharedTicket)
 
 // Share a booking with another user => respond from the reciver
 router.patch("/:id/share/response", authenticate, shareBookingResponse)

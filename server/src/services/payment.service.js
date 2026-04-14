@@ -1,6 +1,10 @@
-import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import { handleSuccessfulTopup } from "../utils/paymentHelper.js"
+import prisma from "../prisma/client.js"
 import chapa from "../config/chapa.js"
+
+import crypto from "crypto"
+import { stkPush } from "./mpesa.service.js"
 
 /**
  * Generate unique transaction reference
@@ -8,9 +12,7 @@ import chapa from "../config/chapa.js"
 const generateReference = (prefix = "payment") =>
   `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 
-// ===================================================
 // INITIATE PAYMENT
-// ===================================================
 export const initiatePaymentService = async (
   userId,
   { amount, gateway, type, flow, bookingId, userInfo },
@@ -167,7 +169,7 @@ const handleSuccessfulPayment = async (tx, payment) => {
 
   switch (type) {
     case "WALLET_TOPUP":
-      return handleWalletTopup(tx, payment)
+      return handleSuccessfulTopup(tx, payment)
 
     case "BUS_BOOKING":
       return handleBusBookingPayment(tx, payment, bookingId)
@@ -178,35 +180,6 @@ const handleSuccessfulPayment = async (tx, payment) => {
     default:
       console.warn("Unhandled payment type:", type)
   }
-}
-
-// ---------------- WALLET TOPUP ----------------
-const handleWalletTopup = async (tx, payment) => {
-  const wallet = await tx.wallet.findUnique({
-    where: { userId: payment.userId },
-  })
-
-  if (!wallet) return
-
-  const newBalance = wallet.balance.add(payment.amount)
-
-  await tx.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: newBalance },
-  })
-
-  await tx.walletTransaction.create({
-    data: {
-      walletId: wallet.id,
-      amount: payment.amount,
-      type: "DEPOSIT",
-      status: "SUCCESS",
-      balanceAfter: newBalance,
-      reference: payment.reference,
-      description: `Wallet top-up via ${payment.method}`,
-      metadata: { paymentId: payment.id },
-    },
-  })
 }
 
 // ---------------- BUS BOOKING ----------------
@@ -272,5 +245,112 @@ const createChapaPayment = async (payment, user) => {
 
   return {
     paymentUrl: response.data.checkout_url,
+  }
+}
+
+// M-Pesa Top-up Service
+export const mpesaTopUpService = async ({ amount, phone, userId }) => {
+  try {
+    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
+    if (!phone) return errorResponse("Phone number required", 400)
+
+    const reference = crypto.randomBytes(8).toString("hex")
+
+    // 1️⃣ Create pending payment
+    await prisma.payment.create({
+      data: {
+        userId,
+        amount,
+        currency: "ETB",
+        method: "MOBILE_MONEY",
+        gateway: "MPESA",
+        flow: "WALLET_TOPUP",
+        reference,
+        status: "PENDING",
+        metadata: { phone },
+      },
+    })
+
+    // 2️⃣ Call shared STK Push service
+    const stkResponse = await stkPush({ phone, amount, reference })
+
+    return successResponse("STK push initiated", {
+      reference,
+      response: stkResponse,
+    })
+  } catch (error) {
+    console.error(
+      "M-Pesa Top-up service error:",
+      error.response?.data || error.message,
+    )
+    return errorResponse("Failed to initiate M-Pesa top-up", 500)
+  }
+}
+
+// M-Pesa Callback Service
+export const mpesaCallbackService = async (data) => {
+  try {
+    const callback = data?.Body?.stkCallback
+    if (!callback) return errorResponse("Invalid callback structure", 400)
+
+    const resultCode = callback.ResultCode
+    const metadata = callback.CallbackMetadata?.Item || []
+    const getValue = (name) => metadata.find((i) => i.Name === name)?.Value
+    const reference = getValue("AccountReference")
+
+    if (!reference) return errorResponse("Transaction reference missing", 400)
+
+    const payment = await prisma.payment.findUnique({ where: { reference } })
+    if (!payment) return errorResponse("Payment not found", 404)
+    if (payment.status === "SUCCESS")
+      return successResponse("Payment already processed")
+
+    if (resultCode !== 0) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "FAILED",
+          metadata: {
+            ...payment.metadata,
+            callbackData: data,
+            failedAt: new Date(),
+          },
+        },
+      })
+      return errorResponse("Payment failed", 400)
+    }
+
+    const mpesaReceipt = getValue("MpesaReceiptNumber")
+    const phone = getValue("PhoneNumber")
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "SUCCESS",
+          gatewayRef: mpesaReceipt,
+          method: "MOBILE_MONEY",
+          metadata: {
+            ...payment.metadata,
+            phone,
+            callbackData: data,
+            completedAt: new Date(),
+          },
+        },
+      })
+
+      // ✅ Use your shared function to update wallet, transactions, and points
+      await handleSuccessfulPayment(tx, payment)
+    })
+
+    return successResponse("Payment processed successfully", {
+      reference,
+      amount: payment.amount,
+      receipt: mpesaReceipt,
+      phone,
+    })
+  } catch (error) {
+    console.error("M-Pesa callback service error:", error)
+    return errorResponse("Failed to process M-Pesa payment", 500)
   }
 }

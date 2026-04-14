@@ -32,10 +32,10 @@ export function HeroSection() {
 
   const [textIndex, setTextIndex] = useState(0)
   const texts = [
-    "Drive. Park. Charge. Ride — All in One",
     "Seamless Urban Mobility Solutions",
     "Your Smart City Journey Starts Here",
     "Redefining Urban Transportation",
+    "Drive. Park. Charge. Ride, All in One",
   ]
 
   useEffect(() => {
@@ -149,9 +149,8 @@ export function HeroSection() {
         {/* Badge */}
         <motion.div variants={itemVariants} className="mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-            <Sparkles className="w-4 h-4 text-yellow-400" />
             <span className="text-sm font-medium text-white/90 font-jakarta">
-              Revolutionizing Urban Mobility
+              Revolutionizing Addis Abeba's Mobility
             </span>
           </div>
         </motion.div>
@@ -183,7 +182,7 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="text-lg md:text-xl lg:text-2xl text-white/90"
+              className="text-lg md:text-xl lg:text-2xl text-white/90 font-jakarta"
             >
               {texts[textIndex]}
             </motion.p>
@@ -200,9 +199,8 @@ export function HeroSection() {
               key={f.text}
               custom={i}
               variants={featureVariants}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 backdrop-blur-xs border-none"
+              className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-xs border-none"
             >
-              <f.icon className={`w-8 h-8 ${f.color}`} />
               <span className="text-sm text-white/80">{f.text}</span>
             </motion.div>
           ))}

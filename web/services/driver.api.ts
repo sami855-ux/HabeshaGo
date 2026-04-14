@@ -10,7 +10,6 @@ enum VerificationStatus {
 export const fetchAllDriver = async () => {
   try {
     const response = await axiosInstance.get("/drivers")
-    console.log("Drivers", response.data.data)
     return response.data.data
   } catch (error: any) {
     console.error("Error fetching buses:", error)
@@ -77,5 +76,25 @@ export const updateVerificationStatus = async (
       message: "Failed to update verification status",
       error: error.message,
     }
+  }
+}
+
+export const getFormattedDrivers = async (search = "") => {
+  try {
+    const res = await axiosInstance.get("/drivers/formatted-drivers", {
+      params: {
+        search,
+      },
+    })
+
+    return res.data.data
+  } catch (error) {
+    console.error("Error fetching formatted drivers:", error)
+
+    throw (
+      error?.response?.data || {
+        message: "Failed to fetch drivers",
+      }
+    )
   }
 }

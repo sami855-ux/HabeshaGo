@@ -329,12 +329,11 @@ export default function PaymentStep({
           >
             {/* Chapa Payment */}
             <motion.div
-              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
               className={cn(
-                "relative rounded-xl border-2 transition-all duration-300",
+                "relative rounded-lg border-2 transition-all duration-300",
                 paymentMethod === "CHAPA"
-                  ? "border-orange-500 bg-orange-50/50 dark:bg-orange-900/10"
+                  ? "border-orange-400 bg-orange-50/50 dark:bg-orange-900/10"
                   : "border-gray-200 dark:border-gray-800 hover:border-orange-300 dark:hover:border-orange-700",
               )}
             >
@@ -387,10 +386,9 @@ export default function PaymentStep({
 
             {/* Wallet Payment */}
             <motion.div
-              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
               className={cn(
-                "relative rounded-xl border-2 transition-all duration-300",
+                "relative rounded-lg border-2 transition-all duration-300",
                 paymentMethod === "WALLET"
                   ? "border-orange-500 bg-orange-50/50 dark:bg-orange-900/10"
                   : "border-gray-200 dark:border-gray-800 hover:border-orange-300 dark:hover:border-orange-700",

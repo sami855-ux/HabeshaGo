@@ -37,9 +37,9 @@ export default function MapPage() {
       </Suspense>
 
       {/* UI Overlay */}
-      <div className="absolute left-4 right-4 top-4 z-[1000] space-y-2 md:left-8 md:right-auto md:w-96">
+      <div className="absolute top-4 right-0 z-[50] space-y-2 md:right-8 md:left-auto md:w-[440px]">
         <Card className="p-4 shadow-lg">
-          <div className="space-y-4">
+          <div className="space-y-2">
             <MapFilters />
             <MapSearch />
           </div>
@@ -47,7 +47,7 @@ export default function MapPage() {
       </div>
 
       {/* Share Button */}
-      <div className="absolute bottom-4 right-4 z-[1000]">
+      <div className="absolute bottom-4 right-4 z-[70]">
         <ShareLocationButton />
       </div>
     </div>

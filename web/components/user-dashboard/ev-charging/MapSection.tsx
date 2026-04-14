@@ -63,7 +63,7 @@ export function MapSection({
 
     // Initialize map
     if (!mapRef.current) {
-      mapRef.current = L.map("map").setView([9.0192, 38.7468], 12)
+      mapRef.current = L.map("map").setView([9.0192, 38.7468], 16)
 
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",

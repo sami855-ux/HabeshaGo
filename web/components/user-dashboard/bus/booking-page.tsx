@@ -46,6 +46,7 @@ import {
   BookingResponse,
 } from "@/services/booking.api"
 import { toast } from "sonner"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Types based on your data structure
 interface BusSchedule {
@@ -124,15 +125,62 @@ interface BusData {
   route: BusRoute
 }
 
+interface Ticket {
+  id: number
+  bookingId: number
+  userId: string
+
+  seatNumber?: number
+  boardingStop?: string
+  alightingStop?: string
+
+  qrCode?: string
+  checkedIn: boolean
+  checkedInAt?: Date | null
+  validUntil?: Date
+
+  sharedToId?: string | null
+  sharedAt?: Date | null
+  sharedTicketUsed: boolean
+
+  cancelledAt?: Date | null
+
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface Payment {
+  id: number
+  userId: string
+  amount: number
+  status?: string
+  createdAt?: Date
+}
+
 interface Booking {
-  id: string
+  id: number // backend uses Int → not string
   bookingCode: string
   busId: number
   scheduleId: number
   passengerCount: number
+
   totalPrice: number
+  amountPaid: number
+  currency: string
+
   status: string
   createdAt: Date
+
+  availableSeats: number
+
+  // relations
+  tickets: Ticket[]
+  payment?: Payment
+
+  // optional (only when points used)
+  pointsUsed?: number
+  pointsValue?: number
+  pointsConversionRate?: number
 }
 
 type PaymentMethod = "CHAPA" | "WALLET" | "CARD" | "BANK"
@@ -174,6 +222,8 @@ export default function BookingPage({
   onBack,
   onBookingComplete,
 }: BookingPageProps) {
+  const queryClient = useQueryClient()
+
   const [step, setStep] = useState<"payment" | "pin" | "processing">("payment")
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
@@ -417,7 +467,7 @@ export default function BookingPage({
       const bookingData: BookingRequest = {
         busId: bus.id,
         date: adjustedDate.toISOString(),
-        totalAmount: finalAmount,
+        totalAmount: totalBeforeDiscount,
         currency: bus.route.currency,
         isPointUsed: usePoints,
         scheduleStartTime: schedule.startTime,
@@ -440,24 +490,43 @@ export default function BookingPage({
       // Create booking via API
       const response = await createNewBooking(bookingData)
 
+      const data = response?.data
+
       // Check if booking was successful
-      if (response && "booking" in response) {
-        const bookingResponse = response as BookingResponse
+      if (data) {
+        const bookingResponse = data
 
         // Create booking object for the UI
         const booking: Booking = {
-          id:
-            bookingResponse.booking.id ||
-            Math.random().toString(36).substr(2, 9),
-          bookingCode:
-            bookingResponse.booking.bookingCode ||
-            `BUS${Date.now().toString().slice(-8)}`,
-          busId: bus.id,
-          scheduleId: schedule.scheduleId,
-          passengerCount: passengers,
-          totalPrice: finalAmount,
-          status: "CONFIRMED",
-          createdAt: new Date(),
+          id: bookingResponse.booking.id,
+          bookingCode: bookingResponse.booking.bookingCode,
+          busId: bookingResponse.booking.busId,
+          scheduleId: bookingResponse.booking.scheduleId,
+          passengerCount: bookingResponse.tickets?.length || passengers,
+
+          totalPrice: Number(bookingResponse.booking.totalAmount),
+          status: bookingResponse.booking.status,
+          createdAt: new Date(bookingResponse.booking.createdAt),
+
+          availableSeats: bookingResponse.availableSeats,
+          amountPaid: Number(bookingResponse.booking.amountPaid),
+          currency: bookingResponse.booking.currency,
+
+          // ✅ add points ONLY if used
+          ...(bookingResponse.booking.pointsUsed &&
+            bookingResponse.booking.pointsUsed > 0 && {
+              pointsUsed: bookingResponse.booking.pointsUsed,
+              pointsValue: Number(bookingResponse.booking.pointsValue),
+              pointsConversionRate: Number(
+                bookingResponse.booking.pointsConversionRate,
+              ),
+            }),
+
+          // tickets can be useful for seat display
+          tickets: bookingResponse.tickets,
+
+          // payment info (optional)
+          payment: bookingResponse.payment,
         }
 
         // If using wallet, update wallet balance (handled by API)
@@ -467,17 +536,28 @@ export default function BookingPage({
           )
         }
 
+        queryClient.invalidateQueries({
+          queryKey: ["user_bookings"],
+        })
+
         setIsLoading(false)
         setShowConfirmation(true)
         onBookingComplete(booking)
 
         toast.success("Booking confirmed successfully!")
       } else {
-        throw new Error("Booking creation failed")
+        toast.error(
+          response.message || "Failed to create booking. Please try again.",
+        )
+
+        setIsLoading(false)
+        setStep("payment")
       }
     } catch (error) {
       console.error("Booking creation failed:", error)
-      toast.error("Failed to create booking. Please try again.")
+      toast.error(
+        error.message || "Failed to create booking. Please try again.",
+      )
       setStep("payment")
       setIsLoading(false)
     }

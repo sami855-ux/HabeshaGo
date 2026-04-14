@@ -18,18 +18,22 @@ import {
   Search,
   ChevronDown,
   Sparkles,
+  ChevronLeft,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
 
 export function EVChargingDashboard() {
+  const router = useRouter()
+
   const [selectedStation, setSelectedStation] =
     useState<ChargingStation | null>(null)
   const [filters, setFilters] = useState<any>({})
   const [isMobileListOpen, setIsMobileListOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Handle scroll effect for header
   useEffect(() => {
@@ -41,60 +45,32 @@ export function EVChargingDashboard() {
   }, [])
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+    <div className="h-screen flex flex-col ">
       {/* Modern Header with Glassmorphism */}
       <motion.header
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className={`sticky top-0 z-50 px-6 py-3 transition-all duration-300 ${
-          isScrolled
-            ? "bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg"
-            : "bg-transparent"
+          isScrolled ? "bg-white/80 " : "bg-transparent"
         }`}
       >
         <div className="flex items-center justify-between max-w-[1920px] mx-auto">
-          {/* Logo and Brand */}
-          <div className="flex items-center gap-3">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative"
+          {/* Back Button */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center"
+          >
+            <Button
+              variant="ghost"
+              size="default"
+              onClick={() => router.back()}
+              className="gap-2 rounded-xl px-4 py-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 group"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-600 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="absolute -inset-1 bg-orange-400 rounded-2xl blur-lg opacity-25"
-              />
-            </motion.div>
-
-            <div>
-              <motion.h1
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent"
-              >
-                HabeshaGo
-              </motion.h1>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="secondary"
-                  className="rounded-full bg-blue-50 text-blue-700 border-0 text-xs"
-                >
-                  EV Network
-                </Badge>
-              </div>
-            </div>
-          </div>
+              <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+              <span className="hidden sm:inline font-medium">Back</span>
+            </Button>
+          </motion.div>
 
           {/* Search Bar - Modern */}
           <motion.div
@@ -103,10 +79,12 @@ export function EVChargingDashboard() {
             className="hidden md:flex items-center flex-1 max-w-md mx-8"
           >
             <div className="relative w-full group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-3 top-1/2 z-25 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
               <Input
                 placeholder="Search stations, locations..."
-                className="w-full pl-10 pr-4 py-6 rounded-xl border-gray-200 bg-white/50 transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-6 rounded-xl border-gray-200 bg-white/50 transition-all focus:border-emerald-300 focus:ring-emerald-200"
               />
               <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-xs text-gray-400">
                 <span className="border rounded px-1.5 py-0.5 bg-gray-50">
@@ -118,6 +96,9 @@ export function EVChargingDashboard() {
               </kbd>
             </div>
           </motion.div>
+
+          {/* Optional: Add spacer for balance when back button is visible on mobile */}
+          <div className="md:hidden w-10" />
         </div>
       </motion.header>
 
@@ -160,6 +141,7 @@ export function EVChargingDashboard() {
             </div>
             <StationList
               filters={filters}
+              searchQuery={searchQuery}
               onStationSelect={(station) => {
                 setSelectedStation(station)
                 setIsMobileListOpen(false)

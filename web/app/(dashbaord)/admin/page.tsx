@@ -412,42 +412,88 @@ export default function DashboardWithCharts() {
           </div>
         </div>
 
-        {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 gap-5 mb-8 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi, index) => (
-            <Card key={index} className="overflow-hidden border-none ">
-              <CardHeader className="pb-1">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${kpi.color}`}>
-                    <kpi.icon className="h-7 w-7 text-primary-foreground" />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {kpi.trend === "up" ? (
-                      <TrendingUp className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4 text-red-500" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${
-                        kpi.trend === "up" ? "text-green-600" : "text-red-600"
+            <div key={index} className="h-full">
+              <Card className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900/90">
+                {/* Gradient background on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                {/* Subtle border gradient on hover */}
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400/20 to-teal-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                <CardContent className="relative p-6">
+                  {/* Header with Icon and Trend */}
+                  <div className="mb-4 flex items-start justify-between">
+                    {/* Icon with gradient background */}
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
+                      <div className="relative rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 p-3 shadow-lg transition-transform duration-300 group-hover:scale-110">
+                        <kpi.icon className="h-5 w-5 text-white" />
+                      </div>
+                    </div>
+
+                    {/* Trend Badge */}
+                    <div
+                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
+                        kpi.trend === "up"
+                          ? "bg-emerald-50 dark:bg-emerald-950/30"
+                          : "bg-red-50 dark:bg-red-950/30"
                       }`}
                     >
-                      {kpi.change}
-                    </span>
+                      {kpi.trend === "up" ? (
+                        <TrendingUp
+                          className={`h-3.5 w-3.5 ${
+                            kpi.trend === "up"
+                              ? "text-emerald-500"
+                              : "text-red-500"
+                          }`}
+                        />
+                      ) : (
+                        <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                      )}
+                      <span
+                        className={`text-xs font-semibold ${
+                          kpi.trend === "up"
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : "text-red-700 dark:text-red-400"
+                        }`}
+                      >
+                        {kpi.change}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{kpi.title}</p>
-                  <h3 className="text-2xl font-bold text-foreground">
-                    {kpi.value}
-                  </h3>
-                  <p className="text-sm text-card-foreground">{kpi.subtitle}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.details}</p>
-                </div>
-              </CardContent>
-            </Card>
+
+                  {/* Content */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">
+                      {kpi.title}
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        {kpi.value}
+                      </p>
+                    </div>
+
+                    {/* Additional info */}
+                    {(kpi.subtitle || kpi.details) && (
+                      <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                        {kpi.subtitle && (
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {kpi.subtitle}
+                          </p>
+                        )}
+                        {kpi.details && (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                            {kpi.details}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           ))}
         </div>
 
@@ -484,141 +530,6 @@ export default function DashboardWithCharts() {
               </Card>
             ))}
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Activity Feed */}
-          <Card className="lg:col-span-2 border-none">
-            <CardHeader>
-              <CardTitle>Activity Feed / Recent Events</CardTitle>
-              <CardDescription>
-                Real-time updates on system activities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activityData.map((activity) => (
-                      <TableRow key={activity.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getActivityIcon(activity.type)}
-                            <span className="capitalize">{activity.type}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {activity.description}
-                        </TableCell>
-                        <TableCell>{activity.user}</TableCell>
-                        <TableCell>{activity.time}</TableCell>
-                        <TableCell>{getStatusBadge(activity.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Reports Snapshot */}
-          <Card className="border-none">
-            <CardHeader>
-              <CardTitle>Reports Snapshot</CardTitle>
-              <CardDescription>Quick overview of trends</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">Daily Ticket Sales</h4>
-                  <Badge variant="outline" className="text-green-600">
-                    +12.5%
-                  </Badge>
-                </div>
-                <div className="h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportsData}>
-                      <defs>
-                        <linearGradient
-                          id="orangeGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="hsl(34, 100%, 50%)"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="hsl(34, 100%, 50%)"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <Area
-                        type="monotone"
-                        dataKey="sales"
-                        stroke="hsl(34, 100%, 50%)"
-                        fill="url(#orangeGradient)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">EV Charging Usage</h4>
-                  <Badge variant="outline" className="text-green-600">
-                    +8.3%
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  {evChargingData.map((station) => (
-                    <div
-                      key={station.station}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm w-32">{station.station}</span>
-                      <div className="flex items-center gap-2">
-                        <Progress
-                          value={station.usage}
-                          className="flex-1 h-2 rounded-full bg-orange-100"
-                          style={{
-                            background: "#FFE5B4", // soft orange background
-                          }}
-                        />
-                        <span className="text-sm w-10 text-right">
-                          {station.usage}%
-                        </span>
-                        <Badge
-                          variant="default"
-                          className={`text-xs px-2 py-1 ${
-                            station.status === "active"
-                              ? "bg-orange-500 text-white"
-                              : "bg-orange-200 text-orange-800"
-                          }`}
-                        >
-                          {station.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Charts Section */}
@@ -839,6 +750,141 @@ export default function DashboardWithCharts() {
           </Card>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Activity Feed */}
+          <Card className="lg:col-span-2 border-none">
+            <CardHeader>
+              <CardTitle>Activity Feed / Recent Events</CardTitle>
+              <CardDescription>
+                Real-time updates on system activities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activityData.map((activity) => (
+                      <TableRow key={activity.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getActivityIcon(activity.type)}
+                            <span className="capitalize">{activity.type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {activity.description}
+                        </TableCell>
+                        <TableCell>{activity.user}</TableCell>
+                        <TableCell>{activity.time}</TableCell>
+                        <TableCell>{getStatusBadge(activity.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Reports Snapshot */}
+          <Card className="border-none">
+            <CardHeader>
+              <CardTitle>Reports Snapshot</CardTitle>
+              <CardDescription>Quick overview of trends</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium">Daily Ticket Sales</h4>
+                  <Badge variant="outline" className="text-green-600">
+                    +12.5%
+                  </Badge>
+                </div>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={reportsData}>
+                      <defs>
+                        <linearGradient
+                          id="orangeGradient"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="hsl(34, 100%, 50%)"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="hsl(34, 100%, 50%)"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <Area
+                        type="monotone"
+                        dataKey="sales"
+                        stroke="hsl(34, 100%, 50%)"
+                        fill="url(#orangeGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium">EV Charging Usage</h4>
+                  <Badge variant="outline" className="text-green-600">
+                    +8.3%
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {evChargingData.map((station) => (
+                    <div
+                      key={station.station}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-sm w-32">{station.station}</span>
+                      <div className="flex items-center gap-2">
+                        <Progress
+                          value={station.usage}
+                          className="flex-1 h-2 rounded-full bg-orange-100"
+                          style={{
+                            background: "#FFE5B4", // soft orange background
+                          }}
+                        />
+                        <span className="text-sm w-10 text-right">
+                          {station.usage}%
+                        </span>
+                        <Badge
+                          variant="default"
+                          className={`text-xs px-2 py-1 ${
+                            station.status === "active"
+                              ? "bg-orange-500 text-white"
+                              : "bg-orange-200 text-orange-800"
+                          }`}
+                        >
+                          {station.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Map Overview */}
         <Card>
           <CardHeader>
@@ -888,8 +934,8 @@ export default function DashboardWithCharts() {
                                 i === 1
                                   ? "bg-green-500"
                                   : i === 2
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
                               }`}
                             ></div>
                             <span>Bus #{100 + i}</span>
@@ -927,7 +973,7 @@ export default function DashboardWithCharts() {
                               </span>
                             </div>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>

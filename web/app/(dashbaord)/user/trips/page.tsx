@@ -69,6 +69,13 @@ export default function TripsPage() {
     from: Date | undefined
     to: Date | undefined
   }>({ from: undefined, to: undefined })
+  const [ticketType, setTicketType] = useState<
+    "all" | "bus" | "ev" | "parking"
+  >("all")
+
+  // const filteredUpcomingTrips = upcomingTrips.filter(
+  //   (trip) => ticketType === "all" || trip.ticketType === ticketType,
+  // )
 
   const {
     data: trips,
@@ -85,7 +92,7 @@ export default function TripsPage() {
   const uniqueRoutes = useMemo(() => {
     if (!trips) return []
     const routes = new Set(
-      trips.map((trip) => `${trip.boardingStop} → ${trip.alightingStop}`),
+      trips.map((trip) => `${trip.origin} → ${trip.destination}`),
     )
     return Array.from(routes)
   }, [trips])
@@ -112,15 +119,15 @@ export default function TripsPage() {
       // Search filter
       const searchMatch =
         searchQuery === "" ||
-        trip.boardingStop.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.alightingStop.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trip.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trip.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
         trip.bookingCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         trip.bus?.busNumber.toLowerCase().includes(searchQuery.toLowerCase())
 
       // Route filter
       const routeMatch =
         selectedRoute === "all" ||
-        `${trip.boardingStop} → ${trip.alightingStop}` === selectedRoute
+        `${trip.origin} → ${trip.destination}` === selectedRoute
 
       // Date filter
       let dateMatch = true
@@ -164,9 +171,9 @@ export default function TripsPage() {
     return [...trips].sort((a, b) => {
       switch (sortBy) {
         case "date-asc":
-          return new Date(a.date).getTime() - new Date(b.date).getTime()
+          return new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime()
         case "date-desc":
-          return new Date(b.date).getTime() - new Date(a.date).getTime()
+          return new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime()
         case "price-asc":
           return parseFloat(a.totalAmount) - parseFloat(b.totalAmount)
         case "price-desc":
@@ -235,27 +242,34 @@ export default function TripsPage() {
           <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase font-semibold text-muted-foreground">
-                Travel
+                My Travel Dashboard
               </p>
-              <h1 className="text-3xl font-bold">My Trips</h1>
-              <p className="text-sm text-muted-foreground">
-                View upcoming journeys, manage bookings, and track your travel
-                history.
+              <h1 className="text-3xl font-bold tracking-tight">My Tickets</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage your bus tickets, EV charging sessions, and parking
+                reservations all in one place.
               </p>
             </div>
           </header>
 
           {/* Quick Stats */}
           <div className="flex gap-3">
-            <Card className="px-4 py-2 bg-orange-50 border-orange-200">
-              <p className="text-sm text-orange-600">Upcoming</p>
-              <p className="text-2xl font-bold text-orange-700">
+            <Card className="relative overflow-hidden px-5 py-3 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-orange-200 rounded-full -mr-10 -mt-10 opacity-30" />
+              <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">
+                Upcoming
+              </p>
+              <p className="text-3xl font-bold text-orange-700 mt-1">
                 {filteredUpcomingTrips.length}
               </p>
             </Card>
-            <Card className="px-4 py-2 bg-gray-50">
-              <p className="text-sm text-gray-600">Past</p>
-              <p className="text-2xl font-bold text-gray-700">
+
+            <Card className="relative overflow-hidden px-5 py-3 bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gray-300 rounded-full -mr-10 -mt-10 opacity-30" />
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Past
+              </p>
+              <p className="text-3xl font-bold text-gray-700 mt-1">
                 {filteredPastTrips.length}
               </p>
             </Card>
@@ -495,24 +509,42 @@ export default function TripsPage() {
         onValueChange={(value) => setActiveTab(value as TripCategory)}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-2 w-full max-w-md mb-8">
-          <TabsTrigger value="upcoming" className="relative">
-            Upcoming Trips
-            {filteredUpcomingTrips.length > 0 && (
-              <Badge className="ml-2 bg-orange-100 text-orange-700 border-0">
-                {filteredUpcomingTrips.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="past">
-            Past Trips
-            {filteredPastTrips.length > 0 && (
-              <Badge className="ml-2 bg-gray-100 text-gray-700 border-0">
-                {filteredPastTrips.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          {/* Ticket Type Filter */}
+          <div className="flex flex-wrap gap-2">
+            {["all", "bus", "ev", "parking"].map((type) => (
+              <Button
+                key={type}
+                variant={ticketType === type ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTicketType(type as any)}
+                className="capitalize"
+              >
+                {type === "all" ? "All" : `${type} Tickets`}
+              </Button>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <TabsList className="grid grid-cols-2 w-full sm:w-auto">
+            <TabsTrigger value="upcoming" className="relative">
+              Upcoming Trips
+              {filteredUpcomingTrips.length > 0 && (
+                <Badge className="ml-2 bg-orange-100 text-orange-700 border-0">
+                  {filteredUpcomingTrips.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="past">
+              Past Trips
+              {filteredPastTrips.length > 0 && (
+                <Badge className="ml-2 bg-gray-100 text-gray-700 border-0">
+                  {filteredPastTrips.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Upcoming Trips Tab */}
         <TabsContent value="upcoming" className="space-y-4">

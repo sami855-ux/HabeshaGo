@@ -411,39 +411,6 @@ export default function BusList({
 
                           {/* Delay Warning & Direction */}
                           <div className="flex items-center gap-2">
-                            {/* Modern Direction Indicator */}
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 border-2",
-                                isForward
-                                  ? "border-blue-200 bg-blue-50/50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                                  : "border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
-                              )}
-                            >
-                              {isForward ? (
-                                <>
-                                  <ArrowDown className="w-3.5 h-3.5 rotate-180" />
-                                  <span className="text-xs font-medium">
-                                    Forward
-                                  </span>
-                                  <span className="text-xs opacity-70 ml-1">
-                                    (Origin → Destination)
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <ArrowUp className="w-3.5 h-3.5 rotate-180" />
-                                  <span className="text-xs font-medium">
-                                    Reverse
-                                  </span>
-                                  <span className="text-xs opacity-70 ml-1">
-                                    (Destination → Origin)
-                                  </span>
-                                </>
-                              )}
-                            </Badge>
-
                             {bus.delayMinutes > 0 && (
                               <Badge
                                 variant="destructive"

@@ -95,8 +95,8 @@ export function BulkActionsBar({
   ]
 
   return (
-    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30 animate-slide-up">
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center space-x-4">
+    <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-30 animate-slide-up">
+      <div className="bg-gray-300 rounded-2xl shadow-lg border border-gray-200 px-4 py-4 flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <CheckSquare className="w-5 h-5 text-blue-600" />
           <span className="text-sm font-medium text-gray-900">

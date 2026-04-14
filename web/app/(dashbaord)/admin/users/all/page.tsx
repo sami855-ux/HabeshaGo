@@ -37,16 +37,21 @@ import {
   Car,
   UserCog,
   RefreshCw,
+  ChevronLeft,
 } from "lucide-react"
 import { UserTable } from "@/components/admin-dashboard/UserTable"
 import type { UserTableData, UserStatus, Theme, BadgeTheme } from "@/types/user"
 import { useUsers } from "@/hooks/useAllUsers"
 import { useDeleteUser } from "@/hooks/deleteUser"
 import { set } from "date-fns"
+import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
 
 export default function UserManagementPage() {
   const { data: users, isLoading, error, refetch } = useUsers()
   const deleteUserMutation = useDeleteUser()
+
+  const router = useRouter()
 
   const [theme, setTheme] = useState<Theme>("light")
   const [badgeTheme, setBadgeTheme] = useState<BadgeTheme>("colorful")
@@ -54,7 +59,7 @@ export default function UserManagementPage() {
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false)
   const [userToAction, setUserToAction] = useState<string | null>(null)
   const [actionType, setActionType] = useState<"delete" | "suspend" | null>(
-    null
+    null,
   )
   const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
@@ -71,8 +76,8 @@ export default function UserManagementPage() {
         tableStatus: user.isSuspended
           ? "suspended"
           : user.emailVerified && user.phoneVerified
-          ? "active"
-          : "inactive",
+            ? "active"
+            : "inactive",
         lastLogin: user.sessions?.[0]?.createdAt ?? null,
       }))
       setTableData(mappedData)
@@ -84,21 +89,21 @@ export default function UserManagementPage() {
     const total = tableData.length
     const active = tableData.filter((u) => u.tableStatus === "active").length
     const suspended = tableData.filter(
-      (u) => u.tableStatus === "suspended"
+      (u) => u.tableStatus === "suspended",
     ).length
     const inactive = tableData.filter(
-      (u) => u.tableStatus === "inactive"
+      (u) => u.tableStatus === "inactive",
     ).length
     const admins = tableData.filter((u) => u.role === "ADMIN").length
     const drivers = tableData.filter((u) => u.role === "DRIVER").length
     const passengers = tableData.filter((u) => u.role === "PASSENGER").length
     const totalBalance = tableData.reduce(
       (sum, user) => sum + (user.wallet?.balance || 0),
-      0
+      0,
     )
     const totalBookings = tableData.reduce(
       (sum, user) => sum + (user.bookings?.length || 0),
-      0
+      0,
     )
 
     return {
@@ -152,8 +157,8 @@ export default function UserManagementPage() {
       prev.map((user) =>
         user.id === userId
           ? { ...user, isSuspended: false, tableStatus: "active" }
-          : user
-      )
+          : user,
+      ),
     )
   }
 
@@ -165,8 +170,8 @@ export default function UserManagementPage() {
         prev.map((user) =>
           userIds.includes(user.id)
             ? { ...user, isSuspended: true, tableStatus: "suspended" }
-            : user
-        )
+            : user,
+        ),
       )
     }
   }
@@ -181,8 +186,8 @@ export default function UserManagementPage() {
         prev.map((user) =>
           user.id === userToAction
             ? { ...user, isSuspended: true, tableStatus: "suspended" }
-            : user
-        )
+            : user,
+        ),
       )
     }
 
@@ -238,56 +243,67 @@ export default function UserManagementPage() {
       }`}
     >
       {/* Header */}
-      <div className="space-y-4">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/admin" className="flex items-center gap-2">
-                <Home className="h-4 w-4" /> Dashboard
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="flex items-center gap-2">
-                <Users className="h-4 w-4" /> User Management
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex items-start gap-4">
+          {/* Back Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mt-1 h-10 w-10 cursor-pointer rounded-full border border-gray-200 bg-white shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80 dark:hover:bg-gray-800"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              User Management
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage all users, drivers, and administrators in the system
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={isRefetching}
-              className="gap-2 cursor-pointer"
-            >
-              <RefreshCw
-                className={`h-4 w-4 transition-transform ${
-                  isRefetching ? "animate-spin" : ""
-                }`}
-              />
-              Refresh
-            </Button>
-
-            <Button variant="outline" onClick={exportToCSV} className="gap-2">
-              <Download className="h-4 w-4" /> Export
-            </Button>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Add User
-            </Button>
+          <div className="space-y-2">
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Administration
+              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white md:text-3xl">
+                User Management
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Manage all users, drivers, and administrators in the system
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Stats Badge */}
+          <Badge
+            variant="secondary"
+            className="hidden items-center gap-2 rounded-full px-3 py-1.5 sm:flex"
+          >
+            <Users className="h-3 w-3" />
+            <span className="text-xs font-medium">Total Users: 1,234</span>
+          </Badge>
+
+          {/* Action Buttons */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 rounded-full border-gray-200 bg-white shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80"
+            onClick={handleRefresh}
+            disabled={isRefetching}
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+
+          <Button
+            size="sm"
+            className="h-9 gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 shadow-md transition-all hover:scale-105 hover:shadow-lg"
+            onClick={exportToCSV}
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+        </div>
+      </header>
 
       {/* Role Distribution */}
       <Card className="border-none">

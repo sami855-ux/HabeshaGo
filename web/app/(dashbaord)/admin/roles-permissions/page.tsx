@@ -29,6 +29,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
   Search,
   Filter,
   Columns,
@@ -42,6 +52,12 @@ import {
   Trash,
   Save,
   RefreshCw,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  TrendingUp,
+  Zap,
+  ChevronLeft,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -54,24 +70,27 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
+import { motion, AnimatePresence } from "framer-motion"
 
 // Mock data - Roles as columns, Permissions as rows
 const mockRoles = [
   {
-    id: "super-admin",
-    name: "Super Admin",
+    id: "admin",
+    name: "Admin",
     description: "Full system access",
     userCount: 3,
     color:
       "bg-red-500/10 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
+    icon: Shield,
   },
   {
     id: "fleet-manager",
-    name: "Fleet Manager",
+    name: "EV Charger Station Manager",
     description: "Manage vehicles and drivers",
     userCount: 12,
     color:
       "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
+    icon: Settings,
   },
   {
     id: "customer-support",
@@ -80,30 +99,34 @@ const mockRoles = [
     userCount: 25,
     color:
       "bg-green-500/10 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
+    icon: Users,
   },
   {
     id: "finance-manager",
-    name: "Finance Manager",
+    name: "Parking Station Manager",
     description: "Handle payments and reports",
     userCount: 8,
     color:
       "bg-purple-500/10 text-purple-600 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800",
+    icon: TrendingUp,
   },
   {
     id: "driver",
-    name: "Driver",
+    name: "Driver/Operator",
     description: "Basic driver access",
     userCount: 1500,
     color:
       "bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
+    icon: Zap,
   },
   {
     id: "viewer",
-    name: "Viewer",
+    name: "Viewer/Users",
     description: "Read-only access",
     userCount: 5,
     color:
       "bg-gray-500/10 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800",
+    icon: Eye,
   },
 ]
 
@@ -111,6 +134,7 @@ const mockPermissionCategories = [
   {
     id: "user-management",
     name: "User Management",
+    icon: Users,
     permissions: [
       {
         id: "users.view",
@@ -142,6 +166,7 @@ const mockPermissionCategories = [
   {
     id: "vehicle-management",
     name: "Vehicle Management",
+    icon: Settings,
     permissions: [
       {
         id: "vehicles.view",
@@ -173,6 +198,7 @@ const mockPermissionCategories = [
   {
     id: "ride-management",
     name: "Ride Management",
+    icon: Zap,
     permissions: [
       {
         id: "rides.view",
@@ -204,6 +230,7 @@ const mockPermissionCategories = [
   {
     id: "payment-management",
     name: "Payment Management",
+    icon: TrendingUp,
     permissions: [
       {
         id: "payments.view",
@@ -230,6 +257,7 @@ const mockPermissionCategories = [
   {
     id: "analytics",
     name: "Analytics & Reports",
+    icon: TrendingUp,
     permissions: [
       {
         id: "analytics.view",
@@ -251,6 +279,7 @@ const mockPermissionCategories = [
   {
     id: "settings",
     name: "System Settings",
+    icon: Settings,
     permissions: [
       {
         id: "settings.general",
@@ -277,7 +306,7 @@ const allPermissions = mockPermissionCategories.flatMap((category) =>
     ...permission,
     categoryId: category.id,
     categoryName: category.name,
-  }))
+  })),
 )
 
 // Initial permissions state
@@ -291,20 +320,22 @@ const initialPermissionsState = Object.fromEntries(
         role.id === "super-admin"
           ? true
           : role.id === "fleet-manager"
-          ? permission.id.includes("vehicle") || permission.id.includes("ride")
-          : role.id === "customer-support"
-          ? permission.id.includes("user") || permission.id.includes("ride")
-          : role.id === "finance-manager"
-          ? permission.id.includes("payment") ||
-            permission.id.includes("analytics")
-          : role.id === "driver"
-          ? permission.id === "rides.view" || permission.id === "vehicles.view"
-          : role.id === "viewer"
-          ? permission.id.includes("view")
-          : false,
-      ])
+            ? permission.id.includes("vehicle") ||
+              permission.id.includes("ride")
+            : role.id === "customer-support"
+              ? permission.id.includes("user") || permission.id.includes("ride")
+              : role.id === "finance-manager"
+                ? permission.id.includes("payment") ||
+                  permission.id.includes("analytics")
+                : role.id === "driver"
+                  ? permission.id === "rides.view" ||
+                    permission.id === "vehicles.view"
+                  : role.id === "viewer"
+                    ? permission.id.includes("view")
+                    : false,
+      ]),
     ),
-  ])
+  ]),
 )
 
 // Define table columns
@@ -322,6 +353,34 @@ export default function PermissionsMatrix() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveProgress, setSaveProgress] = useState(0)
+
+  // Calculate changes summary
+  const changesSummary = useMemo(() => {
+    let totalChanges = 0
+    let roleChanges: Record<string, number> = {}
+
+    Object.keys(permissions).forEach((permissionId) => {
+      Object.keys(permissions[permissionId]).forEach((roleId) => {
+        const current = permissions[permissionId][roleId]
+        const initial = initialPermissionsState[permissionId]?.[roleId]
+        if (current !== initial) {
+          totalChanges++
+          roleChanges[roleId] = (roleChanges[roleId] || 0) + 1
+        }
+      })
+    })
+
+    return {
+      totalChanges,
+      roleChanges,
+      hasChanges: totalChanges > 0,
+    }
+  }, [permissions])
 
   // Define columns
   const columns = useMemo<ColumnDef<PermissionRow>[]>(
@@ -330,8 +389,8 @@ export default function PermissionsMatrix() {
         accessorKey: "categoryName",
         header: () => (
           <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            <span>Category</span>
+            <Shield className="h-4 w-4 text-emerald-500" />
+            <span className="text-foreground">Category</span>
           </div>
         ),
         cell: ({ row }) => (
@@ -345,8 +404,8 @@ export default function PermissionsMatrix() {
         accessorKey: "name",
         header: () => (
           <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span>Permission</span>
+            <Settings className="h-4 w-4 text-emerald-500" />
+            <span className="text-foreground">Permission</span>
           </div>
         ),
         cell: ({ row }) => (
@@ -377,7 +436,7 @@ export default function PermissionsMatrix() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30"
                       onClick={() => handleBulkToggleRole(role.id, true)}
                     >
                       <CheckSquare className="h-3 w-3" />
@@ -394,7 +453,7 @@ export default function PermissionsMatrix() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30"
                       onClick={() => handleBulkToggleRole(role.id, false)}
                     >
                       <Square className="h-3 w-3" />
@@ -423,7 +482,7 @@ export default function PermissionsMatrix() {
                       onCheckedChange={() =>
                         handlePermissionToggle(permissionId, roleId)
                       }
-                      className="data-[state=checked]:bg-primary"
+                      className="data-[state=checked]:bg-emerald-500 data-[state=checked]:shadow-md transition-all duration-200"
                       aria-label={`Toggle ${row.original.name} for ${role.name}`}
                     />
                   </div>
@@ -444,7 +503,7 @@ export default function PermissionsMatrix() {
         enableSorting: false,
       })),
     ],
-    [permissions]
+    [permissions],
   )
 
   // Filter data based on search and category
@@ -461,7 +520,7 @@ export default function PermissionsMatrix() {
         (item) =>
           item.name.toLowerCase().includes(query) ||
           item.description.toLowerCase().includes(query) ||
-          item.categoryName.toLowerCase().includes(query)
+          item.categoryName.toLowerCase().includes(query),
       )
     }
 
@@ -528,58 +587,140 @@ export default function PermissionsMatrix() {
     setPermissions(initialPermissionsState)
   }
 
-  const handleSavePermissions = () => {
-    // In a real app, this would call an API
-    console.log("Saving permissions:", permissions)
-    alert("Permissions saved successfully!")
+  const handleSavePermissions = async () => {
+    setSaveDialogOpen(true)
+    setIsSaving(true)
+    setSaveSuccess(false)
+    setSaveError(null)
+    setSaveProgress(0)
+
+    // Simulate API call with progress
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setSaveProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + 10
+        })
+      }, 200)
+
+      // Simulate API call delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      clearInterval(progressInterval)
+      setSaveProgress(100)
+
+      // In a real app, this would call an API
+      console.log("Saving permissions:", permissions)
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setSaveSuccess(true)
+    } catch (error) {
+      setSaveError("Failed to save permissions. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCloseDialog = () => {
+    if (saveSuccess) {
+      // Update initial state to match current
+      // In a real app, you would persist the changes
+    }
+    setSaveDialogOpen(false)
+    setSaveProgress(0)
+    setSaveSuccess(false)
+    setSaveError(null)
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6 rounded-xl">
+    <div className="min-h-screen bg-background p-4 md:p-6">
       <TooltipProvider>
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Permissions Matrix
-              </h1>
-              <p className="text-muted-foreground">
-                Manage permissions across all roles in a single view
-              </p>
+          <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-8">
+            <div className="flex items-start gap-4">
+              {/* Back Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mt-1 h-9 w-9 rounded-full border border-gray-200 bg-white shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80 dark:hover:bg-gray-800"
+                onClick={() => window.history.back()}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Role Management
+                </p>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white md:text-3xl">
+                  Permissions Matrix
+                </h1>
+                <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="h-4 w-4" />
+                  Manage permissions across all roles in a single view
+                </p>
+              </div>
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Quick Stats Badge */}
+              <Badge
+                variant="secondary"
+                className="hidden items-center gap-2 rounded-full px-3 py-1.5 sm:flex"
+              >
+                <Shield className="h-3 w-3" />
+                <span className="text-xs font-medium">
+                  {mockRoles.length} Roles • {allPermissions.length} Permissions
+                </span>
+              </Badge>
+
+              {/* Action Buttons */}
               <Button
                 variant="outline"
+                size="sm"
+                className="h-9 gap-2 rounded-full border-gray-200 bg-white shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80"
                 onClick={handleResetToDefaults}
-                className="border-border"
+                disabled={!changesSummary.hasChanges}
               >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Reset Defaults
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">Reset</span>
               </Button>
+
               <Button
+                size="sm"
+                className="h-9 gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 shadow-md transition-all hover:scale-105 hover:shadow-lg disabled:opacity-50"
                 onClick={handleSavePermissions}
-                className="bg-primary hover:bg-primary/90"
+                disabled={!changesSummary.hasChanges || isSaving}
               >
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>Save Changes</span>
               </Button>
             </div>
-          </div>
+          </header>
 
           {/* Controls */}
-          <Card className="border-none">
+          {/* Controls */}
+          <Card className="border-none shadow-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Search */}
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-500" />
                     <Input
                       placeholder="Search permissions..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 bg-background border-input"
+                      className="pl-9 bg-background border-input focus:border-emerald-500 focus:ring-emerald-500/20"
                     />
                   </div>
                 </div>
@@ -587,11 +728,14 @@ export default function PermissionsMatrix() {
                 {/* Category Filter */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="border-input">
+                    <Button
+                      variant="outline"
+                      className="border-input hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                    >
                       <Filter className="mr-2 h-4 w-4" />
                       {selectedCategory
                         ? mockPermissionCategories.find(
-                            (c) => c.id === selectedCategory
+                            (c) => c.id === selectedCategory,
                           )?.name
                         : "All Categories"}
                     </Button>
@@ -600,9 +744,14 @@ export default function PermissionsMatrix() {
                     align="end"
                     className="bg-card border-border w-56"
                   >
-                    <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-emerald-600 dark:text-emerald-400">
+                      Filter by Category
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setSelectedCategory(null)}>
+                    <DropdownMenuItem
+                      onClick={() => setSelectedCategory(null)}
+                      className="focus:bg-emerald-50 focus:text-emerald-600 dark:focus:bg-emerald-950/30"
+                    >
                       All Categories
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -610,6 +759,7 @@ export default function PermissionsMatrix() {
                       <DropdownMenuItem
                         key={category.id}
                         onClick={() => setSelectedCategory(category.id)}
+                        className="focus:bg-emerald-50 focus:text-emerald-600 dark:focus:bg-emerald-950/30"
                       >
                         {category.name}
                       </DropdownMenuItem>
@@ -620,7 +770,10 @@ export default function PermissionsMatrix() {
                 {/* Column Visibility */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="border-input">
+                    <Button
+                      variant="outline"
+                      className="border-input hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                    >
                       <Columns className="mr-2 h-4 w-4" />
                       Columns
                     </Button>
@@ -629,7 +782,9 @@ export default function PermissionsMatrix() {
                     align="end"
                     className="bg-card border-border"
                   >
-                    <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-emerald-600 dark:text-emerald-400">
+                      Toggle Columns
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {table
                       .getAllColumns()
@@ -641,12 +796,13 @@ export default function PermissionsMatrix() {
                           onCheckedChange={(value) =>
                             column.toggleVisibility(!!value)
                           }
+                          className="focus:bg-emerald-50 focus:text-emerald-600 dark:focus:bg-emerald-950/30"
                         >
                           {column.id === "categoryName"
                             ? "Category"
                             : column.id === "name"
-                            ? "Permission"
-                            : mockRoles.find((r) => r.id === column.id)?.name}
+                              ? "Permission"
+                              : mockRoles.find((r) => r.id === column.id)?.name}
                         </DropdownMenuCheckboxItem>
                       ))}
                   </DropdownMenuContent>
@@ -656,8 +812,9 @@ export default function PermissionsMatrix() {
               {/* Category Quick Actions */}
               <div className="mt-4 flex flex-wrap gap-2">
                 {mockPermissionCategories.map((category) => {
+                  const CategoryIcon = category.icon
                   const categoryPermissions = allPermissions.filter(
-                    (p) => p.categoryId === category.id
+                    (p) => p.categoryId === category.id,
                   )
                   const totalPermissions =
                     categoryPermissions.length * mockRoles.length
@@ -669,7 +826,10 @@ export default function PermissionsMatrix() {
                           .length
                       )
                     },
-                    0
+                    0,
+                  )
+                  const percentage = Math.round(
+                    (enabledPermissions / totalPermissions) * 100,
                   )
 
                   return (
@@ -679,23 +839,32 @@ export default function PermissionsMatrix() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-auto py-2 px-3 border-border"
+                            className="h-auto py-2 px-3 border-border gap-2 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 group"
                             onClick={() =>
                               handleBulkToggleCategory(
                                 category.id,
-                                enabledPermissions < totalPermissions / 2
+                                enabledPermissions < totalPermissions / 2,
                               )
                             }
                           >
-                            <Badge variant="secondary" className="mr-2">
-                              {enabledPermissions}/{totalPermissions}
+                            <CategoryIcon className="h-3 w-3 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                            <span className="text-sm text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                              {category.name}
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className="ml-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                            >
+                              {percentage}%
                             </Badge>
-                            {category.name}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{category.name} Permissions</p>
                           <p className="text-xs text-muted-foreground mt-1">
+                            {enabledPermissions}/{totalPermissions} enabled
+                          </p>
+                          <p className="text-xs text-muted-foreground">
                             Click to{" "}
                             {enabledPermissions < totalPermissions / 2
                               ? "enable all"
@@ -711,7 +880,7 @@ export default function PermissionsMatrix() {
           </Card>
 
           {/* Permissions Matrix Table */}
-          <Card className="border-none overflow-hidden">
+          <Card className="border-none shadow-sm overflow-hidden">
             <CardContent className="p-0">
               <div className="relative overflow-auto">
                 <div className="min-w-[800px]">
@@ -732,29 +901,31 @@ export default function PermissionsMatrix() {
                                   header.id === "categoryName"
                                     ? "200px"
                                     : header.id === "name"
-                                    ? "300px"
-                                    : mockRoles.some((r) => r.id === header.id)
-                                    ? "150px"
-                                    : "auto",
+                                      ? "300px"
+                                      : mockRoles.some(
+                                            (r) => r.id === header.id,
+                                          )
+                                        ? "150px"
+                                        : "auto",
                                 left:
                                   header.id === "categoryName"
                                     ? "0"
                                     : header.id === "name"
-                                    ? "200px"
-                                    : "auto",
+                                      ? "200px"
+                                      : "auto",
                                 zIndex:
                                   header.id === "categoryName"
                                     ? 30
                                     : header.id === "name"
-                                    ? 20
-                                    : 10,
+                                      ? 20
+                                      : 10,
                               }}
                             >
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
                                     header.column.columnDef.header,
-                                    header.getContext()
+                                    header.getContext(),
                                   )}
                             </th>
                           ))}
@@ -777,8 +948,8 @@ export default function PermissionsMatrix() {
                                     cell.column.id === "categoryName"
                                       ? "0"
                                       : cell.column.id === "name"
-                                      ? "200px"
-                                      : "auto",
+                                        ? "200px"
+                                        : "auto",
                                   position:
                                     cell.column.id === "categoryName" ||
                                     cell.column.id === "name"
@@ -788,14 +959,14 @@ export default function PermissionsMatrix() {
                                     cell.column.id === "categoryName"
                                       ? 20
                                       : cell.column.id === "name"
-                                      ? 10
-                                      : 1,
+                                        ? 10
+                                        : 1,
                                   backgroundColor: "inherit",
                                 }}
                               >
                                 {flexRender(
                                   cell.column.columnDef.cell,
-                                  cell.getContext()
+                                  cell.getContext(),
                                 )}
                               </td>
                             ))}
@@ -817,174 +988,115 @@ export default function PermissionsMatrix() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Legend & Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-lg">Legend</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={true}
-                    disabled
-                    className="data-[state=checked]:bg-primary"
-                  />
-                  <span className="text-sm text-foreground">
-                    Enabled permission
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Switch checked={false} disabled />
-                  <span className="text-sm text-foreground">
-                    Disabled permission
-                  </span>
-                </div>
-                <Separator />
-                <div className="text-sm text-muted-foreground">
-                  Click any switch to toggle permission for that role
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg">Role Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {mockRoles.map((role) => {
-                    const totalPermissions = allPermissions.length
-                    const enabledPermissions = Object.values(
-                      permissions
-                    ).reduce((count, rolePerms) => {
-                      return count + (rolePerms[role.id] ? 1 : 0)
-                    }, 0)
-                    const percentage = Math.round(
-                      (enabledPermissions / totalPermissions) * 100
-                    )
-
-                    return (
-                      <div
-                        key={role.id}
-                        className={`p-4 rounded-lg border ${role.color}`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-foreground">
-                            {role.name}
-                          </h3>
-                          <Badge variant="secondary">
-                            {role.userCount} users
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {role.description}
-                        </p>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Permissions</span>
-                            <span className="font-medium">
-                              {enabledPermissions}/{totalPermissions}
-                            </span>
-                          </div>
-                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                              onClick={() =>
-                                handleBulkToggleRole(role.id, true)
-                              }
-                            >
-                              Enable All
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                              onClick={() =>
-                                handleBulkToggleRole(role.id, false)
-                              }
-                            >
-                              Disable All
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-border">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-foreground">
-                    {mockRoles.length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Roles
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-border">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-foreground">
-                    {allPermissions.length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Permissions
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-border">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-foreground">
-                    {Object.values(permissions).reduce((total, rolePerms) => {
-                      return (
-                        total + Object.values(rolePerms).filter(Boolean).length
-                      )
-                    }, 0)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Enabled Permissions
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-border">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-foreground">
-                    {mockRoles.reduce(
-                      (total, role) => total + role.userCount,
-                      0
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Users
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </TooltipProvider>
+
+      {/* Save Changes Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={handleCloseDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isSaving ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : saveSuccess ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : saveError ? (
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              ) : (
+                <Save className="h-5 w-5" />
+              )}
+              {isSaving
+                ? "Saving Permissions..."
+                : saveSuccess
+                  ? "Changes Saved!"
+                  : saveError
+                    ? "Save Failed"
+                    : "Confirm Changes"}
+            </DialogTitle>
+            <DialogDescription>
+              {isSaving
+                ? "Please wait while we save your permission changes..."
+                : saveSuccess
+                  ? "Your permission changes have been successfully saved."
+                  : saveError
+                    ? saveError
+                    : `You have ${changesSummary.totalChanges} permission change${
+                        changesSummary.totalChanges !== 1 ? "s" : ""
+                      } that will be applied.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isSaving && (
+            <div className="space-y-3 py-4">
+              <Progress value={saveProgress} className="h-2" />
+              <p className="text-xs text-center text-muted-foreground">
+                {saveProgress < 30 && "Preparing changes..."}
+                {saveProgress >= 30 && saveProgress < 60 && "Updating roles..."}
+                {saveProgress >= 60 &&
+                  saveProgress < 90 &&
+                  "Applying permissions..."}
+                {saveProgress >= 90 && "Finalizing..."}
+              </p>
+            </div>
+          )}
+
+          {!isSaving &&
+            !saveSuccess &&
+            !saveError &&
+            changesSummary.hasChanges && (
+              <div className="space-y-4 py-4">
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <h4 className="text-sm font-medium mb-2">Changes Summary</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Total changes:
+                      </span>
+                      <span className="font-medium">
+                        {changesSummary.totalChanges}
+                      </span>
+                    </div>
+                    <Separator />
+                    {Object.entries(changesSummary.roleChanges).map(
+                      ([roleId, count]) => {
+                        const role = mockRoles.find((r) => r.id === roleId)
+                        return (
+                          <div
+                            key={roleId}
+                            className="flex justify-between text-sm"
+                          >
+                            <span className="text-muted-foreground">
+                              {role?.name}:
+                            </span>
+                            <span className="font-medium">{count} changes</span>
+                          </div>
+                        )
+                      },
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          <DialogFooter>
+            {!isSaving && (
+              <Button variant="outline" onClick={handleCloseDialog}>
+                {saveSuccess ? "Close" : "Cancel"}
+              </Button>
+            )}
+            {!isSaving && !saveSuccess && !saveError && (
+              <Button onClick={handleSavePermissions} className="bg-primary">
+                Confirm & Save
+              </Button>
+            )}
+            {saveError && (
+              <Button onClick={handleSavePermissions} className="bg-primary">
+                Try Again
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

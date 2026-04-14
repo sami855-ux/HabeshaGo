@@ -48,13 +48,16 @@ export const createNewBooking = async (
     const res = await axiosInstance.post("/booking", data)
 
     if (res.data.success) {
-      return res.data.data as BookingResponse
+      return res.data
     } else {
-      return {}
+      return res.data
     }
   } catch (error) {
     console.error("Error creating booking:", error)
-    return {}
+    return {
+      success: false,
+      message: error?.response?.data.message || "Failed to create a booking",
+    }
   }
 }
 
@@ -90,12 +93,14 @@ export const getUserBookings = async () => {
 export const shareBookingRequest = async (
   bookingId: string,
   targetUserId: string,
+  ticketIds: number[],
 ) => {
   try {
     const res = await axiosInstance.patch(
       `/booking/${bookingId}/share/request`,
       {
         targetUserId,
+        ticketIds,
       },
     )
     return res.data
@@ -111,4 +116,31 @@ export const shareBookingRequest = async (
 export const getSharedTicketsAPI = async () => {
   const response = await axiosInstance.get("/booking/shared-tickets")
   return response.data.data
+}
+
+export const cancelSharedTicketRequest = async (
+  shareId: string,
+  ticketId: number,
+) => {
+  console.log(ticketId, shareId)
+  try {
+    const response = await axiosInstance.patch(
+      `/booking/share/${shareId}/cancel`,
+      {
+        ticketId,
+      },
+    )
+
+    // use API response directly
+    return response.data
+  } catch (error: any) {
+    console.error("Error cancelling ticket:", error)
+
+    return {
+      success: false,
+      statusCode: error.response?.status || 500,
+      message: error.response?.data?.message || "Failed to cancel the ticket",
+      data: error.response?.data?.data || null,
+    }
+  }
 }

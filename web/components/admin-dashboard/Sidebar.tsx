@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
+import { FaMoneyBillWave } from "react-icons/fa"
 
 export type MenuItem = {
   id: string
@@ -160,6 +161,28 @@ function Sidebar() {
       path: "/admin",
     },
     {
+      id: "finance",
+      label: "Finance",
+      icon: <FaMoneyBillWave className="h-5 w-5" />,
+      subItems: [
+        {
+          id: "revenue-overview",
+          label: "Revenue Overview",
+          path: "/admin/finance/revenue",
+        },
+        {
+          id: "commission-report",
+          label: "Commission Report",
+          path: "/admin/finance/commissions",
+        },
+        {
+          id: "admin-wallet",
+          label: "Admin Wallet",
+          path: "/admin/finance/admin-wallet",
+        },
+      ],
+    },
+    {
       id: "users",
       label: "Users",
       icon: <Users className="h-5 w-5" />,
@@ -238,24 +261,6 @@ function Sidebar() {
       label: "Disputes & Refunds",
       icon: <Receipt className="h-5 w-5" />,
       path: "/admin/disputes",
-    },
-    {
-      id: "services",
-      label: "Services",
-      icon: <ShoppingCart className="h-5 w-5" />,
-      path: "/admin/services",
-    },
-    {
-      id: "reports",
-      label: "Reports",
-      icon: <BarChart className="h-5 w-5" />,
-      path: "/admin/reports",
-    },
-    {
-      id: "support",
-      label: "Support",
-      icon: <HelpCircle className="h-5 w-5" />,
-      path: "/admin/support",
     },
     {
       id: "system-logs",

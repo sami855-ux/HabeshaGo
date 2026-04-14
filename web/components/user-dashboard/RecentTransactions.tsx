@@ -236,9 +236,10 @@ const LoadingSkeleton = () => (
   </div>
 )
 
-export default function RecentTransactions() {
+export default function RecentTransactions({ userId }: { userId: string }) {
   const queryClient = useQueryClient()
   const router = useRouter()
+
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState("")
@@ -253,7 +254,7 @@ export default function RecentTransactions() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["wallet-transactions"],
+    queryKey: ["wallet-transactions", userId],
     queryFn: fetchTransactions,
     retry: 2,
     retryDelay: 1000,

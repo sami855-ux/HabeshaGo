@@ -13,17 +13,7 @@ import {
   Clock,
   Loader2,
 } from "lucide-react"
-import { format } from "date-fns"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,24 +23,42 @@ import { EmptyState } from "@/components/user-dashboard/trip/EmptyState"
 import { FiltersBar } from "@/components/user-dashboard/trip/FiltersBar"
 import { getSharedTicketsAPI } from "@/services/booking.api"
 
+// Updated interface to match the actual data structure
 interface SharedTicket {
-  id: string
+  shareId: string
+  ticketId: number
+  seatNumber: number
+  boardingStop: string
+  alightingStop: string
+  qrCode: string
+  checkedIn: boolean
+  validUntil: string
   status: "PENDING" | "ACCEPTED" | "REJECTED"
   sharedAt: string
   booking: {
     id: number
-    seatNumber?: string
-    // Add more booking fields as needed
+    bookingCode: string
+    createdAt: string
   }
-  targetUser?: {
+  bus: {
+    id: number
+    busNumber: string
+    origin: string
+    destination: string
+  }
+  // For sent tickets
+  receiver?: {
     id: string
     name: string
     phone: string
+    email: string
   }
+  // For received tickets
   owner?: {
     id: string
     name: string
     phone: string
+    email: string
   }
 }
 
@@ -70,11 +78,13 @@ export default function SharedTicketsPage() {
   })
 
   // Fetch shared tickets
-  const { data, isLoading, error } = useQuery<ApiResponse>({
+  const { data, isLoading, error, refetch } = useQuery<ApiResponse>({
     queryKey: ["sharedTickets", user?.id],
     queryFn: () => getSharedTicketsAPI(),
     enabled: !!user?.id,
   })
+
+  console.log(data)
 
   // Get current tab data
   const currentTickets = data?.[activeTab] || []
@@ -85,20 +95,30 @@ export default function SharedTicketsPage() {
       // Apply search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
+
+        // Search by receiver/owner name, phone, ticketId, or booking code
         const targetName =
-          ticket.targetUser?.name?.toLowerCase() ||
-          ticket.owner?.name?.toLowerCase() ||
-          ""
+          activeTab === "sent"
+            ? ticket.receiver?.name?.toLowerCase() || ""
+            : ticket.owner?.name?.toLowerCase() || ""
+
         const targetPhone =
-          ticket.targetUser?.phone?.toLowerCase() ||
-          ticket.owner?.phone?.toLowerCase() ||
-          ""
-        const bookingId = ticket.booking.id.toString()
+          activeTab === "sent"
+            ? ticket.receiver?.phone?.toLowerCase() || ""
+            : ticket.owner?.phone?.toLowerCase() || ""
+
+        const ticketId = ticket.ticketId.toString()
+        const bookingCode = ticket.booking.bookingCode.toLowerCase()
+        const busNumber = ticket.bus.busNumber.toLowerCase()
+        const seatNumber = ticket.seatNumber.toString()
 
         if (
           !targetName.includes(searchLower) &&
           !targetPhone.includes(searchLower) &&
-          !bookingId.includes(searchLower)
+          !ticketId.includes(searchLower) &&
+          !bookingCode.includes(searchLower) &&
+          !busNumber.includes(searchLower) &&
+          !seatNumber.includes(searchLower)
         ) {
           return false
         }
@@ -124,7 +144,7 @@ export default function SharedTicketsPage() {
 
       return true
     })
-  }, [currentTickets, filters])
+  }, [currentTickets, filters, activeTab])
 
   const clearFilters = () => {
     setFilters({
@@ -158,7 +178,7 @@ export default function SharedTicketsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <motion.div
@@ -228,7 +248,11 @@ export default function SharedTicketsPage() {
             {isLoading ? (
               <LoadingSkeleton />
             ) : filteredTickets.length > 0 ? (
-              <TicketGrid tickets={filteredTickets} type="sent" />
+              <TicketGrid
+                tickets={filteredTickets}
+                type="sent"
+                refetch={refetch}
+              />
             ) : (
               <EmptyState
                 type="sent"
@@ -243,7 +267,11 @@ export default function SharedTicketsPage() {
             {isLoading ? (
               <LoadingSkeleton />
             ) : filteredTickets.length > 0 ? (
-              <TicketGrid tickets={filteredTickets} type="received" />
+              <TicketGrid
+                tickets={filteredTickets}
+                type="received"
+                refetch={refetch}
+              />
             ) : (
               <EmptyState
                 type="received"
@@ -288,6 +316,7 @@ function LoadingSkeleton() {
 function TicketGrid({
   tickets,
   type,
+  refetch,
 }: {
   tickets: SharedTicket[]
   type: "sent" | "received"
@@ -301,13 +330,17 @@ function TicketGrid({
       <AnimatePresence>
         {tickets.map((ticket: SharedTicket, index: number) => (
           <motion.div
-            key={ticket.id}
+            key={index} // Use shareId instead of id
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ delay: index * 0.05 }}
           >
-            <SharedTicketCard ticket={ticket} type={type} />
+            <SharedTicketCard
+              ticket={ticket}
+              type={type}
+              onStatusChange={() => refetch()}
+            />
           </motion.div>
         ))}
       </AnimatePresence>

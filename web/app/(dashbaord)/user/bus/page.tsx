@@ -1,134 +1,132 @@
-"use client";
+"use client"
 
-import { useState, useRef, useEffect } from "react";
-import BusSearchForm from "@/components/user-dashboard/bus/bus-search-form";
-import BusList from "@/components/user-dashboard/bus/bus-list";
-import BusDetailsSheet from "@/components/user-dashboard/bus/bus-details-sheet";
-import BookingPage from "@/components/user-dashboard/bus/booking-page";
-import BookingConfirmation from "@/components/user-dashboard/bus/booking-confirmation";
-import { motion } from "framer-motion";
-import { searchBusesAPI } from "@/services/bus.api";
-import { toast } from "sonner";
+import { useState, useRef, useEffect } from "react"
+import BusSearchForm from "@/components/user-dashboard/bus/bus-search-form"
+import BusList from "@/components/user-dashboard/bus/bus-list"
+import BusDetailsSheet from "@/components/user-dashboard/bus/bus-details-sheet"
+import BookingPage from "@/components/user-dashboard/bus/booking-page"
+import BookingConfirmation from "@/components/user-dashboard/bus/booking-confirmation"
+import { motion } from "framer-motion"
+import { searchBusesAPI } from "@/services/bus.api"
+import { toast } from "sonner"
 
 // Define the correct types based on the data structure
 interface BusSchedule {
-  scheduleId: number;
-  startTime: string;
-  endTime: string;
-  availableSeats: number;
+  scheduleId: number
+  startTime: string
+  endTime: string
+  availableSeats: number
 }
 
 interface BusRoute {
-  id: number;
-  name: string;
-  price: string;
-  currency: string;
-  estimatedTimeMin: number;
-  midPoints: string[];
+  id: number
+  name: string
+  price: string
+  currency: string
+  estimatedTimeMin: number
+  midPoints: string[]
 }
 
 interface BusVehicle {
-  id: number;
-  plateNumber: string;
-  vin: string;
-  type: string;
-  model: string;
-  manufacturer: string;
-  year: number;
-  capacity: number;
-  vehicleImageUrl: string;
-  status: string;
-  mileage: number;
-  ownerName: string | null;
-  ownerPhone: string | null;
-  gpsDeviceId: string;
-  createdAt: string;
-  updatedAt: string;
+  id: number
+  plateNumber: string
+  vin: string
+  type: string
+  model: string
+  manufacturer: string
+  year: number
+  capacity: number
+  vehicleImageUrl: string
+  status: string
+  mileage: number
+  ownerName: string | null
+  ownerPhone: string | null
+  gpsDeviceId: string
+  createdAt: string
+  updatedAt: string
 }
 
 interface BusDriver {
-  id: string;
-  userId: string;
-  licenseNo: string;
-  experience: number;
-  status: string;
-  driverLicenseUrl: string;
-  licenseStatus: string;
-  idType: string;
-  idFrontUrl: string;
-  idBackUrl: string;
-  idStatus: string;
-  verifiedById: string | null;
-  verifiedAt: string | null;
-  rejectionReason: string | null;
-  isOnDuty: boolean;
-  lastActiveAt: string | null;
-  rating: number;
-  totalTrips: number;
-  complaintsCount: number;
-  createdAt: string;
+  id: string
+  userId: string
+  licenseNo: string
+  experience: number
+  status: string
+  driverLicenseUrl: string
+  licenseStatus: string
+  idType: string
+  idFrontUrl: string
+  idBackUrl: string
+  idStatus: string
+  verifiedById: string | null
+  verifiedAt: string | null
+  rejectionReason: string | null
+  isOnDuty: boolean
+  lastActiveAt: string | null
+  rating: number
+  totalTrips: number
+  complaintsCount: number
+  createdAt: string
 }
 
 interface BusData {
-  id: number;
-  busNumber: string;
-  capacity: number;
-  reservedSeats: number;
-  currentStop: string | null;
-  nextDestination: string | null;
-  status: "ACTIVE" | "UNDER_MAINTENANCE" | "ON_TRIP" | "OFF_DUTY";
-  departureTime: string | null;
-  estimatedArrival: string | null;
-  delayMinutes: number;
-  lastServiceDate: string;
-  nextServiceDate: string;
-  driver: BusDriver;
-  vehicle: BusVehicle;
-  route: BusRoute;
+  id: number
+  busNumber: string
+  capacity: number
+  reservedSeats: number
+  currentStop: string | null
+  nextDestination: string | null
+  status: "ACTIVE" | "UNDER_MAINTENANCE" | "ON_TRIP" | "OFF_DUTY"
+  departureTime: string | null
+  estimatedArrival: string | null
+  delayMinutes: number
+  lastServiceDate: string
+  nextServiceDate: string
+  driver: BusDriver
+  vehicle: BusVehicle
+  route: BusRoute
 }
 
 interface BusListItem {
-  bus: BusData;
-  nearestSchedule: BusSchedule;
+  bus: BusData
+  nearestSchedule: BusSchedule
 }
 
 interface Booking {
-  id: string;
-  bookingCode: string;
-  busId: number;
-  scheduleId: number;
-  passengerCount: number;
-  totalPrice: number;
-  status: string;
-  createdAt: string;
+  id: string
+  bookingCode: string
+  busId: number
+  scheduleId: number
+  passengerCount: number
+  totalPrice: number
+  status: string
+  createdAt: string
 }
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useState<{
-    from: string;
-    to: string;
-    date: Date;
-    time: string;
-    passengers: number;
-  } | null>(null);
+    from: string
+    to: string
+    date: Date
+    time: string
+    passengers: number
+  } | null>(null)
 
-  const [buses, setBuses] = useState<BusListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedBus, setSelectedBus] = useState<BusData | null>(null);
+  const [buses, setBuses] = useState<BusListItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedBus, setSelectedBus] = useState<BusData | null>(null)
   const [selectedSchedule, setSelectedSchedule] = useState<BusSchedule | null>(
     null,
-  );
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isBooking, setIsBooking] = useState(false);
-  const [completedBooking, setCompletedBooking] = useState<Booking | null>(
-    null,
-  );
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  )
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [isBooking, setIsBooking] = useState(false)
+  const [completedBooking, setCompletedBooking] = useState<Booking | null>(null)
+  const [showConfirmation, setShowConfirmation] = useState(false)
 
   // Refs for scrolling
-  const resultsRef = useRef<HTMLDivElement>(null);
-  const searchTriggeredRef = useRef(false);
-  const initialLoadRef = useRef(true);
+  const resultsRef = useRef<HTMLDivElement>(null)
+  const searchTriggeredRef = useRef(false)
+  const initialLoadRef = useRef(true)
 
   // Scroll to results when buses are loaded
   useEffect(() => {
@@ -148,30 +146,30 @@ export default function HomePage() {
         resultsRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "start",
-        });
+        })
 
         // Add a visual highlight effect
-        resultsRef.current?.classList.add("scroll-highlight");
+        resultsRef.current?.classList.add("scroll-highlight")
         setTimeout(() => {
-          resultsRef.current?.classList.remove("scroll-highlight");
-        }, 1000);
+          resultsRef.current?.classList.remove("scroll-highlight")
+        }, 1000)
 
         // Reset the search triggered flag
-        searchTriggeredRef.current = false;
-      }, 500);
+        searchTriggeredRef.current = false
+      }, 500)
     }
-  }, [buses, isLoading]);
+  }, [buses, isLoading])
 
   const handleSearch = async (data: {
-    from: string;
-    to: string;
-    date: Date;
-    time: string;
-    passengers: number;
+    from: string
+    to: string
+    date: Date
+    time: string
+    passengers: number
   }) => {
-    const [hour, minute] = data.time.split(":").map(Number);
-    const fullDateTime = new Date(data.date);
-    fullDateTime.setHours(hour, minute, 0, 0);
+    const [hour, minute] = data.time.split(":").map(Number)
+    const fullDateTime = new Date(data.date)
+    fullDateTime.setHours(hour, minute, 0, 0)
 
     const dataNew = {
       from: data.from,
@@ -179,99 +177,98 @@ export default function HomePage() {
       passengers: data.passengers,
       date: fullDateTime,
       time: data.time,
-    };
+    }
 
-    setIsLoading(true);
-    setSearchParams(data);
+    setIsLoading(true)
+    setSearchParams(data)
     // Set flag that search was triggered
-    searchTriggeredRef.current = true;
+    searchTriggeredRef.current = true
 
     try {
-      const res = await searchBusesAPI(dataNew);
+      const res = await searchBusesAPI(dataNew)
 
       if (!res?.success) {
-        console.log(res);
+        console.log(res)
         toast.error("Search failed", {
           description:
             res?.message || "Unable to fetch buses. Please try again.",
-        });
-        setBuses([]);
-        return;
+        })
+        setBuses([])
+        return
       }
 
-      const buses = Array.isArray(res.data) ? res.data : [];
-      console.log(buses);
-      setBuses(buses);
+      const buses = Array.isArray(res.data) ? res.data : []
+      setBuses(buses)
 
       if (buses.length === 0) {
         toast.info("No buses found", {
           description: "Try adjusting your route or date.",
-        });
+        })
       } else {
         toast.success("Buses found", {
           description: `${buses.length} result${buses.length > 1 ? "s" : ""} available.`,
-        });
+        })
       }
     } catch (error) {
-      console.error("Search failed:", error);
+      console.error("Search failed:", error)
 
       toast.error("Something went wrong", {
         description: "Please check your connection and try again.",
-      });
+      })
 
-      setBuses([]);
+      setBuses([])
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleViewDetails = (busId: number) => {
-    const busItem = buses.find((item) => item.bus.id === busId);
+    const busItem = buses.find((item) => item.bus.id === busId)
 
     if (busItem) {
-      setSelectedBus(busItem.bus);
-      setSelectedSchedule(busItem.nearestSchedule);
-      setIsSheetOpen(true);
+      setSelectedBus(busItem.bus)
+      setSelectedSchedule(busItem.nearestSchedule)
+      setIsSheetOpen(true)
     }
-  };
+  }
 
   const handleBook = (busId: number, scheduleId: number) => {
-    const busItem = buses.find((item) => item.bus.id === busId);
+    const busItem = buses.find((item) => item.bus.id === busId)
 
     if (busItem && searchParams) {
-      setSelectedBus(busItem.bus);
-      setSelectedSchedule(busItem.nearestSchedule);
-      setIsBooking(true);
-      setIsSheetOpen(false);
+      setSelectedBus(busItem.bus)
+      setSelectedSchedule(busItem.nearestSchedule)
+      setIsBooking(true)
+      setIsSheetOpen(false)
     }
-  };
+  }
 
   const handleBookingComplete = (booking: Booking) => {
-    setCompletedBooking(booking);
-    setIsBooking(false);
-    setShowConfirmation(true);
-  };
+    setCompletedBooking(booking)
+    setIsBooking(false)
+    setShowConfirmation(true)
+  }
 
   const handleCloseConfirmation = () => {
-    setShowConfirmation(false);
-    setCompletedBooking(null);
-    setSearchParams(null);
-    setBuses([]);
-    setSelectedBus(null);
-    setSelectedSchedule(null);
-  };
+    setShowConfirmation(false)
+    setCompletedBooking(null)
+    setSearchParams(null)
+    setBuses([])
+    setSelectedBus(null)
+    setSelectedSchedule(null)
+  }
 
   const handleBackFromBooking = () => {
-    setIsBooking(false);
-    setSelectedBus(null);
-    setSelectedSchedule(null);
-  };
+    setIsBooking(false)
+    setSelectedBus(null)
+    setSelectedSchedule(null)
+  }
 
   const handleBookAnother = () => {
-    setShowConfirmation(false);
-    setCompletedBooking(null);
+    setShowConfirmation(false)
+    setCompletedBooking(null)
     // Keep search params to show search form
-  };
+  }
 
   if (showConfirmation && completedBooking && selectedBus && searchParams) {
     return (
@@ -280,11 +277,13 @@ export default function HomePage() {
         bus={selectedBus}
         selectedDate={searchParams.date}
         selectedTime={searchParams.time}
+        from={searchParams.from}
+        to={searchParams.to}
         onClose={handleCloseConfirmation}
         onBookAnother={handleBookAnother}
         onBack={handleBackFromBooking}
       />
-    );
+    )
   }
 
   if (isBooking && selectedBus && selectedSchedule && searchParams) {
@@ -298,7 +297,7 @@ export default function HomePage() {
         onBack={handleBackFromBooking}
         onBookingComplete={handleBookingComplete}
       />
-    );
+    )
   }
 
   return (
@@ -439,5 +438,5 @@ export default function HomePage() {
         }
       `}</style>
     </div>
-  );
+  )
 }

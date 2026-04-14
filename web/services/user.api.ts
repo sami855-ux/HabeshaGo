@@ -6,6 +6,24 @@ export interface ApiResponse<T> {
   data?: T
   message?: string
 }
+// Define the response types
+export interface RevenueOverview {
+  totalRevenue: number
+  totalCommission: number
+  adminWalletBalance: number
+}
+
+export interface DailyRevenue {
+  date: string
+  revenue: number
+}
+
+export interface ProviderRevenue {
+  providerId: string
+  providerName: string
+  totalRevenue: number
+  totalCommission: number
+}
 
 export const getUserById = async (id: string): Promise<ApiResponse<User>> => {
   try {
@@ -182,5 +200,64 @@ export const getTransportStats = async (): Promise<TransportStats | null> => {
   } catch (error) {
     console.error("Error fetching transport stats:", error)
     return null
+  }
+}
+
+export const getFormattedUsers = async () => {
+  console.log("hi")
+  try {
+    const res = await axiosInstance.get("/users/formatted-users")
+
+    console.log(res.data)
+    return res.data.data
+  } catch (error) {
+    console.error("Error fetching formatted drivers:", error)
+
+    throw (
+      error?.response?.data || {
+        message: "Failed to fetch drivers",
+      }
+    )
+  }
+}
+
+export const getRevenueOverviewAPI = async (): Promise<RevenueOverview> => {
+  try {
+    const res = await axiosInstance.get<{ data: RevenueOverview }>(
+      "/admin/finance/revenue-overview",
+    )
+    return res.data.data
+  } catch (err) {
+    console.error("Error fetching revenue overview:", err)
+    throw err
+  }
+}
+
+export const getDailyRevenueAPI = async (
+  days = 30,
+): Promise<DailyRevenue[]> => {
+  try {
+    const res = await axiosInstance.get<{ data: DailyRevenue[] }>(
+      "/admin/finance/revenue-overview/daily",
+      {
+        params: { days },
+      },
+    )
+    return res.data.data
+  } catch (err) {
+    console.error("Error fetching daily revenue:", err)
+    throw err
+  }
+}
+
+export const getProviderRevenueAPI = async (): Promise<ProviderRevenue[]> => {
+  try {
+    const res = await axiosInstance.get<{ data: ProviderRevenue[] }>(
+      "/admin/finance/revenue-overview/providers",
+    )
+    return res.data.data
+  } catch (err) {
+    console.error("Error fetching provider revenue:", err)
+    throw err
   }
 }

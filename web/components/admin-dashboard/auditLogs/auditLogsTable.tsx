@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState, useMemo } from "react"
 import {
   useReactTable,
@@ -21,13 +23,11 @@ import {
   MoreVertical,
   RefreshCw,
   UserPlus,
-  UserMinus,
   Car,
   Bus,
   CreditCard,
   Shield,
   XCircle,
-  CheckSquare,
   AlertCircle,
   Copy,
   ArrowUpDown,
@@ -38,8 +38,49 @@ import {
   Settings,
   Ban,
   CheckCheck,
+  Calendar,
+  X,
+  Info,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
+import { motion, AnimatePresence } from "framer-motion"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { AuditLog, AuditAction, EntityType } from "@/types/audit-log"
 
 export enum UserRole {
@@ -56,87 +97,299 @@ interface AuditLogsTableProps {
   onDelete?: (selectedIds: string[]) => void
 }
 
-const getActionConfig = (action: AuditAction) => {
-  switch (action) {
-    case AuditAction.CREATE:
-      return {
-        color: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
-        icon: UserPlus,
-        iconColor: "text-emerald-600",
-      }
-    case AuditAction.UPDATE:
-      return {
-        color: "bg-blue-500/10 text-blue-700 border-blue-200",
-        icon: Settings,
-        iconColor: "text-blue-600",
-      }
-    case AuditAction.VERIFY:
-      return {
-        color: "bg-indigo-500/10 text-indigo-700 border-indigo-200",
-        icon: Shield,
-        iconColor: "text-indigo-600",
-      }
-    case AuditAction.REJECT:
-      return {
-        color: "bg-rose-500/10 text-rose-700 border-rose-200",
-        icon: XCircle,
-        iconColor: "text-rose-600",
-      }
-    case AuditAction.ACTIVATE:
-      return {
-        color: "bg-teal-500/10 text-teal-700 border-teal-200",
-        icon: CheckCheck,
-        iconColor: "text-teal-600",
-      }
-    case AuditAction.DEACTIVATE:
-      return {
-        color: "bg-amber-500/10 text-amber-700 border-amber-200",
-        icon: Ban,
-        iconColor: "text-amber-600",
-      }
-    case AuditAction.DELETE:
-      return {
-        color: "bg-red-500/10 text-red-700 border-red-200",
-        icon: Trash2,
-        iconColor: "text-red-600",
-      }
-    default:
-      return {
-        color: "bg-gray-500/10 text-gray-700 border-gray-200",
-        icon: AlertCircle,
-        iconColor: "text-gray-600",
-      }
+// Modern Action Badge Component
+const ActionBadge = ({ action }: { action: AuditAction }) => {
+  const config = {
+    [AuditAction.CREATE]: {
+      icon: UserPlus,
+      label: "Create",
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800",
+    },
+    [AuditAction.UPDATE]: {
+      icon: Settings,
+      label: "Update",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800",
+    },
+    [AuditAction.VERIFY]: {
+      icon: Shield,
+      label: "Verify",
+      className:
+        "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800",
+    },
+    [AuditAction.REJECT]: {
+      icon: XCircle,
+      label: "Reject",
+      className:
+        "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800",
+    },
+    [AuditAction.ACTIVATE]: {
+      icon: CheckCheck,
+      label: "Activate",
+      className:
+        "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800",
+    },
+    [AuditAction.DEACTIVATE]: {
+      icon: Ban,
+      label: "Deactivate",
+      className:
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800",
+    },
+    [AuditAction.DELETE]: {
+      icon: Trash2,
+      label: "Delete",
+      className:
+        "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800",
+    },
   }
+
+  const {
+    icon: Icon,
+    label,
+    className,
+  } = config[action] || config[AuditAction.UPDATE]
+
+  return (
+    <Badge variant="outline" className={`gap-1.5 px-2.5 py-1 ${className}`}>
+      <Icon className="h-3 w-3" />
+      <span className="text-xs font-medium">{label}</span>
+    </Badge>
+  )
 }
 
-const getEntityIcon = (entityType: EntityType) => {
-  switch (entityType) {
-    case EntityType.DRIVER:
-      return User
-    case EntityType.VEHICLE:
-      return Car
-    case EntityType.BUS:
-      return Bus
-    case EntityType.WALLET:
-      return CreditCard
-    case EntityType.USER:
-      return User
-    default:
-      return Settings
+// Modern Entity Badge Component
+const EntityBadge = ({ entityType }: { entityType: EntityType }) => {
+  const config = {
+    [EntityType.DRIVER]: {
+      icon: User,
+      label: "Driver",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400",
+    },
+    [EntityType.VEHICLE]: {
+      icon: Car,
+      label: "Vehicle",
+      className:
+        "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400",
+    },
+    [EntityType.BUS]: {
+      icon: Bus,
+      label: "Bus",
+      className:
+        "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400",
+    },
+    [EntityType.WALLET]: {
+      icon: CreditCard,
+      label: "Wallet",
+      className:
+        "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400",
+    },
+    [EntityType.USER]: {
+      icon: User,
+      label: "User",
+      className:
+        "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-400",
+    },
   }
+
+  const {
+    icon: Icon,
+    label,
+    className,
+  } = config[entityType] || config[EntityType.USER]
+
+  return (
+    <Badge variant="outline" className={`gap-1.5 px-2.5 py-1 ${className}`}>
+      <Icon className="h-3 w-3" />
+      <span className="text-sm font-medium">{label}</span>
+    </Badge>
+  )
 }
 
-const getRoleBadge = (role: UserRole) => {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "bg-purple-100 text-purple-800"
-    case UserRole.DRIVER:
-      return "bg-blue-100 text-blue-800"
-    case UserRole.PASSENGER:
-      return "bg-green-100 text-green-800"
-    default:
-      return "bg-gray-100 text-gray-800"
+// Modern Role Badge
+const RoleBadge = ({ role }: { role: UserRole }) => {
+  const config = {
+    [UserRole.ADMIN]: {
+      label: "Admin",
+      className:
+        "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400",
+    },
+    [UserRole.DRIVER]: {
+      label: "Driver",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400",
+    },
+    [UserRole.PASSENGER]: {
+      label: "Passenger",
+      className:
+        "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400",
+    },
   }
+
+  const { label, className } = config[role] || config[UserRole.PASSENGER]
+
+  return (
+    <Badge variant="outline" className={`px-2 py-0.5 text-xs ${className}`}>
+      {label}
+    </Badge>
+  )
+}
+
+// Log Details Dialog Component
+const LogDetailsDialog = ({
+  log,
+  open,
+  onOpenChange,
+}: {
+  log: AuditLog | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) => {
+  if (!log) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-blue-500" />
+            Audit Log Details
+          </DialogTitle>
+          <DialogDescription>
+            Detailed information about this audit event
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Header Info */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Log ID</p>
+              <p className="text-sm font-mono font-medium">{log.id}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Timestamp</p>
+              <p className="text-sm font-medium">
+                {format(log.createdAt, "PPP 'at' p")}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Action</p>
+              <ActionBadge action={log.action} />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Entity</p>
+              <EntityBadge entityType={log.entityType} />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Entity ID</p>
+              <p className="text-sm font-mono">{log.entityId}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Performed By</p>
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
+                  <User className="h-3 w-3 text-emerald-600" />
+                </div>
+                <span className="text-sm font-medium">
+                  {log.actorId || "System"}
+                </span>
+                {log.actorRole && <RoleBadge role={log.actorRole} />}
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Details */}
+          {(log.reason || log.ipAddress) && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Additional Information
+              </h4>
+              <div className="space-y-2">
+                {log.reason && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                        Reason
+                      </p>
+                      <p className="text-sm text-amber-800 dark:text-amber-300">
+                        {log.reason}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {log.ipAddress && (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        IP Address
+                      </p>
+                      <p className="text-sm font-mono">{log.ipAddress}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Changes Section */}
+          {(log.oldValue || log.newValue) && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Data Changes
+              </h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                {log.oldValue && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-red-500" />
+                      <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                        Previous Value
+                      </p>
+                    </div>
+                    <pre className="text-xs bg-red-50 dark:bg-red-950/20 p-3 rounded-lg border border-red-200 dark:border-red-800 overflow-x-auto font-mono">
+                      {JSON.stringify(log.oldValue, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {log.newValue && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      <p className="text-xs font-medium text-green-600 dark:text-green-400">
+                        New Value
+                      </p>
+                    </div>
+                    <pre className="text-xs bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800 overflow-x-auto font-mono">
+                      {JSON.stringify(log.newValue, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              navigator.clipboard.writeText(JSON.stringify(log, null, 2))
+              onOpenChange(false)
+            }}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Copy JSON
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export function AuditLogsTable({
@@ -152,258 +405,224 @@ export function AuditLogsTable({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [globalFilter, setGlobalFilter] = useState("")
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [bulkActionDialog, setBulkActionDialog] = useState<{
+    open: boolean
+    action: "delete" | "export" | null
+    selectedIds: string[]
+  }>({
+    open: false,
+    action: null,
+    selectedIds: [],
+  })
 
   const columns = useMemo<ColumnDef<AuditLog>[]>(
     () => [
       {
         id: "select",
         header: ({ table }) => (
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500/20"
+          <Checkbox
             checked={table.getIsAllPageRowsSelected()}
-            onChange={table.getToggleAllPageRowsSelectedHandler()}
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+            className="h-4 w-4"
           />
         ),
         cell: ({ row }) => (
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500/20"
+          <Checkbox
             checked={row.getIsSelected()}
-            onChange={row.getToggleSelectedHandler()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="h-4 w-4"
           />
         ),
-        size: 50,
+        size: 40,
       },
       {
         accessorKey: "action",
         header: ({ column }) => (
-          <button
+          <Button
+            variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="flex items-center gap-2 font-medium text-gray-900 hover:text-gray-700 group"
+            className="font-semibold whitespace-nowrap px-2"
           >
             Action
-            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600" />
-          </button>
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
         ),
-        cell: ({ row }) => {
-          const { action } = row.original
-          const config = getActionConfig(action)
-          const Icon = config.icon
-
-          return (
-            <div className="flex items-center gap-3">
-              <div className={`p-1.5 rounded-lg ${config.color} border`}>
-                <Icon className={`h-4 w-4 ${config.iconColor}`} />
-              </div>
-              <span className="font-medium text-gray-900">{action}</span>
-            </div>
-          )
-        },
+        cell: ({ row }) => <ActionBadge action={row.original.action} />,
         filterFn: "includesString",
-        size: 160,
+        size: 120,
       },
       {
         accessorKey: "entityType",
-        header: "Entity",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="font-semibold whitespace-nowrap px-2"
+          >
+            Entity
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
         cell: ({ row }) => {
           const { entityType, entityId } = row.original
-          const EntityIcon = getEntityIcon(entityType)
-
           return (
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded-lg bg-gray-50 border border-gray-100">
-                <EntityIcon className="h-4 w-4 text-gray-600" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">{entityType}</div>
-                <div className="text-xs text-gray-500 font-mono mt-0.5">
-                  {entityId}
-                </div>
-              </div>
+            <div className="space-y-1">
+              <EntityBadge entityType={entityType} />
             </div>
           )
         },
         filterFn: "includesString",
-        size: 200,
+        size: 140,
       },
       {
         accessorKey: "actor",
-        header: "Performed By",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="font-semibold whitespace-nowrap px-2"
+          >
+            Performed By
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
         cell: ({ row }) => {
           const { actorId, actorRole } = row.original
-
           return (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-100 flex items-center justify-center">
-                  <User className="h-3.5 w-3.5 text-blue-600" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
+                <User className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {actorId || "System"}
                 </div>
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {actorId || "System"}
-                  </div>
-                  {actorRole && (
-                    <div
-                      className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadge(actorRole)} inline-block mt-0.5`}
-                    >
-                      {actorRole}
-                    </div>
-                  )}
-                </div>
+                {actorRole && <RoleBadge role={actorRole} />}
               </div>
             </div>
           )
         },
-        size: 220,
+        size: 200,
       },
       {
         accessorKey: "createdAt",
         header: ({ column }) => (
-          <button
+          <Button
+            variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="flex items-center gap-2 font-medium text-gray-900 hover:text-gray-700 group"
+            className="font-semibold whitespace-nowrap px-2"
           >
+            <Calendar className="mr-2 h-4 w-4" />
             Timestamp
-            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600" />
-          </button>
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
         ),
         cell: ({ row }) => {
           const date = row.original.createdAt
-
           return (
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="p-1 rounded-md bg-gray-50">
-                  <Clock className="h-3.5 w-3.5 text-gray-500" />
-                </div>
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {format(date, "MMM dd, yyyy")}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {format(date, "HH:mm:ss")}
-                  </div>
-                </div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                {format(date, "MMM dd, yyyy")}
               </div>
-              <div className="text-xs text-gray-400">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {format(date, "HH:mm:ss")}
+              </div>
+              <div className="text-xs text-muted-foreground/70">
                 {formatDistanceToNow(date, { addSuffix: true })}
               </div>
             </div>
           )
         },
         sortingFn: "datetime",
-        size: 180,
+        size: 160,
       },
       {
         accessorKey: "details",
         header: "Details",
         cell: ({ row }) => {
           const { reason, ipAddress } = row.original
-          const isExpanded = expandedRows.has(row.id)
-
           return (
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-md">
               {reason && (
                 <div className="flex items-start gap-2">
-                  <div className="p-1 rounded-md bg-gray-50 mt-0.5">
-                    <AlertCircle className="h-3.5 w-3.5 text-gray-500" />
-                  </div>
-                  <span className="text-sm text-gray-600 leading-relaxed">
+                  <AlertCircle className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                     {reason}
                   </span>
                 </div>
               )}
-
               {ipAddress && (
                 <div className="flex items-center gap-2 text-xs">
-                  <div className="p-1 rounded-md bg-gray-50">
-                    <Globe className="h-3 w-3 text-gray-500" />
-                  </div>
-                  <span className="text-gray-500 font-mono">{ipAddress}</span>
+                  <Globe className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground font-mono">
+                    {ipAddress}
+                  </span>
                 </div>
               )}
-
-              {(row.original.oldValue || row.original.newValue) && (
-                <button
-                  onClick={() => {
-                    const newExpanded = new Set(expandedRows)
-                    if (isExpanded) {
-                      newExpanded.delete(row.id)
-                    } else {
-                      newExpanded.add(row.id)
-                    }
-                    setExpandedRows(newExpanded)
-                  }}
-                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  {isExpanded ? "Hide changes" : "View changes"}
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                  />
-                </button>
-              )}
-
-              {isExpanded &&
-                (row.original.oldValue || row.original.newValue) && (
-                  <div className="mt-3 p-4 bg-gray-50/50 rounded-lg border border-gray-100">
-                    <div className="grid grid-cols-2 gap-4">
-                      {row.original.oldValue && (
-                        <div>
-                          <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-                            Previous Value
-                          </div>
-                          <pre className="text-xs bg-white p-3 rounded-lg border border-gray-200 overflow-x-auto font-mono">
-                            {JSON.stringify(row.original.oldValue, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {row.original.newValue && (
-                        <div>
-                          <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-                            New Value
-                          </div>
-                          <pre className="text-xs bg-white p-3 rounded-lg border border-gray-200 overflow-x-auto font-mono">
-                            {JSON.stringify(row.original.newValue, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
             </div>
           )
         },
-        size: 350,
+        size: 280,
       },
       {
         id: "actions",
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => navigator.clipboard.writeText(row.original.id)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-              title="Copy Log ID"
-            >
-              <Copy className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-            </button>
-            <button
-              onClick={() => console.log("View details:", row.original.id)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-blue-50 hover:text-blue-600"
+              onClick={() => {
+                setSelectedLog(row.original)
+                setDetailsDialogOpen(true)
+              }}
               title="View Details"
             >
-              <Eye className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors group">
-              <MoreVertical className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-            </button>
+              <Eye className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => navigator.clipboard.writeText(row.original.id)}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Log ID
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedLog(row.original)
+                    setDetailsDialogOpen(true)
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         ),
-        size: 120,
+        size: 80,
       },
     ],
-    [expandedRows],
+    [],
   )
 
   const table = useReactTable({
@@ -429,305 +648,410 @@ export function AuditLogsTable({
     .getSelectedRowModel()
     .rows.map((row) => row.original.id)
 
+  const handleBulkAction = (action: "delete" | "export") => {
+    if (selectedRows.length === 0) return
+    setBulkActionDialog({
+      open: true,
+      action,
+      selectedIds: selectedRows,
+    })
+  }
+
+  const confirmBulkAction = () => {
+    if (bulkActionDialog.action === "delete") {
+      onDelete?.(bulkActionDialog.selectedIds)
+      setRowSelection({})
+    } else if (bulkActionDialog.action === "export") {
+      onExport?.(bulkActionDialog.selectedIds)
+    }
+    setBulkActionDialog({ open: false, action: null, selectedIds: [] })
+  }
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-              Audit Logs
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Monitor all system activities and track changes
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onRefresh}
-              className="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-              title="Refresh"
-            >
-              <RefreshCw className="h-5 w-5 text-gray-600" />
-            </button>
-
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="search"
-                placeholder="Search logs..."
+    <>
+      <div className="space-y-4">
+        {/* Table Controls */}
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-1 flex items-center gap-4 w-full">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search logs by action, entity, or details..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-10 pr-4 py-2.5 w-64 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all bg-gray-50/50"
+                className="pl-9 rounded-full"
               />
             </div>
-          </div>
-        </div>
 
-        {/* Bulk Actions Bar */}
-        {selectedRows.length > 0 && (
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl mb-4 border border-blue-100">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-blue-900">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2 rounded-full"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {columnFilters.length > 0 && (
+                <Badge variant="secondary" className="ml-1 rounded-full">
+                  {columnFilters.length}
+                </Badge>
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="rounded-full h-9 w-9"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
+            </Button>
+          </div>
+
+          {/* Bulk Actions */}
+          {selectedRows.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-full border border-blue-200 dark:border-blue-800"
+            >
+              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
                 {selectedRows.length} log{selectedRows.length !== 1 ? "s" : ""}{" "}
                 selected
               </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => onExport?.(selectedRows)}
-                className="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all hover:shadow-sm font-medium text-gray-700"
+              <div className="h-4 w-px bg-blue-200 dark:bg-blue-800" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleBulkAction("export")}
+                className="gap-2 text-blue-700 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-400"
               >
-                <Download className="h-4 w-4" />
-                Export Selected
-              </button>
-
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Delete ${selectedRows.length} selected audit logs? This action cannot be undone.`,
-                    )
-                  ) {
-                    onDelete?.(selectedRows)
-                  }
-                }}
-                className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-all hover:shadow-sm font-medium"
+                <Download className="h-3.5 w-3.5" />
+                Export
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleBulkAction("delete")}
+                className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400"
               >
-                <Trash2 className="h-4 w-4" />
-                Delete Selected
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">
-              Filter by:
-            </span>
-          </div>
-
-          <select
-            className="px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all bg-gray-50/50"
-            onChange={(e) => {
-              const value = e.target.value
-              if (value) {
-                table.getColumn("action")?.setFilterValue(value)
-              } else {
-                table.getColumn("action")?.setFilterValue(undefined)
-              }
-            }}
-          >
-            <option value="">All Actions</option>
-            {Object.values(AuditAction).map((action) => (
-              <option key={action} value={action}>
-                {action}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all bg-gray-50/50"
-            onChange={(e) => {
-              const value = e.target.value
-              if (value) {
-                table.getColumn("entityType")?.setFilterValue(value)
-              } else {
-                table.getColumn("entityType")?.setFilterValue(undefined)
-              }
-            }}
-          >
-            <option value="">All Entities</option>
-            {Object.values(EntityType).map((entity) => (
-              <option key={entity} value={entity}>
-                {entity}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => {
-              setColumnFilters([])
-              setGlobalFilter("")
-              setRowSelection({})
-            }}
-            className="px-3.5 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all font-medium"
-          >
-            Clear filters
-          </button>
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </Button>
+            </motion.div>
+          )}
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50/80 border-b border-gray-100">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                    style={{ width: header.getSize() }}
-                  >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-
-          <tbody className="divide-y divide-gray-100">
-            {isLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i} className="animate-pulse">
-                  {Array.from({ length: columns.length }).map((_, j) => (
-                    <td key={j} className="px-6 py-5">
-                      <div className="h-4 bg-gray-200 rounded"></div>
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : table.getRowModel().rows.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="px-6 py-16 text-center">
-                  <div className="inline-flex flex-col items-center">
-                    <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                      <Search className="h-8 w-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      No audit logs found
-                    </h3>
-                    <p className="text-gray-500 max-w-md">
-                      Try adjusting your search or filter criteria to find what
-                      you're looking for.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="hover:bg-gray-50/50 transition-colors duration-150"
+        {/* Filter Bar */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-wrap gap-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <Select
+                  onValueChange={(value) => {
+                    if (value && value !== "all") {
+                      table.getColumn("action")?.setFilterValue(value)
+                    } else {
+                      table.getColumn("action")?.setFilterValue(undefined)
+                    }
+                  }}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-5">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  <SelectTrigger className="w-[140px] rounded-full">
+                    <SelectValue placeholder="All Actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Actions</SelectItem>
+                    {Object.values(AuditAction).map((action) => (
+                      <SelectItem key={action} value={action}>
+                        {action}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="text-sm text-gray-600">
-              Showing{" "}
-              <span className="font-medium text-gray-900">
+                <Select
+                  onValueChange={(value) => {
+                    if (value && value !== "all") {
+                      table.getColumn("entityType")?.setFilterValue(value)
+                    } else {
+                      table.getColumn("entityType")?.setFilterValue(undefined)
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-[140px] rounded-full">
+                    <SelectValue placeholder="All Entities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Entities</SelectItem>
+                    {Object.values(EntityType).map((entity) => (
+                      <SelectItem key={entity} value={entity}>
+                        {entity}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setColumnFilters([])
+                    setGlobalFilter("")
+                  }}
+                  className="rounded-full"
+                >
+                  Clear all
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Table */}
+        <div className="rounded-2xl border bg-white dark:bg-gray-950 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                        style={{ width: header.getSize() }}
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      {Array.from({ length: columns.length }).map((_, j) => (
+                        <td key={j} className="px-4 py-4">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded"></div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : table.getRowModel().rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length}
+                      className="px-4 py-10 text-center"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="rounded-full bg-gray-100 dark:bg-gray-800 p-4 mb-3">
+                          <Search className="h-10 w-10 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          No audit logs found
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Try adjusting your search or filter criteria
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedLog(row.original)
+                        setDetailsDialogOpen(true)
+                      }}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-4 py-4">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30">
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                Showing{" "}
                 {table.getState().pagination.pageIndex *
                   table.getState().pagination.pageSize +
-                  1}
-              </span>{" "}
-              to{" "}
-              <span className="font-medium text-gray-900">
+                  1}{" "}
+                to{" "}
                 {Math.min(
                   (table.getState().pagination.pageIndex + 1) *
                     table.getState().pagination.pageSize,
                   data.length,
-                )}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-gray-900">{data.length}</span>{" "}
-              entries
+                )}{" "}
+                of {data.length} entries
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Rows per page:
+                </span>
+                <Select
+                  value={table.getState().pagination.pageSize.toString()}
+                  onValueChange={(value) => table.setPageSize(Number(value))}
+                >
+                  <SelectTrigger className="w-20 h-8 rounded-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 30, 50, 100].map((size) => (
+                      <SelectItem key={size} value={size.toString()}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Rows per page:</span>
-              <select
-                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white"
-                value={table.getState().pagination.pageSize}
-                onChange={(e) => table.setPageSize(Number(e.target.value))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="rounded-full"
               >
-                {[10, 20, 30, 50, 100].map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                Previous
+              </Button>
 
-          <div className="flex items-center gap-2">
-            <button
-              className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-gray-700"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              Previous
-            </button>
+              <div className="flex items-center gap-1">
+                {Array.from(
+                  { length: Math.min(5, table.getPageCount()) },
+                  (_, i) => {
+                    const pageIndex = i
+                    return (
+                      <Button
+                        key={i}
+                        variant={
+                          table.getState().pagination.pageIndex === pageIndex
+                            ? "default"
+                            : "outline"
+                        }
+                        size="sm"
+                        onClick={() => table.setPageIndex(pageIndex)}
+                        className="h-8 w-8 p-0 rounded-full"
+                      >
+                        {pageIndex + 1}
+                      </Button>
+                    )
+                  },
+                )}
 
-            <div className="flex items-center gap-1">
-              {Array.from(
-                { length: Math.min(5, table.getPageCount()) },
-                (_, i) => {
-                  const pageIndex = i
-                  return (
-                    <button
-                      key={i}
-                      className={`h-9 w-9 rounded-xl font-medium transition-all ${
-                        table.getState().pagination.pageIndex === pageIndex
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                      onClick={() => table.setPageIndex(pageIndex)}
+                {table.getPageCount() > 5 && (
+                  <>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        table.setPageIndex(table.getPageCount() - 1)
+                      }
+                      className="h-8 w-8 p-0 rounded-full"
                     >
-                      {pageIndex + 1}
-                    </button>
-                  )
-                },
-              )}
+                      {table.getPageCount()}
+                    </Button>
+                  </>
+                )}
+              </div>
 
-              {table.getPageCount() > 5 && (
-                <>
-                  <span className="px-2 text-gray-400">...</span>
-                  <button
-                    className="h-9 w-9 rounded-xl font-medium text-gray-700 hover:bg-gray-100 transition-all"
-                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                  >
-                    {table.getPageCount()}
-                  </button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="rounded-full"
+              >
+                Next
+              </Button>
             </div>
-
-            <button
-              className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-gray-700"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              Next
-            </button>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Log Details Dialog */}
+      <LogDetailsDialog
+        log={selectedLog}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+      />
+
+      {/* Bulk Action Confirmation Dialog */}
+      <AlertDialog
+        open={bulkActionDialog.open}
+        onOpenChange={(open) =>
+          setBulkActionDialog((prev) => ({ ...prev, open }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkActionDialog.action === "delete"
+                ? "Delete Selected Logs"
+                : "Export Selected Logs"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkActionDialog.action === "delete" ? (
+                <>
+                  This action will permanently delete{" "}
+                  <strong>{bulkActionDialog.selectedIds.length}</strong> audit
+                  log
+                  {bulkActionDialog.selectedIds.length > 1 ? "s" : ""}. This
+                  action cannot be undone.
+                </>
+              ) : (
+                <>
+                  You are about to export{" "}
+                  <strong>{bulkActionDialog.selectedIds.length}</strong> audit
+                  log
+                  {bulkActionDialog.selectedIds.length > 1 ? "s" : ""}. The data
+                  will be downloaded as a JSON file.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkAction}
+              className={
+                bulkActionDialog.action === "delete"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : ""
+              }
+            >
+              {bulkActionDialog.action === "delete" ? "Delete" : "Export"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

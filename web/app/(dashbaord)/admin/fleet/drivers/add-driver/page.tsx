@@ -71,76 +71,7 @@ import {
 // Custom Components
 import { ImageUploader } from "@/components/admin-dashboard/driver/ImageUploader"
 import { axiosInstance } from "@/services/axiosInstance"
-
-// Mockup Data
-const mockUsers = [
-  {
-    id: "cmkoh7np700001wh5jspnf9w9",
-    name: "Sam Smith",
-    email: "samiux85567@gmail.com",
-    phone: "251978109304",
-    avatarUrl:
-      "https://res.cloudinary.com/dxxovha85/image/upload/v1769426727/negari/avatars/mzixz2qj99def69sceuo.png",
-    emailVerified: true,
-    location: "Addis Ababa",
-  },
-  {
-    id: "user_2",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "251911223344",
-    avatarUrl: null,
-    emailVerified: true,
-    location: "Addis Ababa",
-  },
-  {
-    id: "user_3",
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    phone: "251922334455",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop",
-    emailVerified: false,
-    location: "Dire Dawa",
-  },
-  {
-    id: "user_4",
-    name: "Mike Johnson",
-    email: "mike.j@example.com",
-    phone: "251933445566",
-    avatarUrl: null,
-    emailVerified: true,
-    location: "Bahir Dar",
-  },
-  {
-    id: "user_5",
-    name: "Sarah Williams",
-    email: "sarah.w@example.com",
-    phone: "251944556677",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop",
-    emailVerified: true,
-    location: "Addis Ababa",
-  },
-]
-
-// Mockup API Functions
-const fetchUsers = async (search?: string) => {
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  if (!search) {
-    return { data: mockUsers }
-  }
-
-  const filteredUsers = mockUsers.filter(
-    (user) =>
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase()) ||
-      user.phone.includes(search),
-  )
-
-  return { data: filteredUsers }
-}
+import { getFormattedUsers } from "@/services/user.api"
 
 // Create driver with FormData
 const createDriver = async (formData: FormData) => {
@@ -291,12 +222,36 @@ export default function CreateDriverPage() {
     isLoading: isLoadingUsers,
     refetch,
   } = useQuery({
-    queryKey: ["users", searchQuery],
-    queryFn: () => fetchUsers(searchQuery),
-    enabled: isUserSelectOpen,
+    queryKey: ["drivers_formatted"],
+    queryFn: getFormattedUsers,
+    enabled: true,
   })
 
-  const users = usersData?.data || []
+  const users = usersData || []
+
+  // Add this after your users data fetching
+  const filteredUsers = users.filter((user: any) => {
+    if (!searchQuery.trim()) return true
+
+    const searchLower = searchQuery.toLowerCase().trim()
+
+    // Search in name
+    if (user.name?.toLowerCase().includes(searchLower)) return true
+
+    // Search in email
+    if (user.email?.toLowerCase().includes(searchLower)) return true
+
+    // Search in phone number
+    if (user.phone?.toLowerCase().includes(searchLower)) return true
+
+    return false
+  })
+
+  console.log("Users data state:", {
+    usersData,
+    isLoadingUsers,
+    usersCount: users.length,
+  })
 
   // Form with FormProvider
   const methods = useForm<DriverFormValues>({
@@ -692,7 +647,6 @@ export default function CreateDriverPage() {
                                 value={searchQuery}
                                 onChange={(e) => {
                                   setSearchQuery(e.target.value)
-                                  refetch()
                                 }}
                                 className="pl-9"
                               />
@@ -703,9 +657,9 @@ export default function CreateDriverPage() {
                                 <div className="flex items-center justify-center p-8">
                                   <Loader2 className="h-6 w-6 animate-spin" />
                                 </div>
-                              ) : users.length > 0 ? (
+                              ) : filteredUsers.length > 0 ? (
                                 <div className="divide-y">
-                                  {users.map((user: any) => (
+                                  {filteredUsers.map((user: any) => (
                                     <button
                                       key={user.id}
                                       className="w-full p-4 hover:bg-muted/50 cursor-pointer transition-colors text-left"

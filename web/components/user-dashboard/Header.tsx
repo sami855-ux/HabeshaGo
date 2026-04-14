@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Bell,
   ChevronDown,
@@ -44,11 +44,25 @@ import SearchDialog from "./SearchDialog"
 import { motion } from "framer-motion"
 import { PiGearSix } from "react-icons/pi"
 import { MdSupportAgent } from "react-icons/md"
+import { useQuery } from "@tanstack/react-query"
+import { fetchAllNotification } from "@/services/notification.api"
+
+const notificationKeys = {
+  all: ["notifications"] as const,
+  lists: () => [...notificationKeys.all, "list"] as const,
+}
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
   const dispatch = useDispatch()
   const { user, loading } = useSelector((state: RootState) => state.user)
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: notificationKeys.lists(),
+    queryFn: fetchAllNotification,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -57,7 +71,9 @@ function Header({ className }: { className?: string }) {
   const [scrolled, setScrolled] = useState(false)
 
   // Mock unread count - you can update this based on your notification state
-  const [unreadNotificationCount] = useState(3)
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length
+  }, [notifications])
 
   // Handle scroll effect for morphism
   useEffect(() => {
@@ -225,10 +241,10 @@ function Header({ className }: { className?: string }) {
                           >
                             <Badge
                               variant="destructive"
-                              className="absolute -top-1 -right-1 px-1 min-w-0 w-5 h-5 flex items-center justify-center text-xs p-0"
+                              className="absolute -top-1.5 -right-1 px-1 min-w-0 w-6 h-6 flex items-center justify-center text-xs p-0"
                             >
-                              {unreadNotificationCount > 9
-                                ? "9+"
+                              {unreadNotificationCount > 10
+                                ? "10+"
                                 : unreadNotificationCount}
                             </Badge>
                           </motion.div>
@@ -351,7 +367,7 @@ function Header({ className }: { className?: string }) {
 
                   <div className="px-1 py-1">
                     <DropdownMenuItem
-                      onClick={() => router.push("/ev-owner/settings")}
+                      onClick={() => router.push("/user/settings")}
                       className="cursor-pointer gap-3 py-2"
                     >
                       <PiGearSix className="w-4 h-4 text-muted-foreground" />
@@ -359,7 +375,7 @@ function Header({ className }: { className?: string }) {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() => router.push("/ev-owner/support")}
+                      onClick={() => router.push("/user/support")}
                       className="cursor-pointer gap-3 py-2"
                     >
                       <MdSupportAgent className="w-4 h-4 text-muted-foreground" />

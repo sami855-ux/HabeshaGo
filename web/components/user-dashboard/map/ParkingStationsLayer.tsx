@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import L from "leaflet"
 import { ParkingStation, Coordinates } from "@/types/map-user"
-import { calculateDistance, formatDistance } from "@/lib/utils"
+import { calculateDistance, cn, formatDistance } from "@/lib/utils"
 import { useQueryParams } from "@/hooks/useQueryParams"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,22 @@ interface ParkingStationsLayerProps {
   onDestinationSelect: (destination: Coordinates) => void
 }
 
+// Example station object with images array
+const stationData = {
+  name: "Downtown Parking Plaza",
+  address: "123 Main Street, Downtown",
+  distance: 0.5,
+  availableSpaces: 15,
+  totalSpaces: 50,
+  pricing: "$2.50",
+  location: { lat: 40.7128, lng: -74.006 },
+  images: [
+    "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=300&h=150&fit=crop",
+    "https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=300&h=150&fit=crop",
+    "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=300&h=150&fit=crop",
+  ],
+}
+
 export default function ParkingStationsLayer({
   map,
   userLocation,
@@ -25,11 +41,8 @@ export default function ParkingStationsLayer({
   const markersRef = useRef<L.Marker[]>([])
   const { getParam } = useQueryParams()
 
-  /*
-  ----------------------------------
-  LOAD PARKING STATIONS
-  ----------------------------------
-  */
+  const [currentImage, setCurrentImage] = useState(0)
+
   useEffect(() => {
     const loadStations = async () => {
       try {
@@ -57,11 +70,6 @@ export default function ParkingStationsLayer({
     loadStations()
   }, [userLocation])
 
-  /*
-  ----------------------------------
-  CREATE MARKERS
-  ----------------------------------
-  */
   useEffect(() => {
     if (!map || !map.getPane || stations.length === 0) return
 
@@ -94,9 +102,9 @@ export default function ParkingStationsLayer({
     const parkingIcon = L.divIcon({
       className: "parking-station-marker",
       html: `
-      <div class="bg-purple-500 p-2 rounded-full shadow-lg">
+      <div class="bg-purple-500 p-1 rounded-full shadow-lg">
         <svg xmlns="http://www.w3.org/2000/svg"
-          width="16" height="16"
+          width="22" height="22"
           viewBox="0 0 24 24"
           fill="none"
           stroke="white"
@@ -132,16 +140,125 @@ export default function ParkingStationsLayer({
       const root = createRoot(popupContent)
 
       root.render(
-        <div className="p-2 min-w-[200px]">
-          <h3 className="font-semibold text-lg">{station.name}</h3>
+        <div className=" min-w-[200px]">
+          {/* Image Slider */}
+          <div className="mb-3 rounded-lg overflow-hidden relative">
+            <div className="relative">
+              <img
+                src={
+                  stationData.images?.[currentImage] ||
+                  "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=300&h=150&fit=crop"
+                }
+                alt={stationData.name}
+                className="w-full h-32 object-cover transition-opacity duration-300"
+              />
 
-          <p className="text-sm text-gray-600">{station.address}</p>
+              {/* Navigation Arrows */}
+              {stationData.images && stationData.images.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCurrentImage((prev) =>
+                        prev === 0 ? stationData.images.length - 1 : prev - 1,
+                      )
+                    }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-all"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCurrentImage((prev) =>
+                        prev === stationData.images.length - 1 ? 0 : prev + 1,
+                      )
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-all"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Dots Indicator */}
+            {stationData.images && stationData.images.length > 1 && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {stationData.images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCurrentImage(idx)
+                    }}
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full transition-all",
+                      currentImage === idx
+                        ? "bg-white w-3"
+                        : "bg-white/50 hover:bg-white/70",
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <h3 className="font-semibold text-lg">{stationData.name}</h3>
+
+          {/* Static Rating Stars */}
+          <div className="flex items-center gap-1 mt-1 mb-2">
+            <div className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <svg
+                  key={i}
+                  className={cn(
+                    "w-4 h-4",
+                    i < 4
+                      ? "text-yellow-400 fill-current"
+                      : "text-gray-300 fill-current",
+                  )}
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                </svg>
+              ))}
+            </div>
+            <span className="text-xs text-gray-500">(24 reviews)</span>
+          </div>
+
+          <p className="text-sm text-gray-600">{stationData.address}</p>
 
           <div className="mt-2 space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-sm">Distance:</span>
               <span className="font-medium">
-                {formatDistance(station.distance!)}
+                {formatDistance(stationData.distance!)}
               </span>
             </div>
 
@@ -149,26 +266,26 @@ export default function ParkingStationsLayer({
               <span className="text-sm">Available:</span>
               <Badge
                 variant={
-                  station.availableSpaces > 20 ? "default" : "destructive"
+                  stationData.availableSpaces > 20 ? "default" : "destructive"
                 }
               >
-                {station.availableSpaces}/{station.totalSpaces}
+                {stationData.availableSpaces}/{stationData.totalSpaces}
               </Badge>
             </div>
 
-            {station.pricing && (
+            {stationData.pricing && (
               <div className="flex items-center justify-between">
                 <span className="text-sm">Pricing:</span>
-                <span className="font-medium">{station.pricing}</span>
+                <span className="font-medium">{stationData.pricing}</span>
               </div>
             )}
           </div>
 
           <div className="flex gap-2 mt-3">
             <Button
-              className="flex-1"
+              className="flex-1 "
               size="sm"
-              onClick={() => onDestinationSelect(station.location)}
+              onClick={() => onDestinationSelect(stationData.location)}
             >
               Route
             </Button>
@@ -179,7 +296,7 @@ export default function ParkingStationsLayer({
               variant="outline"
               onClick={() => {
                 window.open(
-                  `https://www.google.com/maps/dir/?api=1&destination=${station.location.lat},${station.location.lng}`,
+                  `https://www.google.com/maps/dir/?api=1&destination=${stationData.location.lat},${stationData.location.lng}`,
                   "_blank",
                 )
               }}
@@ -189,7 +306,6 @@ export default function ParkingStationsLayer({
           </div>
         </div>,
       )
-
       marker.bindPopup(popupContent)
 
       newMarkers.push(marker)

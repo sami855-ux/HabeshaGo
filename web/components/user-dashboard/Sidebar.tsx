@@ -541,10 +541,4 @@ function Sidebar() {
   )
 }
 
-// Mock user data - replace with your actual user data
-const user = {
-  name: "John Doe",
-  email: "john@example.com",
-}
-
 export default Sidebar

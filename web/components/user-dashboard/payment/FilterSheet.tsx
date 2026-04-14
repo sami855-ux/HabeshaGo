@@ -101,12 +101,12 @@ export function FilterSheet({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/25 bg-opacity-50 transition-opacity z-40"
+        className="fixed inset-0 bg-black/25 bg-opacity-50 transition-opacity z-70"
         onClick={onClose}
       />
 
       {/* Sheet */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
+      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-100 transform transition-transform duration-300 ease-in-out">
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">

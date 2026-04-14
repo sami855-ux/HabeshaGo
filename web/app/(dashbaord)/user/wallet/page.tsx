@@ -419,7 +419,7 @@ export default function WalletPage() {
       {hasWallet && (
         <>
           <DepositAction />
-          <RecentTransactions />
+          <RecentTransactions userId={user?.id} />
         </>
       )}
 

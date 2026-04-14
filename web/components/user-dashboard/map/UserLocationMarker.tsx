@@ -63,15 +63,15 @@ export default function UserLocationMarker({
           html: `
             <div class="relative flex items-center justify-center">
               <!-- Outer pulse ring -->
-              <div class="absolute h-8 w-8 rounded-full bg-blue-400/30 animate-ping"></div>
+              <div class="absolute h-16 w-16 rounded-full bg-blue-400/30 animate-ping"></div>
               
               <!-- Inner pulse ring (delayed) -->
-              <div class="absolute h-6 w-6 rounded-full bg-blue-500/40 animate-ping" style="animation-delay: 0.5s"></div>
+              <div class="absolute h-8 w-8 rounded-full bg-blue-500/40 animate-ping" style="animation-delay: 0.5s"></div>
               
               <!-- Core marker -->
-              <div class="relative h-4 w-4 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 border-2 border-white shadow-lg flex items-center justify-center">
+              <div class="relative h-7 w-7 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 border-2 border-white shadow-lg flex items-center justify-center">
                 <!-- Inner dot for depth -->
-                <div class="h-1.5 w-1.5 rounded-full bg-white"></div>
+                <div class="h-3 w-3 rounded-full bg-white"></div>
               </div>
               
               <!-- Direction indicator (optional - shows heading if available) -->
@@ -96,7 +96,7 @@ export default function UserLocationMarker({
         marker
           .bindPopup(
             `
-          <div class="p-3 min-w-[200px]">
+          <div class="p- min-w-[200px]">
             <div class="flex items-center gap-2 mb-2">
               <div class="h-3 w-3 rounded-full bg-green-500 animate-pulse"></div>
               <h3 class="font-semibold text-gray-900 font-geist">Your Location</h3>
@@ -105,19 +105,19 @@ export default function UserLocationMarker({
             <div class="space-y-2 text-sm">
               <div class="flex items-center justify-between">
                 <span class="text-gray-500">Latitude:</span>
-                <span class="font-mono font-medium">${userLocation.lat.toFixed(6)}°</span>
+                <span class="font-grotesk not-only:font-medium">${userLocation.lat.toFixed(6)}°</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-gray-500">Longitude:</span>
-                <span class="font-mono font-medium">${userLocation.lng.toFixed(6)}°</span>
+                <span class="font-medium font-grotesk">${userLocation.lng.toFixed(6)}°</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-gray-500">Accuracy:</span>
-                <span class="font-medium text-green-600">±${accuracy}m</span>
+                <span class="font-medium text-green-600 font-grotesk">±${accuracy}m</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-gray-500">Updated:</span>
-                <span class="font-medium">${new Date().toLocaleTimeString()}</span>
+                <span class="font-medium font-grotesk">${new Date().toLocaleTimeString()}</span>
               </div>
             </div>
             

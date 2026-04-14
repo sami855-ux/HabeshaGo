@@ -89,9 +89,9 @@ export default function EVStationsLayer({
     const evIcon = L.divIcon({
       className: "ev-station-marker",
       html: `
-      <div class="bg-green-500 p-2 rounded-full shadow-lg">
+      <div class="bg-green-500 p-1 rounded-full shadow-lg">
         <svg xmlns="http://www.w3.org/2000/svg"
-        width="16" height="16"
+        width="25" height="25"
         viewBox="0 0 24 24"
         fill="none"
         stroke="white"
@@ -114,7 +114,7 @@ export default function EVStationsLayer({
 
     /*
     ----------------------------------
-    CREATE MARKERS
+    CREATE MARKERS (FIXED VERSION)
     ----------------------------------
     */
     filteredStations.forEach((station) => {
@@ -122,58 +122,64 @@ export default function EVStationsLayer({
         icon: evIcon,
       }).addTo(map)
 
-      const popupContent = document.createElement("div")
-      const root = createRoot(popupContent)
-
-      root.render(
-        <div className="p-2 min-w-[200px]">
-          <h3 className="font-semibold text-lg">{station.name}</h3>
-
-          <p className="text-sm text-gray-600">{station.address}</p>
-
-          <div className="mt-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Distance:</span>
-              <span className="font-medium">
-                {formatDistance(station.distance!)}
+      // Create popup content as HTML string instead of React component
+      const popupContent = `
+        <div class="p-2 min-w-[200px]">
+          <h3 class="font-semibold text-lg">${station.name}</h3>
+          <p class="text-sm text-gray-600">${station.address}</p>
+          <div class="mt-2 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-sm">Distance:</span>
+              <span class="font-medium">${formatDistance(station.distance!)}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm">Type:</span>
+              <span class="px-2 py-1 rounded-md text-xs font-medium ${
+                station.chargingType === "fast"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground"
+              }">
+                ${station.chargingType}
               </span>
             </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Type:</span>
-              <Badge
-                variant={
-                  station.chargingType === "fast" ? "default" : "secondary"
-                }
-              >
-                {station.chargingType}
-              </Badge>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Available:</span>
-              <span className="font-medium">
-                {station.availableChargers}/{station.totalChargers}
-              </span>
+            <div class="flex items-center justify-between">
+              <span class="text-sm">Available:</span>
+              <span class="font-medium">${station.availableChargers}/${station.totalChargers}</span>
             </div>
           </div>
-
-          <Button
-            className="w-full mt-3"
-            size="sm"
-            onClick={() => {
-              window.open(
-                `https://www.google.com/maps/dir/?api=1&destination=${station.location.lat},${station.location.lng}`,
-                "_blank",
-              )
-            }}
+          <button 
+            class="navigate-button w-full mt-3 px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            data-lat="${station.location.lat}"
+            data-lng="${station.location.lng}"
           >
             Navigate
-          </Button>
-        </div>,
-      )
+          </button>
+        </div>
+      `
 
-      marker.bindPopup(popupContent)
+      const popup = L.popup().setContent(popupContent)
+      marker.bindPopup(popup)
+
+      // Handle button click event
+      marker.on("popupopen", () => {
+        const button = document.querySelector(".navigate-button")
+        if (button) {
+          const handleClick = () => {
+            const lat = button.getAttribute("data-lat")
+            const lng = button.getAttribute("data-lng")
+            window.open(
+              `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+              "_blank",
+            )
+          }
+          button.addEventListener("click", handleClick)
+
+          // Clean up event listener when popup closes
+          marker.once("popupclose", () => {
+            button.removeEventListener("click", handleClick)
+          })
+        }
+      })
 
       newMarkers.push(marker)
     })

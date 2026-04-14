@@ -1,55 +1,103 @@
+import { User } from "./user"
+
+export interface Ticket {
+  id: number
+  seatNumber: number | null
+
+  boardingStop: string | null
+  alightingStop: string | null
+
+  qrCode: string | null
+
+  checkedIn: boolean
+  checkedInAt: string | null
+  validUntil: string | null
+
+  sharedTo: User | null
+  sharedTicketUsed: boolean
+  sharedAt: string
+
+  cancelledAt: string | null
+}
+
 export type TripStatus = "CONFIRMED" | "COMPLETED" | "CANCELLED"
 
 export interface Trip {
   id: number
-  userId: string
-  busId: number
-  date: string // ISO date
+  userId?: string
+  busId?: number
+
+  date: string
   status: TripStatus
-  boardingStop: string
-  alightingStop: string
+
+  origin: string
+  destination: string
+
   bookingCode: string
-  cancelledAt: string | null
-  payNow: boolean
-  sharedToId: string | null
-  sharedAt: string | null
-  sharedTicketUsed: boolean
-  qrCode: string
-  checkedIn: boolean
-  checkedInAt: string | null
-  validUntil: string
-  discount: string
-  promoCode: string | null
+  cancelledAt?: string | null
+
+  // Pricing
+  discount?: string
+  promoCode?: string | null
   amountPaid: string
   totalAmount: string
   currency: string
-  pointsUsed: number
-  pointsValue: string
-  pointsConversionRate: string
-  paymentId: number
-  createdAt: string
-  updatedAt: string
+
+  // Points
+  pointsUsed?: number
+  pointsValue?: string
+  pointsConversionRate?: string
+
+  // Relations
+  paymentId?: number
+  bookedAt: string
+  updatedAt?: string
+
+  // tickets array
+  tickets: Ticket[]
+
   bus: {
     id: number
     busNumber: string
     capacity: number
     status: string
-    driverId: string
-    routeId: number
+
     currentStop: string | null
     nextDestination: string | null
     isActive: boolean
+
     departureTime: string | null
     estimatedArrival: string | null
     delayMinutes: number
-    lastServiceDate: string
-    nextServiceDate: string
-    reservedSeats: number
-    availableSeats: number
-    vehicleId: number
-    createdAt: string
-    updatedAt: string
+
+    // ✅ driver nested
+    driver: {
+      id: string
+      name: string
+      phone: string
+      licenseNo: string
+      experience: number
+      rating: number
+      totalTrips: number
+      status: string
+      isOnDuty: boolean
+    }
+
+    // ✅ vehicle nested
+    vehicle: {
+      id: number
+      plateNumber: string
+      model: string
+      manufacturer: string
+      year: number
+      capacity: number
+      mileage: number
+      image: string
+      status: string
+      type: string
+    }
   }
+
   payment: {
     id: number
     userId: string
@@ -58,18 +106,19 @@ export interface Trip {
     method: string
     gateway: string
     flow: string
+
     pointsUsed: number
     pointsValue: string
+
     status: string
     gatewayRef: string | null
     reference: string
+
     metadata: string | null
     walletId: number
     minibusReservationId: string | null
+
     createdAt: string
     updatedAt: string
   }
-  sharedTo: null | any // You can define a more specific type if needed
 }
-
-export type TripCategory = "upcoming" | "past"

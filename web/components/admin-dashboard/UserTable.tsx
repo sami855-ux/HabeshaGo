@@ -50,7 +50,6 @@ import {
   AlertTriangle,
   User2,
   Key,
-  Wallet,
   Copy,
   Filter,
   ChevronDown,
@@ -58,6 +57,8 @@ import {
   Users,
   UserCheck,
   UserX,
+  Circle,
+  Zap,
 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
@@ -69,11 +70,7 @@ import type {
   BadgeTheme,
 } from "@/types/user"
 import { UserDetailSheet } from "./UserDetailSheet"
-import {
-  getStatusBadge,
-  getRoleBadge,
-  getVerificationBadge,
-} from "@/lib/badge-utils"
+import { getStatusBadge, getRoleBadge } from "@/lib/badge-utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,16 +98,105 @@ import {
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 
-interface UserTableProps {
-  data: UserTableData[]
-  isLoading?: boolean
-  onDelete?: (userId: string) => void
-  onEdit?: (user: User) => void
-  onSuspend?: (userId: string) => void
-  onUnsuspend?: (userId: string) => void
-  onBulkAction?: (action: string, userIds: string[]) => void
-  theme?: "light" | "dark"
-  badgeTheme?: BadgeTheme
+// Modern Verification Badge Component
+const VerificationBadge = ({ verified }: { verified: boolean }) => {
+  if (!verified) {
+    return (
+      <Badge
+        variant="outline"
+        className="gap-1.5 px-2 py-0.5 text-xs border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+      >
+        <Circle className="h-2.5 w-2.5 fill-amber-400 stroke-amber-400" />
+        Not Verified
+      </Badge>
+    )
+  }
+
+  return (
+    <Badge
+      variant="outline"
+      className="gap-1.5 px-2 py-0.5 text-xs border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
+    >
+      <CheckCircle className="h-3 w-3" />
+      Verified
+    </Badge>
+  )
+}
+
+// Modern Status Badge with icons
+const ModernStatusBadge = ({ status }: { status: string }) => {
+  const statusConfig = {
+    active: {
+      icon: Zap,
+      label: "Active",
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800",
+    },
+    suspended: {
+      icon: AlertTriangle,
+      label: "Suspended",
+      className:
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800",
+    },
+    inactive: {
+      icon: XCircle,
+      label: "Inactive",
+      className:
+        "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/50 dark:text-gray-400 dark:border-gray-800",
+    },
+  }
+
+  const config =
+    statusConfig[status as keyof typeof statusConfig] || statusConfig.inactive
+  const Icon = config.icon
+
+  return (
+    <Badge
+      variant="outline"
+      className={`gap-1.5 px-2.5 py-1 ${config.className}`}
+    >
+      <Icon className="h-3 w-3" />
+      <span className="text-xs font-medium">{config.label}</span>
+    </Badge>
+  )
+}
+
+// Modern Role Badge
+const ModernRoleBadge = ({ role }: { role: string }) => {
+  const roleConfig = {
+    ADMIN: {
+      icon: Shield,
+      label: "Admin",
+      className:
+        "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800",
+    },
+    DRIVER: {
+      icon: User2,
+      label: "Driver",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800",
+    },
+    PASSENGER: {
+      icon: Users,
+      label: "Passenger",
+      className:
+        "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800",
+    },
+  }
+
+  const config =
+    roleConfig[role as keyof typeof roleConfig] || roleConfig.PASSENGER
+  const Icon = config.icon
+
+  return (
+    <Badge
+      variant="outline"
+      className={`gap-1.5 px-2.5 py-1 ${config.className}`}
+    >
+      <Icon className="h-3 w-3" />
+      <span className="text-xs font-medium">{config.label}</span>
+    </Badge>
+  )
 }
 
 // Custom filter functions
@@ -288,7 +374,7 @@ export function UserTable({
     toast.success(
       `${bulkActionDialog.selectedIds.length} users ${
         bulkActionDialog.action === "delete" ? "deleted" : "suspended"
-      }`
+      }`,
     )
   }
 
@@ -335,36 +421,40 @@ export function UserTable({
           const user = row.original
           return (
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 flex-shrink-0">
                 {user.avaterUrl ? (
                   <img
                     src={user.avaterUrl}
                     alt={user.name || "User"}
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-9 w-9 rounded-full object-cover"
                   />
                 ) : (
-                  <User2 className="h-4 w-4 text-primary" />
+                  <User2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 )}
               </div>
               <div className="min-w-0">
-                <div className="font-medium truncate">
+                <div className="font-medium truncate text-gray-900 dark:text-white">
                   {user.name || "Unnamed User"}
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="text-xs text-muted-foreground truncate">
-                    ID: {user.id.slice(0, 8)}...
-                  </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <button
+                    onClick={() => handleCopyId(user.id)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <span className="font-mono">
+                      ID: {user.id.slice(0, 8)}...
+                    </span>
+                    <Copy className="h-3 w-3" />
+                  </button>
                   {user.role === "ADMIN" && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Shield className="h-3 w-3" />
-                    </div>
+                    <Shield className="h-3 w-3 text-purple-500" />
                   )}
                 </div>
               </div>
             </div>
           )
         },
-        size: 220,
+        size: 240,
       },
       {
         accessorKey: "email",
@@ -381,21 +471,31 @@ export function UserTable({
         ),
         cell: ({ row }) => {
           const user = row.original
+          const hasEmail = user.email && user.email !== ""
+
           return (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm truncate">{user.email || "—"}</span>
+                {hasEmail ? (
+                  <span className="text-sm truncate text-gray-700 dark:text-gray-300">
+                    {user.email}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic">
+                    No email provided
+                  </span>
+                )}
               </div>
-              {user.email && (
+              {hasEmail && (
                 <div className="pl-6">
-                  {getVerificationBadge(user.emailVerified, badgeTheme)}
+                  <VerificationBadge verified={user.emailVerified} />
                 </div>
               )}
             </div>
           )
         },
-        size: 200,
+        size: 220,
       },
       {
         accessorKey: "phone",
@@ -412,21 +512,31 @@ export function UserTable({
         ),
         cell: ({ row }) => {
           const user = row.original
+          const hasPhone = user.phone && user.phone !== ""
+
           return (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm truncate">{user.phone || "—"}</span>
+                {hasPhone ? (
+                  <span className="text-sm truncate text-gray-700 dark:text-gray-300">
+                    {user.phone}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic">
+                    No phone provided
+                  </span>
+                )}
               </div>
-              {user.phone && (
+              {hasPhone && (
                 <div className="pl-6">
-                  {getVerificationBadge(user.phoneVerified, badgeTheme)}
+                  <VerificationBadge verified={user.phoneVerified} />
                 </div>
               )}
             </div>
           )
         },
-        size: 160,
+        size: 180,
       },
       {
         accessorKey: "role",
@@ -440,8 +550,8 @@ export function UserTable({
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }) => getRoleBadge(row.getValue("role"), badgeTheme),
-        size: 120,
+        cell: ({ row }) => <ModernRoleBadge role={row.getValue("role")} />,
+        size: 110,
       },
       {
         accessorKey: "status",
@@ -457,13 +567,9 @@ export function UserTable({
         ),
         cell: ({ row }) => {
           const user = row.original
-          return (
-            <div className="space-y-1">
-              {getStatusBadge(user.tableStatus, badgeTheme)}
-            </div>
-          )
+          return <ModernStatusBadge status={user.tableStatus} />
         },
-        size: 140,
+        size: 130,
       },
       {
         accessorKey: "createdAt",
@@ -474,16 +580,16 @@ export function UserTable({
             className="font-semibold whitespace-nowrap px-2"
           >
             <Calendar className="mr-2 h-4 w-4" />
-            Created
+            Joined
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="text-sm">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             {format(new Date(row.getValue("createdAt")), "MMM dd, yyyy")}
           </div>
         ),
-        size: 130,
+        size: 120,
       },
       {
         id: "actions",
@@ -492,60 +598,62 @@ export function UserTable({
 
           return (
             <div className="flex items-center gap-1">
-              {/* Eye button to open detail sheet */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 px-2 gap-1.5 bg-blue-500 hover:bg-blue-300 text-white cursor-pointer"
+                className="h-8 px-3 gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-md transition-all"
                 onClick={() => setOpenSheetUserId(user.id)}
               >
                 <Eye className="h-3.5 w-3.5" />
                 View
               </Button>
 
-              {/* Three Dots Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                  >
                     <MoreVertical className="h-4 w-4" />
                     <span className="sr-only">Open menu</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>User Actions</DropdownMenuLabel>
 
                   <DropdownMenuItem
-                    className="cursor-pointer flex items-center"
+                    className="cursor-pointer gap-2"
                     onClick={() => handleCopyId(user.id)}
                   >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy ID
+                    <Copy className="h-4 w-4" />
+                    Copy User ID
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
                   <DropdownMenuItem
-                    className="cursor-pointer"
+                    className="cursor-pointer gap-2"
                     onClick={() => onEdit?.(user)}
                   >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit User
+                    <Edit className="h-4 w-4" />
+                    Edit Profile
                   </DropdownMenuItem>
 
                   {user.isSuspended ? (
                     <DropdownMenuItem
-                      className="cursor-pointer text-green-600"
+                      className="cursor-pointer gap-2 text-emerald-600 focus:text-emerald-600"
                       onClick={() => onUnsuspend?.(user.id)}
                     >
-                      <CheckCircle className="mr-2 h-4 w-4" />
+                      <CheckCircle className="h-4 w-4" />
                       Unsuspend User
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem
-                      className="cursor-pointer text-yellow-600"
+                      className="cursor-pointer gap-2 text-amber-600 focus:text-amber-600"
                       onClick={() => onSuspend?.(user.id)}
                     >
-                      <AlertTriangle className="mr-2 h-4 w-4" />
+                      <AlertTriangle className="h-4 w-4" />
                       Suspend User
                     </DropdownMenuItem>
                   )}
@@ -553,26 +661,26 @@ export function UserTable({
                   <DropdownMenuSeparator />
 
                   <DropdownMenuItem
-                    className="cursor-pointer text-blue-600"
+                    className="cursor-pointer gap-2 text-blue-600 focus:text-blue-600"
                     onClick={() => {
                       console.log("Send verification to:", user.email)
                       toast.info("Verification email sent")
                     }}
                     disabled={!user.email}
                   >
-                    <Mail className="mr-2 h-4 w-4" />
-                    Send Verification
+                    <Mail className="h-4 w-4" />
+                    Send Verification Email
                   </DropdownMenuItem>
 
                   {!user.twoFactorEnabled && (
                     <DropdownMenuItem
-                      className="cursor-pointer text-purple-600"
+                      className="cursor-pointer gap-2 text-purple-600 focus:text-purple-600"
                       onClick={() => {
                         console.log("Enable 2FA for:", user.id)
                         toast.info("2FA setup initiated")
                       }}
                     >
-                      <Key className="mr-2 h-4 w-4" />
+                      <Key className="h-4 w-4" />
                       Enable 2FA
                     </DropdownMenuItem>
                   )}
@@ -580,10 +688,10 @@ export function UserTable({
                   <DropdownMenuSeparator />
 
                   <DropdownMenuItem
-                    className="cursor-pointer text-red-600 focus:text-red-600"
+                    className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
                     onClick={() => onDelete?.(user.id)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                     Delete User
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -591,10 +699,10 @@ export function UserTable({
             </div>
           )
         },
-        size: 100,
+        size: 120,
       },
     ],
-    [badgeTheme, onDelete, onEdit, onSuspend, onUnsuspend]
+    [onDelete, onEdit, onSuspend, onUnsuspend],
   )
 
   const table = useReactTable({
@@ -658,16 +766,16 @@ export function UserTable({
                   placeholder="Search users by name, email, phone, or ID..."
                   value={globalFilter ?? ""}
                   onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 rounded-full"
                 />
               </div>
 
               <SheetTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2 rounded-full">
                   <Filter className="h-4 w-4" />
                   Filters
                   {columnFilters.length > 0 && (
-                    <Badge variant="secondary" className="ml-1">
+                    <Badge variant="secondary" className="ml-1 rounded-full">
                       {columnFilters.length}
                     </Badge>
                   )}
@@ -683,7 +791,11 @@ export function UserTable({
                 <div className="flex gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 rounded-full"
+                      >
                         Bulk Actions
                         <ChevronDown className="h-4 w-4" />
                       </Button>
@@ -709,30 +821,21 @@ export function UserTable({
                         Activate Selected
                       </DropdownMenuItem>
                       <DropdownMenuItem>
-                        <Users className="mr-2 h-4 w-4" />
+                        <Download className="mr-2 h-4 w-4" />
                         Export Selected
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Export CSV</DropdownMenuItem>
-                      <DropdownMenuItem>Export Excel</DropdownMenuItem>
-                      <DropdownMenuItem>Export JSON</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button variant="outline" size="sm" className="rounded-full">
+                    <Download className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             )}
           </div>
 
-          <SheetContent className="w-[400px] sm:w-[640px] overflow-y-auto px-6">
+          <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto px-6">
             <SheetHeader>
               <SheetTitle>Advanced Filters</SheetTitle>
             </SheetHeader>
@@ -742,7 +845,7 @@ export function UserTable({
               <div className="space-y-3">
                 <Label>Role</Label>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -758,7 +861,7 @@ export function UserTable({
               <div className="space-y-3">
                 <Label>Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -777,7 +880,7 @@ export function UserTable({
                   value={emailVerificationFilter}
                   onValueChange={setEmailVerificationFilter}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by email verification" />
                   </SelectTrigger>
                   <SelectContent>
@@ -795,7 +898,7 @@ export function UserTable({
                   value={phoneVerificationFilter}
                   onValueChange={setPhoneVerificationFilter}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by phone verification" />
                   </SelectTrigger>
                   <SelectContent>
@@ -813,31 +916,13 @@ export function UserTable({
                   value={twoFactorFilterValue}
                   onValueChange={setTwoFactorFilterValue}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by 2FA status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="enabled">Enabled</SelectItem>
                     <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Wallet Balance Filter */}
-              <div className="space-y-3">
-                <Label>Wallet Balance</Label>
-                <Select value={walletFilter} onValueChange={setWalletFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by wallet balance" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="has-balance">Has Balance</SelectItem>
-                    <SelectItem value="no-balance">No Balance</SelectItem>
-                    <SelectItem value="high-balance">
-                      High Balance ($100+)
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -849,7 +934,7 @@ export function UserTable({
                   value={activityFilterValue}
                   onValueChange={setActivityFilterValue}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Filter by activity" />
                   </SelectTrigger>
                   <SelectContent>
@@ -896,7 +981,7 @@ export function UserTable({
                 <Button
                   variant="outline"
                   onClick={clearFilters}
-                  className="flex-1"
+                  className="flex-1 rounded-full"
                 >
                   Clear All
                 </Button>
@@ -905,7 +990,7 @@ export function UserTable({
                     applyFilters()
                     setShowFilters(false)
                   }}
-                  className="flex-1"
+                  className="flex-1 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600"
                 >
                   Apply Filters
                 </Button>
@@ -919,12 +1004,16 @@ export function UserTable({
                   </Label>
                   <div className="flex flex-wrap gap-2">
                     {columnFilters.map((filter, index) => (
-                      <Badge key={index} variant="secondary" className="gap-1">
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="gap-1 rounded-full"
+                      >
                         {filter.id}: {filter.value as string}
                         <button
                           onClick={() => {
                             const newFilters = columnFilters.filter(
-                              (_, i) => i !== index
+                              (_, i) => i !== index,
                             )
                             setColumnFilters(newFilters)
                           }}
@@ -942,11 +1031,14 @@ export function UserTable({
         </Sheet>
 
         {/* Table */}
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-lg border overflow-x-auto bg-white dark:bg-gray-950 shadow-sm">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow
+                  key={headerGroup.id}
+                  className="border-b border-gray-200 dark:border-gray-800"
+                >
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
@@ -959,13 +1051,13 @@ export function UserTable({
                           ? `${header.column.columnDef.size}px`
                           : undefined,
                       }}
-                      className="px-2 py-3"
+                      className="px-3 py-4 text-gray-600 dark:text-gray-400 font-semibold text-sm"
                     >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   ))}
@@ -978,13 +1070,13 @@ export function UserTable({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="hover:bg-muted/50 transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors border-b border-gray-100 dark:border-gray-800"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-2 py-3">
+                      <TableCell key={cell.id} className="px-3 py-4">
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext()
+                          cell.getContext(),
                         )}
                       </TableCell>
                     ))}
@@ -994,12 +1086,16 @@ export function UserTable({
                 <TableRow>
                   <TableCell
                     colSpan={columns.length}
-                    className="h-24 text-center"
+                    className="h-64 text-center"
                   >
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <User2 className="h-12 w-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">No users found</p>
-                      <p className="text-sm text-muted-foreground mt-1">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="rounded-full bg-gray-100 dark:bg-gray-800 p-4 mb-3">
+                        <User2 className="h-10 w-10 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-medium">
+                        No users found
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                         Try adjusting your search or filters
                       </p>
                     </div>
@@ -1023,7 +1119,7 @@ export function UserTable({
                 value={pageSize.toString()}
                 onValueChange={(value) => handlePageSizeChange(Number(value))}
               >
-                <SelectTrigger className="h-8 w-20">
+                <SelectTrigger className="h-9 w-20 rounded-full">
                   <SelectValue placeholder={pageSize} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1044,6 +1140,7 @@ export function UserTable({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
+              className="rounded-full"
             >
               Previous
             </Button>
@@ -1062,12 +1159,12 @@ export function UserTable({
                       }
                       size="sm"
                       onClick={() => table.setPageIndex(pageNumber - 1)}
-                      className="h-8 w-8 p-0"
+                      className="h-9 w-9 p-0 rounded-full"
                     >
                       {pageNumber}
                     </Button>
                   )
-                }
+                },
               )}
               {table.getPageCount() > 5 && (
                 <span className="text-sm text-muted-foreground px-2">...</span>
@@ -1078,6 +1175,7 @@ export function UserTable({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
+              className="rounded-full"
             >
               Next
             </Button>
@@ -1085,7 +1183,7 @@ export function UserTable({
         </div>
       </div>
 
-      {/* User Detail Sheet - Fixed to show when clicking View Details */}
+      {/* User Detail Sheet */}
       {sheetUser && (
         <UserDetailSheet
           user={sheetUser}
@@ -1139,7 +1237,7 @@ export function UserTable({
               className={
                 bulkActionDialog.action === "delete"
                   ? "bg-red-600 hover:bg-red-700"
-                  : "bg-yellow-600 hover:bg-yellow-700"
+                  : "bg-amber-600 hover:bg-amber-700"
               }
             >
               {bulkActionDialog.action === "delete"

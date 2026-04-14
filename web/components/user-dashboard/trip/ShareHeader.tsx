@@ -3,7 +3,7 @@ import { Headset, Shield } from "lucide-react"
 
 export function ShareHeader() {
   return (
-    <div className=" bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm sticky top-0 z-10">
+    <div className="backdrop-blur-sm sticky top-0 z-10">
       <div className="container mx-auto px-4 py-4">
         <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>

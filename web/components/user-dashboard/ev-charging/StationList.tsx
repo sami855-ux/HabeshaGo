@@ -29,6 +29,7 @@ interface StationListProps {
   filters: any
   onStationSelect: (station: ChargingStation) => void
   selectedStationId?: number
+  searchQuery: string
 }
 
 // Modern color palette
@@ -64,15 +65,33 @@ export function StationList({
   filters,
   onStationSelect,
   selectedStationId,
+  searchQuery,
 }: StationListProps) {
   const { data: stations, isLoading } = useQuery({
-    queryKey: ["charging-stations-list", filters],
+    queryKey: ["charging-stations-list", filters, searchQuery],
     queryFn: async () => {
       let filtered = [...mockStations]
 
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+
+        filtered = filtered.filter((s) => {
+          return (
+            s.name?.toLowerCase().includes(query) ||
+            s.address?.toLowerCase().includes(query) ||
+            s.city?.toLowerCase().includes(query) ||
+            s.chargingPoints?.some((cp) =>
+              cp.connectorType?.toLowerCase().includes(query),
+            )
+          )
+        })
+      }
+
+      // Existing filters
       if (filters.status?.length) {
         filtered = filtered.filter((s) => filters.status.includes(s.status))
       }
+
       if (filters.connectorTypes?.length) {
         filtered = filtered.filter((s) =>
           s.chargingPoints.some((cp) =>
@@ -80,14 +99,17 @@ export function StationList({
           ),
         )
       }
+
       if (filters.minPower) {
         filtered = filtered.filter((s) =>
           s.chargingPoints.some((cp) => cp.powerKw >= filters.minPower),
         )
       }
+
       if (filters.verifiedOnly) {
         filtered = filtered.filter((s) => s.isVerified)
       }
+
       if (filters.availableOnly) {
         filtered = filtered.filter((s) =>
           s.chargingPoints.some((cp) => cp.status === "AVAILABLE"),
@@ -155,10 +177,10 @@ export function StationList({
                 whileTap={{ scale: 0.98 }}
               >
                 <Card
-                  className={`relative overflow-hidden shadow-none cursor-pointer transition-all duration-300 rounded-xl border-2 py-0 pt-6 ${
+                  className={`relative overflow-hidden shadow-md cursor-pointer transition-all duration-300 rounded-xl border-2  py-0 pt-6 ${
                     selectedStationId === station.id
                       ? "border-orange-300 "
-                      : "border-transparent hover:border-orange-100 hover:shadow-md"
+                      : "border-border hover:border-orange-100 hover:shadow-md"
                   }`}
                   onClick={() => onStationSelect(station)}
                 >

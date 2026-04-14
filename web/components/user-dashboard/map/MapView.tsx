@@ -105,7 +105,7 @@ export default function MapView() {
     const lng = parseFloat(getParam("lng") || "")
 
     if (!isNaN(lat) && !isNaN(lng)) {
-      mapRef.current.setView([lat, lng], 16)
+      mapRef.current.setView([lat, lng], 18)
 
       const marker = L.marker([lat, lng]).addTo(mapRef.current)
 
@@ -148,10 +148,10 @@ export default function MapView() {
             />
           )}
 
-          {/* <EVStationsLayer
+          <EVStationsLayer
             map={mapRef.current}
             userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
-          /> */}
+          />
 
           <ParkingStationsLayer
             map={mapRef.current}

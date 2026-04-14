@@ -111,7 +111,7 @@ export const mockStations: ChargingStation[] = [
       {
         id: 100001,
         stationId: 1,
-        url: "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800",
+        url: "https://images.unsplash.com/photo-1671785120538-c24cbe823ccc?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         caption: "Main charging area",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -210,6 +210,14 @@ export const mockStations: ChargingStation[] = [
         stationId: 2,
         url: "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800",
         caption: "Super fast chargers",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 100002,
+        stationId: 1,
+        url: "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800",
+        caption: "Waiting lounge",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },

@@ -1,4 +1,3 @@
-// components/user-dashboard/trip/ShareFlow.tsx
 import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect, useRef, useCallback } from "react"
 import {
@@ -11,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   Search,
   Loader2,
@@ -28,7 +26,16 @@ import {
   Filter,
   Trash2,
   ChevronRight,
+  MinusCircle,
+  PlusCircle,
+  Info,
+  ArrowRight,
+  Calendar,
+  Clock,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import {
   Dialog,
   DialogContent,
@@ -46,6 +53,9 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
 
 interface FavoriteContact {
   id: string
@@ -60,6 +70,15 @@ interface FavoriteContact {
   friends?: boolean
 }
 
+interface Ticket {
+  id: number
+  seatNumber: number
+  boardingStop: string
+  alightingStop: string
+  checkedIn: boolean
+  sharedToId: string | null
+}
+
 interface ShareFlowProps {
   step: number
   phoneNumber: string
@@ -69,13 +88,25 @@ interface ShareFlowProps {
   isSearching: boolean
   searchError: string | null
   shareSuccess: boolean
-  ticketData: any
+  ticketData: {
+    id: number
+    tickets: Ticket[]
+    bus?: {
+      busNumber: string
+    }
+    date: string
+    departureTime?: string
+    boardingStop: string
+    alightingStop: string
+  }
   onSearch: (phone: string) => Promise<void>
   onSelectUser: (user: any) => void
   onContinueToShare: () => void
   onGoBack: () => void
   onOpenShareDialog: () => void
   currentUserId?: string
+  selectedTickets: number[]
+  setSelectedTickets: () => void
 }
 
 export function ShareFlow({
@@ -94,6 +125,8 @@ export function ShareFlow({
   onGoBack,
   onOpenShareDialog,
   currentUserId = "default",
+  selectedTickets,
+  setSelectedTickets,
 }: ShareFlowProps) {
   const [favoriteContacts, setFavoriteContacts] = useState<FavoriteContact[]>(
     [],
@@ -104,19 +137,24 @@ export function ShareFlow({
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [favoritesSearchQuery, setFavoritesSearchQuery] = useState("")
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false)
+  const [showTicketSelection, setShowTicketSelection] = useState(false)
 
   const phoneInputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
 
-  const bus = ticketData.bus
-  const route = bus?.route
+  // Get available tickets (not shared and not checked in)
+  const availableTickets =
+    ticketData.tickets?.filter(
+      (ticket) => !ticket.sharedToId && !ticket.checkedIn,
+    ) || []
 
-  const origin =
-    route?.origin || ticketData.boardingStop.split(" ")[0] || "Origin"
-  const destination =
-    route?.destination ||
-    ticketData.alightingStop.split(" ")[0] ||
-    "Destination"
+  const sharedTickets =
+    ticketData.tickets?.filter((ticket) => ticket.sharedToId) || []
+
+  console.log(sharedTickets)
+
+  const checkedInTickets =
+    ticketData.tickets?.filter((ticket) => ticket.checkedIn) || []
 
   // Load favorite contacts from localStorage
   useEffect(() => {
@@ -156,7 +194,6 @@ export function ShareFlow({
   )
 
   const addToFavorites = (user: any) => {
-    // Check if already in favorites
     if (favoriteContacts.some((fav) => fav.id === user.id)) {
       toast.info("Already in favorites", {
         description: "This contact is already in your favorites",
@@ -199,16 +236,13 @@ export function ShareFlow({
   }
 
   const handlePhoneChange = (value: string) => {
-    // Ensure the number starts with +251
     if (!value.startsWith("+251")) {
       setPhoneNumber("+251 ")
       return
     }
 
-    // Remove all non-digit characters except +
     const digits = value.replace(/[^\d+]/g, "")
 
-    // Format the phone number
     if (digits.startsWith("+251")) {
       let formatted = "+251 "
       const rest = digits.slice(4)
@@ -230,6 +264,24 @@ export function ShareFlow({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSearch(phoneNumber)
+  }
+
+  const handleToggleTicket = (ticketId: number) => {
+    setSelectedTickets((prev) => {
+      if (prev.includes(ticketId)) {
+        return prev.filter((id) => id !== ticketId)
+      } else {
+        return [...prev, ticketId]
+      }
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedTickets.length === availableTickets.length) {
+      setSelectedTickets([])
+    } else {
+      setSelectedTickets(availableTickets.map((t) => t.id))
+    }
   }
 
   // Debounced search for favorites
@@ -279,8 +331,7 @@ export function ShareFlow({
           Share with Friend
         </CardTitle>
         <CardDescription>
-          {step === 1 &&
-            "Search for a user by phone number or select from favorites"}
+          {step === 1 && "Select tickets to share and search for a recipient"}
           {step === 2 && "Confirm the user you want to share with"}
           {step === 3 && "Review and confirm sharing details"}
         </CardDescription>
@@ -288,7 +339,7 @@ export function ShareFlow({
 
       <CardContent className="p-6">
         <AnimatePresence mode="wait">
-          {/* Step 1: Search User */}
+          {/* Step 1: Select Tickets & Search User */}
           {step === 1 && (
             <motion.div
               key="step1"
@@ -297,6 +348,178 @@ export function ShareFlow({
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
+              {/* Ticket Selection Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Ticket className="h-4 w-4 text-orange-500" />
+                    Select Tickets to Share
+                  </h4>
+                  <Badge variant="outline" className="text-xs">
+                    {availableTickets.length} Available
+                  </Badge>
+                </div>
+
+                {/* Ticket Summary Cards */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-xl text-center">
+                    <p className="text-xs text-gray-500">Available</p>
+                    <p className="text-xl font-bold text-green-600">
+                      {availableTickets.length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl text-center">
+                    <p className="text-xs text-gray-500">Shared</p>
+                    <p className="text-xl font-bold text-purple-600">
+                      {sharedTickets.length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl text-center">
+                    <p className="text-xs text-gray-500">Checked In</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {checkedInTickets.length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ticket List */}
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
+                  {availableTickets.length === 0 ? (
+                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                      <Ticket className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-500">
+                        No available tickets to share
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        All tickets are either shared or checked in
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between p-2">
+                        <span className="text-xs font-medium text-gray-500">
+                          Select tickets to share
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSelectAll}
+                          className="text-xs h-8"
+                        >
+                          {selectedTickets.length === availableTickets.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </Button>
+                      </div>
+                      {availableTickets.map((ticket, index) => (
+                        <motion.div
+                          key={ticket.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          whileTap={{ scale: 0.99 }}
+                        >
+                          <Card
+                            className={cn(
+                              "cursor-pointer transition-all duration-200 overflow-hidden py-2 rounded-md",
+                              selectedTickets.includes(ticket.id)
+                                ? "border-orange-300  dark:ring-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20"
+                                : "hover:border-orange-200 hover:bg-gray-50/50 dark:hover:bg-gray-800/50",
+                            )}
+                            onClick={() => handleToggleTicket(ticket.id)}
+                          >
+                            <div className="p-4 py-0">
+                              <div className="flex items-start gap-4">
+                                {/* Custom Checkbox */}
+                                <div className="pt-1">
+                                  <Checkbox
+                                    checked={selectedTickets.includes(
+                                      ticket.id,
+                                    )}
+                                    className={cn(
+                                      "data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500",
+                                      "h-5 w-5 rounded-full border-2",
+                                    )}
+                                  />
+                                </div>
+
+                                {/* Ticket Icon and Main Info */}
+                                <div className="flex-1">
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-semibold text-base">
+                                          Ticket {index + 1}
+                                        </h4>
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "text-xs px-3",
+                                            selectedTickets.includes(ticket.id)
+                                              ? "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400"
+                                              : "",
+                                          )}
+                                        >
+                                          <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                            Available
+                                          </span>
+                                        </Badge>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <span>Seat {ticket.seatNumber}</span>
+                                        <span>•</span>
+                                        <span>
+                                          ID: #
+                                          {ticket.id
+                                            .toString()
+                                            .padStart(4, "0")}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Price or Additional Info */}
+                                    <div className="text-right">
+                                      <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
+                                        Shareable
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {sharedTickets.length > 0 && (
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl">
+                    <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-400">
+                      <Info className="h-4 w-4" />
+                      <span>
+                        {sharedTickets.length} ticket(s) already shared
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Recipient Details
+                  </span>
+                </div>
+              </div>
+
               {/* Phone Number Search Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -317,7 +540,7 @@ export function ShareFlow({
                       value={phoneNumber}
                       onChange={(e) => handlePhoneChange(e.target.value)}
                       className="pl-12 py-6 text-lg rounded-xl border-2 focus:border-orange-300"
-                      disabled={isSearching}
+                      disabled={isSearching || selectedTickets.length === 0}
                     />
                     {phoneNumber && phoneNumber !== "+251 " && !isSearching && (
                       <Button
@@ -336,6 +559,12 @@ export function ShareFlow({
                       </div>
                     )}
                   </div>
+                  {selectedTickets.length === 0 && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      Please select at least one ticket to share
+                    </p>
+                  )}
                 </div>
 
                 {searchError && (
@@ -353,7 +582,11 @@ export function ShareFlow({
 
                 <Button
                   type="submit"
-                  disabled={isSearching || !phoneNumber.replace(/\s/g, "")}
+                  disabled={
+                    isSearching ||
+                    !phoneNumber.replace(/\s/g, "") ||
+                    selectedTickets.length === 0
+                  }
                   className="w-full py-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white"
                 >
                   {isSearching ? (
@@ -440,7 +673,10 @@ export function ShareFlow({
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => onSelectUser(user)}
+                            onClick={() => {
+                              onSelectUser(user)
+                              setShowTicketSelection(false)
+                            }}
                             className="bg-orange-500 hover:bg-orange-600"
                           >
                             Select
@@ -572,7 +808,11 @@ export function ShareFlow({
                               <div className="flex items-center justify-between">
                                 <div
                                   className="flex items-center gap-3 flex-1 cursor-pointer"
-                                  onClick={() => onSelectUser(contact)}
+                                  onClick={() => {
+                                    // if (!sharedTickets.length) return
+                                    onSelectUser(contact)
+                                    setShowTicketSelection(false)
+                                  }}
                                 >
                                   <Avatar className="h-12 w-12 border-2 border-orange-200">
                                     {contact.avatar ? (
@@ -636,7 +876,10 @@ export function ShareFlow({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => onSelectUser(contact)}
+                                    onClick={() => {
+                                      onSelectUser(contact)
+                                      setShowTicketSelection(false)
+                                    }}
                                     className="hover:bg-orange-50 hover:text-orange-600"
                                   >
                                     <ChevronRight className="size-4" />
@@ -671,6 +914,7 @@ export function ShareFlow({
               key="step3"
               selectedUser={selectedUser}
               ticketData={ticketData}
+              selectedTickets={selectedTickets}
               onGoBack={onGoBack}
               onOpenShareDialog={onOpenShareDialog}
             />
@@ -690,10 +934,12 @@ export function ShareFlow({
               <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
             <h3 className="text-2xl font-bold mb-2">
-              Ticket Shared Successfully!
+              Ticket{selectedTickets.length > 1 ? "s" : ""} Shared Successfully!
             </h3>
             <p className="text-gray-600 mb-2">
-              The ticket has been shared with {selectedUser?.name}.
+              {selectedTickets.length} ticket
+              {selectedTickets.length > 1 ? "s have" : " has"} been shared with{" "}
+              {selectedUser?.name}.
             </p>
             <p className="text-sm text-gray-500 mb-6">
               They'll receive a notification and can access it immediately.
@@ -869,18 +1115,29 @@ function Step2Confirm({
 function Step3Confirm({
   selectedUser,
   ticketData,
+  selectedTickets,
   onGoBack,
   onOpenShareDialog,
 }: any) {
-  const bus = ticketData.bus
-  const route = bus?.route
+  const allTickets = ticketData.tickets || []
 
-  const origin =
-    route?.origin || ticketData.boardingStop.split(" ")[0] || "Origin"
-  const destination =
-    route?.destination ||
-    ticketData.alightingStop.split(" ")[0] ||
-    "Destination"
+  // Get boarding and alighting stops (use first ticket as reference)
+  const boardingStop = allTickets[0]?.boardingStop || "Unknown"
+  const alightingStop = allTickets[0]?.alightingStop || "Unknown"
+
+  // Extract origin and destination from stops
+  const origin = boardingStop
+  const destination = alightingStop
+
+  const availableTickets =
+    ticketData.tickets?.filter(
+      (ticket: Ticket) => !ticket.sharedToId && !ticket.checkedIn,
+    ) || []
+
+  const selectedTicketsDetails = availableTickets.filter((ticket: Ticket) =>
+    selectedTickets.includes(ticket.id),
+  )
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -900,13 +1157,11 @@ function Step3Confirm({
               <Ticket className="h-5 w-5 text-orange-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-gray-500">Ticket</p>
+              <p className="text-xs text-gray-500">Route</p>
               <p className="font-medium">
                 {origin} → {destination}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {ticketData.date} • {ticketData.departureTime}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">{ticketData.date}</p>
             </div>
           </div>
 
@@ -920,6 +1175,25 @@ function Step3Confirm({
               <p className="text-xs text-gray-500">{selectedUser.phone}</p>
             </div>
           </div>
+
+          <div className="p-3 bg-white rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Ticket className="h-4 w-4 text-orange-500" />
+              <p className="text-xs text-gray-500">
+                Selected Tickets ({selectedTickets.length})
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {selectedTicketsDetails.map((ticket: Ticket) => (
+                <Badge
+                  key={ticket.id}
+                  className="bg-orange-100 text-orange-700 border-0"
+                >
+                  Seat {ticket.seatNumber}
+                </Badge>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -928,8 +1202,9 @@ function Step3Confirm({
           <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
           <span>
             <span className="font-semibold">Important:</span> Once shared, the
-            ticket will be transferred to {selectedUser.name}. You will no
-            longer be able to use or modify this ticket.
+            selected ticket{selectedTickets.length > 1 ? "s" : ""} will be
+            transferred to {selectedUser.name}. You will no longer be able to
+            use or modify these tickets.
           </span>
         </p>
       </div>
@@ -947,14 +1222,10 @@ function Step3Confirm({
           className="flex-1 rounded-xl h-12 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-lg shadow-orange-500/30"
         >
           <Share2 className="h-4 w-4 mr-2" />
-          Share Ticket
+          Share {selectedTickets.length} Ticket
+          {selectedTickets.length > 1 ? "s" : ""}
         </Button>
       </div>
     </motion.div>
   )
-}
-
-// Helper function for classnames
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ")
 }

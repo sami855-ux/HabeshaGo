@@ -17,7 +17,6 @@ import { Switch } from "@/components/ui/switch"
 import {
   Loader2,
   RefreshCw,
-  Bus,
   Users,
   User,
   Route as RouteIcon,
@@ -28,25 +27,18 @@ import {
   ChevronDown,
   Clock,
   AlertTriangle,
-  Plus,
-  X,
   Settings,
   Timer,
   Calendar,
   Wrench,
-  Navigation,
   ShieldAlert,
   Car,
   Award,
   LayoutGrid,
   Info,
-  Pause,
-  Play,
-  Trash2,
-  ChevronRight,
+  Lock,
   MapPinHouse,
   Compass,
-  CircleDot,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
@@ -63,7 +55,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { axiosInstance } from "@/services/axiosInstance"
 import { toast } from "sonner"
@@ -71,62 +62,20 @@ import { fetchAllRoutesSimple } from "@/services/route.api"
 import { fetchAllDriversSimple } from "@/services/driver.api"
 import { getAllSimpleVehicles } from "@/services/vehicle.api"
 
-// Types
-interface BusFormData {
-  busNumber: string
-  capacity: number
-  status: "ACTIVE" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE"
-  vehicleId?: number
-  driverId?: string
-  routeId?: number
-  currentStop?: string
-  nextDestination?: string
-  isActive: boolean
-  departureTime?: Date
-  estimatedArrival?: Date
-  delayMinutes: number
-  lastServiceDate?: Date
-  nextServiceDate?: Date
-  currentLocation?: {
-    latitude?: number
-    longitude?: number
-  }
-  schedules: BusSchedule[]
-}
-
-interface BusSchedule {
-  startTime: string
-  isActive: boolean
-  intervalAfter?: number // Interval in minutes after this trip
-}
-
-interface Driver {
-  id: string
-  name: string
-  licenseNumber: string
-  experience?: number
-  status?: string
-}
-
-interface Route {
-  id: number
-  name: string
-  origin: string
-  destination: string
-  distanceKm?: number
-  estimatedTimeMin: number
-  stops?: string[]
-}
-
-interface Vehicle {
-  id: number
-  plateNumber: string
-  type: string
-  model: string
-  year?: number
-  status?: string
-  mileage?: number
-}
+// Import our separated components and utilities
+import {
+  EthiopianTimeUtils,
+  ethiopianTimeSlots,
+} from "@/lib/EthiopianTimeUtils"
+// import { ScheduleCard } from "@/components/bus/ScheduleCard"
+import {
+  BusFormData,
+  Driver,
+  Route,
+  Vehicle,
+  BusSchedule,
+} from "@/types/bus-create"
+import { ScheduleCard } from "@/components/user-dashboard/bus/ScheduleCard"
 
 const busStatuses = [
   {
@@ -175,9 +124,10 @@ export default function ModernBusForm() {
   const [vehicleOpen, setVehicleOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [intervalModalOpen, setIntervalModalOpen] = useState(false)
-  const [selectedScheduleIndex, setSelectedScheduleIndex] = useState<number | null>(null)
+  const [selectedScheduleIndex, setSelectedScheduleIndex] = useState<
+    number | null
+  >(null)
   const [customInterval, setCustomInterval] = useState("")
-  const [manualTimeInput, setManualTimeInput] = useState("")
   const router = useRouter()
 
   const {
@@ -186,7 +136,6 @@ export default function ModernBusForm() {
     reset,
     watch,
     setValue,
-    trigger,
     formState: { errors },
   } = useForm<BusFormData>({
     defaultValues: {
@@ -200,66 +149,192 @@ export default function ModernBusForm() {
     mode: "onChange",
   })
 
- useEffect(() => {
-  let mounted = true
+  useEffect(() => {
+    let mounted = true
 
-  const fetchData = async () => {
-    setIsLoading(true)
+    const fetchData = async () => {
+      setIsLoading(true)
 
-    const results = await Promise.allSettled([
-      fetchAllDriversSimple(),
-      fetchAllRoutesSimple(),
-      getAllSimpleVehicles(),
-    ])
+      const results = await Promise.allSettled([
+        fetchAllDriversSimple(),
+        fetchAllRoutesSimple(),
+        getAllSimpleVehicles(),
+      ])
 
-    if (!mounted) return
+      if (!mounted) return
 
-    const [driversRes, routesRes, vehiclesRes] = results
+      const [driversRes, routesRes, vehiclesRes] = results
 
-    // Drivers
-    if (driversRes.status === "fulfilled") {
-      setAvailableDrivers(driversRes.value)
-    } else {
-      console.error("Drivers error:", driversRes.reason)
-      toast.error("Failed to load drivers")
-      setAvailableDrivers([])
+      if (driversRes.status === "fulfilled") {
+        setAvailableDrivers(driversRes.value)
+      } else {
+        console.error("Drivers error:", driversRes.reason)
+        toast.error("Failed to load drivers")
+        setAvailableDrivers([])
+      }
+
+      if (routesRes.status === "fulfilled") {
+        setAvailableRoutes(routesRes.value)
+      } else {
+        console.error("Routes error:", routesRes.reason)
+        toast.error("Failed to load routes")
+        setAvailableRoutes([])
+      }
+
+      if (vehiclesRes.status === "fulfilled") {
+        setAvailableVehicles(vehiclesRes.value)
+      } else {
+        console.error("Vehicles error:", vehiclesRes.reason)
+        toast.error("Failed to load vehicles")
+        setAvailableVehicles([])
+      }
+
+      setIsLoading(false)
     }
 
-    // Routes
-    if (routesRes.status === "fulfilled") {
-      setAvailableRoutes(routesRes.value)
-    } else {
-      console.error("Routes error:", routesRes.reason)
-      toast.error("Failed to load routes")
-      setAvailableRoutes([])
-    }
+    fetchData()
 
-    // Vehicles
-    if (vehiclesRes.status === "fulfilled") {
-      setAvailableVehicles(vehiclesRes.value)
-    } else {
-      console.error("Vehicles error:", vehiclesRes.reason)
-      toast.error("Failed to load vehicles")
-      setAvailableVehicles([])
+    return () => {
+      mounted = false
     }
+  }, [])
 
-    setIsLoading(false)
+  const isBasicInfoCompleted = () => {
+    const busNumber = watch("busNumber")?.trim()
+    const capacity = watch("capacity")
+    const routeId = watch("routeId")
+    const driverId = watch("driverId")
+    const vehicleId = watch("vehicleId")
+
+    return (
+      busNumber &&
+      busNumber.length > 0 &&
+      capacity &&
+      capacity > 0 &&
+      routeId &&
+      driverId &&
+      vehicleId
+    )
   }
 
-  fetchData()
-
-  return () => {
-    mounted = false
-  }
-}, [])
-
-
-  // Get selected route
   const selectedRoute = watch("routeId")
     ? availableRoutes.find((r) => r.id === watch("routeId"))
     : null
 
-  // Add schedule manually
+  const calculateEndTime = (
+    startTime: string,
+    routeDuration: number,
+  ): string => {
+    const [hour, minute] = startTime.split(":").map(Number)
+    const totalMinutes = hour * 60 + minute + routeDuration
+    const endHour = Math.floor(totalMinutes / 60) % 24
+    const endMinute = totalMinutes % 60
+    return `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`
+  }
+
+  const validateInterval = (
+    newTime: string,
+    existingSchedules: BusSchedule[],
+  ): boolean => {
+    if (existingSchedules.length === 0) return true
+
+    const [newHour, newMinute] = newTime.split(":").map(Number)
+    const newTotalMinutes = newHour * 60 + newMinute
+
+    for (const schedule of existingSchedules) {
+      const [existingHour, existingMinute] = schedule.startTime
+        .split(":")
+        .map(Number)
+      const existingTotalMinutes = existingHour * 60 + existingMinute
+      const difference = Math.abs(newTotalMinutes - existingTotalMinutes)
+
+      if (difference < 45) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  const getNextDirection = (
+    schedules: BusSchedule[],
+  ): "FORWARD" | "REVERSE" => {
+    if (schedules.length === 0) return "FORWARD"
+    const lastDirection = schedules[schedules.length - 1].direction
+    return lastDirection === "FORWARD" ? "REVERSE" : "FORWARD"
+  }
+
+  // Add schedule using Ethiopian time
+  // Add schedule using Ethiopian time with minutes support
+  const addScheduleAtEthiopianTime = (
+    ethiopianHour: number,
+    ethiopianMinute: number,
+    period: "ጠዋት" | "ከሰዓት",
+  ) => {
+    if (!selectedRoute) {
+      toast.error("Please select a route first")
+      return
+    }
+
+    // Validate operation hours
+    if (!EthiopianTimeUtils.isValidOperationTime(ethiopianHour, period)) {
+      toast.error(
+        `Time ${EthiopianTimeUtils.formatTime(ethiopianHour, ethiopianMinute, period)} is outside operation hours`,
+      )
+      toast.error(EthiopianTimeUtils.getOperationHoursDisplay())
+      return
+    }
+
+    const currentSchedules = watch("schedules") || []
+
+    // Convert Ethiopian time to Western time for storage
+    const westernTime = EthiopianTimeUtils.toWesternTime(
+      ethiopianHour,
+      ethiopianMinute,
+      period,
+    )
+    const timeString = `${String(westernTime.hour).padStart(2, "0")}:${String(westernTime.minute).padStart(2, "0")}`
+
+    // Validate minimum interval (45 minutes)
+    if (!validateInterval(timeString, currentSchedules)) {
+      toast.error(
+        "Schedule must be at least 45 minutes apart from existing schedules",
+      )
+      return
+    }
+
+    // Determine direction
+    const direction = getNextDirection(currentSchedules)
+
+    // Calculate end time
+    const endTime = calculateEndTime(timeString, selectedRoute.estimatedTimeMin)
+    const endEthiopian = EthiopianTimeUtils.toEthiopianTime(
+      parseInt(endTime.split(":")[0]),
+      parseInt(endTime.split(":")[1]),
+    )
+
+    setValue("schedules", [
+      ...currentSchedules,
+      {
+        startTime: timeString,
+        ethiopianTime: EthiopianTimeUtils.formatTime(
+          ethiopianHour,
+          ethiopianMinute,
+          period,
+        ),
+        direction: direction,
+        endTime: endTime,
+        endEthiopianTime: endEthiopian.display,
+        isActive: true,
+        intervalAfter: 45,
+      },
+    ])
+
+    toast.success(
+      `Added ${direction} trip at ${EthiopianTimeUtils.formatTime(ethiopianHour, ethiopianMinute, period)} - ${endEthiopian.display}`,
+    )
+  }
+
   const addSchedule = () => {
     if (!selectedRoute) {
       toast.error("Please select a route first")
@@ -267,84 +342,45 @@ export default function ModernBusForm() {
     }
 
     const schedules = watch("schedules") || []
-    
-    // Find the latest time to suggest next time
-    let suggestedHour = 12 // Default start at 12:00
-    let suggestedMinute = 0
-    
+
+    // Find next available Ethiopian time slot
+    let nextHour = 12
+    let nextMinute = 0
+    let nextPeriod: "ጠዋት" | "ከሰዓት" = "ጠዋት"
+
     if (schedules.length > 0) {
+      // Get the last schedule
       const lastSchedule = schedules[schedules.length - 1]
-      const [lastHour, lastMinute] = lastSchedule.startTime.split(":").map(Number)
-      
-      // Suggest time after the trip duration + interval (default 30 min interval)
-      const intervalMinutes = lastSchedule.intervalAfter || 30
-      const totalMinutes = lastHour * 60 + lastMinute + selectedRoute.estimatedTimeMin + intervalMinutes
-      
-      suggestedHour = Math.floor(totalMinutes / 60) % 24
-      suggestedMinute = totalMinutes % 60
+
+      // Get the end time of the last schedule (in Western time)
+      const [endHour, endMinute] = lastSchedule.endTime
+        ?.split(":")
+        .map(Number) || [0, 0]
+
+      // Add the interval (minimum 45 minutes) to the end time
+      const intervalMinutes = Math.max(lastSchedule.intervalAfter || 45, 45)
+      const nextStartTotal = endHour * 60 + endMinute + intervalMinutes
+      const nextWesternHour = Math.floor(nextStartTotal / 60) % 24
+      const nextWesternMinute = nextStartTotal % 60
+
+      // Convert to Ethiopian time with minutes
+      const nextEthiopian = EthiopianTimeUtils.toEthiopianTime(
+        nextWesternHour,
+        nextWesternMinute,
+      )
+      nextHour = nextEthiopian.hour
+      nextMinute = nextEthiopian.minute
+      nextPeriod = nextEthiopian.period
+
+      console.log(
+        `Last trip ends at ${lastSchedule.endEthiopianTime}, adding ${intervalMinutes} min interval, next departure at ${nextEthiopian.display}`,
+      )
     }
 
-    const timeString = `${String(suggestedHour).padStart(2, '0')}:${String(suggestedMinute).padStart(2, '0')}`
-    
-    setValue("schedules", [...schedules, {
-      startTime: timeString,
-      isActive: true,
-      intervalAfter: 30 // Default 30 minutes interval after trip
-    }])
-    toast.success(`Added schedule at ${timeString}`)
+    // Add the schedule at the calculated time with minutes
+    addScheduleAtEthiopianTime(nextHour, nextMinute, nextPeriod)
   }
 
-  // Add schedule at specific time
-  const addScheduleAtTime = (time: string) => {
-    if (!selectedRoute) {
-      toast.error("Please select a route first")
-      return
-    }
-
-    const currentSchedules = watch("schedules") || []
-    
-    if (currentSchedules.some(s => s.startTime === time)) {
-      toast.error(`${time} is already scheduled`)
-      return
-    }
-
-    setValue("schedules", [...currentSchedules, {
-      startTime: time,
-      isActive: true,
-      intervalAfter: 30 // Default 30 minutes interval
-    }])
-    toast.success(`Added schedule at ${time}`)
-  }
-
-  // Add manual time
-  const addManualTime = () => {
-    if (!selectedRoute) {
-      toast.error("Please select a route first")
-      return
-    }
-
-    if (!manualTimeInput.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
-      toast.error("Please enter time in HH:MM format (e.g., 14:30)")
-      return
-    }
-
-    const currentSchedules = watch("schedules") || []
-    
-    if (currentSchedules.some(s => s.startTime === manualTimeInput)) {
-      toast.error(`${manualTimeInput} is already scheduled`)
-      return
-    }
-
-    setValue("schedules", [...currentSchedules, {
-      startTime: manualTimeInput,
-      isActive: true,
-      intervalAfter: 30 // Default 30 minutes interval
-    }])
-    setManualTimeInput("")
-    toast.success(`Added schedule at ${manualTimeInput}`)
-  }
-
-  // Toggle schedule active state
   const toggleScheduleActive = (index: number) => {
     const schedules = watch("schedules") || []
     const updated = [...schedules]
@@ -352,44 +388,40 @@ export default function ModernBusForm() {
     setValue("schedules", updated)
   }
 
-  // Remove schedule
   const removeSchedule = (index: number) => {
     const schedules = watch("schedules") || []
     const updated = schedules.filter((_, i) => i !== index)
     setValue("schedules", updated)
+    toast.success("Schedule removed")
   }
 
-  // Clear all schedules
   const clearAllSchedules = () => {
     setValue("schedules", [])
     toast.info("All schedules cleared")
   }
 
-  // Toggle all schedules active/inactive
   const toggleAllSchedules = (active: boolean) => {
     const schedules = watch("schedules") || []
-    const updated = schedules.map(s => ({ ...s, isActive: active }))
+    const updated = schedules.map((s) => ({ ...s, isActive: active }))
     setValue("schedules", updated)
   }
 
-  // Open interval modal for a specific schedule
   const openIntervalModal = (index: number) => {
     setSelectedScheduleIndex(index)
     const schedules = watch("schedules") || []
-    setCustomInterval(schedules[index]?.intervalAfter?.toString() || "30")
+    setCustomInterval(schedules[index]?.intervalAfter?.toString() || "45")
     setIntervalModalOpen(true)
   }
 
-  // Save interval for a schedule
   const saveInterval = () => {
     if (selectedScheduleIndex === null || !customInterval) return
-    
+
     const schedules = watch("schedules") || []
     const updated = [...schedules]
     const intervalValue = parseInt(customInterval)
-    
-    if (isNaN(intervalValue) || intervalValue < 0) {
-      toast.error("Please enter a valid positive number")
+
+    if (isNaN(intervalValue) || intervalValue < 45) {
+      toast.error("Please enter a valid number (minimum 45 minutes)")
       return
     }
 
@@ -399,29 +431,104 @@ export default function ModernBusForm() {
     toast.success(`Interval set to ${intervalValue} minutes`)
   }
 
-  // Calculate next departure time based on trip duration and interval
-  const calculateNextDeparture = (schedule: BusSchedule, route: Route) => {
-    const [hour, minute] = schedule.startTime.split(":").map(Number)
-    const totalMinutes = hour * 60 + minute + route.estimatedTimeMin + (schedule.intervalAfter || 30)
-    const nextHour = Math.floor(totalMinutes / 60) % 24
-    const nextMinute = totalMinutes % 60
-    return `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`
+  const calculateNextDeparture = (
+    currentSchedule: BusSchedule,
+    allSchedules: BusSchedule[],
+    route: Route,
+  ) => {
+    // Find the index of the current schedule
+    const currentIndex = allSchedules.findIndex(
+      (s) => s.startTime === currentSchedule.startTime,
+    )
+
+    // If there's no next schedule
+    if (currentIndex === -1 || currentIndex + 1 >= allSchedules.length) {
+      return {
+        western: null,
+        ethiopian: null,
+        hasNext: false,
+        warning: null,
+      }
+    }
+
+    const nextSchedule = allSchedules[currentIndex + 1]
+
+    // Calculate the gap between current trip's end and next trip's start
+    const [endHour, endMinute] = currentSchedule.endTime
+      ?.split(":")
+      .map(Number) || [0, 0]
+    const [nextStartHour, nextStartMinute] = nextSchedule.startTime
+      .split(":")
+      .map(Number)
+
+    const currentEndTotal = endHour * 60 + endMinute
+    const nextStartTotal = nextStartHour * 60 + nextStartMinute
+    const gapMinutes = nextStartTotal - currentEndTotal
+    const requiredGap = currentSchedule.intervalAfter || 45
+
+    // Check if the gap is sufficient
+    let warning = null
+    if (gapMinutes < requiredGap) {
+      warning = `⚠️ Only ${gapMinutes} min gap (minimum ${requiredGap} min required)`
+    }
+
+    return {
+      western: nextSchedule.startTime,
+      ethiopian: nextSchedule.ethiopianTime,
+      hasNext: true,
+      gapMinutes,
+      requiredGap,
+      warning,
+    }
   }
 
   const onSubmit = async (data: BusFormData) => {
     setIsSubmitting(true)
-    
+
     try {
+      // Get today's date for the schedule dates
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      // Format schedules with proper ISO dates
+      const formattedSchedules = data.schedules.map((schedule) => {
+        // Parse the Western time from the schedule (e.g., "06:00")
+        const [hours, minutes] = schedule.startTime.split(":").map(Number)
+
+        // Create a date object with today's date and the schedule time
+        const scheduleDate = new Date(today)
+        scheduleDate.setHours(hours, minutes, 0, 0)
+
+        // Convert to ISO string
+        const startTimeISO = scheduleDate.toISOString()
+
+        return {
+          startTime: startTimeISO,
+          direction: schedule.direction,
+        }
+      })
+
       const submitData = {
-        ...data,
-        availableSeats: data.capacity,
+        busNumber: data.busNumber,
+        capacity: data.capacity,
+        status: data.status,
+        vehicleId: data.vehicleId,
+        driverId: data.driverId,
+        routeId: data.routeId,
+        isActive: data.isActive,
+        delayMinutes: data.delayMinutes,
+        lastServiceDate: data.lastServiceDate,
+        nextServiceDate: data.nextServiceDate,
+        estimatedArrival: selectedRoute?.estimatedTimeMin,
+        schedules: formattedSchedules,
       }
+
       console.log("Submitting data:", submitData)
 
       const response = await axiosInstance.post("/buses", submitData)
-      
+
       if (response.data.success) {
-        toast.success(`Bus ${data.busNumber} created successfully!`, { description: "You can now manage your bus from the dashboard." })
+        toast.success(`Bus ${data.busNumber} created successfully!`)
         // router.push("/")
       } else {
         toast.error(response.data.message || "Failed to create bus")
@@ -429,7 +536,7 @@ export default function ModernBusForm() {
     } catch (error: any) {
       toast.error(
         error.response?.data?.message ||
-        "Failed to create bus. Please try again."
+          "Failed to create bus. Please try again.",
       )
     } finally {
       setIsSubmitting(false)
@@ -455,26 +562,29 @@ export default function ModernBusForm() {
     ? availableVehicles.find((v) => v.id === watch("vehicleId"))
     : null
 
-  const capacity = watch("capacity") || 0
   const schedules = watch("schedules") || []
-  const activeSchedules = schedules.filter(s => s.isActive).length
+  const activeSchedules = schedules.filter((s) => s.isActive).length
   const totalSchedules = schedules.length
 
-  const isFormValid = watch("busNumber")?.trim() && capacity > 0
+  const isFormValid = isBasicInfoCompleted()
 
-  // Sort schedules by time
-  const sortedSchedules = [...schedules].sort((a, b) => {
-    const [hourA, minuteA] = a.startTime.split(":").map(Number)
-    const [hourB, minuteB] = b.startTime.split(":").map(Number)
-    return hourA * 60 + minuteA - (hourB * 60 + minuteB)
-  })
+  const getMissingFields = () => {
+    const missing = []
+    if (!watch("busNumber")?.trim()) missing.push("Bus Number")
+    if (!watch("capacity") || watch("capacity") <= 0) missing.push("Capacity")
+    if (!watch("routeId")) missing.push("Route")
+    if (!watch("driverId")) missing.push("Driver")
+    if (!watch("vehicleId")) missing.push("Vehicle")
+    return missing
+  }
 
-  // Common time slots for quick add
-  const commonTimes = [
-    "06:00", "07:00", "08:00", "09:00", "10:00", 
-    "11:00", "12:00", "13:00", "14:00", "15:00", 
-    "16:00", "17:00", "18:00", "19:00", "20:00"
-  ]
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/50 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/30 p-4 md:p-6">
@@ -498,16 +608,19 @@ export default function ModernBusForm() {
                 </p>
               </div>
             </div>
-            
-            {/* Status Indicator */}
+
             <div className="hidden lg:flex items-center gap-3">
-              <div className={cn(
-                "relative px-4 py-0.5 rounded-lg font-medium border backdrop-blur-sm transition-all duration-300",
-                isFormValid 
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 shadow-sm" 
-                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900"
-              )}>
-                {isFormValid ? "Ready to Submit" : "Incomplete"}
+              <div
+                className={cn(
+                  "relative px-4 py-0.5 rounded-lg font-medium border backdrop-blur-sm transition-all duration-300",
+                  isFormValid
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 shadow-sm"
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900",
+                )}
+              >
+                {isFormValid
+                  ? "Ready to Submit"
+                  : `${getMissingFields().length} items remaining`}
               </div>
             </div>
           </div>
@@ -516,27 +629,50 @@ export default function ModernBusForm() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Main Form Card */}
             <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-800/50 overflow-hidden">
-              {/* Tabs */}
               <div className="border-b border-gray-200 dark:border-gray-800 px-6">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
                   <TabsList className="grid grid-cols-2 h-14 gap-1 bg-transparent p-1">
-                    <TabsTrigger 
-                      value="basic" 
+                    <TabsTrigger
+                      value="basic"
                       className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500/10 data-[state=active]:to-cyan-400/10 data-[state=active]:border data-[state=active]:border-blue-200 dark:data-[state=active]:border-blue-800 rounded-xl"
                     >
                       <LayoutGrid className="h-4 w-4 mr-2" />
                       Basic Info
+                      {!isBasicInfoCompleted() && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-2 h-5 px-1 text-[10px]"
+                        >
+                          Required
+                        </Badge>
+                      )}
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="schedule" 
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/10 data-[state=active]:to-green-400/10 data-[state=active]:border data-[state=active]:border-emerald-200 dark:data-[state=active]:border-emerald-800 rounded-xl"
+                    <TabsTrigger
+                      value="schedule"
+                      disabled={!isBasicInfoCompleted()}
+                      className={cn(
+                        "rounded-xl",
+                        !isBasicInfoCompleted() &&
+                          "opacity-50 cursor-not-allowed",
+                        "data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/10 data-[state=active]:to-green-400/10 data-[state=active]:border data-[state=active]:border-emerald-200 dark:data-[state=active]:border-emerald-800",
+                      )}
                     >
-                      <Timer className="h-4 w-4 mr-2" />
+                      {!isBasicInfoCompleted() ? (
+                        <Lock className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Timer className="h-4 w-4 mr-2" />
+                      )}
                       Schedule
-                      {schedules.length > 0 && (
-                        <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs">
+                      {schedules.length > 0 && isBasicInfoCompleted() && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 h-5 w-5 p-0 text-xs"
+                        >
                           {schedules.length}
                         </Badge>
                       )}
@@ -548,8 +684,25 @@ export default function ModernBusForm() {
               <div className="p-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   {/* Basic Info Tab */}
-                  <TabsContent value="basic" className="space-y-6 mt-0 ">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shadow-none">
+                  <TabsContent value="basic" className="space-y-6 mt-0">
+                    {!isBasicInfoCompleted() && (
+                      <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20">
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="h-5 w-5 text-amber-500" />
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                              Complete Required Fields
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Please fill in: {getMissingFields().join(", ")} to
+                              enable schedule creation
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Bus Number */}
                       <div className="space-y-3">
                         <Label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -562,9 +715,13 @@ export default function ModernBusForm() {
                             <Input
                               placeholder="e.g., BUS-2024-001"
                               className="border-0 bg-transparent pl-4 h-12 text-base placeholder:text-gray-400 focus-visible:ring-0"
-                              {...register("busNumber", { 
+                              {...register("busNumber", {
                                 required: true,
-                                onChange: (e) => setValue("busNumber", e.target.value.toUpperCase())
+                                onChange: (e) =>
+                                  setValue(
+                                    "busNumber",
+                                    e.target.value.toUpperCase(),
+                                  ),
                               })}
                             />
                           </div>
@@ -592,11 +749,11 @@ export default function ModernBusForm() {
                               max="200"
                               placeholder="40"
                               className="border-0 bg-transparent pl-12 h-12 text-base placeholder:text-gray-400"
-                              {...register("capacity", { 
-                                required: true, 
+                              {...register("capacity", {
+                                required: true,
                                 valueAsNumber: true,
                                 min: 1,
-                                max: 200
+                                max: 200,
                               })}
                             />
                             <div className="absolute left-4 top-1/2 -translate-y-1/2">
@@ -633,31 +790,45 @@ export default function ModernBusForm() {
                                 isSelected
                                   ? cn(
                                       "bg-white dark:bg-gray-900 shadow-sm",
-                                      status.borderColor
+                                      status.borderColor,
                                     )
-                                  : "bg-white/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800"
+                                  : "bg-white/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800",
                               )}
                             >
                               {isSelected && (
-                                <div className={cn(
-                                  "absolute inset-0 rounded-lg bg-gradient-to-br opacity-10",
-                                  status.color
-                                )} />
+                                <div
+                                  className={cn(
+                                    "absolute inset-0 rounded-lg bg-gradient-to-br opacity-10",
+                                    status.color,
+                                  )}
+                                />
                               )}
                               <div className="relative flex flex-col items-center gap-2">
-                                <div className={cn(
-                                  "p-2 rounded-lg transition-colors",
-                                  isSelected ? status.bgColor : "bg-gray-100 dark:bg-gray-800"
-                                )}>
-                                  <Icon className={cn(
-                                    "h-4 w-4",
-                                    isSelected ? status.textColor : "text-gray-400"
-                                  )} />
+                                <div
+                                  className={cn(
+                                    "p-2 rounded-lg transition-colors",
+                                    isSelected
+                                      ? status.bgColor
+                                      : "bg-gray-100 dark:bg-gray-800",
+                                  )}
+                                >
+                                  <Icon
+                                    className={cn(
+                                      "h-4 w-4",
+                                      isSelected
+                                        ? status.textColor
+                                        : "text-gray-400",
+                                    )}
+                                  />
                                 </div>
-                                <span className={cn(
-                                  "text-xs font-medium",
-                                  isSelected ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"
-                                )}>
+                                <span
+                                  className={cn(
+                                    "text-xs font-medium",
+                                    isSelected
+                                      ? "text-gray-900 dark:text-white"
+                                      : "text-gray-600 dark:text-gray-400",
+                                  )}
+                                >
                                   {status.label}
                                 </span>
                               </div>
@@ -672,26 +843,29 @@ export default function ModernBusForm() {
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "h-2 w-2 rounded-full animate-pulse",
-                              watch("isActive") 
-                                ? "bg-emerald-500" 
-                                : "bg-gray-400"
-                            )} />
+                            <div
+                              className={cn(
+                                "h-2 w-2 rounded-full animate-pulse",
+                                watch("isActive")
+                                  ? "bg-emerald-500"
+                                  : "bg-gray-400",
+                              )}
+                            />
                             <Label className="font-medium text-gray-900 dark:text-white">
                               Active Status
                             </Label>
                           </div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {watch("isActive") 
+                            {watch("isActive")
                               ? "Bus is active and available for service"
-                              : "Bus is inactive and not in service"
-                            }
+                              : "Bus is inactive and not in service"}
                           </p>
                         </div>
                         <Switch
                           checked={watch("isActive")}
-                          onCheckedChange={(checked) => setValue("isActive", checked)}
+                          onCheckedChange={(checked) =>
+                            setValue("isActive", checked)
+                          }
                           className="data-[state=checked]:bg-emerald-500"
                         />
                       </div>
@@ -732,7 +906,9 @@ export default function ModernBusForm() {
                             min="0"
                             placeholder="0"
                             className="h-12 rounded-xl border-gray-200 dark:border-gray-800 pl-12"
-                            {...register("delayMinutes", { valueAsNumber: true })}
+                            {...register("delayMinutes", {
+                              valueAsNumber: true,
+                            })}
                           />
                           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
                             <Timer className="h-5 w-5" />
@@ -744,284 +920,52 @@ export default function ModernBusForm() {
 
                   {/* Schedule Tab */}
                   <TabsContent value="schedule" className="space-y-6 mt-0">
-                    {/* Schedule Header */}
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-blue-950/20 dark:to-cyan-950/20">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
-                            Custom Schedule
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Manually add trips and set intervals between them
-                          </p>
+                    {!isBasicInfoCompleted() ? (
+                      <div className="p-8 rounded-xl border border-amber-200 dark:border-amber-900 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20 text-center">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-400/20 flex items-center justify-center">
+                          <Lock className="h-10 w-10 text-amber-500" />
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {schedules.length}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Scheduled Trips
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Route Selection Warning */}
-                    {!selectedRoute ? (
-                      <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900 bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20">
-                        <div className="flex items-center gap-3">
-                          <AlertTriangle className="h-5 w-5 text-amber-500" />
-                          <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white">
-                              Select a Route First
-                            </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Please select a route to enable schedule creation.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <RouteIcon className="h-5 w-5 text-emerald-500" />
-                            <div>
-                              <h4 className="font-semibold text-gray-900 dark:text-white">
-                                {selectedRoute.name}
-                              </h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Trip Duration: {selectedRoute.estimatedTimeMin} minutes
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-white/50 dark:bg-gray-900/50">
-                              {selectedRoute.estimatedTimeMin} min trip
-                            </Badge>
-                            <Button
-                              onClick={addSchedule}
-                              size="sm"
-                              className="gap-1 bg-gradient-to-r from-emerald-500 to-green-400"
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          Schedule Tab Locked
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4 max-w-md mx-auto">
+                          Please complete all required fields in the Basic Info
+                          tab first:
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {getMissingFields().map((field, index) => (
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="bg-amber-500/10 border-amber-200 dark:border-amber-900"
                             >
-                              <Plus className="h-3 w-3" />
-                              Add Trip
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Manual Time Input */}
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-950/20 dark:to-pink-950/20">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
-                        Add Specific Time
-                      </h4>
-                      <div className="flex gap-3">
-                        <div className="flex-1">
-                          <Input
-                            placeholder="Enter time (HH:MM) e.g., 14:30"
-                            value={manualTimeInput}
-                            onChange={(e) => setManualTimeInput(e.target.value)}
-                            className="rounded-xl"
-                          />
+                              {field}
+                            </Badge>
+                          ))}
                         </div>
                         <Button
-                          onClick={addManualTime}
-                          disabled={!selectedRoute || !manualTimeInput}
-                          className="bg-gradient-to-r from-purple-500 to-pink-400 rounded-xl"
+                          onClick={() => setActiveTab("basic")}
+                          className="mt-6 bg-gradient-to-r from-amber-500 to-orange-400"
                         >
-                          <Plus className="h-4 w-4" />
-                          Add
+                          Go to Basic Info
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        Format: 24-hour clock (00:00 to 23:59)
-                      </p>
-                    </div>
-
-                    {/* Quick Add Time Slots */}
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-50/50 to-cyan-50/50 dark:from-blue-950/20 dark:to-cyan-950/20">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
-                        Quick Add Time Slots
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {commonTimes.map(time => (
-                          <Button
-                            key={time}
-                            onClick={() => addScheduleAtTime(time)}
-                            variant="outline"
-                            size="sm"
-                            disabled={!selectedRoute}
-                            className="h-8"
-                          >
-                            {time}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Schedule Actions */}
-                    {schedules.length > 0 && (
-                      <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-800/50">
-                        <div className="flex items-center gap-4">
-                          <div className="text-center">
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Active</div>
-                            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{activeSchedules}</div>
-                          </div>
-                          <Separator orientation="vertical" className="h-10" />
-                          <div className="text-center">
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Total</div>
-                            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{totalSchedules}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleAllSchedules(true)}
-                            className="gap-1"
-                          >
-                            <Play className="h-3 w-3" />
-                            Activate All
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleAllSchedules(false)}
-                            className="gap-1"
-                          >
-                            <Pause className="h-3 w-3" />
-                            Deactivate All
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={clearAllSchedules}
-                            className="gap-1 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Clear All
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Schedule List */}
-                    {schedules.length > 0 ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                            Scheduled Trips
-                          </h4>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Trip time: {selectedRoute?.estimatedTimeMin || 0} min
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          {sortedSchedules.map((schedule, index) => {
-                            const [hour, minute] = schedule.startTime.split(":").map(Number)
-                            const period = hour === 0 ? "AM" : hour < 12 ? "AM" : "PM"
-                            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                            
-                            return (
-                              <div
-                                key={index}
-                                className={cn(
-                                  "group relative p-4 rounded-xl border transition-all hover:shadow-sm",
-                                  schedule.isActive
-                                    ? "border-emerald-200 dark:border-emerald-900 bg-gradient-to-r from-emerald-50/30 to-green-50/30 dark:from-emerald-950/10 dark:to-green-950/10"
-                                    : "border-slate-200 dark:border-slate-800 bg-gradient-to-r from-slate-50/30 to-gray-50/30 dark:from-slate-950/10 dark:to-gray-950/10"
-                                )}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                      "p-2 rounded-lg",
-                                      schedule.isActive
-                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                        : "bg-slate-500/10 text-slate-600 dark:text-slate-400"
-                                    )}>
-                                      <Clock className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                      <div className="font-semibold text-gray-900 dark:text-white text-lg">
-                                        {schedule.startTime}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {displayHour}:{String(minute).padStart(2, '0')} {period}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {/* Interval Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openIntervalModal(index)}
-                                      className="gap-1"
-                                    >
-                                      <Timer className="h-3 w-3" />
-                                      Interval: {schedule.intervalAfter || 30}min
-                                    </Button>
-                                    
-                                    <Switch
-                                      checked={schedule.isActive}
-                                      onCheckedChange={() => toggleScheduleActive(index)}
-                                      size="sm"
-                                      className="data-[state=checked]:bg-emerald-500"
-                                    />
-                                    <button
-                                      onClick={() => removeSchedule(index)}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <X className="h-4 w-4 text-gray-500" />
-                                    </button>
-                                  </div>
-                                </div>
-                                
-                                {/* Next Departure Info */}
-                                {selectedRoute && (
-                                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
-                                    <div className="flex items-center gap-2 text-sm">
-                                      <Clock className="h-3 w-3 text-blue-500" />
-                                      <span className="text-gray-600 dark:text-gray-400">
-                                        Trip duration: {selectedRoute.estimatedTimeMin} min • 
-                                        Next departure: {calculateNextDeparture(schedule, selectedRoute)} 
-                                        ({schedule.intervalAfter || 30} min interval)
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
                     ) : (
-                      <div className="text-center py-10">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-400/10 flex items-center justify-center">
-                          <Timer className="h-8 w-8 text-blue-500" />
-                        </div>
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          No schedules yet
-                        </h4>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-                          {selectedRoute 
-                            ? `Click "Add Trip" to create your custom schedule`
-                            : "Select a route first to enable schedule creation"}
-                        </p>
-                        {selectedRoute && (
-                          <Button
-                            onClick={addSchedule}
-                            className="gap-2 bg-gradient-to-r from-emerald-500 to-green-400"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Add First Trip
-                          </Button>
-                        )}
-                      </div>
+                      <ScheduleCard
+                        selectedRoute={selectedRoute}
+                        schedules={schedules}
+                        activeSchedules={activeSchedules}
+                        totalSchedules={totalSchedules}
+                        onAddSchedule={addSchedule}
+                        onAddScheduleAtTime={addScheduleAtEthiopianTime}
+                        onToggleActive={toggleScheduleActive}
+                        onRemoveSchedule={removeSchedule}
+                        onToggleAll={toggleAllSchedules}
+                        onClearAll={clearAllSchedules}
+                        onOpenIntervalModal={openIntervalModal}
+                        calculateNextDeparture={calculateNextDeparture}
+                        calculateEndTime={calculateEndTime}
+                      />
                     )}
                   </TabsContent>
                 </Tabs>
@@ -1040,7 +984,7 @@ export default function ModernBusForm() {
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Vehicle Assignment
+                      Vehicle Assignment *
                     </div>
                     <CardDescription>
                       Assign a vehicle to this bus
@@ -1053,17 +997,23 @@ export default function ModernBusForm() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
+                      className={cn(
+                        "w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700",
+                        !watch("vehicleId") &&
+                          "border-amber-300 dark:border-amber-700",
+                      )}
                     >
                       {selectedVehicle ? (
                         <div className="flex items-center gap-2">
                           <Car className="h-4 w-4 text-purple-500" />
-                          <span className="font-medium">{selectedVehicle.plateNumber}</span>
+                          <span className="font-medium">
+                            {selectedVehicle.plateNumber}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-gray-500">
                           <Car className="h-4 w-4" />
-                          <span>Select vehicle</span>
+                          <span>Select vehicle *</span>
                         </div>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
@@ -1086,7 +1036,9 @@ export default function ModernBusForm() {
                             >
                               <Car className="mr-3 h-5 w-5 text-purple-500" />
                               <div className="flex-1">
-                                <div className="font-medium">{vehicle.plateNumber}</div>
+                                <div className="font-medium">
+                                  {vehicle.plateNumber}
+                                </div>
                                 <div className="text-sm text-gray-500">
                                   {vehicle.model} • {vehicle.type}
                                 </div>
@@ -1113,25 +1065,21 @@ export default function ModernBusForm() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="space-y-1">
-                          <div className="text-gray-500 dark:text-gray-400">Model</div>
-                          <div className="font-medium">{selectedVehicle.model}</div>
+                          <div className="text-gray-500 dark:text-gray-400">
+                            Model
+                          </div>
+                          <div className="font-medium">
+                            {selectedVehicle.model}
+                          </div>
                         </div>
                         <div className="space-y-1">
-                          <div className="text-gray-500 dark:text-gray-400">Type</div>
-                          <div className="font-medium">{selectedVehicle.type}</div>
+                          <div className="text-gray-500 dark:text-gray-400">
+                            Type
+                          </div>
+                          <div className="font-medium">
+                            {selectedVehicle.type}
+                          </div>
                         </div>
-                        {selectedVehicle.year && (
-                          <div className="space-y-1">
-                            <div className="text-gray-500 dark:text-gray-400">Year</div>
-                            <div className="font-medium">{selectedVehicle.year}</div>
-                          </div>
-                        )}
-                        {selectedVehicle.mileage && (
-                          <div className="space-y-1">
-                            <div className="text-gray-500 dark:text-gray-400">Mileage</div>
-                            <div className="font-medium">{selectedVehicle.mileage.toLocaleString()} km</div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1148,7 +1096,7 @@ export default function ModernBusForm() {
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Driver Assignment
+                      Driver Assignment *
                     </div>
                     <CardDescription>
                       Assign a driver to this bus
@@ -1161,17 +1109,23 @@ export default function ModernBusForm() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700"
+                      className={cn(
+                        "w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700",
+                        !watch("driverId") &&
+                          "border-amber-300 dark:border-amber-700",
+                      )}
                     >
                       {selectedDriver ? (
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium">{selectedDriver.name}</span>
+                          <span className="font-medium">
+                            {selectedDriver.name}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-gray-500">
                           <User className="h-4 w-4" />
-                          <span>Select driver</span>
+                          <span>Select driver *</span>
                         </div>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
@@ -1217,7 +1171,7 @@ export default function ModernBusForm() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-semibold">
-                          { selectedDriver.name.charAt(0)}
+                          {selectedDriver.name.charAt(0)}
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 dark:text-white">
@@ -1228,14 +1182,6 @@ export default function ModernBusForm() {
                           </div>
                         </div>
                       </div>
-                      {selectedDriver.experience && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Award className="h-4 w-4 text-amber-500" />
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {selectedDriver.experience} years experience
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1251,7 +1197,7 @@ export default function ModernBusForm() {
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Route Assignment
+                      Route Assignment *
                     </div>
                     <CardDescription>
                       Required for schedule generation
@@ -1264,17 +1210,23 @@ export default function ModernBusForm() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700"
+                      className={cn(
+                        "w-full justify-between h-12 rounded-xl border-gray-300 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700",
+                        !watch("routeId") &&
+                          "border-amber-300 dark:border-amber-700",
+                      )}
                     >
                       {selectedRoute ? (
                         <div className="flex items-center gap-2">
                           <RouteIcon className="h-4 w-4 text-emerald-500" />
-                          <span className="font-medium">{selectedRoute.name}</span>
+                          <span className="font-medium">
+                            {selectedRoute.name}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-gray-500">
                           <RouteIcon className="h-4 w-4" />
-                          <span>Select route</span>
+                          <span>Select route *</span>
                         </div>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
@@ -1339,12 +1291,20 @@ export default function ModernBusForm() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="space-y-1">
-                          <div className="text-gray-500 dark:text-gray-400">Trip Time</div>
-                          <div className="font-medium">{selectedRoute.estimatedTimeMin} minutes</div>
+                          <div className="text-gray-500 dark:text-gray-400">
+                            Trip Time
+                          </div>
+                          <div className="font-medium">
+                            {selectedRoute.estimatedTimeMin} minutes
+                          </div>
                         </div>
                         <div className="space-y-1">
-                          <div className="text-gray-500 dark:text-gray-400">Distance</div>
-                          <div className="font-medium">{selectedRoute.distanceKm || 0} km</div>
+                          <div className="text-gray-500 dark:text-gray-400">
+                            Distance
+                          </div>
+                          <div className="font-medium">
+                            {selectedRoute.distanceKm || 0} km
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1352,7 +1312,6 @@ export default function ModernBusForm() {
                 )}
               </CardContent>
             </Card>
-
           </div>
         </div>
 
@@ -1362,22 +1321,26 @@ export default function ModernBusForm() {
             <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "h-3 w-3 rounded-full animate-pulse",
-                    isFormValid 
-                      ? "bg-gradient-to-r from-emerald-500 to-green-400" 
-                      : "bg-gradient-to-r from-amber-500 to-orange-400"
-                  )} />
+                  <div
+                    className={cn(
+                      "h-3 w-3 rounded-full animate-pulse",
+                      isFormValid
+                        ? "bg-gradient-to-r from-emerald-500 to-green-400"
+                        : "bg-gradient-to-r from-amber-500 to-orange-400",
+                    )}
+                  />
                   <div>
                     <div className="font-semibold text-gray-900 dark:text-white">
-                      {isFormValid ? "Ready to create bus" : "Complete required fields"}
+                      {isFormValid
+                        ? "Ready to create bus"
+                        : "Complete required fields"}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {selectedRoute 
-                        ? `${schedules.length} trips on ${selectedRoute.name} (${selectedRoute.estimatedTimeMin} min each)` 
-                        : schedules.length > 0 
-                          ? `${schedules.length} trips scheduled`
-                          : "No schedule configured"}
+                      {!isFormValid &&
+                        `Missing: ${getMissingFields().join(", ")}`}
+                      {isFormValid &&
+                        selectedRoute &&
+                        `${schedules.length} trips on ${selectedRoute.name} (${selectedRoute.estimatedTimeMin} min each)`}
                     </div>
                   </div>
                 </div>
@@ -1404,9 +1367,7 @@ export default function ModernBusForm() {
                         Creating...
                       </>
                     ) : (
-                      <>
-                        Create Bus
-                      </>
+                      <>Create Bus</>
                     )}
                   </Button>
                 </div>
@@ -1427,23 +1388,24 @@ export default function ModernBusForm() {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Set the waiting time after this trip before the next departure
+                  (minimum 45 minutes)
                 </p>
               </div>
-              
+
               <div className="space-y-3">
                 <Label className="text-sm font-medium">
                   Interval After Trip (minutes)
                 </Label>
                 <Input
                   type="number"
-                  min="0"
+                  min="45"
                   value={customInterval}
                   onChange={(e) => setCustomInterval(e.target.value)}
-                  placeholder="e.g., 30"
+                  placeholder="e.g., 45"
                   className="h-12 rounded-xl"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Recommended: 15-60 minutes for efficient scheduling
+                  Minimum: 45 minutes for efficient scheduling
                 </p>
               </div>
 
@@ -1452,8 +1414,11 @@ export default function ModernBusForm() {
                   <div className="flex items-center gap-2 text-sm">
                     <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
                     <span className="text-blue-600 dark:text-blue-400">
-                      Trip duration: {selectedRoute.estimatedTimeMin} minutes • 
-                      Total cycle time: {selectedRoute.estimatedTimeMin + (parseInt(customInterval) || 30)} minutes
+                      Trip duration: {selectedRoute.estimatedTimeMin} minutes •
+                      Total cycle time:{" "}
+                      {selectedRoute.estimatedTimeMin +
+                        (parseInt(customInterval) || 45)}{" "}
+                      minutes
                     </span>
                   </div>
                 </div>

@@ -1,4 +1,3 @@
-// components/user-dashboard/shared-tickets/FiltersBar.tsx
 "use client"
 
 import { useState } from "react"
@@ -8,7 +7,6 @@ import {
   Search,
   X,
   Calendar as CalendarIcon,
-  Filter,
   ChevronDown,
   SlidersHorizontal,
   RotateCcw,
@@ -37,14 +35,16 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
+interface Filters {
+  search: string
+  status: string
+  dateFrom: string
+  dateTo: string
+}
+
 interface FiltersBarProps {
-  filters: {
-    search: string
-    status: string
-    dateFrom: string
-    dateTo: string
-  }
-  onFilterChange: (filters: any) => void
+  filters: Filters
+  onFilterChange: (filters: Filters) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
 }
@@ -60,11 +60,11 @@ export function FiltersBar({
     null,
   )
 
-  const updateFilter = (key: string, value: string) => {
+  const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     onFilterChange({ ...filters, [key]: value })
   }
 
-  // Count active filters
+  // Count active filters (excluding default values)
   const activeFilterCount = Object.entries(filters).filter(([key, value]) => {
     if (key === "search") return value !== ""
     if (key === "status") return value !== "all"
@@ -79,6 +79,8 @@ export function FiltersBar({
         type === "from" ? "dateFrom" : "dateTo",
         format(date, "yyyy-MM-dd"),
       )
+    } else {
+      updateFilter(type === "from" ? "dateFrom" : "dateTo", "")
     }
     setDatePickerOpen(null)
   }
@@ -87,11 +89,20 @@ export function FiltersBar({
   const dateFromObj = filters.dateFrom ? new Date(filters.dateFrom) : undefined
   const dateToObj = filters.dateTo ? new Date(filters.dateTo) : undefined
 
+  // Clear individual filter
+  const clearFilter = (key: keyof Filters) => {
+    if (key === "status") {
+      updateFilter("status", "all")
+    } else {
+      updateFilter(key, "")
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden"
+      className="overflow-hidden"
     >
       {/* Main Filter Bar */}
       <div className="p-4">
@@ -100,14 +111,14 @@ export function FiltersBar({
           <div className="flex-1 relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
             <Input
-              placeholder="Search by name, phone or booking ID..."
+              placeholder="Search by name, phone, booking ID, bus number or seat..."
               value={filters.search}
               onChange={(e) => updateFilter("search", e.target.value)}
               className="pl-9 h-11 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 transition-all"
             />
             {filters.search && (
               <button
-                onClick={() => updateFilter("search", "")}
+                onClick={() => clearFilter("search")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -178,6 +189,18 @@ export function FiltersBar({
                   disabled={(date) => (dateToObj ? date > dateToObj : false)}
                   className="rounded-lg border-0"
                 />
+                {dateFromObj && (
+                  <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDateSelect("from", undefined)}
+                      className="w-full text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
               </PopoverContent>
             </Popover>
 
@@ -211,6 +234,18 @@ export function FiltersBar({
                   }
                   className="rounded-lg border-0"
                 />
+                {dateToObj && (
+                  <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDateSelect("to", undefined)}
+                      className="w-full text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
               </PopoverContent>
             </Popover>
 
@@ -322,12 +357,27 @@ export function FiltersBar({
                         mode="single"
                         selected={dateFromObj}
                         onSelect={(date) => {
-                          if (date)
+                          if (date) {
                             updateFilter("dateFrom", format(date, "yyyy-MM-dd"))
+                          } else {
+                            updateFilter("dateFrom", "")
+                          }
                         }}
                         initialFocus
                         className="rounded-lg border-0"
                       />
+                      {dateFromObj && (
+                        <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateFilter("dateFrom", "")}
+                            className="w-full text-xs"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      )}
                     </PopoverContent>
                   </Popover>
 
@@ -351,12 +401,27 @@ export function FiltersBar({
                         mode="single"
                         selected={dateToObj}
                         onSelect={(date) => {
-                          if (date)
+                          if (date) {
                             updateFilter("dateTo", format(date, "yyyy-MM-dd"))
+                          } else {
+                            updateFilter("dateTo", "")
+                          }
                         }}
                         initialFocus
                         className="rounded-lg border-0"
                       />
+                      {dateToObj && (
+                        <div className="p-2 border-t border-gray-100 dark:border-gray-800">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateFilter("dateTo", "")}
+                            className="w-full text-xs"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      )}
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -398,11 +463,11 @@ export function FiltersBar({
                   className="pl-2 pr-1 py-1 gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
                 >
                   <Search className="h-3 w-3 mr-1 text-gray-500" />
-                  <span className="max-w-[150px] truncate">
+                  <span className="max-w-[200px] truncate">
                     {filters.search}
                   </span>
                   <button
-                    onClick={() => updateFilter("search", "")}
+                    onClick={() => clearFilter("search")}
                     className="ml-1 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     <X className="h-3 w-3" />
@@ -431,9 +496,11 @@ export function FiltersBar({
                       filters.status === "REJECTED" && "bg-rose-500",
                     )}
                   />
-                  <span>{filters.status}</span>
+                  <span className="capitalize">
+                    {filters.status.toLowerCase()}
+                  </span>
                   <button
-                    onClick={() => updateFilter("status", "all")}
+                    onClick={() => clearFilter("status")}
                     className="ml-1 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     <X className="h-3 w-3" />
@@ -451,7 +518,7 @@ export function FiltersBar({
                     From {format(new Date(filters.dateFrom), "MMM d, yyyy")}
                   </span>
                   <button
-                    onClick={() => updateFilter("dateFrom", "")}
+                    onClick={() => clearFilter("dateFrom")}
                     className="ml-1 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     <X className="h-3 w-3" />
@@ -469,7 +536,7 @@ export function FiltersBar({
                     To {format(new Date(filters.dateTo), "MMM d, yyyy")}
                   </span>
                   <button
-                    onClick={() => updateFilter("dateTo", "")}
+                    onClick={() => clearFilter("dateTo")}
                     className="ml-1 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     <X className="h-3 w-3" />

@@ -566,11 +566,10 @@ export default function BusSearchForm({
                 whileTap={{ scale: 0.95 }}
               >
                 <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-md">
-                  <Sparkles className="w-3 h-3 mr-1" />
                   {isLoadingCities ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
-                    `${cities.length}+ Routes`
+                    `Routes`
                   )}
                 </Badge>
               </motion.div>

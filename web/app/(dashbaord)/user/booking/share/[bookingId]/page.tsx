@@ -25,9 +25,12 @@ export default function TicketSharePage() {
   const [step, setStep] = useState(1)
   const [phoneNumber, setPhoneNumber] = useState("+251 ")
   const [searchResults, setSearchResults] = useState<any[]>([])
+
+  const [selectedTickets, setSelectedTickets] = useState<number[]>([])
   const [selectedUser, setSelectedUser] = useState<any | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -42,6 +45,8 @@ export default function TicketSharePage() {
         const data = await getBooking(bookingId)
         if (data && Object.keys(data).length > 0) {
           setTicketData(data)
+
+          console.log(data)
         } else {
           toast.error("Booking not found")
           router.push("/user/trips")
@@ -135,10 +140,15 @@ export default function TicketSharePage() {
   // Handle share
   const handleShare = async () => {
     setIsSharing(true)
+    setShowSuccess(false)
 
-    // Simulate API call for sharing
+    console.log(selectedTickets, bookingId, selectedUser.id)
     try {
-      const res = await shareBookingRequest(bookingId, selectedUser.id)
+      const res = await shareBookingRequest(
+        bookingId,
+        selectedUser.id,
+        selectedTickets,
+      )
 
       if (res.success) {
         setShareSuccess(true)
@@ -148,7 +158,9 @@ export default function TicketSharePage() {
           router.push("/user/trips")
         }, 3000)
 
-        toast.success("Ticket has been shared successfuly")
+        // Show success state
+        setShowSuccess(true)
+        toast.success("Ticket has been shared successfully")
 
         queryClient.invalidateQueries({
           queryKey: ["user_bookings"],
@@ -156,14 +168,21 @@ export default function TicketSharePage() {
       } else {
         toast.error(res.message || "Failed to share the ticket")
       }
+      // Close dialog after showing success for 1.5 seconds
+      setTimeout(() => {
+        setIsSharing(false)
+        setShowShareDialog(false)
+        setShowSuccess(false)
+
+        // Redirect if needed
+        // router.push("/user/trips")
+      }, 1500)
     } catch (error) {
       console.error("Share error:", error)
+      setIsSharing(false)
       toast.error("Share failed", {
         description: "Unable to share ticket. Please try again.",
       })
-    } finally {
-      setIsSharing(false)
-      setShowShareDialog(false)
     }
   }
 
@@ -204,7 +223,7 @@ export default function TicketSharePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen ">
       <ShareHeader />
 
       <div className="container mx-auto px-4 py-8">
@@ -242,6 +261,8 @@ export default function TicketSharePage() {
               onGoBack={handleGoBack}
               onOpenShareDialog={() => setShowShareDialog(true)}
               currentUserId={user?.id || ""}
+              setSelectedTickets={setSelectedTickets}
+              selectedTickets={selectedTickets}
             />
           </motion.div>
         </div>
@@ -254,6 +275,7 @@ export default function TicketSharePage() {
         ticketData={ticketData}
         isSharing={isSharing}
         onConfirm={handleShare}
+        showSuccess={showSuccess}
       />
     </div>
   )

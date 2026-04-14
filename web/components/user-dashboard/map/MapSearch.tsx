@@ -164,7 +164,7 @@ export default function MapSearch() {
   }
 
   return (
-    <div className="relative w-full max-w-md">
+    <div className="relative w-full max-w-md h-20 pt-2">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div className="flex gap-2">
@@ -280,7 +280,7 @@ export default function MapSearch() {
 
       {/* Quick redirect hint */}
       {!searchValue && (
-        <div className="absolute -bottom-6 left-0 text-xs text-gray-400">
+        <div className="absolute -bottom-2 left-0 text-xs text-gray-400">
           Try:{" "}
           <button
             onClick={() => {

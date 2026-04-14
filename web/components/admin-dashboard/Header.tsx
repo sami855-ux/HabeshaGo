@@ -10,6 +10,9 @@ import {
   Sun,
   LogOut,
   Settings2,
+  LifeBuoy,
+  MessageSquare,
+  Shield,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -95,12 +98,12 @@ function Header({ className }: { className?: string }) {
     <>
       <header
         className={cn(
-          "sticky top-0 z-10 bg-background border-b w-full",
+          "sticky top-0 z-10 bg-background border-b w-full ",
           isExpanded ? "h-32" : "h-16",
           className,
         )}
       >
-        <div className="container mx-auto w-full h-full">
+        <div className="mx-auto w-full h-full">
           <div className="flex items-center justify-end h-full">
             {/* Center & Right Section */}
             <div className="flex gap-2">
@@ -138,6 +141,8 @@ function Header({ className }: { className?: string }) {
                 >
                   <Search className="w-5 h-5" />
                 </Button>
+
+                <ThemeToggle />
 
                 {/* Notifications Bell Button */}
                 <TooltipProvider>
@@ -209,59 +214,126 @@ function Header({ className }: { className?: string }) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-72"
+                    className="w-80"
                     onCloseAutoFocus={(e) => {
-                      // Prevent focus trapping issues
                       e.preventDefault()
                     }}
                   >
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setIsDropdownOpen(false)
-                        router.push("/user/Profile")
-                      }}
-                    >
-                      <User className="w-4 h-4 mr-2" />
-                      <span>Profile</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsDropdownOpen(false)}>
-                      <Settings2 className="w-4 h-4 mr-2" />
-                      <span>Settings</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="flex items-center justify-between w-full cursor-default"
-                      onSelect={(e) => {
-                        // Prevent the dropdown from closing when clicking the theme toggle
-                        e.preventDefault()
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <Sun className="w-4 h-4 mr-2" />
-                        <span className="pl-2">Theme</span>
+                    {/* Enhanced User Info Section */}
+                    <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-t-lg">
+                      <Avatar className="h-12 w-12 border-2 border-white shadow-md">
+                        <AvatarImage src={user?.avaterUrl} />
+                        <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg">
+                          {user?.name?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold leading-none truncate capitalize">
+                            {user?.name || "User"}
+                          </p>
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-100"
+                          >
+                            {user?.role || "User"}
+                          </Badge>
+                        </div>
+                        {user?.email && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {user.email}
+                          </p>
+                        )}
                       </div>
-                      <div onClick={() => setIsDropdownOpen(false)}>
-                        <ThemeToggle
-                          // Optional: Add a callback to close dropdown when theme changes
-                          onThemeChange={() => {
-                            // Close dropdown when theme changes
-                            setIsDropdownOpen(false)
-                          }}
-                        />
-                      </div>
-                    </DropdownMenuItem>
+                    </div>
+
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => {
-                        setIsDropdownOpen(false)
-                        setIsLogoutModalOpen(true)
-                      }}
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
+
+                    {/* Account Section */}
+                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-4 pt-3 pb-1">
+                      ACCOUNT
+                    </DropdownMenuLabel>
+                    <div className="px-2 py-1">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          router.push("/user/profile")
+                        }}
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
+                      >
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Profile</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          router.push("/user/settings")
+                        }}
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
+                      >
+                        <Settings2 className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Settings</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          router.push("/user/security")
+                        }}
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
+                      >
+                        <Shield className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Security</span>
+                      </DropdownMenuItem>
+                    </div>
+
+                    <DropdownMenuSeparator />
+
+                    {/* Support Section */}
+                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-4 pt-3 pb-1">
+                      SUPPORT
+                    </DropdownMenuLabel>
+                    <div className="px-2 py-1">
+                      <DropdownMenuItem
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          router.push("/user/help")
+                        }}
+                      >
+                        <LifeBuoy className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Help Center</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          router.push("/user/feedback")
+                        }}
+                      >
+                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Send Feedback</span>
+                      </DropdownMenuItem>
+                    </div>
+
+                    <DropdownMenuSeparator />
+
+                    {/* Logout Section */}
+                    <div className="px-2 py-2">
+                      <DropdownMenuItem
+                        className="cursor-pointer gap-3 py-2.5 rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10"
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          setIsLogoutModalOpen(true)
+                        }}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span className="text-sm font-medium">Log out</span>
+                      </DropdownMenuItem>
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

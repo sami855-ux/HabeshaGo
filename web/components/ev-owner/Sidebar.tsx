@@ -64,7 +64,7 @@ function Sidebar() {
       id: "overview",
       label: "Overview",
       icon: <HiOutlineSquares2X2 className="h-5 w-5" />,
-      path: "",
+      path: "/",
     },
     {
       id: "stations",
@@ -85,25 +85,18 @@ function Sidebar() {
       path: "/sessions",
     },
     {
-      id: "analytics",
-      label: "Analytics",
-      icon: <HiOutlineChartBar className="h-5 w-5" />,
-      path: "/analytics",
-    },
-    {
       id: "payments",
       label: "Payments",
       icon: <HiOutlineCreditCard className="h-5 w-5" />,
       path: "/payments",
     },
     {
-      id: "customers",
-      label: "Customers",
-      icon: <HiOutlineUsers className="h-5 w-5" />,
-      path: "/customers",
+      id: "analytics",
+      label: "Analytics",
+      icon: <HiOutlineChartBar className="h-5 w-5" />,
+      path: "/analytics",
     },
   ]
-
 
   const isItemActive = (item: MenuItem): boolean => {
     if (item.path && pathname === `/ev-charge-manager${item.path}`) return true

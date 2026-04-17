@@ -263,6 +263,7 @@ const quickAccessPanels = [
     count: 45,
     colSpan: 2,
     rowSpan: 1,
+    path: "/admin/infrastructure/ev-stations",
   },
   {
     title: "Manage Drivers/Staff",

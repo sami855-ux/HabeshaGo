@@ -1,8 +1,17 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useChargingStations } from "@/hooks/use-charging-stations"
-import { ChargingSession, ChargingStation } from "@/types/ev"
+import { useQuery } from "@tanstack/react-query"
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -13,14 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react"
 import {
   ResponsiveContainer,
   LineChart,
@@ -28,125 +39,446 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   BarChart,
   Bar,
   PieChart,
   Pie,
   Cell,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts"
 import {
   Activity,
   Battery,
-  Clock3,
   DollarSign,
   Leaf,
   Users,
   Zap,
+  TrendingUp,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+// Types
+type ChargingPoint = {
+  id: number
+  connectorType: string
+  powerKw: number
+  status: string
+  chargingSpeed: string
+  slotNumber?: string
+}
+
+type ChargingSession = {
+  id: number
+  vehicleId: number
+  stationId: number
+  chargingPointId: number
+  userId: string
+  startTime: string
+  endTime: string | null
+  energyConsumedKwh: string
+  durationMinutes: number
+  totalCost: string
+  status: "ACTIVE" | "COMPLETED" | "CANCELLED"
+  createdAt: string
+  updatedAt: string
+}
+
+type ChargingStation = {
+  id: number
+  name: string
+  location: string
+  operator: string
+  chargingPoints: ChargingPoint[]
+  sessions: ChargingSession[]
+}
 
 type SessionRow = ChargingSession & {
   stationName: string
   chargerSpeed: "SLOW" | "FAST" | "SUPER_FAST"
 }
 
-const sampleSessions: SessionRow[] = [
+// Mock Data
+const MOCK_STATIONS: ChargingStation[] = [
   {
-    id: 40001,
-    vehicleId: 101,
-    stationId: 9001,
-    chargingPointId: 20001,
-    startTime: "2026-04-06T08:10:00.000Z",
-    endTime: "2026-04-06T09:00:00.000Z",
-    energyConsumedKwh: "21.5",
-    durationMinutes: 50,
-    totalCost: "10.75",
-    status: "COMPLETED",
-    userId: "user-001",
-    createdAt: "2026-04-06T08:10:00.000Z",
-    updatedAt: "2026-04-06T09:00:00.000Z",
-    stationName: "Bole EV Hub",
-    chargerSpeed: "SUPER_FAST",
+    id: 1,
+    name: "Green Valley EV Hub",
+    location: "123 Green Street, Downtown",
+    operator: "EcoCharge",
+    chargingPoints: [
+      {
+        id: 101,
+        connectorType: "CCS",
+        powerKw: 150,
+        status: "AVAILABLE",
+        chargingSpeed: "ULTRA_FAST",
+        slotNumber: "A-01",
+      },
+      {
+        id: 102,
+        connectorType: "CCS",
+        powerKw: 150,
+        status: "OCCUPIED",
+        chargingSpeed: "ULTRA_FAST",
+        slotNumber: "A-02",
+      },
+      {
+        id: 103,
+        connectorType: "TYPE2",
+        powerKw: 22,
+        status: "AVAILABLE",
+        chargingSpeed: "FAST",
+        slotNumber: "A-03",
+      },
+    ],
+    sessions: [
+      {
+        id: 40001,
+        vehicleId: 101,
+        stationId: 1,
+        chargingPointId: 101,
+        userId: "user-001",
+        startTime: "2026-04-06T08:10:00.000Z",
+        endTime: "2026-04-06T09:00:00.000Z",
+        energyConsumedKwh: "21.5",
+        durationMinutes: 50,
+        totalCost: "10.75",
+        status: "COMPLETED",
+        createdAt: "2026-04-06T08:10:00.000Z",
+        updatedAt: "2026-04-06T09:00:00.000Z",
+      },
+      {
+        id: 40002,
+        vehicleId: 102,
+        stationId: 1,
+        chargingPointId: 102,
+        userId: "user-015",
+        startTime: "2026-04-06T11:20:00.000Z",
+        endTime: null,
+        energyConsumedKwh: "9.2",
+        durationMinutes: 20,
+        totalCost: "4.60",
+        status: "ACTIVE",
+        createdAt: "2026-04-06T11:20:00.000Z",
+        updatedAt: "2026-04-06T11:40:00.000Z",
+      },
+    ],
   },
   {
-    id: 40002,
-    vehicleId: 102,
-    stationId: 9001,
-    chargingPointId: 20002,
-    startTime: "2026-04-06T11:20:00.000Z",
-    endTime: null,
-    energyConsumedKwh: "9.2",
-    durationMinutes: 20,
-    totalCost: "4.60",
-    status: "ACTIVE",
-    userId: "user-015",
-    createdAt: "2026-04-06T11:20:00.000Z",
-    updatedAt: "2026-04-06T11:40:00.000Z",
-    stationName: "Bole EV Hub",
-    chargerSpeed: "FAST",
+    id: 2,
+    name: "Emerald Charge Point",
+    location: "456 Park Avenue",
+    operator: "GreenEnergy",
+    chargingPoints: [
+      {
+        id: 201,
+        connectorType: "CHADEMO",
+        powerKw: 50,
+        status: "FAULTED",
+        chargingSpeed: "FAST",
+        slotNumber: "B-01",
+      },
+    ],
+    sessions: [
+      {
+        id: 40003,
+        vehicleId: 103,
+        stationId: 2,
+        chargingPointId: 201,
+        userId: "user-002",
+        startTime: "2026-04-05T14:05:00.000Z",
+        endTime: "2026-04-05T14:55:00.000Z",
+        energyConsumedKwh: "17.0",
+        durationMinutes: 50,
+        totalCost: "8.10",
+        status: "COMPLETED",
+        createdAt: "2026-04-05T14:05:00.000Z",
+        updatedAt: "2026-04-05T14:55:00.000Z",
+      },
+    ],
   },
   {
-    id: 40003,
-    vehicleId: 103,
-    stationId: 9003,
-    chargingPointId: 20007,
-    startTime: "2026-04-05T14:05:00.000Z",
-    endTime: "2026-04-05T14:55:00.000Z",
-    energyConsumedKwh: "17.0",
-    durationMinutes: 50,
-    totalCost: "8.10",
-    status: "COMPLETED",
-    userId: "user-002",
-    createdAt: "2026-04-05T14:05:00.000Z",
-    updatedAt: "2026-04-05T14:55:00.000Z",
-    stationName: "Megenagna Fast Charge",
-    chargerSpeed: "FAST",
-  },
-  {
-    id: 40004,
-    vehicleId: 104,
-    stationId: 9002,
-    chargingPointId: 20009,
-    startTime: "2026-04-04T19:40:00.000Z",
-    endTime: "2026-04-04T20:10:00.000Z",
-    energyConsumedKwh: "7.3",
-    durationMinutes: 30,
-    totalCost: "3.10",
-    status: "CANCELLED",
-    userId: "user-009",
-    createdAt: "2026-04-04T19:40:00.000Z",
-    updatedAt: "2026-04-04T20:10:00.000Z",
-    stationName: "Piassa Charge Point",
-    chargerSpeed: "SLOW",
+    id: 3,
+    name: "Sustainable Energy Station",
+    location: "789 Eco Boulevard",
+    operator: "EcoCharge",
+    chargingPoints: [
+      {
+        id: 301,
+        connectorType: "CCS",
+        powerKw: 180,
+        status: "AVAILABLE",
+        chargingSpeed: "ULTRA_FAST",
+        slotNumber: "C-01",
+      },
+      {
+        id: 302,
+        connectorType: "TYPE2",
+        powerKw: 22,
+        status: "OCCUPIED",
+        chargingSpeed: "FAST",
+        slotNumber: "C-02",
+      },
+    ],
+    sessions: [
+      {
+        id: 40004,
+        vehicleId: 104,
+        stationId: 3,
+        chargingPointId: 302,
+        userId: "user-009",
+        startTime: "2026-04-04T19:40:00.000Z",
+        endTime: "2026-04-04T20:10:00.000Z",
+        energyConsumedKwh: "7.3",
+        durationMinutes: 30,
+        totalCost: "3.10",
+        status: "CANCELLED",
+        createdAt: "2026-04-04T19:40:00.000Z",
+        updatedAt: "2026-04-04T20:10:00.000Z",
+      },
+    ],
   },
 ]
 
-const fmtCurrency = (value: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    value || 0,
-  )
+// API Service
+const analyticsAPI = {
+  getStations: async (): Promise<ChargingStation[]> => {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    return MOCK_STATIONS
+  },
+}
 
-const num = (value?: string | null) => Number(value ?? 0)
+// Custom hook
+const useAnalyticsQuery = () => {
+  return useQuery({
+    queryKey: ["analytics-stations"],
+    queryFn: analyticsAPI.getStations,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+  })
+}
 
-const COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6"]
+// Helper functions
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(value || 0)
+
+const formatNumber = (value?: string | null) => Number(value ?? 0)
+
+const COLORS = [
+  "#10b981",
+  "#3b82f6",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ec4899",
+]
 
 type DatePreset = "TODAY" | "WEEK" | "MONTH" | "CUSTOM"
 
-export default function EVAnalyticsPage() {
-  const { data } = useChargingStations()
+// Station Performance Table
+const columnHelper = createColumnHelper<{
+  stationName: string
+  sessions: number
+  energy: number
+  revenue: number
+  status: string
+}>()
 
+const stationColumns = [
+  columnHelper.accessor("stationName", {
+    header: "Station Name",
+    cell: (info) => (
+      <span className="font-medium text-emerald-700 dark:text-emerald-400">
+        {info.getValue()}
+      </span>
+    ),
+  }),
+  columnHelper.accessor("sessions", {
+    header: "Sessions",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("energy", {
+    header: "Energy (kWh)",
+    cell: (info) => info.getValue().toFixed(1),
+  }),
+  columnHelper.accessor("revenue", {
+    header: "Revenue",
+    cell: (info) => formatCurrency(info.getValue()),
+  }),
+  columnHelper.accessor("status", {
+    header: "Status",
+    cell: (info) => (
+      <Badge
+        variant={info.getValue() === "ACTIVE" ? "default" : "secondary"}
+        className={info.getValue() === "ACTIVE" ? "bg-emerald-600" : ""}
+      >
+        {info.getValue()}
+      </Badge>
+    ),
+  }),
+]
+
+// Custom Table Component
+function CustomTable({ data, columns, onRowClick }: any) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 5 } },
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-800">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="px-4 py-3 text-left text-sm font-medium text-emerald-900 dark:text-emerald-300"
+                  >
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-emerald-100 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 cursor-pointer transition-colors"
+                onClick={() => onRowClick?.(row.original)}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-4 py-3 text-sm">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing{" "}
+          {table.getState().pagination.pageIndex *
+            table.getState().pagination.pageSize +
+            1}{" "}
+          to{" "}
+          {Math.min(
+            (table.getState().pagination.pageIndex + 1) *
+              table.getState().pagination.pageSize,
+            data.length,
+          )}{" "}
+          of {data.length}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Stats Card Component
+function StatsCard({ title, value, icon: Icon, trend, color }: any) {
+  return (
+    <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+      <Card className="border-emerald-200 dark:border-emerald-800 shadow-sm hover:shadow-md transition-shadow">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                {title}
+              </p>
+              <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                {value}
+              </p>
+              {trend && (
+                <div className="flex items-center gap-1 mt-2">
+                  {trend > 0 ? (
+                    <TrendingUp className="h-3 w-3 text-green-600" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-red-600" />
+                  )}
+                  <span
+                    className={`text-xs ${trend > 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {Math.abs(trend)}%
+                  </span>
+                </div>
+              )}
+            </div>
+            <div
+              className={`rounded-full bg-${color}-100 p-3 dark:bg-${color}-950/20`}
+            >
+              <Icon className={`h-5 w-5 text-${color}-600`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// Main Component
+export default function EVAnalyticsPage() {
+  const {
+    data: stations = [],
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useAnalyticsQuery()
+  const router = useRouter()
   const [datePreset, setDatePreset] = useState<DatePreset>("WEEK")
   const [stationFilter, setStationFilter] = useState("ALL")
-  const [userFilter, setUserFilter] = useState("")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
 
-  const stations = (data ?? []) as ChargingStation[]
+  // Process sessions
   const allSessions = useMemo(() => {
     const rows = stations.flatMap((station) => {
       const speedByPointId = new Map(
-        station.chargingPoints.map((point) => [point.id, point.chargingSpeed]),
+        station.chargingPoints.map((point) => [
+          point.id,
+          point.chargingSpeed as "SLOW" | "FAST" | "SUPER_FAST",
+        ]),
       )
       return (station.sessions ?? []).map((session) => ({
         ...session,
@@ -154,14 +486,10 @@ export default function EVAnalyticsPage() {
         chargerSpeed: speedByPointId.get(session.chargingPointId) ?? "FAST",
       }))
     })
-    return rows.length ? rows : sampleSessions
+    return rows
   }, [stations])
 
-  const stationOptions = useMemo(() => {
-    const names = new Set(allSessions.map((s) => s.stationName))
-    return Array.from(names).sort((a, b) => a.localeCompare(b))
-  }, [allSessions])
-
+  // Filter sessions
   const filteredSessions = useMemo(() => {
     const now = new Date()
     let startBoundary: Date | null = null
@@ -177,53 +505,60 @@ export default function EVAnalyticsPage() {
     const endBoundary =
       datePreset === "CUSTOM" && toDate ? new Date(`${toDate}T23:59:59`) : null
 
-    const term = userFilter.trim().toLowerCase()
     return allSessions.filter((session) => {
       const startedAt = new Date(session.startTime)
       const matchesStation =
         stationFilter === "ALL" || session.stationName === stationFilter
-      const matchesUser = !term || session.userId.toLowerCase().includes(term)
       const matchesStart = startBoundary ? startedAt >= startBoundary : true
       const matchesEnd = endBoundary ? startedAt <= endBoundary : true
-      return matchesStation && matchesUser && matchesStart && matchesEnd
+      return matchesStation && matchesStart && matchesEnd
     })
-  }, [allSessions, datePreset, fromDate, toDate, stationFilter, userFilter])
+  }, [allSessions, datePreset, fromDate, toDate, stationFilter])
 
+  // Charger stats
   const chargerStats = useMemo(() => {
-    const allPoints = stations.flatMap((station) => station.chargingPoints ?? [])
+    const allPoints = stations.flatMap(
+      (station) => station.chargingPoints ?? [],
+    )
     const available = allPoints.filter((p) => p.status === "AVAILABLE").length
     const occupied = allPoints.filter((p) => p.status === "OCCUPIED").length
     const offlineOrFault = allPoints.filter(
       (p) => p.status === "OFFLINE" || p.status === "FAULTED",
     ).length
-    return { available, occupied, offlineOrFault }
+    return { available, occupied, offlineOrFault, total: allPoints.length }
   }, [stations])
 
+  // Overview stats
   const overview = useMemo(() => {
     const totalSessions = filteredSessions.length
     const totalEnergy = filteredSessions.reduce(
-      (sum, session) => sum + num(session.energyConsumedKwh),
+      (sum, session) => sum + formatNumber(session.energyConsumedKwh),
       0,
     )
     const totalRevenue = filteredSessions.reduce(
-      (sum, session) => sum + num(session.totalCost),
+      (sum, session) => sum + formatNumber(session.totalCost),
       0,
     )
     const activeUsers = new Set(
       filteredSessions
-        .filter((session) => session.status === "ACTIVE")
-        .map((session) => session.userId),
+        .filter((s) => s.status === "ACTIVE")
+        .map((s) => s.userId),
     ).size
     const avgDuration =
       totalSessions > 0
-        ? filteredSessions.reduce(
-            (sum, session) => sum + (session.durationMinutes ?? 0),
-            0,
-          ) / totalSessions
+        ? filteredSessions.reduce((sum, s) => sum + s.durationMinutes, 0) /
+          totalSessions
         : 0
-    return { totalSessions, totalEnergy, totalRevenue, activeUsers, avgDuration }
+    return {
+      totalSessions,
+      totalEnergy,
+      totalRevenue,
+      activeUsers,
+      avgDuration,
+    }
   }, [filteredSessions])
 
+  // Sessions over time
   const sessionsOverTime = useMemo(() => {
     const buckets = new Map<string, number>()
     filteredSessions.forEach((session) => {
@@ -236,6 +571,7 @@ export default function EVAnalyticsPage() {
     }))
   }, [filteredSessions])
 
+  // Usage by hour
   const usageByHour = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, h) => ({
       hour: `${h.toString().padStart(2, "0")}:00`,
@@ -248,501 +584,468 @@ export default function EVAnalyticsPage() {
     return hours
   }, [filteredSessions])
 
+  // Charger type usage
   const chargerTypeUsage = useMemo(() => {
-    const counts = {
-      FAST: 0,
-      SLOW: 0,
-      SUPER_FAST: 0,
-    }
+    const counts = { FAST: 0, SLOW: 0, SUPER_FAST: 0 }
     filteredSessions.forEach((session) => {
       counts[session.chargerSpeed] += 1
     })
-    return [
-      { name: "Fast", value: counts.FAST },
-      { name: "Slow", value: counts.SLOW },
-      { name: "Super Fast", value: counts.SUPER_FAST },
-    ]
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name.replace("_", " "),
+      value,
+    }))
   }, [filteredSessions])
 
+  // Station performance
   const stationPerformance = useMemo(() => {
-    const map = new Map<string, { sessions: number; energy: number }>()
+    const map = new Map<
+      string,
+      { sessions: number; energy: number; revenue: number }
+    >()
     filteredSessions.forEach((session) => {
-      const current = map.get(session.stationName) ?? { sessions: 0, energy: 0 }
+      const current = map.get(session.stationName) ?? {
+        sessions: 0,
+        energy: 0,
+        revenue: 0,
+      }
       current.sessions += 1
-      current.energy += num(session.energyConsumedKwh)
+      current.energy += formatNumber(session.energyConsumedKwh)
+      current.revenue += formatNumber(session.totalCost)
       map.set(session.stationName, current)
     })
     return Array.from(map.entries())
-      .map(([stationName, value]) => ({
+      .map(([stationName, data]) => ({
         stationName,
-        sessions: value.sessions,
-        energy: value.energy,
-        status: value.sessions > 0 ? "ACTIVE" : "INACTIVE",
+        sessions: data.sessions,
+        energy: data.energy,
+        revenue: data.revenue,
+        status: data.sessions > 0 ? "ACTIVE" : "INACTIVE",
       }))
       .sort((a, b) => b.sessions - a.sessions)
   }, [filteredSessions])
 
-  const userAnalytics = useMemo(() => {
-    const usersMap = new Map<string, number>()
-    filteredSessions.forEach((session) => {
-      usersMap.set(session.userId, (usersMap.get(session.userId) ?? 0) + 1)
-    })
-    const totalRegisteredUsers = usersMap.size + 12
-    const activeUsers = new Set(
-      filteredSessions
-        .filter((session) => session.status === "ACTIVE")
-        .map((session) => session.userId),
-    ).size
-    const topUsers = Array.from(usersMap.entries())
-      .map(([userId, sessions]) => ({ userId, sessions }))
-      .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, 5)
+  // Environmental impact
+  const environmental = useMemo(() => {
+    const totalEnergy = filteredSessions.reduce(
+      (sum, session) => sum + formatNumber(session.energyConsumedKwh),
+      0,
+    )
     return {
-      totalRegisteredUsers,
-      activeUsers,
-      inactiveUsers: Math.max(0, totalRegisteredUsers - activeUsers),
-      newUsersOverTime: Math.max(1, Math.floor(usersMap.size / 2)),
-      topUsers,
+      totalEnergy,
+      co2SavedKg: totalEnergy * 0.52,
+      fuelSavedLiters: totalEnergy * 0.11,
     }
   }, [filteredSessions])
 
-  const revenueAnalytics = useMemo(() => {
-    const total = filteredSessions.reduce((sum, s) => sum + num(s.totalCost), 0)
-    const averagePerSession = filteredSessions.length
-      ? total / filteredSessions.length
-      : 0
-    const byStationMap = new Map<string, number>()
-    filteredSessions.forEach((session) => {
-      byStationMap.set(
-        session.stationName,
-        (byStationMap.get(session.stationName) ?? 0) + num(session.totalCost),
-      )
-    })
-    const revenuePerStation = Array.from(byStationMap.entries()).map(
-      ([stationName, revenue]) => ({ stationName, revenue }),
-    )
-    const revenueGrowth = sessionsOverTime.map((item, idx) => ({
-      date: item.date,
-      revenue: Number((item.sessions * (averagePerSession || 3 + idx)).toFixed(2)),
-    }))
-    const paymentTypes = [
-      { name: "Wallet", value: 46 },
-      { name: "Card", value: 34 },
-      { name: "Mobile Money", value: 20 },
-    ]
-    return { total, averagePerSession, revenuePerStation, revenueGrowth, paymentTypes }
-  }, [filteredSessions, sessionsOverTime])
-
-  const environmental = useMemo(() => {
-    const totalEnergy = filteredSessions.reduce(
-      (sum, session) => sum + num(session.energyConsumedKwh),
-      0,
-    )
-    const co2SavedKg = totalEnergy * 0.52
-    const fuelSavedLiters = totalEnergy * 0.11
-    return { totalEnergy, co2SavedKg, fuelSavedLiters }
-  }, [filteredSessions])
-
+  // Real-time monitoring
   const realTimeMonitoring = useMemo(() => {
     const liveSessions = filteredSessions.filter((s) => s.status === "ACTIVE")
-    const liveUsers = new Set(liveSessions.map((s) => s.userId)).size
-    return { liveSessions, liveUsers }
+    return {
+      liveSessions: liveSessions.length,
+      liveUsers: new Set(liveSessions.map((s) => s.userId)).size,
+    }
   }, [filteredSessions])
 
-  const alerts = useMemo(() => {
-    const failedSessions = filteredSessions.filter((s) => s.status === "CANCELLED").length
-    const chargerErrors = chargerStats.offlineOrFault
-    const maintenanceAlerts = Math.max(0, Math.floor(chargerErrors / 2))
-    return { failedSessions, chargerErrors, maintenanceAlerts }
-  }, [filteredSessions, chargerStats])
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 space-y-6 max-w-7xl">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>Failed to load analytics data.</span>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-3 w-3" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground">
-          EV charging insights for operations, users, and revenue.
-        </p>
-      </div>
+    <div className="min-h-screen ">
+      <div className="container mx-auto py-6 space-y-6 max-w-7xl px-4">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex items-start gap-4">
+              {/* Back Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mt-1 h-10 w-10 cursor-pointer rounded-full border border-gray-200 bg-white shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900/80 dark:hover:bg-gray-800"
+                onClick={() => router.back()}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters & Controls</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Select
-            value={datePreset}
-            onValueChange={(value: DatePreset) => setDatePreset(value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TODAY">Today</SelectItem>
-              <SelectItem value="WEEK">Week</SelectItem>
-              <SelectItem value="MONTH">Month</SelectItem>
-              <SelectItem value="CUSTOM">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={stationFilter} onValueChange={setStationFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Station Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Stations</SelectItem>
-              {stationOptions.map((station) => (
-                <SelectItem key={station} value={station}>
-                  {station}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            placeholder="User filter (user ID)"
-            value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-          />
-          <Input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            disabled={datePreset !== "CUSTOM"}
-          />
-          <Input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            disabled={datePreset !== "CUSTOM"}
-          />
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
+                    EV Infrastructure
+                  </p>
+                  <h1 className="bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-3xl">
+                    Analytics Dashboard
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Real-time insights and performance metrics
+                  </p>
+                </div>
+              </div>
+            </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Today&apos;s Sessions</p>
-            <p className="text-2xl font-bold">{overview.totalSessions}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Energy Delivered</p>
-            <p className="text-2xl font-bold">{overview.totalEnergy.toFixed(1)} kWh</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-            <p className="text-2xl font-bold">{fmtCurrency(overview.totalRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Active Users</p>
-            <p className="text-2xl font-bold">{overview.activeUsers}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Available vs Occupied</p>
-            <p className="text-sm font-semibold">
-              {chargerStats.available} / {chargerStats.occupied}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Quick Stats Badge */}
+              <Badge
+                variant="secondary"
+                className="hidden items-center gap-2 rounded-full px-3 py-1.5 sm:flex bg-emerald-50 text-emerald-700 border-emerald-200"
+              >
+                <Activity className="h-3 w-3" />
+                <span className="text-xs font-medium">Live Analytics</span>
+              </Badge>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Sessions Over Time</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sessionsOverTime}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="sessions"
-                  stroke="#16a34a"
-                  strokeWidth={2}
+              {/* Action Buttons */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 rounded-full border-emerald-200 bg-white shadow-sm hover:bg-emerald-50 dark:border-gray-800 dark:bg-gray-900/80"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
                 />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Charger Type Usage</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chargerTypeUsage}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={55}
-                  outerRadius={85}
-                  label
-                >
-                  {chargerTypeUsage.map((entry, index) => (
-                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="border-emerald-200 dark:border-emerald-800 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900 dark:text-emerald-100">
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <Select
+                value={datePreset}
+                onValueChange={(v: DatePreset) => setDatePreset(v)}
+              >
+                <SelectTrigger className="border-emerald-200">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODAY">Today</SelectItem>
+                  <SelectItem value="WEEK">Last 7 Days</SelectItem>
+                  <SelectItem value="MONTH">This Month</SelectItem>
+                  <SelectItem value="CUSTOM">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={stationFilter} onValueChange={setStationFilter}>
+                <SelectTrigger className="border-emerald-200">
+                  <SelectValue placeholder="Station" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Stations</SelectItem>
+                  {stations.map((station) => (
+                    <SelectItem key={station.id} value={station.name}>
+                      {station.name}
+                    </SelectItem>
                   ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+                </SelectContent>
+              </Select>
+              {datePreset === "CUSTOM" && (
+                <>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="border-emerald-200"
+                  />
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="border-emerald-200"
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Usage by Hour (Peak Usage Hours)</CardTitle>
-        </CardHeader>
-        <CardContent className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={usageByHour}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" fontSize={11} interval={1} />
-              <YAxis fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="sessions" fill="#2563eb" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-3 text-sm text-muted-foreground">
-            Average session duration: {overview.avgDuration.toFixed(1)} minutes
-          </div>
-        </CardContent>
-      </Card>
+        {/* Stats Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+        >
+          <StatsCard
+            title="Total Sessions"
+            value={overview.totalSessions}
+            icon={Activity}
+            trend={12}
+            color="emerald"
+          />
+          <StatsCard
+            title="Energy Delivered"
+            value={`${overview.totalEnergy.toFixed(1)} kWh`}
+            icon={Battery}
+            trend={8}
+            color="blue"
+          />
+          <StatsCard
+            title="Total Revenue"
+            value={formatCurrency(overview.totalRevenue)}
+            icon={DollarSign}
+            trend={15}
+            color="green"
+          />
+          <StatsCard
+            title="Active Users"
+            value={overview.activeUsers}
+            icon={Users}
+            trend={5}
+            color="purple"
+          />
+        </motion.div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Station Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Station Name</TableHead>
-                  <TableHead>Sessions</TableHead>
-                  <TableHead>Energy (kWh)</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stationPerformance.length ? (
-                  stationPerformance.map((row) => (
-                    <TableRow key={row.stationName}>
-                      <TableCell className="font-medium">{row.stationName}</TableCell>
-                      <TableCell>{row.sessions}</TableCell>
-                      <TableCell>{row.energy.toFixed(1)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={row.status === "ACTIVE" ? "outline" : "secondary"}
-                        >
-                          {row.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8">
-                      No station performance data.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm">
-            <div className="rounded-md border p-3">
-              Most used station:{" "}
-              <span className="font-medium">
-                {stationPerformance[0]?.stationName ?? "-"}
-              </span>
-            </div>
-            <div className="rounded-md border p-3">
-              Least used station:{" "}
-              <span className="font-medium">
-                {stationPerformance[stationPerformance.length - 1]?.stationName ?? "-"}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>User Analytics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-md border p-3">
-                <p className="text-sm text-muted-foreground">Total Registered Users</p>
-                <p className="text-xl font-semibold">
-                  {userAnalytics.totalRegisteredUsers}
-                </p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-sm text-muted-foreground">Active vs Inactive</p>
-                <p className="text-xl font-semibold">
-                  {userAnalytics.activeUsers} / {userAnalytics.inactiveUsers}
-                </p>
-              </div>
-              <div className="rounded-md border p-3 col-span-2">
-                <p className="text-sm text-muted-foreground">New Users Over Time</p>
-                <p className="text-xl font-semibold">{userAnalytics.newUsersOverTime}</p>
-              </div>
-            </div>
-            <div className="rounded-md border p-3">
-              <p className="text-sm font-medium mb-2">Top Users</p>
-              <div className="space-y-1 text-sm">
-                {userAnalytics.topUsers.map((user) => (
-                  <div
-                    key={user.userId}
-                    className="flex items-center justify-between text-muted-foreground"
-                  >
-                    <span>{user.userId}</span>
-                    <span>{user.sessions} sessions</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue & Payments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Total Revenue</p>
-                <p className="font-semibold">{fmtCurrency(revenueAnalytics.total)}</p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Avg / Session</p>
-                <p className="font-semibold">
-                  {fmtCurrency(revenueAnalytics.averagePerSession)}
-                </p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Revenue Stations</p>
-                <p className="font-semibold">{revenueAnalytics.revenuePerStation.length}</p>
-              </div>
-            </div>
-            <div className="h-56">
+        {/* Charts Row 1 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid gap-6 lg:grid-cols-2"
+        >
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900">
+                Sessions Over Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueAnalytics.revenueGrowth}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                <AreaChart data={sessionsOverTime}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" fontSize={12} />
                   <YAxis fontSize={12} />
-                  <Tooltip />
-                  <Line
+                  <RechartsTooltip />
+                  <Area
                     type="monotone"
-                    dataKey="revenue"
-                    stroke="#16a34a"
-                    strokeWidth={2}
+                    dataKey="sessions"
+                    stroke="#10b981"
+                    fill="#10b981"
+                    fillOpacity={0.2}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
-            </div>
-            <div className="h-56">
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900">
+                Charger Type Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={revenueAnalytics.paymentTypes}
+                    data={chargerTypeUsage}
                     dataKey="value"
                     nameKey="name"
-                    outerRadius={80}
+                    innerRadius={60}
+                    outerRadius={100}
                     label
                   >
-                    {revenueAnalytics.paymentTypes.map((entry, index) => (
-                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    {chargerTypeUsage.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <RechartsTooltip />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Energy & Environmental Impact</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              You saved{" "}
-              <span className="font-semibold text-foreground">
-                {environmental.co2SavedKg.toFixed(0)} kg CO2
-              </span>{" "}
-              this period.
-            </p>
-            <p className="text-sm">
-              Energy Delivered: {environmental.totalEnergy.toFixed(1)} kWh
-            </p>
-            <p className="text-sm">
-              Equivalent Fuel Saved: {environmental.fuelSavedLiters.toFixed(1)} L
-            </p>
-          </CardContent>
-        </Card>
+        {/* Charts Row 2 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900">
+                Usage by Hour (Peak Hours)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={usageByHour}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="hour" fontSize={11} interval={3} />
+                  <YAxis fontSize={12} />
+                  <RechartsTooltip />
+                  <Bar
+                    dataKey="sessions"
+                    fill="#10b981"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Average session duration: {overview.avgDuration.toFixed(1)}{" "}
+                minutes
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Real-Time Monitoring</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm">Live Sessions: {realTimeMonitoring.liveSessions.length}</p>
-            <p className="text-sm">Current Active Users: {realTimeMonitoring.liveUsers}</p>
-            <p className="text-sm">
-              Charger Status: {chargerStats.available} available / {chargerStats.occupied} busy /{" "}
-              {chargerStats.offlineOrFault} offline
-            </p>
-          </CardContent>
-        </Card>
+        {/* Station Performance Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900">
+                Station Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CustomTable
+                data={stationPerformance}
+                columns={stationColumns}
+                onRowClick={(row: any) => console.log(row)}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Alerts & Issues</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm">Failed Sessions: {alerts.failedSessions}</p>
-            <p className="text-sm">Charger Errors: {alerts.chargerErrors}</p>
-            <p className="text-sm">Maintenance Alerts: {alerts.maintenanceAlerts}</p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Environmental & Monitoring Row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="grid gap-6 md:grid-cols-2"
+        >
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900 flex items-center gap-2">
+                <Leaf className="h-5 w-5 text-emerald-600" />
+                Environmental Impact
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">CO₂ Saved</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {environmental.co2SavedKg.toFixed(0)} kg
+                  </p>
+                </div>
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Fuel Saved</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {environmental.fuelSavedLiters.toFixed(1)} L
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg bg-gradient-to-r from-emerald-500 to-green-500 p-4 text-center text-white">
+                <p className="text-sm opacity-90">Total Green Energy</p>
+                <p className="text-2xl font-bold">
+                  {environmental.totalEnergy.toFixed(1)} kWh
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {[
-          { label: "Overview", icon: Activity },
-          { label: "Usage", icon: Zap },
-          { label: "Stations", icon: Clock3 },
-          { label: "Users", icon: Users },
-          { label: "Revenue", icon: DollarSign },
-          { label: "Impact", icon: Leaf },
-          { label: "Monitoring", icon: Battery },
-        ].map((item) => (
-          <div key={item.label} className="rounded-md border p-3 text-center">
-            <item.icon className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-            <p className="text-xs">{item.label}</p>
-          </div>
-        ))}
+          <Card className="border-emerald-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-900 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-emerald-600" />
+                Real-Time Monitoring
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Live Sessions</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {realTimeMonitoring.liveSessions}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Active Users</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {realTimeMonitoring.liveUsers}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="rounded-lg p-2 bg-green-100 dark:bg-green-950/20">
+                  <p className="text-xs text-muted-foreground">Available</p>
+                  <p className="font-bold text-green-600">
+                    {chargerStats.available}
+                  </p>
+                </div>
+                <div className="rounded-lg p-2 bg-yellow-100 dark:bg-yellow-950/20">
+                  <p className="text-xs text-muted-foreground">Occupied</p>
+                  <p className="font-bold text-yellow-600">
+                    {chargerStats.occupied}
+                  </p>
+                </div>
+                <div className="rounded-lg p-2 bg-red-100 dark:bg-red-950/20">
+                  <p className="text-xs text-muted-foreground">Offline/Fault</p>
+                  <p className="font-bold text-red-600">
+                    {chargerStats.offlineOrFault}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   )

@@ -126,7 +126,7 @@ function EvOwnerHeader({ className }: { className?: string }) {
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               className="hidden md:flex gap-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-700 hover:to-emerald-600 text-white shadow-md"
-              onClick={() => router.push("/ev-owner/stations/create")}
+              onClick={() => router.push("/ev-charge-manager/stations/new")}
             >
               <Plus className="w-4 h-4" />
               Add Station

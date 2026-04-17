@@ -11,7 +11,7 @@ export const createStation = async (req, res) => {
       for (const file of req.files.images) {
         const imageUrl = await uploadToCloudinary(
           file.buffer,
-          "HabeshaGo/stations/images"
+          "HabeshaGo/stations/images",
         )
 
         uploadedImages.push({
@@ -37,7 +37,7 @@ export const createStation = async (req, res) => {
         const documentUrl = await uploadToCloudinary(
           file.buffer,
           "HabeshaGo/stations/documents",
-          "auto"
+          "auto",
         )
 
         uploadedDocuments.push({
@@ -50,9 +50,20 @@ export const createStation = async (req, res) => {
 
     //  Build Payload
     const payload = {
-      ...req.body,
+      name: req.body.name,
+      address: req.body.address,
+      city: req.body.city,
+      description: req.body.description,
+      status: req.body.status,
+      isVerified: req.body.isVerified === "true",
+
       lat: parseFloat(req.body.lat),
       lng: parseFloat(req.body.lng),
+
+      // parse arrays safely
+      chargingPoints: JSON.parse(req.body.chargingPoints || "[]"),
+      tariffs: JSON.parse(req.body.tariffs || "[]"),
+
       images: uploadedImages,
       documents: uploadedDocuments,
     }
@@ -103,7 +114,7 @@ export const updateStation = async (req, res) => {
   try {
     const result = await stationService.updateStationService(
       req.params.id,
-      req.body
+      req.body,
     )
     return res.status(result.statusCode).json(result)
   } catch (error) {
@@ -137,7 +148,7 @@ export const getStationPoints = async (req, res) => {
   try {
     const result = await stationService.getStationPointsService(
       req.params.id,
-      req.query
+      req.query,
     )
     return res.status(result.statusCode).json(result)
   } catch (error) {

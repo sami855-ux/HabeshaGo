@@ -56,14 +56,6 @@ export const getAllUsers = async (req, res) => {
             status: true,
           },
         },
-        parkingReservations: {
-          select: {
-            id: true,
-            slotNumber: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
         sessions: {
           select: {
             id: true,
@@ -93,11 +85,6 @@ export const getAllUsers = async (req, res) => {
         minibusReservations: user.minibusReservations.map((m) => ({
           ...m,
           date: m.date.toISOString(),
-        })),
-        parkingReservations: user.parkingReservations.map((p) => ({
-          ...p,
-          startTime: p.startTime.toISOString(),
-          endTime: p.endTime.toISOString(),
         })),
         sessions: user.sessions.map((s) => ({
           ...s,

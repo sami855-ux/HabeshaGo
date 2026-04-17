@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client"
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 
@@ -13,6 +14,8 @@ export const createStationService = async (data) => {
       isVerified = false,
       images = [],
       documents = [],
+      chargingPoints = [],
+      tariffs = [],
     } = data
 
     // Basic Validation
@@ -32,7 +35,7 @@ export const createStationService = async (data) => {
     if (existingStation) {
       return errorResponse(
         "Station with the same name and nearby location already exists",
-        400
+        400,
       )
     }
 
@@ -47,7 +50,42 @@ export const createStationService = async (data) => {
         status,
         isVerified: Boolean(isVerified),
 
-        // Only create if arrays are not empty
+        // Charging Points
+        chargingPoints:
+          chargingPoints.length > 0
+            ? {
+                create: chargingPoints.map((point) => ({
+                  connectorType: point.connectorType || "TYPE2",
+                  powerKw: Number(point.powerKw),
+                  status: point.status || "AVAILABLE",
+                  slotNumber: point.slotNumber || null,
+                  maxVoltage: point.maxVoltage
+                    ? Number(point.maxVoltage)
+                    : null,
+                  maxCurrent: point.maxCurrent
+                    ? Number(point.maxCurrent)
+                    : null,
+                  chargingSpeed: point.chargingSpeed || "SLOW",
+                })),
+              }
+            : undefined,
+
+        // Tariffs
+        tariffs:
+          tariffs.length > 0
+            ? {
+                create: tariffs.map((tariff) => ({
+                  pricePerKwh: new Prisma.Decimal(tariff.pricePerKwh),
+                  pricePerMinute: tariff.pricePerMinute || null,
+                  idleFeePerMinute: tariff.idleFeePerMinute || null,
+                  currency: tariff.currency || "ETB",
+                  validFrom: new Date(tariff.validFrom) || new Date(),
+                  validTo: tariff.validTo ? new Date(tariff.validTo) : null,
+                })),
+              }
+            : undefined,
+
+        // Images
         images:
           images.length > 0
             ? {
@@ -58,6 +96,7 @@ export const createStationService = async (data) => {
               }
             : undefined,
 
+        // Documents
         documents:
           documents.length > 0
             ? {
@@ -162,7 +201,7 @@ export const updateStationService = async (id, data) => {
       if (duplicateStation) {
         return errorResponse(
           "Another station with the same name and nearby location already exists",
-          400
+          400,
         )
       }
     }

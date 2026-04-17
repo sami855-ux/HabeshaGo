@@ -51,17 +51,22 @@ model User {
   payments Payment[]
   driver   Driver?
 
-  chargingSessions ChargingSession[]
-  reservations     EVReservation[]
-  vehicles         Vehicle[]
+  minibusReservations MinibusReservation[]
+  parkingReservations ParkingReservation[]
+  chargingSessions    ChargingSession[]
+  reservations        EVReservation[]
+  vehicles            Vehicle[]
 
   ratingsGiven Rating[]
 
-  minibusReservations MinibusReservation[]
-  parkingReservations ParkingReservation[]
-
   notifications     Notification[]
   TransactionLedger TransactionLedger[]
+
+  supportChatsAsUser  SupportChatSession[] @relation("UserSupportChats")
+  supportChatsAsAgent SupportChatSession[] @relation("AgentSupportChats")
+
+  typingStatuses ChatTypingStatus[]
+  agentStatus    SupportAgentStatus?
 
   @@map("user")
 }
@@ -127,10 +132,6 @@ model Notification {
   @@index([userId])
   @@index([isRead])
 }
-
-////////////////////////////////////////////////////////////
-//////////////////// SUPPORT CHAT MODELS ///////////////////
-////////////////////////////////////////////////////////////
 
 model SupportChatSession {
   id String @id @default(cuid())
@@ -1013,26 +1014,129 @@ model MinibusReservation {
 }
 
 model ParkingLot {
-  id           Int                  @id @default(autoincrement())
-  name         String
-  location     String
-  totalSlots   Int
-  occupied     Int                  @default(0)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  address String
+  city    String
+
+  latitude  Float
+  longitude Float
+
+  totalSlots     Int
+  availableSlots Int
+
+  pricePerMinute Float
+
+  openingTime DateTime?
+  closingTime DateTime?
+
+  hasSecurity Boolean @default(false)
+  hasCCTV     Boolean @default(false)
+
+  status LotStatus @default(ACTIVE)
+
+  slots        ParkingSlot[]
   reservations ParkingReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city])
+}
+
+model ParkingSlot {
+  id String @id @default(cuid())
+
+  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
+  parkingLotId String
+
+  slotNumber String
+
+  slotType SlotType   @default(CAR)
+  status   SlotStatus @default(AVAILABLE)
+
+  isOccupied Boolean @default(false)
+
+  floor   Int?
+  section String?
+
+  isEV       Boolean @default(false)
+  hasCharger Boolean @default(false)
+
+  lastOccupiedAt DateTime?
+  sensorId       String?
+
+  reservations ParkingReservation[]
+  sessions     ParkingSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([parkingLotId, slotNumber])
+  @@index([parkingLotId])
+  @@index([parkingLotId, status])
+  @@index([status, isOccupied])
 }
 
 model ParkingReservation {
-  id         Int        @id @default(autoincrement())
-  userId     String
-  lotId      Int
-  slotNumber Int
-  startTime  DateTime
-  endTime    DateTime
-  createdAt  DateTime   @default(now())
-  lot        ParkingLot @relation(fields: [lotId], references: [id])
-  user       User       @relation(fields: [userId], references: [id])
+  id String @id @default(cuid())
+
+  userId String
+
+  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
+  parkingLotId String
+
+  slot   ParkingSlot @relation(fields: [slotId], references: [id])
+  slotId String
+
+  startTime DateTime
+  endTime   DateTime
+
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+
+  status ParkingStatus @default(PENDING)
+
+  qrCode   String?
+  isNoShow Boolean @default(false)
+
+  notes String?
+
+  sessions ParkingSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([slotId, startTime, endTime])
+}
+
+model ParkingSession {
+  id String @id @default(cuid())
+
+  slot   ParkingSlot @relation(fields: [slotId], references: [id])
+  slotId String
+
+  parkingReservationId String?
+  parkingReservation   ParkingReservation? @relation(fields: [parkingReservationId], references: [id])
+
+  entryTime DateTime  @default(now())
+  exitTime  DateTime?
+
+  duration Int? // in minutes
+
+  status SessionStatus @default(ACTIVE)
+
+  entryMethod EntryMethod  @default(MANUAL)
+  exitMethod  EntryMethod?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slotId, status])
 }
 
 model AuditLog {
@@ -1058,6 +1162,48 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId])
+}
+
+enum SlotType {
+  CAR
+  BIKE
+  TRUCK
+  EV
+}
+
+enum SlotStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  MAINTENANCE
+  BLOCKED
+  OUT_OF_SERVICE
+}
+
+enum ParkingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum LotStatus {
+  ACTIVE
+  INACTIVE
+  FULL
+}
+
+enum EntryMethod {
+  MANUAL
+  QR
+  SENSOR
 }
 
 enum DocumentType {
@@ -1229,23 +1375,11 @@ enum ReferenceType {
   EV_CHARGING_SESSION
 }
 
-enum SessionStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
-}
-
-enum SlotStatus {
-  AVAILABLE
-  OCCUPIED
-  OUT_OF_SERVICE
 }
 
 enum BusStatus {

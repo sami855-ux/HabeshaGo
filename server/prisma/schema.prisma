@@ -754,6 +754,9 @@ model Rating {
   stationId Int?
   station   ChargingStation? @relation(fields: [stationId], references: [id])
 
+  parkingLotId String?
+  parkingLot   ParkingLot? @relation(fields: [parkingLotId], references: [id])
+
   // Rating value & feedback
   score   Int     @db.SmallInt // 1 to 5
   comment String?
@@ -762,8 +765,12 @@ model Rating {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, stationId])
+  @@unique([userId, parkingLotId])
+
   @@index([userId])
   @@index([stationId])
+  @@index([parkingLotId])
+
   @@map("ratings")
 }
 
@@ -1039,6 +1046,7 @@ model ParkingLot {
 
   slots        ParkingSlot[]
   reservations ParkingReservation[]
+  ratings      Rating[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1347,6 +1355,8 @@ enum ConnectorType {
   CCS
   TYPE2
   CHADEMO
+  TESLA
+  GBT
 }
 
 enum ReservationStatus {

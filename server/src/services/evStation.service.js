@@ -124,14 +124,85 @@ export const createStationService = async (data) => {
   }
 }
 
-export const getAllStationsService = async (filters) => {
+
+export const getAllStationsService = async (filters = {}) => {
   try {
-    const { city, status } = filters || {}
-    const stations = await prisma.chargingStation.findMany({
-      where: {
-        ...(city && { city }),
-        ...(status && { status }),
-      },
+    const {
+      city,
+      status,
+      search,
+      verifiedOnly,
+      availableOnly,
+      connectorTypes,
+      minPower,
+      lat,
+      lng,
+      radius = 50,
+    } = filters
+
+    const where = {}
+
+    if (city) {
+      where.city = city
+    }
+
+    if (status) {
+      where.status = status
+    }
+
+    if (search) {
+      where.OR = [
+        {
+          name: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          address: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          city: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+      ]
+    }
+
+    if (verifiedOnly === true || verifiedOnly === "true") {
+      where.isVerified = true
+    }
+
+    if (connectorTypes || minPower || availableOnly) {
+      where.chargingPoints = {
+        some: {
+          ...(connectorTypes?.length && {
+            connectorType: {
+              in: connectorTypes,
+            },
+          }),
+
+          ...(minPower && {
+            powerKw: {
+              gte: Number(minPower),
+            },
+          }),
+
+          ...(availableOnly === true || availableOnly === "true"
+            ? {
+                status: "AVAILABLE",
+              }
+            : {}),
+        },
+      }
+    }
+
+    let stations = await prisma.chargingStation.findMany({
+      where,
       include: {
         chargingPoints: true,
         ratings: true,
@@ -141,7 +212,33 @@ export const getAllStationsService = async (filters) => {
         documents: true,
       },
     })
-    return successResponse("Stations retrieved successfully", stations, 200)
+
+    if (lat && lng) {
+      const userLat = Number(lat)
+      const userLng = Number(lng)
+
+      stations = stations
+        .map((station) => {
+          const distance =
+            Math.sqrt(
+              Math.pow(station.lat - userLat, 2) +
+                Math.pow(station.lng - userLng, 2),
+            ) * 111 // approx km conversion
+
+          return {
+            ...station,
+            distance,
+          }
+        })
+        .filter((s) => s.distance <= Number(radius))
+        .sort((a, b) => a.distance - b.distance)
+    }
+
+    return successResponse(
+      "Stations retrieved successfully",
+      stations,
+      200,
+    )
   } catch (error) {
     console.error("Error fetching stations:", error)
     return errorResponse("Failed to fetch stations", 500)

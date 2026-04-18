@@ -60,7 +60,7 @@ export function ChargingPointsGrid({
   const availablePoints = chargingPoints.filter((p) => p.status === "AVAILABLE")
 
   return (
-    <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white/80 backdrop-blur-sm">
+    <Card className="border-0 shadow-none rounded-2xl overflow-hidden bg-white/80 backdrop-blur-sm">
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-100 to-green-50 rounded-full blur-2xl -mr-16 -mt-16"></div>
       <CardHeader className="pb-3 relative">
         <CardTitle className="flex items-center gap-2 text-xl text-gray-800">

@@ -39,18 +39,20 @@ import {
   Fingerprint,
   Lock,
   X,
+  Loader2,
+  RefreshCw,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { formatCurrencyIntl } from "@/lib/utils"
 import { InputOTP, InputOTPSlot } from "../ui/input-otp"
+import { useAppSelector, useAppDispatch } from "@/store/store"
+import { fetchUserWallet } from "@/store/slices/walletSlice"
 
 interface BookingSummaryProps {
   selectedPoint: any
   energyKwh: number
   pricePerKwh: number
   stationData: any
-  pointsBalance: number
-  walletBalance: number
   onBookingComplete: () => void
   onConfirmPayment: () => void
 }
@@ -60,11 +62,18 @@ export function BookingSummary({
   energyKwh,
   pricePerKwh,
   stationData,
-  pointsBalance,
-  walletBalance,
   onBookingComplete,
   onConfirmPayment,
 }: BookingSummaryProps) {
+  const dispatch = useAppDispatch()
+  const {
+    wallet,
+    loading: walletLoading,
+    hasWallet,
+    error: walletError,
+  } = useAppSelector((state) => state.wallet)
+  const { user } = useAppSelector((state) => state.user)
+
   const [applyPoints, setApplyPoints] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<
     "wallet" | "points" | "card"
@@ -77,10 +86,35 @@ export function BookingSummary({
   const [passwordError, setPasswordError] = useState("")
   const [isVerifying, setIsVerifying] = useState(false)
   const [isSticky, setIsSticky] = useState(false)
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false)
+  const [showLoadWalletDialog, setShowLoadWalletDialog] = useState(false)
+  const [loadAmount, setLoadAmount] = useState("")
+  const [loadPaymentMethod, setLoadPaymentMethod] = useState<"card" | "bank">(
+    "card",
+  )
+  const [isProcessingLoad, setIsProcessingLoad] = useState(false)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const otpInputRef = useRef<HTMLDivElement>(null)
+
+  // Fetch wallet and points balance on component mount
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(fetchUserWallet())
+    }
+  }, [dispatch, user])
+
+  // Auto-refresh balances every 30 seconds
+  useEffect(() => {
+    if (!user?.id) return
+
+    const interval = setInterval(() => {
+      dispatch(fetchUserWallet())
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [dispatch, user])
 
   // Handle sticky positioning
   useEffect(() => {
@@ -93,7 +127,7 @@ export function BookingSummary({
       },
       {
         threshold: 0,
-        rootMargin: "-20px 0px 0px 0px", // Adjust offset as needed
+        rootMargin: "-20px 0px 0px 0px",
       },
     )
 
@@ -107,22 +141,30 @@ export function BookingSummary({
   const calculateTotal = () => {
     const energyCost = energyKwh * pricePerKwh
     let total = energyCost
-    if (applyPoints) {
-      const pointsDiscount = Math.min(pointsBalance * 0.01, energyCost)
+    if (applyPoints && wallet?.points) {
+      const pointsDiscount = Math.min(wallet?.points * 0.01, energyCost)
       total = energyCost - pointsDiscount
     }
     return Math.max(total, 0)
   }
 
-  const pointsToUseAmount = Math.min(
-    pointsBalance * 0.01,
-    energyKwh * pricePerKwh,
-  )
+  const pointsToUseAmount = wallet?.points
+    ? Math.min(wallet?.points * 0.01, energyKwh * pricePerKwh)
+    : 0
   const totalAmount = calculateTotal()
 
   const handleWalletPayment = async () => {
     setIsVerifying(true)
     setPasswordError("")
+
+    // Verify wallet balance
+    if (wallet && wallet.balance < totalAmount) {
+      setPasswordError(
+        `Insufficient wallet balance. Please load funds or use another payment method.`,
+      )
+      setIsVerifying(false)
+      return
+    }
 
     // Simulate API call to verify wallet password
     await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -132,6 +174,9 @@ export function BookingSummary({
       setPasswordError("")
       setShowWalletPassword(false)
       setWalletPassword("")
+
+      // Deduct from wallet
+      await processWalletDeduction()
       await processPayment()
       onConfirmPayment()
     } else {
@@ -140,10 +185,66 @@ export function BookingSummary({
     setIsVerifying(false)
   }
 
+  const processWalletDeduction = async () => {
+    try {
+      // API call to deduct amount from wallet
+      const response = await fetch("/api/wallet/deduct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          amount: totalAmount,
+          description: `Charging session payment - ${energyKwh} kWh`,
+        }),
+      })
+
+      if (response.ok) {
+        // Refresh wallet balance
+        await dispatch(fetchUserWallet())
+      }
+    } catch (error) {
+      console.error("Failed to deduct from wallet:", error)
+    }
+  }
+
+  const processPointsDeduction = async () => {
+    if (!applyPoints || !wallet?.points) return
+
+    try {
+      const pointsToDeduct = Math.ceil(pointsToUseAmount * 100) // Convert to points
+      const response = await fetch("/api/points/deduct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          points: pointsToDeduct,
+          description: `Charging session points redemption`,
+        }),
+      })
+
+      if (response.ok) {
+        // Refresh points balance
+        await dispatch(fetchUserWallet())
+      }
+    } catch (error) {
+      console.error("Failed to deduct points:", error)
+    }
+  }
+
   const processPayment = async () => {
     setIsBooking(true)
+
+    // Process payment based on method
+    if (paymentMethod === "points" && applyPoints) {
+      await processPointsDeduction()
+    } else if (paymentMethod === "card") {
+      // Process card payment
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    }
+
     // Simulate payment processing
     await new Promise((resolve) => setTimeout(resolve, 2000))
+
     setIsBooking(false)
     setBookingSuccess(true)
     onBookingComplete()
@@ -156,15 +257,63 @@ export function BookingSummary({
 
   const handleOpenPayment = () => {
     if (paymentMethod === "wallet") {
-      setShowWalletPassword(true)
+      if (wallet && wallet.balance >= totalAmount) {
+        setShowWalletPassword(true)
+      } else {
+        setPasswordError("Insufficient wallet balance. Please load funds.")
+        setShowLoadWalletDialog(true)
+      }
     } else {
       processPayment()
     }
   }
 
+  // const handleLoadWallet = async () => {
+  //   if (!loadAmount || parseFloat(loadAmount) <= 0) {
+  //     setPasswordError("Please enter a valid amount")
+  //     return
+  //   }
+
+  //   setIsProcessingLoad(true)
+  //   setPasswordError("")
+
+  //   try {
+  //     const amount = parseFloat(loadAmount)
+  //     const response = await dispatch(
+  //       loadWallet({
+  //         userId: user?.id,
+  //         amount,
+  //         paymentMethod: loadPaymentMethod,
+  //       }),
+  //     )
+
+  //     if (response.payload?.success) {
+  //       setShowLoadWalletDialog(false)
+  //       setLoadAmount("")
+  //       // Refresh wallet balance
+  //       await dispatch(fetchWalletBalance(user?.id))
+  //       // Show success message
+  //       alert(
+  //         `Successfully loaded ${formatCurrencyIntl(amount)} to your wallet`,
+  //       )
+  //     } else {
+  //       setPasswordError(response.payload?.error || "Failed to load wallet")
+  //     }
+  //   } catch (error) {
+  //     setPasswordError("An error occurred while loading wallet")
+  //   } finally {
+  //     setIsProcessingLoad(false)
+  //   }
+  // }
+
+  const handleRefreshBalances = () => {
+    if (user?.id) {
+      dispatch(fetchUserWallet())
+    }
+  }
+
   useEffect(() => {
     if (showWalletPassword && otpInputRef.current) {
-      // Small delay to ensure the dialog is fully rendered
       setTimeout(() => {
         const firstInput = otpInputRef.current?.querySelector("input")
         if (firstInput) {
@@ -173,6 +322,11 @@ export function BookingSummary({
       }, 100)
     }
   }, [showWalletPassword])
+
+  const walletBalance = wallet?.balance || 0
+  const pointsBalance = wallet?.points || 0
+  const isWalletInsufficient =
+    paymentMethod === "wallet" && walletBalance < totalAmount
 
   return (
     <>
@@ -186,7 +340,7 @@ export function BookingSummary({
           ${isSticky ? "sticky top-6" : "relative"}
         `}
         style={{
-          top: "1.5rem", // 6px in rem
+          top: "1.5rem",
         }}
       >
         <div className="space-y-6">
@@ -283,6 +437,7 @@ export function BookingSummary({
                               : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                           }`}
                           onClick={() => setApplyPoints(!applyPoints)}
+                          disabled={pointsBalance === 0}
                         >
                           {applyPoints
                             ? `-${formatCurrencyIntl(pointsToUseAmount)}`
@@ -323,10 +478,24 @@ export function BookingSummary({
 
                   {/* Payment Methods */}
                   <div className="space-y-3">
-                    <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
-                      <CreditCard className="h-4 w-4 text-emerald-500" />
-                      Select Payment Method
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                        <CreditCard className="h-4 w-4 text-emerald-500" />
+                        Select Payment Method
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRefreshBalances}
+                        disabled={walletLoading}
+                        className="h-8 px-2"
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 ${walletLoading ? "animate-spin" : ""}`}
+                        />
+                      </Button>
+                    </div>
+
                     <RadioGroup
                       value={paymentMethod}
                       onValueChange={(val) => {
@@ -351,7 +520,11 @@ export function BookingSummary({
                             htmlFor="wallet"
                             className="flex items-center gap-2 cursor-pointer"
                           >
-                            <Wallet className="h-4 w-4 text-emerald-600" />
+                            {walletLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                            ) : (
+                              <Wallet className="h-4 w-4 text-emerald-600" />
+                            )}
                             <span className="font-medium">
                               HabeshaGo Wallet
                             </span>
@@ -364,6 +537,20 @@ export function BookingSummary({
                           <div className="text-xs text-gray-500">available</div>
                         </div>
                       </motion.div>
+
+                      {isWalletInsufficient && (
+                        <div className="text-xs text-amber-600 flex items-center justify-between px-3">
+                          <span>Insufficient balance</span>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setShowLoadWalletDialog(true)}
+                            className="text-emerald-600 h-auto p-0"
+                          >
+                            Load Wallet
+                          </Button>
+                        </div>
+                      )}
 
                       {/* Points Payment */}
                       <motion.div
@@ -491,7 +678,9 @@ export function BookingSummary({
               <Button
                 className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg shadow-emerald-500/30 rounded-xl py-6 text-base font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 size="lg"
-                disabled={!selectedPoint || isBooking || bookingSuccess}
+                disabled={
+                  !selectedPoint || isBooking || bookingSuccess || walletLoading
+                }
                 onClick={handleOpenPayment}
               >
                 {isBooking ? (
@@ -508,9 +697,9 @@ export function BookingSummary({
         </div>
       </div>
 
+      {/* Wallet Password Dialog */}
       <Dialog open={showWalletPassword} onOpenChange={setShowWalletPassword}>
         <DialogContent className="sm:max-w-lg md:max-w-xl rounded-2xl overflow-hidden p-0 border-0 shadow-2xl">
-          {/* Close Button */}
           <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-50">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -535,7 +724,6 @@ export function BookingSummary({
           </DialogHeader>
 
           <div className="px-8 py-4 space-y-6 relative">
-            {/* Wallet Info Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -572,7 +760,6 @@ export function BookingSummary({
               </div>
             </motion.div>
 
-            {/* Password Input Section with Input OTP */}
             <div className="space-y-4">
               <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
                 <Key className="h-4 w-4 text-emerald-500" />
@@ -617,7 +804,6 @@ export function BookingSummary({
                 />
               </div>
 
-              {/* Visual Feedback */}
               {walletPassword.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -651,7 +837,6 @@ export function BookingSummary({
               )}
             </div>
 
-            {/* Quick Actions */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -668,7 +853,6 @@ export function BookingSummary({
               </Button>
             </motion.div>
 
-            {/* Security Tips */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -716,6 +900,118 @@ export function BookingSummary({
                 </div>
               ) : (
                 <div className="flex items-center gap-2">Confirm Payment</div>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Wallet Dialog */}
+      <Dialog
+        open={showLoadWalletDialog}
+        onOpenChange={setShowLoadWalletDialog}
+      >
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+              Load Wallet
+            </DialogTitle>
+            <DialogDescription>
+              Add funds to your HabeshaGo wallet to continue with your payment
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label>Amount to Load</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={loadAmount}
+                  onChange={(e) => setLoadAmount(e.target.value)}
+                  className="pl-8 text-lg font-semibold"
+                  min="1"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <RadioGroup
+                value={loadPaymentMethod}
+                onValueChange={(val) =>
+                  setLoadPaymentMethod(val as "card" | "bank")
+                }
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-2 border rounded-lg p-3">
+                  <RadioGroupItem value="card" id="card-load" />
+                  <Label
+                    htmlFor="card-load"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Credit/Debit Card
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-lg p-3">
+                  <RadioGroupItem value="bank" id="bank-load" />
+                  <Label
+                    htmlFor="bank-load"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    Bank Transfer
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {passwordError && (
+              <Alert variant="destructive">
+                <AlertDescription>{passwordError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="bg-amber-50 rounded-lg p-3">
+              <p className="text-xs text-amber-800">
+                Note: Minimum load amount is $1.00. Funds will be available
+                instantly in your wallet.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLoadWalletDialog(false)
+                setLoadAmount("")
+                setPasswordError("")
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              // onClick={handleLoadWallet}
+              disabled={
+                !loadAmount || parseFloat(loadAmount) <= 0 || isProcessingLoad
+              }
+              className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+            >
+              {isProcessingLoad ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Load ${loadAmount ? formatCurrencyIntl(parseFloat(loadAmount)) : "$0"}`
               )}
             </Button>
           </div>

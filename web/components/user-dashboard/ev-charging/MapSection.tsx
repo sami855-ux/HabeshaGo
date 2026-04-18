@@ -1,14 +1,13 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useQuery } from "@tanstack/react-query"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
+
 import { ChargingStation, StationStatus } from "@/types/ev"
-import { mockStations } from "@/lib/mock-data(1)"
 
 interface MapSectionProps {
-  filters: any
+  stations: ChargingStation[]
   onMarkerClick: (station: ChargingStation) => void
   selectedStationId?: number
 }
@@ -22,48 +21,19 @@ const getMarkerColor = (status: StationStatus, hasAvailablePoints: boolean) => {
 }
 
 export function MapSection({
-  filters,
+  stations,
   onMarkerClick,
   selectedStationId,
 }: MapSectionProps) {
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<L.Marker[]>([])
 
-  const { data: stations } = useQuery({
-    queryKey: ["charging-stations", filters],
-    queryFn: async () => {
-      // Simulate API filtering
-      let filtered = [...mockStations]
-
-      if (filters.status?.length) {
-        filtered = filtered.filter((s) => filters.status.includes(s.status))
-      }
-      if (filters.connectorTypes?.length) {
-        filtered = filtered.filter((s) =>
-          s.chargingPoints.some((cp) =>
-            filters.connectorTypes.includes(cp.connectorType),
-          ),
-        )
-      }
-      if (filters.minPower) {
-        filtered = filtered.filter((s) =>
-          s.chargingPoints.some((cp) => cp.powerKw >= filters.minPower),
-        )
-      }
-      if (filters.verifiedOnly) {
-        filtered = filtered.filter((s) => s.isVerified)
-      }
-
-      return filtered
-    },
-  })
-
+  // ✅ INIT MAP (UNCHANGED)
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    // Initialize map
     if (!mapRef.current) {
-      mapRef.current = L.map("map").setView([9.0192, 38.7468], 16)
+      mapRef.current = L.map("map").setView([9.0192, 38.7468], 13)
 
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
@@ -80,24 +50,34 @@ export function MapSection({
     }
   }, [])
 
+  // ✅ UPDATE MARKERS WHEN DATA CHANGES
   useEffect(() => {
     if (!mapRef.current || !stations) return
 
-    // Clear existing markers
+    // Clear old markers
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    // Add new markers
+    const bounds: L.LatLngExpression[] = []
+
     stations.forEach((station) => {
       const hasAvailable = station.chargingPoints.some(
         (cp) => cp.status === "AVAILABLE",
       )
+
       const color = getMarkerColor(station.status, hasAvailable)
 
       const marker = L.marker([station.lat, station.lng], {
         icon: L.divIcon({
           className: "custom-marker",
-          html: `<div class="w-6 h-6 rounded-full border-2 border-white shadow-lg" style="background-color: ${color}"></div>`,
+          html: `
+            <div 
+              class="w-6 h-6 rounded-full border-2 border-white shadow-lg ${
+                selectedStationId === station.id ? "scale-125" : ""
+              }"
+              style="background-color: ${color}"
+            ></div>
+          `,
           iconSize: [24, 24],
           iconAnchor: [12, 12],
         }),
@@ -105,12 +85,22 @@ export function MapSection({
         .addTo(mapRef.current!)
         .on("click", () => onMarkerClick(station))
 
+      // Highlight selected
       if (station.id === selectedStationId) {
-        marker.openPopup()
+        marker.bindPopup(`<b>${station.name}</b>`).openPopup()
       }
 
       markersRef.current.push(marker)
+      bounds.push([station.lat, station.lng])
     })
+
+    // ✅ AUTO FIT MAP (better UX)
+    if (bounds.length > 0) {
+      mapRef.current.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 15,
+      })
+    }
   }, [stations, selectedStationId, onMarkerClick])
 
   return <div id="map" className="w-full h-full" />

@@ -1,236 +1,371 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useTransition,
+  useDeferredValue,
+} from "react"
+import { useQuery } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { useDebounce } from "@/hooks/useDebounce"
+
 import { MapSection } from "./MapSection"
 import { StationList } from "./StationList"
 import { FilterBar } from "./FilterBar"
 import { StationDetailsSheet } from "./StationDetailsSheet"
-import { ChargingStation } from "@/types/ev"
-import {
-  Zap,
-  Battery,
-  Menu,
-  X,
-  Bell,
-  User,
-  Search,
-  ChevronDown,
-  Sparkles,
-  ChevronLeft,
-} from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { useRouter } from "next/navigation"
+
+import { ChargingStation, ChargingPoint } from "@/types/ev"
 import { Button } from "@/components/ui/button"
+import { ChevronLeft, Menu, X, Search, MapPin, Navigation } from "lucide-react"
+import { mockStations } from "@/lib/mock-data(1)"
+import { axiosInstance } from "@/services/axiosInstance"
+
+export type TabType = "ALL" | "NEARBY" | "EXPLORE"
+
+const fetchStations = async ({ queryKey }) => {
+  const [_key, filters] = queryKey
+
+  const params = new URLSearchParams()
+
+  // 🔍 map filters → query params
+  if (filters?.search) params.append("search", filters.search)
+  if (filters?.city) params.append("city", filters.city)
+  if (filters?.status) params.append("status", filters.status)
+
+  if (filters?.verifiedOnly) params.append("verifiedOnly", "true")
+
+  if (filters?.availableOnly) params.append("availableOnly", "true")
+
+  if (filters?.minPower) params.append("minPower", filters.minPower)
+
+  if (filters?.connectorTypes?.length)
+    params.append("connectorTypes", filters.connectorTypes.join(","))
+
+  if (filters?.lat && filters?.lng) {
+    params.append("lat", filters.lat)
+    params.append("lng", filters.lng)
+    params.append("radius", filters.radius || 50)
+  }
+
+  const { data } = await axiosInstance.get(`/ev/station?${params.toString()}`)
+
+  return data.data
+}
+
+interface FilterState {
+  connectorTypes?: string[]
+  chargingSpeeds?: string[]
+  minPower?: number
+  maxPower?: number
+  verifiedOnly?: boolean
+  availableOnly?: boolean
+  distance?: number
+  rating?: number
+  sortBy?: string
+}
 
 export function EVChargingDashboard() {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
+  // State management
   const [selectedStation, setSelectedStation] =
     useState<ChargingStation | null>(null)
-  const [filters, setFilters] = useState<any>({})
-  const [isMobileListOpen, setIsMobileListOpen] = useState(false)
-  const [isScrolled, setIsScrolled] = useState(false)
+  const [filters, setFilters] = useState<FilterState>({})
   const [searchQuery, setSearchQuery] = useState("")
+  const [activeTab, setActiveTab] = useState<TabType>("ALL")
+  const [isMobileListOpen, setIsMobileListOpen] = useState(false)
 
-  // Handle scroll effect for header
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
+  // Optimized search with debounce
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
+  const deferredFilters = useDeferredValue(filters)
+
+  // User location (replace with actual GPS)
+  const userLocation = useMemo(() => ({ lat: 9.0192, lng: 38.7468 }), [])
+
+  // Distance calculation helper
+  const calculateDistance = useCallback(
+    (station: ChargingStation) => {
+      const dx = station.lat - userLocation.lat
+      const dy = station.lng - userLocation.lng
+      return Math.sqrt(dx * dx + dy * dy)
+    },
+    [userLocation],
+  )
+
+  // 🔥 Optimized filtering pipeline
+  const filteredStations = useMemo(() => {
+    let data = [...mockStations]
+
+    // Search filter
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase()
+      data = data.filter(
+        (station) =>
+          station.name.toLowerCase().includes(query) ||
+          station.address?.toLowerCase().includes(query) ||
+          station.city?.toLowerCase().includes(query),
+      )
     }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
+
+    // Tab-specific filtering
+    if (activeTab === "NEARBY") {
+      data = data
+        .map((station) => ({
+          ...station,
+          distance: calculateDistance(station),
+        }))
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+    }
+
+    // Apply filters
+    const {
+      connectorTypes = [],
+      minPower = 0,
+      verifiedOnly = false,
+      availableOnly = false,
+    } = deferredFilters
+
+    if (connectorTypes.length) {
+      data = data.filter((station) =>
+        station.chargingPoints.some((point) =>
+          connectorTypes.includes(point.connectorType),
+        ),
+      )
+    }
+
+    if (minPower > 0) {
+      data = data.filter((station) =>
+        station.chargingPoints.some((point) => point.powerKw >= minPower),
+      )
+    }
+
+    if (verifiedOnly) {
+      data = data.filter((station) => station.isVerified)
+    }
+
+    if (availableOnly) {
+      data = data.filter((station) =>
+        station.chargingPoints.some((point) => point.status === "AVAILABLE"),
+      )
+    }
+
+    return data
+  }, [debouncedSearchQuery, activeTab, deferredFilters, calculateDistance])
+
+  // React Query setup (ready for real API)
+  const {
+    data: stations = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["stations", filters],
+    queryFn: fetchStations,
+
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
+
+  // Handlers
+  const handleFilterChange = useCallback((newFilters: FilterState) => {
+    startTransition(() => {
+      setFilters(newFilters)
+    })
   }, [])
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    startTransition(() => {
+      setActiveTab(tab)
+      setIsMobileListOpen(false)
+    })
+  }, [])
+
+  const handleStationSelect = useCallback((station: ChargingStation) => {
+    setSelectedStation(station)
+    setIsMobileListOpen(false)
+  }, [])
+
+  const handleCloseDetails = useCallback(() => {
+    setSelectedStation(null)
+  }, [])
+
+  const toggleMobileList = useCallback(() => {
+    setIsMobileListOpen((prev) => !prev)
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedStation(null)
+        setIsMobileListOpen(false)
+      }
+      if (e.key === "/" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        document
+          .querySelector<HTMLInputElement>('input[type="search"]')
+          ?.focus()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyPress)
+    return () => window.removeEventListener("keydown", handleKeyPress)
+  }, [])
+
+  // Body scroll lock for mobile list
+  useEffect(() => {
+    if (isMobileListOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [isMobileListOpen])
 
   return (
     <div className="h-screen flex flex-col ">
-      {/* Modern Header with Glassmorphism */}
-      <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className={`sticky top-0 z-50 px-6 py-3 transition-all duration-300 ${
-          isScrolled ? "bg-white/80 " : "bg-transparent"
-        }`}
-      >
-        <div className="flex items-center justify-between max-w-[1920px] mx-auto">
-          {/* Back Button */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center"
+      {/* HEADER */}
+      <header className="sticky top-0 z-25 bg-white/80 backdrop-blur-md px-4 sm:px-6 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="shrink-0 gap-2 hover:bg-gray-100"
+            aria-label="Go back"
           >
-            <Button
-              variant="ghost"
-              size="default"
-              onClick={() => router.back()}
-              className="gap-2 rounded-xl px-4 py-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 group"
-            >
-              <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-              <span className="hidden sm:inline font-medium">Back</span>
-            </Button>
-          </motion.div>
+            <ChevronLeft className="w-5 h-5 hidden sm:block" />
+            <span>Back</span>
+          </Button>
 
-          {/* Search Bar - Modern */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="hidden md:flex items-center flex-1 max-w-md mx-8"
-          >
-            <div className="relative w-full group">
-              <Search className="absolute left-3 top-1/2 z-25 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-              <Input
-                placeholder="Search stations, locations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-6 rounded-xl border-gray-200 bg-white/50 transition-all focus:border-emerald-300 focus:ring-emerald-200"
-              />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-xs text-gray-400">
-                <span className="border rounded px-1.5 py-0.5 bg-gray-50">
-                  ⌘
-                </span>
-                <span className="border rounded px-1.5 py-0.5 bg-gray-50">
-                  K
-                </span>
-              </kbd>
-            </div>
-          </motion.div>
-
-          {/* Optional: Add spacer for balance when back button is visible on mobile */}
-          <div className="md:hidden w-10" />
-        </div>
-      </motion.header>
-
-      {/* Filter Bar with Animation */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <FilterBar onFilterChange={setFilters} />
-      </motion.div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Station List - Desktop & Mobile */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            initial={{ x: -320, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -320, opacity: 0 }}
-            transition={{ type: "spring", damping: 25 }}
-            className={`${
-              isMobileListOpen
-                ? "absolute inset-y-0 left-0 z-40 w-full sm:w-96"
-                : "hidden md:block"
-            } md:relative md:w-[450px] bg-white/80 backdrop-blur-xl border-r border-white/20 shadow-2xl overflow-y-auto`}
-          >
-            <div className="sticky top-0 bg-white/80 backdrop-blur-xl p-4  z-10">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2 text-xl">
-                  Available Stations
-                </h2>
-                <Badge
-                  variant="outline"
-                  className="rounded-full bg-blue-50 text-blue-700 border-0"
-                >
-                  12 near you
-                </Badge>
-              </div>
-            </div>
-            <StationList
-              filters={filters}
-              searchQuery={searchQuery}
-              onStationSelect={(station) => {
-                setSelectedStation(station)
-                setIsMobileListOpen(false)
-              }}
-              selectedStationId={selectedStation?.id}
-            />
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Map Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex-1 relative"
-        >
-          <div className="absolute inset-0">
-            <MapSection
-              filters={filters}
-              onMarkerClick={(station) => {
-                setSelectedStation(station)
-                setIsMobileListOpen(false)
-              }}
-              selectedStationId={selectedStation?.id}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="search"
+              placeholder="Search stations... (⌘ + /)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              aria-label="Search charging stations"
             />
           </div>
+        </div>
+      </header>
 
-          {/* Quick Stats Overlay */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-80 bg-white/90 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl p-4"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-500">Quick Stats</h3>
-              <Badge className="rounded-full bg-green-100 text-green-700 border-0">
-                Live
-              </Badge>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Available", value: "8", color: "text-green-500" },
-                { label: "In Use", value: "4", color: "text-blue-500" },
-                { label: "Total", value: "12", color: "text-gray-900" },
-              ].map((stat, i) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.4 + i * 0.1 }}
-                  className="text-center"
-                >
-                  <div className={`text-xl font-bold ${stat.color}`}>
-                    {stat.value}
-                  </div>
-                  <div className="text-xs text-gray-500">{stat.label}</div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </motion.div>
+      {/* FILTER BAR + TABS */}
+      <FilterBar
+        onFilterChange={handleFilterChange}
+        onTabChange={handleTabChange}
+        activeTab={activeTab}
+      />
+
+      {/* CONTENT */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* DESKTOP LIST */}
+        <aside className="w-[420px] border-r bg-white overflow-y-auto hidden md:block shadow-lg">
+          <StationList
+            stations={stations}
+            isLoading={isLoading}
+            onStationSelect={handleStationSelect}
+            selectedStationId={selectedStation?.id}
+          />
+        </aside>
+
+        {/* MAP */}
+        <main className="flex-1 relative">
+          <MapSection
+            stations={stations}
+            onMarkerClick={handleStationSelect}
+            selectedStationId={selectedStation?.id}
+            // userLocation={userLocation}
+          />
+        </main>
       </div>
 
-      {/* Station Details Sheet */}
+      {/* STATION DETAILS SHEET */}
       <AnimatePresence>
         {selectedStation && (
           <StationDetailsSheet
             station={selectedStation}
-            onClose={() => setSelectedStation(null)}
+            onClose={handleCloseDetails}
           />
         )}
       </AnimatePresence>
 
-      {/* Floating Action Button for Mobile */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        className="fixed bottom-6 right-6 md:hidden w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-500 rounded-full shadow-xl flex items-center justify-center text-white z-50"
-        onClick={() => setIsMobileListOpen(!isMobileListOpen)}
-      >
-        {isMobileListOpen ? (
-          <X className="w-6 h-6" />
-        ) : (
-          <Menu className="w-6 h-6" />
+      {/* MOBILE LIST OVERLAY */}
+      <AnimatePresence>
+        {isMobileListOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={toggleMobileList}
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25 }}
+              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl md:hidden overflow-y-auto"
+            >
+              <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+                <h2 className="font-semibold">Charging Stations</h2>
+                <Button variant="ghost" size="icon" onClick={toggleMobileList}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <StationList
+                stations={stations}
+                isLoading={isLoading}
+                onStationSelect={handleStationSelect}
+                selectedStationId={selectedStation?.id}
+                // compact
+              />
+            </motion.div>
+          </>
         )}
-      </motion.button>
+      </AnimatePresence>
+
+      {/* FLOATING ACTION BUTTON */}
+      {!isMobileListOpen && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="fixed bottom-6 right-6 md:hidden bg-emerald-600 text-white w-14 h-14 rounded-full shadow-lg hover:bg-emerald-700 transition-all z-30 flex items-center justify-center"
+          onClick={toggleMobileList}
+          whileTap={{ scale: 0.95 }}
+          aria-label="Show stations list"
+        >
+          <Menu className="w-6 h-6" />
+          {stations.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+              {stations.length}
+            </span>
+          )}
+        </motion.button>
+      )}
+
+      {/* LOADING INDICATOR */}
+      {isPending && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-black/75 text-white px-4 py-2 rounded-full text-sm z-50">
+          Updating...
+        </div>
+      )}
+
+      {/* ERROR STATE */}
+      {error && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full text-sm z-50">
+          Failed to load stations. Retrying...
+        </div>
+      )}
     </div>
   )
 }

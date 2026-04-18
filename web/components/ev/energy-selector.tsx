@@ -64,7 +64,7 @@ export function EnergySelector({
   const totalPrice = (energyKwh * pricePerKwh).toFixed(2)
 
   return (
-    <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white/80 backdrop-blur-sm">
+    <Card className="border-0 shadow-none rounded-2xl overflow-hidden bg-white/80 backdrop-blur-sm">
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-emerald-100/30 to-green-50/20 rounded-full blur-2xl -ml-32 -mb-32"></div>
 
       <CardHeader className="bg-gradient-to-r from-emerald-50/50 to-green-50/30 pb-4">

@@ -157,6 +157,9 @@ export const issueTokensSocial = async (user, req, res) => {
       case "EV_CHARGER_MANAGER":
         redirectUrl = "http://localhost:3000/ev-charge-manager"
         break
+      case "PARKING_MANAGER":
+        redirectUrl = "http://localhost:3000/parking-manager"
+        break
     }
     return res.redirect(redirectUrl)
   } catch (err) {

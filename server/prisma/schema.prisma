@@ -57,6 +57,8 @@ model User {
   reservations        EVReservation[]
   vehicles            Vehicle[]
 
+  managedStations ChargingStation[]
+
   ratingsGiven Rating[]
 
   notifications     Notification[]
@@ -786,6 +788,9 @@ model ChargingStation {
   status     StationStatus @default(ACTIVE)
   isVerified Boolean       @default(false)
 
+  managerId String  @default("cmo38u4ub00007zvj8qcqu4qn")
+  manager   User   @relation(fields: [managerId], references: [id], onDelete: Cascade)
+
   chargingPoints ChargingPoint[]
   tariffs        Tariff[]
   sessions       ChargingSession[]
@@ -1363,9 +1368,11 @@ enum ConnectorType {
 }
 
 enum ReservationStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
+  PENDING        // created but not confirmed
+  CONFIRMED      // slot reserved/approved
+  CANCELLED      // user/system cancelled
+  EXPIRED        // not used within time window
+  COMPLETED      // charging finished successfully
 }
 
 enum LedgerStatus {

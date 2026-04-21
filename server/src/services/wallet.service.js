@@ -216,3 +216,119 @@ export const changeWalletPinService = async (userId, newPin) => {
     return errorResponse("Failed to change wallet PIN", 500)
   }
 }
+
+export const deductPointsService = async (userId, points, reason) => {
+  try {
+    if (!points || points <= 0) {
+      return errorResponse("Invalid points amount", 400)
+    }
+
+    // 🔍 Get wallet using userId
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId },
+    })
+
+    if (!wallet) {
+      return errorResponse("Wallet not found", 404)
+    }
+
+    if (!wallet.isActive || wallet.isLocked) {
+      return errorResponse("Wallet is locked or inactive", 403)
+    }
+
+    if (wallet.points < points) {
+      return errorResponse("Insufficient points", 400)
+    }
+
+    // ⚡ Use transaction for consistency
+    const updatedWallet = await prisma.$transaction(async (tx) => {
+      // 1. Deduct points
+      const walletUpdate = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          points: {
+            decrement: points,
+          },
+        },
+      })
+
+      // 2. Log transaction
+      await tx.pointTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -points, // negative = deduction
+          type: "SPEND",
+          reason: reason || "Points redemption",
+        },
+      })
+
+      return walletUpdate
+    })
+
+    return successResponse("Points deducted successfully", updatedWallet, 200)
+  } catch (error) {
+    console.error("Deduct points service error:", error)
+    return errorResponse("Failed to deduct points", 500)
+  }
+}
+
+export const deductFromWalletService = async (userId, payload) => {
+  try {
+    const { amount, currency, description, metadata } = payload
+
+    if (!amount || amount <= 0) {
+      return errorResponse("Invalid amount", 400)
+    }
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId },
+    })
+
+    if (!wallet) return errorResponse("Wallet not found", 404)
+
+    if (!wallet.isActive) {
+      return errorResponse("Wallet is inactive", 403)
+    }
+
+    if (wallet.isLocked) {
+      return errorResponse("Wallet is locked", 403)
+    }
+
+    if (wallet.balance < amount) {
+      return errorResponse("Insufficient wallet balance", 400)
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Deduct balance
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: {
+            decrement: amount,
+          },
+        },
+      })
+
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: amount, // store positive for record clarity
+          type: "PAYMENT_OUT",
+          status: "SUCCESS",
+          serviceType: "EV_CHARGING",
+          balanceAfter: updatedWallet.balance,
+          reference: `EV-${Date.now()}-${wallet.id}`,
+          description,
+          metadata,
+        },
+      })
+
+      return { updatedWallet, transaction }
+    })
+
+    return successResponse("Wallet deducted successfully", result, 200)
+  } catch (error) {
+    console.error("Wallet deduction service error:", error)
+    return errorResponse("Failed to deduct wallet", 500)
+  }
+}

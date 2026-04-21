@@ -10,6 +10,7 @@ export const createStationService = async (data) => {
       lng,
       address,
       city,
+      managerId,
       status = "ACTIVE",
       isVerified = false,
       images = [],
@@ -49,6 +50,7 @@ export const createStationService = async (data) => {
         city: city?.trim() || null,
         status,
         isVerified: Boolean(isVerified),
+        managerId: managerId,
 
         // Charging Points
         chargingPoints:
@@ -123,7 +125,6 @@ export const createStationService = async (data) => {
     return errorResponse("Failed to create station", 500)
   }
 }
-
 
 export const getAllStationsService = async (filters = {}) => {
   try {
@@ -234,11 +235,7 @@ export const getAllStationsService = async (filters = {}) => {
         .sort((a, b) => a.distance - b.distance)
     }
 
-    return successResponse(
-      "Stations retrieved successfully",
-      stations,
-      200,
-    )
+    return successResponse("Stations retrieved successfully", stations, 200)
   } catch (error) {
     console.error("Error fetching stations:", error)
     return errorResponse("Failed to fetch stations", 500)
@@ -266,6 +263,27 @@ export const getStationByIdService = async (id) => {
   }
 }
 
+export const getStationsByManagerService = async (managerId) => {
+  try {
+    const stations = await prisma.chargingStation.findMany({
+      where: { managerId },
+      include: {
+        chargingPoints: true,
+        ratings: true,
+        tariffs: true,
+        images: true,
+        documents: true,
+        sessions: true,
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
+    return successResponse("Stations retrieved successfully", stations, 200)
+  } catch (error) {
+    console.error("Error fetching manager stations:", error)
+    return errorResponse("Failed to fetch stations", 500)
+  }
+}
 export const updateStationService = async (id, data) => {
   try {
     const stationId = Number(id)
@@ -357,20 +375,54 @@ export const deleteStationService = async (id) => {
   }
 }
 
-export const getStationPointsService = async (stationId, filters) => {
+export const getStationPointsService = async (managerId) => {
   try {
-    const { connectorType, status } = filters || {}
-    const points = await prisma.chargingPoint.findMany({
-      where: {
-        stationId: Number(stationId),
-        ...(connectorType && { connectorType }),
-        ...(status && { status }),
+    const stations = await prisma.chargingStation.findMany({
+      where: { managerId },
+      include: {
+        chargingPoints: true,
       },
+      orderBy: { createdAt: "desc" },
     })
-    return successResponse("Charging points retrieved", points, 200)
+
+    const formatted = stations.flatMap((station) =>
+      station.chargingPoints.map((point) => ({
+        // 🔌 Charging Point
+        id: point.id,
+        stationId: point.stationId,
+        connectorType: point.connectorType,
+        powerKw: point.powerKw,
+        status: point.status,
+        slotNumber: point.slotNumber,
+        chargingSpeed: point.chargingSpeed,
+        averageSessionDuration: point.averageSessionDuration,
+        maxVoltage: point.maxVoltage,
+        maxCurrent: point.maxCurrent,
+        createdAt: point.createdAt,
+
+        // ⚡ computed fields
+        isAvailable: point.status === "AVAILABLE",
+        isFastCharger: point.powerKw >= 50,
+
+        // 🏢 Station (flattened)
+        stationName: station.name,
+        stationAddress: station.address,
+        stationCity: station.city,
+        stationLat: station.lat,
+        stationLng: station.lng,
+        stationStatus: station.status,
+        stationVerified: station.isVerified,
+      })),
+    )
+
+    return successResponse(
+      "Stations with charging points retrieved",
+      formatted,
+      200,
+    )
   } catch (error) {
-    console.error("Error fetching points:", error)
-    return errorResponse("Failed to fetch points", 500)
+    console.error("Error fetching stations with points:", error)
+    return errorResponse("Failed to fetch stations", 500)
   }
 }
 
@@ -407,5 +459,69 @@ export const getStationTariffsService = async (stationId) => {
   } catch (error) {
     console.error("Error fetching tariffs:", error)
     return errorResponse("Failed to fetch tariffs", 500)
+  }
+}
+
+export const bulkCreateChargingPointsService = async (data) => {
+  try {
+    const { stationId, chargingPoints } = data
+
+    if (!stationId || isNaN(Number(stationId))) {
+      return errorResponse("Valid stationId is required", 400)
+    }
+
+    if (!Array.isArray(chargingPoints) || chargingPoints.length === 0) {
+      return errorResponse("chargingPoints must be a non-empty array", 400)
+    }
+
+    const station = await prisma.chargingStation.findUnique({
+      where: { id: Number(stationId) },
+    })
+
+    if (!station) {
+      return errorResponse("Charging station not found", 404)
+    }
+
+    const preparedData = chargingPoints.map((point, index) => {
+      if (!point.connectorType) {
+        throw new Error(`connectorType is required at index ${index}`)
+      }
+
+      if (!point.powerKw || isNaN(Number(point.powerKw))) {
+        throw new Error(`Valid powerKw is required at index ${index}`)
+      }
+
+      return {
+        stationId: Number(stationId),
+        connectorType: point.connectorType,
+        powerKw: Number(point.powerKw),
+        status: point.status || "AVAILABLE",
+        chargingSpeed: point.chargingSpeed || "SLOW",
+        slotNumber: point.slotNumber || null,
+        maxVoltage: point.maxVoltage ? Number(point.maxVoltage) : null,
+        maxCurrent: point.maxCurrent ? Number(point.maxCurrent) : null,
+        averageSessionDuration: point.averageSessionDuration
+          ? Number(point.averageSessionDuration)
+          : null,
+      }
+    })
+
+    const result = await prisma.chargingPoint.createMany({
+      data: preparedData,
+      skipDuplicates: true,
+    })
+
+    return successResponse(
+      "Charging points created successfully",
+      { createdCount: result.count },
+      201,
+    )
+  } catch (error) {
+    console.error("Error creating charging points:", error)
+
+    return errorResponse(
+      error.message || "Failed to create charging points",
+      500,
+    )
   }
 }

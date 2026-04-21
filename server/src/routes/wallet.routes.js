@@ -5,6 +5,8 @@ import {
   createWallet,
   enableWalletBiometric,
   changeWalletPin,
+  deductPoints,
+  deductFromWallet,
 } from "../controllers/wallet.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import { verifyWalletPin } from "../controllers/transaction.controller.js"
@@ -16,6 +18,12 @@ router.get("/me", authenticate, getMyWallet)
 
 // Verify wallet
 router.post("/verify-pin", authenticate, verifyWalletPin)
+
+//Deduct wallet balance
+router.post("/balance/deduct", authenticate, deductFromWallet)
+
+//Deduct point
+router.post("/deduct", authenticate, deductPoints)
 
 // Wallet transactions
 router.get("/transactions", getWalletTransactions)

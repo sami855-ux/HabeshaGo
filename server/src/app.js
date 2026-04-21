@@ -41,6 +41,7 @@ import reservationRoutes from "./routes/evReservations.route.js"
 import tariffRoutes from "./routes/evTariffs.route.js"
 import ratingRoutes from "./routes/ratings.route.js"
 import parkingRoute from "./routes/parking.routes.js"
+import analyticsRoute from "./routes/analaytics.route.js"
 
 const app = express()
 
@@ -96,6 +97,8 @@ app.use("/api/ev/tariff", tariffRoutes)
 
 app.use("/api/rating", ratingRoutes)
 app.use("/api/parking", parkingRoute)
+
+app.use("/api/analytics", analyticsRoute)
 
 const server = http.createServer(app)
 

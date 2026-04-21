@@ -2,6 +2,7 @@ import { uploadToCloudinary } from "../services/cloudinary.service.js"
 import * as stationService from "../services/evStation.service.js"
 
 export const createStation = async (req, res) => {
+  const managerId = req.user?.id
   try {
     const uploadedImages = []
     const uploadedDocuments = []
@@ -66,6 +67,7 @@ export const createStation = async (req, res) => {
 
       images: uploadedImages,
       documents: uploadedDocuments,
+      managerId: managerId,
     }
 
     const result = await stationService.createStationService(payload)
@@ -86,6 +88,22 @@ export const getAllStations = async (req, res) => {
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get stations controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while fetching stations",
+      data: null,
+    })
+  }
+}
+
+export const getMyStations = async (req, res) => {
+  try {
+    const result = await stationService.getStationsByManagerService(req.user.id)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get my stations controller error:", error)
+
     return res.status(500).json({
       success: false,
       statusCode: 500,
@@ -145,11 +163,9 @@ export const deleteStation = async (req, res) => {
 
 // Nested controllers
 export const getStationPoints = async (req, res) => {
+  const managerId = req.user.id
   try {
-    const result = await stationService.getStationPointsService(
-      req.params.id,
-      req.query,
-    )
+    const result = await stationService.getStationPointsService(managerId)
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get station points controller error:", error)
@@ -187,6 +203,25 @@ export const getStationRatings = async (req, res) => {
       success: false,
       statusCode: 500,
       message: "Error fetching ratings",
+      data: null,
+    })
+  }
+}
+
+export const bulkCreatePoints = async (req, res) => {
+  try {
+    const result = await stationService.bulkCreateChargingPointsService(
+      req.body,
+    )
+
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Bulk create controller error:", error)
+
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while creating charging points",
       data: null,
     })
   }

@@ -1,6 +1,8 @@
 import {
   changeWalletPinService,
   createWalletService,
+  deductFromWalletService,
+  deductPointsService,
   enableWalletBiometricService,
   getMyWalletService,
   getWalletTransactionsService,
@@ -100,6 +102,41 @@ export const changeWalletPin = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to change wallet PIN",
+    })
+  }
+}
+
+export const deductPoints = async (req, res) => {
+  try {
+    const { points, reason } = req.body
+
+    const result = await deductPointsService(req.user.id, points, reason)
+
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Deduct points controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while deducting points",
+      data: null,
+    })
+  }
+}
+
+export const deductFromWallet = async (req, res) => {
+  try {
+    const result = await deductFromWalletService(req.user.id, req.body)
+
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Wallet deduct controller error:", error)
+
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while deducting wallet",
+      data: null,
     })
   }
 }

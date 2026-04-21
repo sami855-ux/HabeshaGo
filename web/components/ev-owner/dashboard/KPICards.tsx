@@ -1,6 +1,24 @@
+// components/ev-owner/dashboard/KPICards.tsx
 import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrendingUp, TrendingDown, Activity, MoreVertical } from "lucide-react"
+import {
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  MoreVertical,
+  MapPin,
+  Zap,
+  Calendar,
+  DollarSign,
+  Battery,
+  Gauge,
+  Clock,
+  Users,
+  Power,
+  Plug,
+  Car,
+  Award,
+} from "lucide-react"
 import { KpiCardData } from "@/types/charging"
 import {
   Tooltip,
@@ -10,11 +28,55 @@ import {
 } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 
+// Icon mapping to handle string icons from API
+const iconMap: Record<string, React.ElementType> = {
+  MapPin: MapPin,
+  Zap: Zap,
+  Activity: Activity,
+  Calendar: Calendar,
+  DollarSign: DollarSign,
+  Battery: Battery,
+  Gauge: Gauge,
+  Clock: Clock,
+  Users: Users,
+  Power: Power,
+  Plug: Plug,
+  Car: Car,
+  Award: Award,
+}
+
 interface KPICardsProps {
   kpis: KpiCardData[]
 }
 
 export const KPICards: React.FC<KPICardsProps> = ({ kpis }) => {
+  // Helper function to render icon
+  const renderIcon = (icon: any) => {
+    // If icon is already a React element, return it
+    if (React.isValidElement(icon)) {
+      return icon
+    }
+
+    // If icon is a string, map it to a component
+    if (typeof icon === "string") {
+      const IconComponent = iconMap[icon]
+      if (IconComponent) {
+        return <IconComponent className="h-5 w-5" />
+      }
+      // Fallback icon
+      return <Activity className="h-5 w-5" />
+    }
+
+    // If icon is a component type, create element
+    if (typeof icon === "function") {
+      const IconComponent = icon as React.ElementType
+      return <IconComponent className="h-5 w-5" />
+    }
+
+    // Default fallback
+    return <Activity className="h-5 w-5" />
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {kpis.map((kpi, index) => (
@@ -34,7 +96,7 @@ export const KPICards: React.FC<KPICardsProps> = ({ kpis }) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="p-2 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900 dark:to-emerald-900 rounded-full text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform duration-300">
-                      {kpi.icon}
+                      {renderIcon(kpi.icon)}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>

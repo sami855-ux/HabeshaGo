@@ -10,184 +10,150 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { motion } from "framer-motion"
-import { SessionRow } from "@/components/ev-owner/sessions-table"
 import { SessionsStats } from "@/components/ev-owner/sessions-stats"
 import { SessionsTable } from "@/components/ev/sessions-table"
 import { SessionDetailsSheet } from "@/components/ev-owner/session-details-sheet"
 import { SessionsFilters } from "@/components/ev-owner/sessions-filters"
+import { axiosInstance } from "@/services/axiosInstance"
 
-// Types
-type ChargingPoint = {
-  id: number
-  connectorType: string
-  powerKw: number
-  status: string
-  chargingSpeed: string
-  slotNumber?: string
-  maxVoltage?: number
-  maxCurrent?: number
-}
+// Types based on the actual API response
+export type SessionStatus =
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "WAITING"
+  | "IN_PROGRESS"
 
-type ChargingSession = {
+export type ChargingSession = {
   id: number
-  vehicleId: number
   stationId: number
   chargingPointId: number
+  vehicleId: number
   userId: string
+
   startTime: string
   endTime: string | null
-  energyConsumedKwh: string
-  energyCost: string
-  timeCost: string
-  idleFee: string
-  totalCost: string
-  status: "ACTIVE" | "COMPLETED" | "CANCELLED"
+  status: SessionStatus
+
+  energyConsumedKwh: number
+  durationMinutes: number
+
+  energyCost: number
+  timeCost: number
+  idleFee: number
+  totalCost: number
+
+  stationName: string
+  stationAddress: string
+  stationCity: string
+
+  connectorType: string
+  powerKw: number
+  slotNumber: string
+  chargingSpeed: string
+
+  userName: string
+  userEmail: string
+
   createdAt: string
-  updatedAt: string
 }
 
-type ChargingStation = {
-  id: number
-  name: string
-  location: string
-  operator: string
-  chargingPoints: ChargingPoint[]
-  sessions: ChargingSession[]
-}
-
-// Mock Data
-const MOCK_STATIONS: ChargingStation[] = [
-  {
-    id: 1,
-    name: "Green Valley EV Hub",
-    location: "123 Green Street, Downtown",
-    operator: "EcoCharge",
-    chargingPoints: [
-      {
-        id: 101,
-        connectorType: "CCS",
-        powerKw: 150,
-        status: "AVAILABLE",
-        chargingSpeed: "ULTRA_FAST",
-        slotNumber: "A-01",
-        maxVoltage: 800,
-        maxCurrent: 375,
-      },
-      {
-        id: 102,
-        connectorType: "CCS",
-        powerKw: 150,
-        status: "OCCUPIED",
-        chargingSpeed: "ULTRA_FAST",
-        slotNumber: "A-02",
-        maxVoltage: 800,
-        maxCurrent: 375,
-      },
-    ],
-    sessions: [
-      {
-        id: 30001,
-        vehicleId: 1,
-        stationId: 1,
-        chargingPointId: 101,
-        userId: "user-001",
-        startTime: "2026-04-06T09:10:00.000Z",
-        endTime: "2026-04-06T09:55:00.000Z",
-        energyConsumedKwh: "24.5",
-        energyCost: "10.50",
-        timeCost: "1.25",
-        idleFee: "0.50",
-        totalCost: "12.25",
-        status: "COMPLETED",
-        createdAt: "2026-04-06T09:10:00.000Z",
-        updatedAt: "2026-04-06T09:55:00.000Z",
-      },
-      {
-        id: 30002,
-        vehicleId: 2,
-        stationId: 1,
-        chargingPointId: 102,
-        userId: "user-014",
-        startTime: "2026-04-06T11:30:00.000Z",
-        endTime: null,
-        energyConsumedKwh: "11.0",
-        energyCost: "5.00",
-        timeCost: "0.50",
-        idleFee: "0.00",
-        totalCost: "5.50",
-        status: "ACTIVE",
-        createdAt: "2026-04-06T11:30:00.000Z",
-        updatedAt: "2026-04-06T11:45:00.000Z",
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "Emerald Charge Point",
-    location: "456 Park Avenue",
-    operator: "GreenEnergy",
-    chargingPoints: [
-      {
-        id: 201,
-        connectorType: "CHADEMO",
-        powerKw: 50,
-        status: "FAULTED",
-        chargingSpeed: "FAST",
-        slotNumber: "B-01",
-        maxVoltage: 400,
-        maxCurrent: 125,
-      },
-    ],
-    sessions: [
-      {
-        id: 30003,
-        vehicleId: 3,
-        stationId: 2,
-        chargingPointId: 201,
-        userId: "user-009",
-        startTime: "2026-04-05T16:40:00.000Z",
-        endTime: "2026-04-05T17:20:00.000Z",
-        energyConsumedKwh: "18.2",
-        energyCost: "7.80",
-        timeCost: "1.00",
-        idleFee: "0.30",
-        totalCost: "9.10",
-        status: "COMPLETED",
-        createdAt: "2026-04-05T16:40:00.000Z",
-        updatedAt: "2026-04-05T17:20:00.000Z",
-      },
-    ],
-  },
-]
+export type SessionRow = ChargingSession
 
 // API Service
 const sessionsAPI = {
   getSessions: async (): Promise<SessionRow[]> => {
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    try {
+      const response = await axiosInstance.get("/ev/session/manager")
 
-    const stations = MOCK_STATIONS
-    const rows = stations.flatMap((station) => {
-      const chargerById = new Map(
-        station.chargingPoints.map((point) => [
-          point.id,
-          { label: point.slotNumber ?? `CP-${point.id}`, details: point },
-        ]),
+      // Handle the response structure: { success, message, statusCode, data }
+      if (response.data?.success && Array.isArray(response.data.data)) {
+        return response.data.data.map((session: any) => ({
+          id: session.id,
+          stationId: session.stationId,
+          chargingPointId: session.chargingPointId,
+          vehicleId: session.vehicleId,
+          userId: session.userId,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          status: session.status,
+          energyConsumedKwh: Number(session.energyConsumedKwh),
+          durationMinutes: session.durationMinutes,
+          energyCost: Number(session.energyCost),
+          timeCost: Number(session.timeCost),
+          idleFee: Number(session.idleFee),
+          totalCost: Number(session.totalCost),
+          stationName: session.stationName,
+          stationAddress: session.stationAddress,
+          stationCity: session.stationCity,
+          connectorType: session.connectorType,
+          powerKw: session.powerKw,
+          slotNumber: session.slotNumber,
+          userName: session.userName,
+          userEmail: session.userEmail,
+          createdAt: session.createdAt,
+        }))
+      }
+
+      return []
+    } catch (error: any) {
+      console.error("Error fetching sessions:", error)
+      throw new Error(
+        error?.response?.data?.message || "Failed to fetch sessions",
       )
+    }
+  },
 
-      return (station.sessions ?? []).map(
-        (session): SessionRow => ({
-          ...session,
-          stationName: station.name,
-          stationLocation: station.location,
-          chargerDetails: chargerById.get(session.chargingPointId)?.details,
-          chargerLabel:
-            chargerById.get(session.chargingPointId)?.label ??
-            `CP-${session.chargingPointId}`,
-        }),
+  getSessionById: async (id: number): Promise<SessionRow> => {
+    try {
+      const response = await axiosInstance.get(`/ev/sessions/${id}`)
+
+      if (response.data?.success && response.data.data) {
+        const session = response.data.data
+        return {
+          id: session.id,
+          stationId: session.stationId,
+          chargingPointId: session.chargingPointId,
+          vehicleId: session.vehicleId,
+          userId: session.userId,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          status: session.status,
+          energyConsumedKwh: Number(session.energyConsumedKwh),
+          durationMinutes: session.durationMinutes,
+          energyCost: Number(session.energyCost),
+          timeCost: Number(session.timeCost),
+          idleFee: Number(session.idleFee),
+          totalCost: Number(session.totalCost),
+          stationName: session.stationName,
+          stationAddress: session.stationAddress,
+          stationCity: session.stationCity,
+          connectorType: session.connectorType,
+          chargingSpeed: session.chargingSpeed,
+          powerKw: session.powerKw,
+          slotNumber: session.slotNumber,
+          userName: session.userName,
+          userEmail: session.userEmail,
+          createdAt: session.createdAt,
+        }
+      }
+
+      throw new Error("Session not found")
+    } catch (error: any) {
+      throw new Error(
+        error?.response?.data?.message || "Failed to fetch session details",
       )
-    })
+    }
+  },
 
-    return rows
+  cancelSession: async (id: number): Promise<void> => {
+    try {
+      await axiosInstance.post(`/ev/sessions/${id}/cancel`)
+    } catch (error: any) {
+      throw new Error(
+        error?.response?.data?.message || "Failed to cancel session",
+      )
+    }
   },
 }
 
@@ -196,9 +162,18 @@ const useSessionsQuery = () => {
   return useQuery({
     queryKey: ["sessions"],
     queryFn: sessionsAPI.getSessions,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     retry: 2,
+    refetchInterval: (data) => {
+      const sessions = data?.data || []
+
+      const hasActiveSessions = sessions.some(
+        (session) => session.status === "ACTIVE",
+      )
+
+      return hasActiveSessions ? 10000 : false
+    },
   })
 }
 
@@ -241,10 +216,14 @@ export default function SessionsPage() {
     if (term) {
       filtered = filtered.filter(
         (session) =>
-          session.userId.toLowerCase().includes(term) ||
+          session.userName.toLowerCase().includes(term) ||
+          session.userEmail.toLowerCase().includes(term) ||
           String(session.vehicleId).toLowerCase().includes(term) ||
           String(session.id).toLowerCase().includes(term) ||
-          session.stationName.toLowerCase().includes(term),
+          session.stationName.toLowerCase().includes(term) ||
+          session.stationAddress.toLowerCase().includes(term) ||
+          session.connectorType.toLowerCase().includes(term) ||
+          session.slotNumber.toLowerCase().includes(term),
       )
     }
 
@@ -259,22 +238,37 @@ export default function SessionsPage() {
   const summary = useMemo(() => {
     const totalSessions = filteredSessions.length
     const totalRevenue = filteredSessions.reduce(
-      (sum, session) => sum + Number(session.totalCost),
+      (sum, session) => sum + session.totalCost,
       0,
     )
     const totalEnergyDelivered = filteredSessions.reduce(
-      (sum, session) => sum + Number(session.energyConsumedKwh),
+      (sum, session) => sum + session.energyConsumedKwh,
       0,
     )
     const activeSessions = filteredSessions.filter(
-      (s) => s.status === "ACTIVE",
+      (s) => s.status === "ACTIVE" || s.status === "IN_PROGRESS",
     ).length
+    const averageDuration =
+      filteredSessions.length > 0
+        ? filteredSessions.reduce((sum, s) => sum + s.durationMinutes, 0) /
+          filteredSessions.length
+        : 0
 
-    return { totalSessions, totalRevenue, totalEnergyDelivered, activeSessions }
+    return {
+      totalSessions,
+      totalRevenue,
+      totalEnergyDelivered,
+      activeSessions,
+      averageDuration: Math.round(averageDuration),
+    }
   }, [filteredSessions])
 
   const handleRefresh = () => {
     refetch()
+  }
+
+  const handleViewDetails = (session: SessionRow) => {
+    setSelectedSession(session)
   }
 
   if (isLoading) {
@@ -287,13 +281,44 @@ export default function SessionsPage() {
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         <TableSkeleton />
       </div>
     )
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto py-6 max-w-7xl">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error instanceof Error
+              ? error.message
+              : "Failed to load sessions. Please try again."}
+          </AlertDescription>
+        </Alert>
+        <Button
+          onClick={() => refetch()}
+          className="mt-4 bg-slate-900 hover:bg-slate-800"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Try Again
+        </Button>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen">
       <div className="container mx-auto py-6 space-y-6 max-w-7xl px-4">
         {/* Header */}
         <motion.div
@@ -354,18 +379,14 @@ export default function SessionsPage() {
           </div>
         </motion.div>
 
-        {/* Error Alert */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Failed to load sessions. Please try again.
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Stats Cards */}
-        <SessionsStats {...summary} />
+        <SessionsStats
+          totalSessions={summary.totalSessions}
+          totalRevenue={summary.totalRevenue}
+          totalEnergyDelivered={summary.totalEnergyDelivered}
+          activeSessions={summary.activeSessions}
+          averageDuration={summary.averageDuration}
+        />
 
         {/* Filters and Table */}
         <motion.div
@@ -400,7 +421,7 @@ export default function SessionsPage() {
 
               <SessionsTable
                 data={filteredSessions}
-                onRowClick={setSelectedSession}
+                onRowClick={handleViewDetails}
               />
             </CardContent>
           </Card>
@@ -411,6 +432,15 @@ export default function SessionsPage() {
           session={selectedSession}
           open={!!selectedSession}
           onOpenChange={(open) => !open && setSelectedSession(null)}
+          onCancel={async (sessionId: number) => {
+            try {
+              await sessionsAPI.cancelSession(sessionId)
+              await refetch()
+              setSelectedSession(null)
+            } catch (error) {
+              console.error("Failed to cancel session:", error)
+            }
+          }}
         />
       </div>
     </div>

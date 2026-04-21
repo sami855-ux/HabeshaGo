@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+// Missing import
+import { RefreshCw } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -48,148 +51,6 @@ import { cn } from "@/lib/utils"
 
 const formatRating = (value: number) => value.toFixed(1)
 
-const sampleStations: ChargingStation[] = [
-  {
-    id: 9001,
-    name: "Bole EV Hub",
-    address: "Bole Road, Near Edna Mall",
-    city: "Addis Ababa",
-    lat: 8.997,
-    lng: 38.7868,
-    status: "ACTIVE",
-    isVerified: true,
-    chargingPoints: [
-      {
-        id: 10001,
-        stationId: 9001,
-        connectorType: "CCS",
-        powerKw: 120,
-        status: "AVAILABLE",
-        chargingSpeed: "SUPER_FAST",
-        createdAt: "2026-04-01T10:00:00.000Z",
-        updatedAt: "2026-04-01T10:00:00.000Z",
-      },
-      {
-        id: 10002,
-        stationId: 9001,
-        connectorType: "TYPE2",
-        powerKw: 60,
-        status: "OCCUPIED",
-        chargingSpeed: "FAST",
-        createdAt: "2026-04-01T10:00:00.000Z",
-        updatedAt: "2026-04-01T10:00:00.000Z",
-      },
-    ],
-    tariffs: [],
-    sessions: [
-      {
-        id: 11001,
-        vehicleId: 1,
-        stationId: 9001,
-        chargingPointId: 10001,
-        startTime: "2026-04-02T09:00:00.000Z",
-        status: "ACTIVE",
-        userId: "user-1",
-        createdAt: "2026-04-02T09:00:00.000Z",
-        updatedAt: "2026-04-02T09:00:00.000Z",
-      },
-    ],
-    ratings: [
-      {
-        id: 12001,
-        userId: "user-11",
-        stationId: 9001,
-        score: 5,
-        comment: "Great location and fast charging.",
-        createdAt: "2026-04-02T10:00:00.000Z",
-        updatedAt: "2026-04-02T10:00:00.000Z",
-      },
-    ],
-    documents: [],
-    images: [],
-    createdAt: "2026-04-01T08:00:00.000Z",
-    updatedAt: "2026-04-02T10:00:00.000Z",
-  },
-  {
-    id: 9002,
-    name: "Piassa Charge Point",
-    address: "Churchill Avenue",
-    city: "Addis Ababa",
-    lat: 9.034,
-    lng: 38.7484,
-    status: "INACTIVE",
-    isVerified: false,
-    chargingPoints: [
-      {
-        id: 10003,
-        stationId: 9002,
-        connectorType: "CHADEMO",
-        powerKw: 50,
-        status: "OFFLINE",
-        chargingSpeed: "FAST",
-        createdAt: "2026-04-01T10:00:00.000Z",
-        updatedAt: "2026-04-01T10:00:00.000Z",
-      },
-    ],
-    tariffs: [],
-    sessions: [],
-    ratings: [],
-    documents: [],
-    images: [],
-    createdAt: "2026-04-01T08:00:00.000Z",
-    updatedAt: "2026-04-01T08:00:00.000Z",
-  },
-  {
-    id: 9003,
-    name: "Megenagna Fast Charge",
-    address: "Megenagna Square",
-    city: "Addis Ababa",
-    lat: 9.0192,
-    lng: 38.8091,
-    status: "ACTIVE",
-    isVerified: true,
-    chargingPoints: [
-      {
-        id: 10004,
-        stationId: 9003,
-        connectorType: "CCS",
-        powerKw: 150,
-        status: "AVAILABLE",
-        chargingSpeed: "SUPER_FAST",
-        createdAt: "2026-04-01T10:00:00.000Z",
-        updatedAt: "2026-04-01T10:00:00.000Z",
-      },
-      {
-        id: 10005,
-        stationId: 9003,
-        connectorType: "TYPE2",
-        powerKw: 22,
-        status: "AVAILABLE",
-        chargingSpeed: "SLOW",
-        createdAt: "2026-04-01T10:00:00.000Z",
-        updatedAt: "2026-04-01T10:00:00.000Z",
-      },
-    ],
-    tariffs: [],
-    sessions: [],
-    ratings: [
-      {
-        id: 12002,
-        userId: "user-22",
-        stationId: 9003,
-        score: 4,
-        comment: "Clean station.",
-        createdAt: "2026-04-02T10:00:00.000Z",
-        updatedAt: "2026-04-02T10:00:00.000Z",
-      },
-    ],
-    documents: [],
-    images: [],
-    createdAt: "2026-04-01T08:00:00.000Z",
-    updatedAt: "2026-04-02T10:00:00.000Z",
-  },
-]
-
 const getAverageRating = (station: ChargingStation) => {
   if (!station.ratings?.length) return 0
   const total = station.ratings.reduce((sum, item) => sum + item.score, 0)
@@ -218,7 +79,7 @@ export default function StationsPage() {
 
   const stations = useMemo(() => {
     const apiStations = (data ?? []) as ChargingStation[]
-    return apiStations.length ? apiStations : sampleStations
+    return apiStations.length ? apiStations : []
   }, [data])
 
   const cityOptions = useMemo(() => {
@@ -287,17 +148,91 @@ export default function StationsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6">
-        <Card className="border-none shadow-lg">
-          <CardContent className="py-12 text-center">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="inline-block"
+      <div className="container mx-auto py-6 space-y-6 max-w-7xl px-4">
+        {/* Header Skeleton */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-start gap-4">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Card
+              key={i}
+              className="border-slate-200 dark:border-slate-800 shadow-sm"
             >
-              <Zap className="h-8 w-8 text-green-500" />
-            </motion.div>
-            <p className="mt-4 text-muted-foreground">Loading stations...</p>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Filters Skeleton */}
+        <Card className="border-none shadow-none">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1 max-w-md" />
+              <Skeleton className="h-10 w-[180px]" />
+            </div>
+
+            {/* Table Skeleton */}
+            <div className="rounded-md border border-slate-200 dark:border-slate-800 overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                  <TableRow>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                      <TableHead key={i}>
+                        <Skeleton className="h-4 w-20" />
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <TableRow key={i}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination Skeleton */}
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-48" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -874,6 +809,3 @@ export default function StationsPage() {
     </div>
   )
 }
-
-// Missing import
-import { RefreshCw } from "lucide-react"

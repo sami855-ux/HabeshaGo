@@ -20,6 +20,7 @@ import {
   FileText,
   Mail,
   MoreVertical,
+  XCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,45 +51,53 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 
+// Updated SessionRow type based on actual API response
+export type SessionStatus =
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "WAITING"
+  | "IN_PROGRESS"
+
 export type SessionRow = {
   id: number
-  vehicleId: number
   stationId: number
   chargingPointId: number
+  vehicleId: number
   userId: string
-  userName?: string
-  userEmail?: string
-  userAvatar?: string
+
   startTime: string
   endTime: string | null
-  energyConsumedKwh: string
-  energyCost: string
-  timeCost: string
-  idleFee: string
-  totalCost: string
-  status: "ACTIVE" | "COMPLETED" | "CANCELLED"
-  createdAt: string
-  updatedAt: string
+  status: SessionStatus
+
+  energyConsumedKwh: number
+  durationMinutes: number
+
+  energyCost: number
+  timeCost: number
+  idleFee: number
+  totalCost: number
+
   stationName: string
-  stationLocation: string
-  chargerLabel: string
-  chargerDetails?: {
-    id: number
-    connectorType: string
-    powerKw: number
-    status: string
-    chargingSpeed: string
-    slotNumber?: string
-    maxVoltage?: number
-    maxCurrent?: number
-  }
+  stationAddress: string
+  stationCity: string
+
+  connectorType: string
+  powerKw: number
+  slotNumber: string
+  chargingSpeed: string
+
+  userName: string
+  userEmail: string
+
+  createdAt: string
 }
 
 // Helper functions
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "-"
 
-const formatNumber = (value?: string | null) => Number(value ?? 0)
+const formatNumber = (value?: number | null) => value ?? 0
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-US", {
@@ -97,8 +106,18 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value)
 
+const formatDuration = (minutes: number) => {
+  if (!minutes || minutes === 0) return "-"
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (hours > 0) {
+    return `${hours}h ${mins}m`
+  }
+  return `${mins}m`
+}
+
 // Get user initials
-const getUserInitials = (userId: string, userName?: string) => {
+const getUserInitials = (userName: string, userEmail: string) => {
   if (userName) {
     const names = userName.split(" ")
     if (names.length >= 2) {
@@ -106,7 +125,7 @@ const getUserInitials = (userId: string, userName?: string) => {
     }
     return userName.substring(0, 2).toUpperCase()
   }
-  return userId.substring(0, 2).toUpperCase()
+  return userEmail.substring(0, 2).toUpperCase()
 }
 
 // Get random color for user avatar
@@ -131,14 +150,14 @@ const getUserColor = (userId: string) => {
 
 // User Avatar Component
 const UserAvatar = ({
-  userId,
   userName,
+  userEmail,
 }: {
-  userId: string
-  userName?: string
+  userName: string
+  userEmail: string
 }) => {
-  const initials = getUserInitials(userId, userName)
-  const colorClass = getUserColor(userId)
+  const initials = getUserInitials(userName, userEmail)
+  const colorClass = getUserColor(userEmail)
 
   return (
     <div className="flex items-center gap-3">
@@ -148,22 +167,25 @@ const UserAvatar = ({
         {initials}
       </div>
       <div className="flex flex-col">
-        <span className="text-sm font-medium">{userName || userId}</span>
-        {userName && (
-          <span className="text-xs text-muted-foreground">{userId}</span>
-        )}
+        <span className="text-sm font-medium">{userName}</span>
+        <span className="text-xs text-muted-foreground">{userEmail}</span>
       </div>
     </div>
   )
 }
 
 // Status Badge Component
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status }: { status: SessionStatus }) => {
   const variants = {
     ACTIVE: {
       variant: "default" as const,
       label: "Active",
       className: "bg-green-600",
+    },
+    IN_PROGRESS: {
+      variant: "default" as const,
+      label: "In Progress",
+      className: "bg-blue-600",
     },
     COMPLETED: {
       variant: "outline" as const,
@@ -173,11 +195,16 @@ const StatusBadge = ({ status }: { status: string }) => {
     CANCELLED: {
       variant: "secondary" as const,
       label: "Cancelled",
-      className: "",
+      className: "bg-red-100 text-red-700 border-red-200",
+    },
+    WAITING: {
+      variant: "secondary" as const,
+      label: "Waiting",
+      className: "bg-yellow-100 text-yellow-700 border-yellow-200",
     },
   }
 
-  const config = variants[status as keyof typeof variants] || variants.COMPLETED
+  const config = variants[status] || variants.COMPLETED
 
   return (
     <Badge variant={config.variant} className={config.className}>
@@ -212,22 +239,33 @@ const getColumns = (
       />
     ),
   }),
-  columnHelper.accessor("userId", {
+  columnHelper.accessor("userName", {
     header: "User",
     cell: (info) => (
       <UserAvatar
-        userId={info.getValue()}
-        userName={info.row.original.userName}
+        userName={info.getValue()}
+        userEmail={info.row.original.userEmail}
       />
     ),
   }),
-  columnHelper.accessor("chargerLabel", {
+  columnHelper.accessor("slotNumber", {
     header: "Charger",
+    cell: (info) => (
+      <div className="flex flex-col">
+        <span className="font-medium">{info.getValue()}</span>
+        <span className="text-xs text-muted-foreground">
+          {info.row.original.connectorType} • {info.row.original.powerKw} kW
+        </span>
+      </div>
+    ),
+  }),
+  columnHelper.accessor("stationName", {
+    header: "Station",
     cell: (info) => (
       <div className="flex flex-col">
         <span>{info.getValue()}</span>
         <span className="text-xs text-muted-foreground">
-          {info.row.original.stationName}
+          {info.row.original.stationCity}
         </span>
       </div>
     ),
@@ -240,13 +278,17 @@ const getColumns = (
     header: "End Time",
     cell: (info) => formatDateTime(info.getValue()),
   }),
+  columnHelper.accessor("durationMinutes", {
+    header: "Duration",
+    cell: (info) => formatDuration(info.getValue()),
+  }),
   columnHelper.accessor("energyConsumedKwh", {
     header: "Energy (kWh)",
-    cell: (info) => formatNumber(info.getValue()),
+    cell: (info) => formatNumber(info.getValue()).toFixed(1),
   }),
   columnHelper.accessor("totalCost", {
     header: "Total Cost",
-    cell: (info) => formatCurrency(formatNumber(info.getValue())),
+    cell: (info) => formatCurrency(info.getValue()),
   }),
   columnHelper.accessor("status", {
     header: "Status",
@@ -275,12 +317,13 @@ const getColumns = (
             <Mail className="mr-2 h-4 w-4" />
             Email Receipt
           </DropdownMenuItem>
-          {row.original.status === "ACTIVE" && (
+          {(row.original.status === "ACTIVE" ||
+            row.original.status === "IN_PROGRESS") && (
             <DropdownMenuItem
               onClick={() => handleCancelSession(row.original)}
-              className="text-red-600"
+              className="text-red-600 focus:text-red-600"
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              <XCircle className="mr-2 h-4 w-4" />
               Cancel Session
             </DropdownMenuItem>
           )}
@@ -294,17 +337,23 @@ interface SessionsTableProps {
   data: SessionRow[] | undefined
   onRowClick: (session: SessionRow) => void
   onBulkAction?: (action: string, selectedRows: SessionRow[]) => void
+  onCancelSession?: (session: SessionRow) => Promise<void>
 }
 
 export function SessionsTable({
   data = [],
   onRowClick,
   onBulkAction,
+  onCancelSession,
 }: SessionsTableProps) {
   const [showBulkActionDialog, setShowBulkActionDialog] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [selectedSessionForCancel, setSelectedSessionForCancel] =
+    useState<SessionRow | null>(null)
   const [bulkAction, setBulkAction] = useState<string>("")
   const [selectedRows, setSelectedRows] = useState<SessionRow[]>([])
   const [rowSelection, setRowSelection] = useState({})
+  const [isCancelling, setIsCancelling] = useState(false)
 
   // Ensure data is always an array
   const safeData = useMemo(() => data || [], [data])
@@ -312,7 +361,6 @@ export function SessionsTable({
   // Action handlers
   const handleViewDetails = (session: SessionRow) => {
     onRowClick(session)
-    toast.info(`Viewing session #${session.id}`)
   }
 
   const handleExportSession = (session: SessionRow) => {
@@ -328,10 +376,37 @@ export function SessionsTable({
     })
   }
 
-  const handleCancelSession = (session: SessionRow) => {
-    toast.warning(`Session #${session.id} cancelled`, {
-      description: "The session has been cancelled successfully.",
-    })
+  const handleCancelSessionClick = (session: SessionRow) => {
+    setSelectedSessionForCancel(session)
+    setShowCancelDialog(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!selectedSessionForCancel) return
+
+    setIsCancelling(true)
+    try {
+      if (onCancelSession) {
+        await onCancelSession(selectedSessionForCancel)
+        toast.success(
+          `Session #${selectedSessionForCancel.id} cancelled successfully`,
+        )
+      } else {
+        // Default behavior
+        toast.warning(`Session #${selectedSessionForCancel.id} cancelled`, {
+          description: "The session has been cancelled successfully.",
+        })
+      }
+      setShowCancelDialog(false)
+      setSelectedSessionForCancel(null)
+    } catch (error) {
+      toast.error(`Failed to cancel session #${selectedSessionForCancel.id}`, {
+        description:
+          error instanceof Error ? error.message : "Please try again",
+      })
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   const columns = useMemo(
@@ -340,9 +415,9 @@ export function SessionsTable({
         handleViewDetails,
         handleExportSession,
         handleEmailReceipt,
-        handleCancelSession,
+        handleCancelSessionClick,
       ),
-    [],
+    [onCancelSession],
   )
 
   const table = useReactTable({
@@ -410,18 +485,20 @@ export function SessionsTable({
       <div className="rounded-md border border-slate-200 dark:border-slate-800">
         <Table>
           <TableHeader>
-            <TableRow>
-              {columns.map((column, index) => {
-                const headerDef = column.columnDef
-                return (
-                  <TableHead key={index}>
-                    {typeof headerDef.header === "string"
-                      ? headerDef.header
-                      : "Column"}
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
                   </TableHead>
-                )
-              })}
-            </TableRow>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
             <TableRow>
@@ -627,6 +704,60 @@ export function SessionsTable({
               }
             >
               Confirm {bulkAction}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Session Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this charging session?
+              {selectedSessionForCancel && (
+                <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <p className="text-sm font-medium">Session Details:</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Station: {selectedSessionForCancel.stationName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Charger: {selectedSessionForCancel.slotNumber} (
+                    {selectedSessionForCancel.connectorType})
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    User: {selectedSessionForCancel.userName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Started:{" "}
+                    {formatDateTime(selectedSessionForCancel.startTime)}
+                  </p>
+                </div>
+              )}
+              <p className="mt-3">
+                This action will stop the charging session immediately and
+                cannot be undone.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>
+              Go Back
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancel}
+              disabled={isCancelling}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isCancelling ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Cancelling...
+                </>
+              ) : (
+                "Yes, Cancel Session"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

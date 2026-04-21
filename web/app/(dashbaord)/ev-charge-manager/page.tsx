@@ -1,19 +1,14 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React from "react"
 import { KPICards } from "@/components/ev-owner/dashboard/KPICards"
 import { RevenueChart } from "@/components/ev-owner/dashboard/RevenueChart"
 import { EnergyChart } from "@/components/ev-owner/dashboard/EnergyChart"
 import { SessionsTable } from "@/components/ev-owner/dashboard/SessionTable"
-import { QuickActions } from "@/components/ev-owner/dashboard/QuickActions"
-import {
-  generateMockSessions,
-  generateTrendData,
-  generateStationPerformance,
-} from "@/data/mock-audit-logs"
-import { KpiCardData, ChargingSession, ChartDataPoint } from "@/types/charging"
+import { useDashboardData } from "@/hooks/useEvDashboardData"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   MapPin,
   Zap,
@@ -21,107 +16,58 @@ import {
   Calendar,
   DollarSign,
   Battery,
-  Bell,
   RefreshCw,
-  Menu,
-  Sun,
-  Moon,
+  AlertCircle,
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useTheme } from "next-themes"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function EVChargingDashboard() {
-  const [sessions, setSessions] = useState<ChargingSession[]>([])
-  const [trendData, setTrendData] = useState<ChartDataPoint[]>([])
-  const [stationPerformance, setStationPerformance] = useState([])
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const { theme, setTheme } = useTheme()
+  const {
+    sessions,
+    trendData,
+    stationPerformance,
+    kpis,
+    isLoading,
+    isFetching,
+    error,
+    lastUpdated,
+    refreshData,
+    isRefreshing,
+    refetch,
+  } = useDashboardData()
 
-  // Load initial data
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = () => {
-    setSessions(generateMockSessions())
-    setTrendData(generateTrendData())
-    setStationPerformance(generateStationPerformance())
+  // Show loading state
+  if (isLoading) {
+    return <DashboardSkeleton />
   }
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    loadData()
-    setLastUpdated(new Date())
-    setIsRefreshing(false)
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Error loading dashboard: {error.message}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="mt-2"
+            >
+              Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
   }
-
-  // KPI Data
-  const kpis: KpiCardData[] = [
-    {
-      title: "Total Stations",
-      value: "12",
-      change: 2,
-      icon: <MapPin className="h-5 w-5" />,
-      description: "Active locations across the city",
-      trend: "up",
-    },
-    {
-      title: "Total Chargers",
-      value: "48",
-      change: 5,
-      icon: <Zap className="h-5 w-5" />,
-      description: "Installed charging units",
-      trend: "up",
-    },
-    {
-      title: "Active Chargers",
-      value: "42",
-      change: -1,
-      icon: <Activity className="h-5 w-5" />,
-      description: "Currently online and available",
-      trend: "down",
-    },
-    {
-      title: "Today's Sessions",
-      value: "156",
-      change: 12,
-      icon: <Calendar className="h-5 w-5" />,
-      description: "+23 vs yesterday",
-      trend: "up",
-    },
-    {
-      title: "Revenue (Today)",
-      value: "$3,245",
-      change: 8.5,
-      icon: <DollarSign className="h-5 w-5" />,
-      description: "Avg $20.80/session",
-      trend: "up",
-    },
-    {
-      title: "Energy Delivered",
-      value: "1,892 kWh",
-      change: 15,
-      icon: <Battery className="h-5 w-5" />,
-      description: "Total energy today",
-      trend: "up",
-    },
-  ]
 
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 backdrop-blur-md pt-3">
-        <div className="container mx-auto ">
+      <header className="sticky top-0 backdrop-blur-md pt-3 bg-background/95 z-10">
+        <div className="container mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
@@ -149,7 +95,7 @@ export default function EVChargingDashboard() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={handleRefresh}
+                onClick={refreshData}
                 disabled={isRefreshing}
                 className="relative"
               >
@@ -163,9 +109,17 @@ export default function EVChargingDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto space-y-6">
-        {/* Last Updated */}
-        <div className="flex justify-end">
+      <main className="container mx-auto space-y-6 pb-6">
+        {/* Last Updated with refetch indicator */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            {isFetching && !isRefreshing && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>Updating...</span>
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Last updated: {lastUpdated.toLocaleTimeString()}
           </p>
@@ -181,13 +135,13 @@ export default function EVChargingDashboard() {
         </div>
 
         {/* Station Performance Mini Cards */}
-        <div className="grid grid-cols-5 gap-3">
-          {stationPerformance.map((station: any, index) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {stationPerformance.map((station, index) => (
             <div
-              key={index}
-              className="bg-gradient-to-br from-white to-green-50 dark:from-gray-900 dark:to-green-950/30 rounded-lg p-3  hover:shadow-md transition-all cursor-pointer"
+              key={station.stationId || index}
+              className="bg-gradient-to-br from-white to-green-50 dark:from-gray-900 dark:to-green-950/30 rounded-lg p-3 hover:shadow-md transition-all cursor-pointer border border-green-100 dark:border-green-900"
             >
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground truncate">
                 {station.stationName}
               </p>
               <div className="flex items-center justify-between mt-1">
@@ -200,7 +154,7 @@ export default function EVChargingDashboard() {
               </div>
               <div className="h-1 bg-green-100 dark:bg-green-900 rounded-full mt-2 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-500"
                   style={{ width: `${station.utilization}%` }}
                 />
               </div>
@@ -208,22 +162,23 @@ export default function EVChargingDashboard() {
           ))}
         </div>
 
-        {/* Sessions Table and Quick Actions */}
-        <div className="">
-          <div className="">
-            <div className="backdrop-blur-sm rounded-xl  p-6">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-green-500" />
-                Recent Charging Sessions
-              </h2>
-              <SessionsTable data={sessions.slice(0, 20)} />
-            </div>
-          </div>
+        {/* Sessions Table */}
+        <div className="backdrop-blur-sm rounded-xl border p-6">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Activity className="h-5 w-5 text-green-500" />
+            Recent Charging Sessions
+            {isFetching && (
+              <Badge variant="outline" className="ml-2">
+                Refreshing...
+              </Badge>
+            )}
+          </h2>
+          <SessionsTable data={sessions} />
         </div>
 
         {/* Footer Stats */}
         <footer className="text-xs text-muted-foreground text-center py-4 border-t border-green-100 dark:border-green-900">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <p>© 2024 EV Charge Pro. All rights reserved.</p>
             <div className="flex items-center gap-4">
               <span>
@@ -238,6 +193,33 @@ export default function EVChargingDashboard() {
           </div>
         </footer>
       </main>
+    </div>
+  )
+}
+
+// Loading skeleton component
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen container mx-auto space-y-6 p-4">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-32 w-full" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Skeleton className="h-[400px] w-full" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+      <div className="grid grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
+      </div>
+      <Skeleton className="h-[400px] w-full" />
     </div>
   )
 }

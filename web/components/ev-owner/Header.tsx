@@ -1,19 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Bell,
   ChevronDown,
   User,
-  Plus,
+  Wallet,
   LogOut,
   Search,
   Zap,
+  Menu,
+  Sun,
 } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,65 +22,70 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
 import { Badge } from "@/components/ui/badge"
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
-
 import { RootState } from "@/store"
 import { useDispatch, useSelector } from "react-redux"
-
 import { useRouter } from "next/navigation"
-
 import { LogoutModal } from "../logout-modal"
-
 import { clearUser } from "@/store/slices/userSlice"
-
 import { logoutUser } from "@/services/auth.user.api"
-
 import { Skeleton } from "@/components/ui/skeleton"
-
 import { motion } from "framer-motion"
 import { PiGearSix } from "react-icons/pi"
 import { MdSupportAgent } from "react-icons/md"
+import { useQuery } from "@tanstack/react-query"
+import { fetchAllNotification } from "@/services/notification.api"
+import NotificationSheet from "../user-dashboard/NotificationSheet"
+import SearchDialog from "../user-dashboard/SearchDialog"
+
+const notificationKeys = {
+  all: ["notifications"] as const,
+  lists: () => [...notificationKeys.all, "list"] as const,
+}
 
 function EvOwnerHeader({ className }: { className?: string }) {
   const router = useRouter()
   const dispatch = useDispatch()
-
   const { user, loading } = useSelector((state: RootState) => state.user)
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: notificationKeys.lists(),
+    queryFn: fetchAllNotification,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-
+  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false)
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
-  const [unreadNotificationCount] = useState(3)
+  // Unread notification count
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length
+  }, [notifications])
 
+  // Handle scroll effect for morphism
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10)
     }
-
     window.addEventListener("scroll", handleScroll)
-
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
   const handleLogout = async () => {
     setIsLoading(true)
-
     try {
       router.push("/")
       await logoutUser()
@@ -91,10 +96,15 @@ function EvOwnerHeader({ className }: { className?: string }) {
 
       localStorage.removeItem("habeshagoUser")
     } catch (error) {
-      console.error(error)
+      console.error("Logout failed:", error)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSearch = (query: string) => {
+    console.log("Searching for:", query)
+    // Handle search logic here - search stations, chargers, sessions, etc.
   }
 
   return (
@@ -111,7 +121,7 @@ function EvOwnerHeader({ className }: { className?: string }) {
           className,
         )}
       >
-        {/* Animated Gradient */}
+        {/* Animated Gradient Background */}
         <motion.div
           className="absolute inset-0 -z-10"
           animate={{
@@ -119,105 +129,150 @@ function EvOwnerHeader({ className }: { className?: string }) {
               ? "radial-gradient(circle at 30% 50%, rgba(59,130,246,0.08) 0%, transparent 50%), radial-gradient(circle at 70% 50%, rgba(16,185,129,0.08) 0%, transparent 50%)"
               : "radial-gradient(circle at 20% 50%, rgba(59,130,246,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(16,185,129,0.03) 0%, transparent 50%)",
           }}
+          transition={{ duration: 0.5 }}
         />
 
         <div className="flex items-center justify-end h-full px-4 gap-2">
           {/* Add Station Button */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
-              className="hidden md:flex gap-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-700 hover:to-emerald-600 text-white shadow-md"
+              className="hidden md:flex gap-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-700 hover:to-emerald-600 text-white shadow-md relative overflow-hidden"
               onClick={() => router.push("/ev-charge-manager/stations/new")}
             >
-              <Plus className="w-4 h-4" />
-              Add Station
+              <motion.div
+                className="absolute inset-0 bg-white/20"
+                initial={{ x: "-100%" }}
+                whileHover={{ x: "100%" }}
+                transition={{ duration: 0.5 }}
+              />
+              <Wallet className="w-4 h-4" />
+              <span>Add Station</span>
             </Button>
           </motion.div>
 
-          {/* Search */}
+          {/* Search Input (Desktop) */}
           <div className="hidden md:flex items-center max-w-lg">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div
+                  <motion.div
                     className="relative w-full cursor-pointer"
-                    onClick={() => setIsSearchOpen(true)}
+                    transition={{ type: "spring", stiffness: 400 }}
                   >
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
                     <Input
-                      readOnly
+                      type="text"
                       placeholder="Search stations, chargers, sessions..."
-                      className="pl-10 bg-background/60 backdrop-blur-sm"
+                      className="w-full pl-10 cursor-pointer bg-background/60 backdrop-blur-sm border-white/20 dark:border-white/10 focus:bg-background/80 transition-all duration-300"
+                      onClick={() => setIsSearchDialogOpen(true)}
+                      readOnly
                     />
-                  </div>
+                  </motion.div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Search your EV network</p>
+                  <p>Click to open search</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
 
+          {/* Mobile Search Button */}
+          <motion.div whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSearchDialogOpen(true)}
+              className="md:hidden hover:bg-white/10 dark:hover:bg-white/5"
+            >
+              <Search className="w-5 h-5" />
+            </Button>
+          </motion.div>
+
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Notifications */}
+          {/* Notifications Bell Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="w-5 h-5" />
-
-                  {unreadNotificationCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center">
-                      {unreadNotificationCount}
-                    </Badge>
-                  )}
-                </Button>
+                <motion.div whileTap={{ scale: 0.95 }}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative hover:bg-white/10 dark:hover:bg-white/5"
+                    onClick={() => setIsNotificationSheetOpen(true)}
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unreadNotificationCount > 0 && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500 }}
+                      >
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1.5 -right-1 px-1 min-w-0 w-5 h-5 flex items-center justify-center text-xs p-0 rounded-full"
+                        >
+                          {unreadNotificationCount > 9
+                            ? "9+"
+                            : unreadNotificationCount}
+                        </Badge>
+                      </motion.div>
+                    )}
+                  </Button>
+                </motion.div>
               </TooltipTrigger>
-
               <TooltipContent>
                 <p>Notifications</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
-          {/* Profile */}
+          {/* Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2">
-                <Avatar className="w-8 h-8">
-                  {loading ? (
-                    <Skeleton className="w-full h-full rounded-full" />
-                  ) : (
-                    <>
-                      <AvatarImage src={user?.avaterUrl} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-emerald-500 text-white">
-                        {user?.name?.charAt(0) || "E"}
-                      </AvatarFallback>
-                    </>
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "gap-2 transition-all duration-300",
+                    "hover:bg-white/10 dark:hover:bg-white/5",
                   )}
-                </Avatar>
+                >
+                  <Avatar className="w-8 h-8 ring-2 ring-white/20 dark:ring-white/10">
+                    {loading ? (
+                      <Skeleton className="w-full h-full rounded-full" />
+                    ) : (
+                      <>
+                        <AvatarImage src={user?.avaterUrl} />
+                        <AvatarFallback className="bg-gradient-to-br from-blue-600 to-emerald-500 text-white">
+                          {user?.name?.charAt(0) || "E"}
+                        </AvatarFallback>
+                      </>
+                    )}
+                  </Avatar>
 
-                <div className="hidden md:block text-left">
-                  {loading ? (
-                    <>
-                      <Skeleton className="h-4 w-20 mb-1" />
-                      <Skeleton className="h-3 w-28" />
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium capitalize">
-                        {user?.name || "EV Owner"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {user?.email}
-                      </p>
-                    </>
-                  )}
-                </div>
+                  <div className="hidden md:block text-left">
+                    {loading ? (
+                      <>
+                        <Skeleton className="h-4 w-20 mb-1" />
+                        <Skeleton className="h-3 w-28" />
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium capitalize">
+                          {user?.name || "EV Owner"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {user?.email}
+                        </p>
+                      </>
+                    )}
+                  </div>
 
-                <ChevronDown className="hidden md:block w-4 h-4" />
-              </Button>
+                  <ChevronDown className="hidden md:block w-4 h-4" />
+                </Button>
+              </motion.div>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-72">
@@ -260,7 +315,7 @@ function EvOwnerHeader({ className }: { className?: string }) {
               {/* Menu Items - Grouped with consistent styling */}
               <div className="px-1 py-1">
                 <DropdownMenuItem
-                  onClick={() => router.push("/ev-owner/profile")}
+                  onClick={() => router.push("/ev-charge-manager/profile")}
                   className="cursor-pointer gap-3 py-2"
                 >
                   <User className="w-4 h-4 text-muted-foreground" />
@@ -285,7 +340,7 @@ function EvOwnerHeader({ className }: { className?: string }) {
 
               <div className="px-1 py-1">
                 <DropdownMenuItem
-                  onClick={() => router.push("/ev-owner/settings")}
+                  onClick={() => router.push("/ev-charge-manager/settings")}
                   className="cursor-pointer gap-3 py-2"
                 >
                   <PiGearSix className="w-4 h-4 text-muted-foreground" />
@@ -293,7 +348,7 @@ function EvOwnerHeader({ className }: { className?: string }) {
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  onClick={() => router.push("/ev-owner/support")}
+                  onClick={() => router.push("/ev-charge-manager/support")}
                   className="cursor-pointer gap-3 py-2"
                 >
                   <MdSupportAgent className="w-4 h-4 text-muted-foreground" />
@@ -318,6 +373,20 @@ function EvOwnerHeader({ className }: { className?: string }) {
         </div>
       </motion.header>
 
+      {/* Notification Sheet */}
+      <NotificationSheet
+        isOpen={isNotificationSheetOpen}
+        onOpenChange={setIsNotificationSheetOpen}
+      />
+
+      {/* Search Dialog */}
+      <SearchDialog
+        open={isSearchDialogOpen}
+        onOpenChange={setIsSearchDialogOpen}
+        onSearch={handleSearch}
+      />
+
+      {/* Logout Modal */}
       <LogoutModal
         isOpen={isLogoutModalOpen}
         onOpenChange={setIsLogoutModalOpen}

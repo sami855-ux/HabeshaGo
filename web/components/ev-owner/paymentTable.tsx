@@ -10,6 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
+import { motion, AnimatePresence } from "framer-motion"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   ChevronLeft,
@@ -24,6 +25,18 @@ import {
   MoreVertical,
   CheckSquare,
   Square,
+  TrendingUp,
+  TrendingDown,
+  CreditCard,
+  Smartphone,
+  Landmark,
+  Wallet,
+  RefreshCw,
+  XCircle,
+  CheckCircle,
+  Clock,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,14 +64,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { timeAgo } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
-type PaymentStatus = "COMPLETED" | "PENDING" | "FAILED" | "REFUNDED"
+type PaymentStatus =
+  | "COMPLETED"
+  | "PENDING"
+  | "FAILED"
+  | "REFUNDED"
+  | "PROCESSING"
 type PaymentMethod = "CARD" | "WALLET" | "MOBILE_MONEY" | "BANK_TRANSFER"
 type PaymentGateway = "STRIPE" | "PAYPAL" | "CHAPA" | "FLUTTERWAVE" | "M-PESA"
 
-type Payment = {
+export type Payment = {
   id: string
   reference: string
   userName: string
@@ -90,59 +115,135 @@ const formatDateTime = (date: string) => {
   return new Date(date).toLocaleString()
 }
 
-// Status Badge Component (neutral colors)
+// Modern Status Badge Component
 const StatusBadge = ({ status }: { status: PaymentStatus }) => {
   const variants = {
     COMPLETED: {
+      icon: CheckCircle,
       label: "Completed",
-      className: "bg-green-100 text-green-800 border-green-200",
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400",
     },
     PENDING: {
+      icon: Clock,
       label: "Pending",
-      className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      className:
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400",
+    },
+    PROCESSING: {
+      icon: RefreshCw,
+      label: "Processing",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400",
     },
     FAILED: {
+      icon: XCircle,
       label: "Failed",
-      className: "bg-red-100 text-red-800 border-red-200",
+      className:
+        "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400",
     },
     REFUNDED: {
+      icon: RefreshCw,
       label: "Refunded",
-      className: "bg-gray-100 text-gray-800 border-gray-200",
+      className:
+        "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400",
     },
   }
 
-  const config = variants[status]
+  const config = variants[status] || variants.PENDING
+  const Icon = config.icon
 
   return (
-    <Badge variant="outline" className={`${config.className}`}>
+    <Badge
+      variant="outline"
+      className={cn(
+        "flex w-fit items-center gap-1.5 px-2.5 py-1 font-medium",
+        config.className,
+      )}
+    >
+      <Icon className="h-3 w-3" />
       {config.label}
     </Badge>
   )
 }
 
-// Method Badge Component (neutral colors)
+// Modern Method Badge Component
 const MethodBadge = ({ method }: { method: PaymentMethod }) => {
   const variants = {
-    CARD: { label: "Card", className: "bg-blue-100 text-blue-800" },
-    WALLET: { label: "Wallet", className: "bg-purple-100 text-purple-800" },
+    CARD: {
+      icon: CreditCard,
+      label: "Card",
+      className: "bg-blue-50 text-blue-700 dark:bg-blue-950/20",
+    },
+    WALLET: {
+      icon: Wallet,
+      label: "Wallet",
+      className: "bg-purple-50 text-purple-700 dark:bg-purple-950/20",
+    },
     MOBILE_MONEY: {
+      icon: Smartphone,
       label: "Mobile Money",
-      className: "bg-orange-100 text-orange-800",
+      className: "bg-orange-50 text-orange-700 dark:bg-orange-950/20",
     },
     BANK_TRANSFER: {
+      icon: Landmark,
       label: "Bank Transfer",
-      className: "bg-cyan-100 text-cyan-800",
+      className: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/20",
     },
   }
 
   const config = variants[method]
+  const Icon = config.icon
 
   return (
-    <Badge variant="secondary" className={`${config.className}`}>
+    <Badge
+      variant="secondary"
+      className={cn(
+        "flex w-fit items-center gap-1.5 px-2.5 py-1 font-medium",
+        config.className,
+      )}
+    >
+      <Icon className="h-3 w-3" />
       {config.label}
     </Badge>
   )
 }
+
+// Modern Stat Card Component
+const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="rounded-xl border bg-gradient-to-br from-white to-slate-50/50 p-4 shadow-sm dark:from-slate-950 dark:to-slate-900/50"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        {trend && (
+          <div className="mt-1 flex items-center gap-1">
+            {trend > 0 ? (
+              <TrendingUp className="h-3 w-3 text-emerald-500" />
+            ) : (
+              <TrendingDown className="h-3 w-3 text-red-500" />
+            )}
+            <span
+              className={cn(
+                "text-xs font-medium",
+                trend > 0 ? "text-emerald-600" : "text-red-600",
+              )}
+            >
+              {Math.abs(trend)}% from last month
+            </span>
+          </div>
+        )}
+      </div>
+      <div className={cn("rounded-full p-3", color)}>
+        <Icon className="h-5 w-5" />
+      </div>
+    </div>
+  </motion.div>
+)
 
 // Column definitions with selection
 const columnHelper = createColumnHelper<Payment>()
@@ -171,46 +272,140 @@ const getColumns = (
     ),
   }),
   columnHelper.accessor("reference", {
-    header: "Reference",
+    header: ({ column }) => (
+      <div
+        className="flex items-center gap-1 cursor-pointer"
+        onClick={() => column.toggleSorting()}
+      >
+        Reference
+        <ArrowUpDown className="h-3 w-3" />
+      </div>
+    ),
     cell: (info) => (
       <span className="font-mono text-sm font-medium">{info.getValue()}</span>
     ),
   }),
   columnHelper.accessor("userName", {
-    header: "User Name",
-    cell: (info) => info.getValue(),
+    header: ({ column }) => (
+      <div
+        className="flex items-center gap-1 cursor-pointer"
+        onClick={() => column.toggleSorting()}
+      >
+        User
+        <ArrowUpDown className="h-3 w-3" />
+      </div>
+    ),
+    cell: (info) => (
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-slate-500 to-slate-700 text-xs font-medium text-white">
+          {info.getValue().charAt(0).toUpperCase()}
+        </div>
+        <span className="font-medium">{info.getValue()}</span>
+      </div>
+    ),
   }),
   columnHelper.accessor("stationName", {
-    header: "Station Name",
-    cell: (info) => info.getValue(),
+    header: ({ column }) => (
+      <div
+        className="flex items-center gap-1 cursor-pointer"
+        onClick={() => column.toggleSorting()}
+      >
+        Station
+        <ArrowUpDown className="h-3 w-3" />
+      </div>
+    ),
+    cell: (info) => (
+      <div>
+        <p className="font-medium">{info.getValue()}</p>
+        <p className="text-xs text-muted-foreground">
+          ID: {info.row.original.stationId}
+        </p>
+      </div>
+    ),
   }),
   columnHelper.accessor("amount", {
-    header: "Amount",
-    cell: (info) => formatCurrency(info.getValue(), info.row.original.currency),
+    header: ({ column }) => (
+      <div
+        className="flex items-center gap-1 cursor-pointer"
+        onClick={() => column.toggleSorting()}
+      >
+        Amount
+        <ArrowUpDown className="h-3 w-3" />
+      </div>
+    ),
+    cell: (info) => (
+      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+        {formatCurrency(info.getValue(), info.row.original.currency)}
+      </span>
+    ),
   }),
   columnHelper.accessor("method", {
     header: "Method",
     cell: (info) => <MethodBadge method={info.getValue()} />,
-  }),
-  columnHelper.accessor("gateway", {
-    header: "Gateway",
-    cell: (info) => info.getValue(),
   }),
   columnHelper.accessor("status", {
     header: "Status",
     cell: (info) => <StatusBadge status={info.getValue()} />,
   }),
   columnHelper.accessor("startTime", {
-    header: "Start Time",
-    cell: (info) => timeAgo(info.getValue()),
+    header: ({ column }) => (
+      <div
+        className="flex items-center gap-1 cursor-pointer"
+        onClick={() => column.toggleSorting()}
+      >
+        Started
+        <ArrowUpDown className="h-3 w-3" />
+      </div>
+    ),
+    cell: (info) => (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="text-sm">{timeAgo(info.getValue())}</span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{formatDateTime(info.getValue())}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
   }),
-
-  columnHelper.accessor("endTime", {
-    header: "End Time",
-    cell: (info) => {
-      const value = info.getValue()
-      return value ? timeAgo(value) : "-"
-    },
+  columnHelper.display({
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => handleViewDetails(row.original)}>
+            <FileText className="mr-2 h-4 w-4" />
+            View Details
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExportPayment(row.original)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Data
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleEmailReceipt(row.original)}>
+            <Mail className="mr-2 h-4 w-4" />
+            Email Receipt
+          </DropdownMenuItem>
+          {(row.original.status === "COMPLETED" ||
+            row.original.status === "PENDING") && (
+            <DropdownMenuItem
+              onClick={() => handleRefundPayment(row.original)}
+              className="text-red-600 focus:text-red-600"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refund Payment
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
   }),
 ]
 
@@ -323,9 +518,19 @@ export function PaymentsTable({ data, onRowClick }: PaymentsTableProps) {
       (p) => p.status === "COMPLETED",
     ).length
     const pending = filteredData.filter((p) => p.status === "PENDING").length
+    const processing = filteredData.filter(
+      (p) => p.status === "PROCESSING",
+    ).length
     const failed = filteredData.filter((p) => p.status === "FAILED").length
     const refunded = filteredData.filter((p) => p.status === "REFUNDED").length
-    return { completed, pending, failed, refunded, total: filteredData.length }
+    return {
+      completed,
+      pending,
+      processing,
+      failed,
+      refunded,
+      total: filteredData.length,
+    }
   }, [filteredData])
 
   const selectedCount = Object.keys(rowSelection).length
@@ -359,172 +564,168 @@ export function PaymentsTable({ data, onRowClick }: PaymentsTableProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Bulk Actions Bar */}
-      {selectedCount > 0 && (
-        <div className="flex items-center justify-between rounded-lg bg-slate-100 p-3 dark:bg-slate-800">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4 text-slate-600" />
-            <span className="text-sm font-medium">
-              {selectedCount} payment{selectedCount !== 1 ? "s" : ""} selected
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleBulkAction("export")}
-              className="border-slate-300"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleBulkAction("email")}
-              className="border-slate-300"
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Email Receipts
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => handleBulkAction("refund")}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Refund
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by reference, user, station..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Status</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="FAILED">Failed</SelectItem>
-            <SelectItem value="REFUNDED">Refunded</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-6">
+      {/* Modern Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <StatCard
+          title="Total Transactions"
+          value={stats.total.toLocaleString()}
+          icon={FileText}
+          color="bg-blue-100 text-blue-600 dark:bg-blue-950/30"
+        />
+        <StatCard
+          title="Total Revenue"
+          value={formatCurrency(totalRevenue, "ETB")}
+          icon={TrendingUp}
+          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30"
+          trend={12.5}
+        />
+        <StatCard
+          title="Completed"
+          value={stats.completed.toLocaleString()}
+          icon={CheckCircle}
+          color="bg-green-100 text-green-600 dark:bg-green-950/30"
+        />
+        <StatCard
+          title="Pending"
+          value={stats.pending.toLocaleString()}
+          icon={Clock}
+          color="bg-amber-100 text-amber-600 dark:bg-amber-950/30"
+        />
+        <StatCard
+          title="Failed"
+          value={stats.failed.toLocaleString()}
+          icon={XCircle}
+          color="bg-red-100 text-red-600 dark:bg-red-950/30"
+        />
       </div>
 
-      {/* Stats Row */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-900/50">
-          <p className="text-xs text-muted-foreground">Total Transactions</p>
-          <p className="text-xl font-bold">{stats.total}</p>
-        </div>
-        <div className="rounded-lg border bg-green-50 p-3 dark:bg-green-950/20">
-          <p className="text-xs text-muted-foreground">Completed</p>
-          <p className="text-xl font-bold text-green-700">{stats.completed}</p>
-        </div>
-        <div className="rounded-lg border bg-yellow-50 p-3 dark:bg-yellow-950/20">
-          <p className="text-xs text-muted-foreground">Pending</p>
-          <p className="text-xl font-bold text-yellow-700">{stats.pending}</p>
-        </div>
-        <div className="rounded-lg border bg-red-50 p-3 dark:bg-red-950/20">
-          <p className="text-xs text-muted-foreground">Failed</p>
-          <p className="text-xl font-bold text-red-700">{stats.failed}</p>
-        </div>
-        <div className="rounded-lg border bg-purple-50 p-3 dark:bg-purple-950/20">
-          <p className="text-xs text-muted-foreground">Total Revenue</p>
-          <p className="text-xl font-bold text-purple-700">
-            {formatCurrency(totalRevenue, "USD")}
-          </p>
-        </div>
-      </div>
+      {/* Bulk Actions Bar with Animation */}
+      <AnimatePresence>
+        {selectedCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex items-center justify-between rounded-lg bg-gradient-to-r from-slate-100 to-slate-50 p-3 dark:from-slate-800 dark:to-slate-900"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
+                <CheckSquare className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-medium">
+                {selectedCount} payment{selectedCount !== 1 ? "s" : ""} selected
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction("export")}
+                className="border-slate-300"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction("email")}
+                className="border-slate-300"
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Email Receipts
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleBulkAction("refund")}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refund
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Table */}
-      <div className="rounded-lg border overflow-x-auto">
+      {/* Modern Table */}
+      <div className="rounded-xl border bg-white shadow-sm dark:bg-slate-950 overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-slate-900/50 border-b">
+          <thead className="bg-slate-50 dark:bg-slate-900 border-b">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-sm font-medium"
-                    onClick={header.column.getToggleSortingHandler()}
+                    className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300"
                   >
-                    <div className="flex items-center gap-1 cursor-pointer select-none">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {header.column.getIsSorted() === "asc" && " ↑"}
-                      {header.column.getIsSorted() === "desc" && " ↓"}
-                    </div>
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.length > 0 ? (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={`border-b hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer transition-colors ${
-                    row.getIsSelected()
-                      ? "bg-slate-50 dark:bg-slate-900/50"
-                      : ""
-                  }`}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-4 py-3 text-sm"
-                      onClick={(e) => {
-                        // Prevent row click when clicking on checkbox or action buttons
-                        if (
-                          cell.column.id === "select" ||
-                          cell.column.id === "actions"
-                        ) {
-                          e.stopPropagation()
-                        }
-                      }}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
-                  ))}
+            <AnimatePresence mode="wait">
+              {table.getRowModel().rows.length > 0 ? (
+                table.getRowModel().rows.map((row, index) => (
+                  <motion.tr
+                    key={row.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: index * 0.02 }}
+                    className={`border-b hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer transition-colors ${
+                      row.getIsSelected()
+                        ? "bg-slate-50 dark:bg-slate-900/50"
+                        : ""
+                    }`}
+                    onClick={() => onRowClick?.(row.original)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className="px-4 py-3 text-sm"
+                        onClick={(e) => {
+                          if (
+                            cell.column.id === "select" ||
+                            cell.column.id === "actions"
+                          ) {
+                            e.stopPropagation()
+                          }
+                        }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
+                  </motion.tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText className="h-12 w-12 text-slate-300" />
+                      <p>No payments found matching your filters.</p>
+                    </div>
+                  </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-12 text-center text-muted-foreground"
-                >
-                  No payments found matching your filters.
-                </td>
-              </tr>
-            )}
+              )}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Modern Pagination */}
       {filteredData.length > 0 && (
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="text-sm text-muted-foreground">
@@ -546,6 +747,7 @@ export function PaymentsTable({ data, onRowClick }: PaymentsTableProps) {
               size="sm"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
+              className="h-9 w-9 p-0"
             >
               <ChevronsLeft className="h-4 w-4" />
             </Button>
@@ -554,18 +756,25 @@ export function PaymentsTable({ data, onRowClick }: PaymentsTableProps) {
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
+              className="h-9 w-9 p-0"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="px-2 py-1 text-sm">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
-            </span>
+            <div className="flex items-center gap-1 px-2">
+              <span className="text-sm font-medium">
+                {table.getState().pagination.pageIndex + 1}
+              </span>
+              <span className="text-sm text-muted-foreground">/</span>
+              <span className="text-sm text-muted-foreground">
+                {table.getPageCount()}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
+              className="h-9 w-9 p-0"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -574,6 +783,7 @@ export function PaymentsTable({ data, onRowClick }: PaymentsTableProps) {
               size="sm"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
+              className="h-9 w-9 p-0"
             >
               <ChevronsRight className="h-4 w-4" />
             </Button>

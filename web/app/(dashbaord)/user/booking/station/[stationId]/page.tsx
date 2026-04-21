@@ -43,6 +43,8 @@ import {
   Loader2,
   DollarSign,
   Timer,
+  Key,
+  X,
 } from "lucide-react"
 
 import { ChargingPointsGrid } from "@/components/ev/charging-points-grid"
@@ -52,6 +54,18 @@ import { BookingSummary } from "@/components/ev/ev-booking-summary"
 import { TimeSlotPicker } from "@/components/ev/TimeslotPicker"
 import { ReservationSuccessComponent } from "@/components/ev/reservation-success"
 import { axiosInstance } from "@/services/axiosInstance"
+import { useAppSelector, useAppDispatch } from "@/store/store"
+import { fetchUserWallet } from "@/store/slices/walletSlice"
+import { InputOTP } from "@/components/ui/input-otp"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { formatCurrencyIntl } from "@/lib/utils"
 
 // Types based on API response
 interface ChargingPoint {
@@ -129,6 +143,7 @@ async function fetchStationData(stationId: string): Promise<StationData> {
 export default function BookingPage() {
   const params = useParams()
   const router = useRouter()
+  const dispatch = useAppDispatch()
   const stationId = params?.stationId as string
 
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(
@@ -164,6 +179,22 @@ export default function BookingPage() {
   const [useNewCard, setUseNewCard] = useState(false)
   const [selectedTariffId, setSelectedTariffId] = useState<number | null>(null)
 
+  // Payment state
+  const [showWalletPassword, setShowWalletPassword] = useState(false)
+  const [walletPassword, setWalletPassword] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [pointsPaymentSuccess, setPointsPaymentSuccess] = useState(false)
+
+  // Get wallet data from Redux
+  const {
+    wallet,
+    loading: walletLoading,
+    hasWallet,
+    error: walletError,
+  } = useAppSelector((state) => state.wallet)
+  const { user } = useAppSelector((state) => state.user)
+
   // Fetch station data with React Query
   const {
     data: stationData,
@@ -173,8 +204,15 @@ export default function BookingPage() {
     queryKey: ["station", stationId],
     queryFn: () => fetchStationData(stationId),
     enabled: !!stationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   })
+
+  // Fetch wallet data on mount
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(fetchUserWallet())
+    }
+  }, [dispatch, user])
 
   // Calculate derived values
   const selectedPoint = stationData?.chargingPoints.find(
@@ -191,8 +229,8 @@ export default function BookingPage() {
   const currency = selectedTariff?.currency || "ETB"
   const subtotal = energyKwh * pricePerKwh
 
-  const walletBalance = 68.5
-  const pointsBalance = 3850
+  const walletBalance = wallet?.balance || 0
+  const pointsBalance = wallet?.points || 0
   const pointsValue = pointsBalance * 0.01
   const pointsToUseAmount = applyPoints ? Math.min(pointsValue, subtotal) : 0
   const totalAmount = subtotal - pointsToUseAmount
@@ -221,52 +259,287 @@ export default function BookingPage() {
     router.push("/user/ev-charging")
   }
 
-  const handleOpenPayment = () => {
-    if (!selectedPoint) return
-    if (energyKwh <= 0 || energyKwh > 200) return
-    if (paymentMethod === "wallet" && walletBalance < totalAmount) return
-    setPaymentStep("confirm")
-    setShowPaymentDialog(true)
+  // Process points deduction
+  const processPointsDeduction = async (): Promise<boolean> => {
+    if (!applyPoints && paymentMethod !== "points") return true
+    if (!wallet?.points || pointsBalance === 0) {
+      if (paymentMethod === "points") {
+        console.error("No points available")
+        return false
+      }
+      return true
+    }
+
+    try {
+      const pointsToDeduct = Math.ceil(pointsToUseAmount * 100)
+
+      if (pointsToDeduct === 0) return true
+
+      const { data } = await axiosInstance.post("/points/deduct", {
+        userId: user?.id,
+        points: pointsToDeduct,
+        value: pointsToUseAmount,
+        currency: currency,
+        reason: "EV Charging Session",
+        metadata: {
+          stationId: stationData?.id,
+          stationName: stationData?.name,
+          energyKwh: energyKwh,
+          amount: pointsToUseAmount,
+          timestamp: new Date().toISOString(),
+        },
+      })
+
+      if (data?.success) {
+        await dispatch(fetchUserWallet())
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Failed to deduct points:", error)
+      return false
+    }
   }
 
+  // Process wallet deduction
+  const processWalletDeduction = async (): Promise<boolean> => {
+    if (paymentMethod !== "wallet") return true
+
+    try {
+      const { data } = await axiosInstance.post("/wallet/balance/deduct", {
+        userId: user?.id,
+        amount: totalAmount,
+        currency: currency,
+        description: `EV Charging at ${stationData?.name} - ${energyKwh} kWh`,
+        metadata: {
+          stationId: stationData?.id,
+          stationName: stationData?.name,
+          pointId: selectedPointId,
+          energyKwh: energyKwh,
+          timestamp: new Date().toISOString(),
+        },
+      })
+
+      if (data?.success) {
+        await dispatch(fetchUserWallet())
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Failed to deduct from wallet:", error)
+      return false
+    }
+  }
+
+  // Process card payment
+  const processCardPayment = async (): Promise<boolean> => {
+    if (paymentMethod !== "card") return true
+
+    try {
+      let paymentData
+
+      if (useNewCard) {
+        paymentData = {
+          userId: user?.id,
+          amount: totalAmount,
+          currency: currency,
+          cardDetails: {
+            number: cardDetails.number.replace(/\s/g, ""),
+            expiry: cardDetails.expiry,
+            cvc: cardDetails.cvc,
+            name: cardDetails.name,
+          },
+          metadata: {
+            stationId: stationData?.id,
+            stationName: stationData?.name,
+            energyKwh: energyKwh,
+          },
+        }
+      } else {
+        paymentData = {
+          userId: user?.id,
+          amount: totalAmount,
+          currency: currency,
+          savedCardId: selectedCardId,
+          metadata: {
+            stationId: stationData?.id,
+            stationName: stationData?.name,
+            energyKwh: energyKwh,
+          },
+        }
+      }
+
+      const { data } = await axiosInstance.post(
+        "/payments/process-card",
+        paymentData,
+      )
+
+      if (data?.success) {
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Card payment failed:", error)
+      return false
+    }
+  }
+
+  // Main payment handler
+  const processPayment = async (): Promise<boolean> => {
+    try {
+      let success = false
+
+      switch (paymentMethod) {
+        case "wallet":
+          success = await processWalletDeduction()
+          break
+        case "points":
+          success = await processPointsDeduction()
+          break
+        case "card":
+          success = await processCardPayment()
+          break
+        default:
+          success = false
+      }
+
+      return success
+    } catch (error) {
+      console.error("Payment failed:", error)
+      return false
+    }
+  }
+
+  // Wallet payment with password verification - API READY
+  const handleWalletPayment = async () => {
+    setIsVerifying(true)
+    setPasswordError("")
+
+    // Verify wallet balance
+    if (walletBalance < totalAmount) {
+      setPasswordError(
+        "Insufficient wallet balance. Please load funds or use another payment method.",
+      )
+      setIsVerifying(false)
+      return
+    }
+
+    try {
+      // API call to verify wallet password
+      const { data } = await axiosInstance.post("/wallet/verify-pin", {
+        pin: walletPassword,
+      })
+      console.log(data)
+
+      if (data?.success) {
+        setPasswordError("")
+        setShowWalletPassword(false)
+        setWalletPassword("")
+
+        // Proceed with payment processing
+        await handleProcessPayment()
+      } else {
+        setPasswordError(
+          data?.message || "Invalid wallet password. Please try again.",
+        )
+        setWalletPassword("")
+      }
+    } catch (error: any) {
+      console.error("Wallet password verification failed:", error)
+
+      // Handle different error scenarios
+      if (error?.response?.status === 429) {
+        setPasswordError("Too many failed attempts. Please try again later.")
+      } else if (error?.response?.status === 403) {
+        setPasswordError("Wallet is locked. Please contact support.")
+      } else {
+        setPasswordError(
+          error?.response?.data?.message ||
+            "Failed to verify wallet password. Please try again.",
+        )
+      }
+
+      setWalletPassword("")
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  // Create reservation after successful payment
+  const createReservation = async () => {
+    setIsBooking(true)
+
+    try {
+      const reservation = {
+        stationId: stationData?.id,
+        stationName: stationData?.name,
+        stationAddress: stationData?.address,
+        stationCity: stationData?.city,
+        pointId: selectedPointId || 0,
+        pointNumber: selectedPoint?.slotNumber,
+        pointPower: selectedPoint?.powerKw || 0,
+        connectorType: selectedPoint?.connectorType || "CCS2",
+        timeSlot: selectedTimeSlot
+          ? {
+              startTime: selectedTimeSlot.startTime.toISOString(),
+              endTime: selectedTimeSlot.endTime.toISOString(),
+            }
+          : null,
+        energyKwh,
+        totalAmount: paymentMethod === "points" ? 0 : totalAmount,
+        originalAmount: subtotal,
+        pointsUsed: paymentMethod === "points" ? pointsToUseAmount : 0,
+        currency,
+        paymentMethod,
+        userId: user?.id,
+        timestamp: new Date().toISOString(),
+      }
+
+      // API call to create reservation
+      const { data } = await axiosInstance.post(
+        "/ev/reservations/create",
+        reservation,
+      )
+
+      if (data?.success) {
+        setReservationDetails({
+          ...reservation,
+          reservationCode: data.data.reservationCode,
+          reservationId: data.data.id,
+          qrCode: data.data.qrCode,
+        })
+        setBookingSuccess(true)
+
+        // Show points success message if applicable
+        if (paymentMethod === "points" && applyPoints) {
+          setPointsPaymentSuccess(true)
+          setTimeout(() => setPointsPaymentSuccess(false), 3000)
+        }
+      } else {
+        throw new Error(data?.message || "Failed to create reservation")
+      }
+    } catch (error) {
+      console.error("Reservation creation error:", error)
+    } finally {
+      setIsBooking(false)
+    }
+  }
+
+  // Handle complete payment flow
   const handleProcessPayment = async () => {
     setPaymentStep("processing")
-    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    if (paymentMethod === "card" && useNewCard) {
-      if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvc) {
-        setPaymentStep("confirm")
-        return
-      }
+    const paymentSuccess = await processPayment()
+
+    if (!paymentSuccess) {
+      setPaymentStep("confirm")
+      return
     }
 
     setPaymentStep("success")
     await new Promise((resolve) => setTimeout(resolve, 1500))
+    await createReservation()
     setShowPaymentDialog(false)
-    setIsBooking(true)
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsBooking(false)
-
-    setReservationDetails({
-      stationName: stationData?.name,
-      stationAddress: stationData?.address,
-      stationCity: stationData?.city,
-      pointId: selectedPointId || 0,
-      pointPower: selectedPoint?.powerKw || 0,
-      connectorType: selectedPoint?.connectorType || "CCS2",
-      timeSlot: selectedTimeSlot || {
-        startTime: new Date(),
-        endTime: new Date(Date.now() + 3600000),
-      },
-      energyKwh: energyKwh,
-      totalAmount: totalAmount,
-      currency: currency,
-      paymentMethod: paymentMethod,
-      reservationCode: `EV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    })
-
-    setBookingSuccess(true)
   }
 
   const handleNavigateToMyReservations = () => {
@@ -279,6 +552,36 @@ export default function BookingPage() {
     setSelectedPointId(null)
     setSelectedTimeSlot(null)
     setEnergyKwh(35)
+    setApplyPoints(false)
+    setPointsPaymentSuccess(false)
+  }
+
+  // Open payment dialog with validation
+  const handleOpenPayment = () => {
+    if (!selectedPoint) return
+    if (energyKwh <= 0 || energyKwh > 200) return
+
+    if (paymentMethod === "wallet") {
+      if (walletBalance >= totalAmount) {
+        setShowWalletPassword(true)
+      } else {
+        setPasswordError("Insufficient wallet balance. Please load funds.")
+      }
+    } else if (paymentMethod === "points") {
+      if (!applyPoints) {
+        // Show error: Please apply points first
+        return
+      }
+      if (pointsBalance === 0) {
+        // Show error: No points available
+        return
+      }
+      setPaymentStep("confirm")
+      setShowPaymentDialog(true)
+    } else {
+      setPaymentStep("confirm")
+      setShowPaymentDialog(true)
+    }
   }
 
   useEffect(() => {
@@ -346,7 +649,7 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="min-h-screen relative ">
+    <div className="min-h-screen relative">
       {/* Clean Header */}
       <div className="border-b border-emerald-200/50 backdrop-blur-sm bg-white/80 top-0 z-10 sticky">
         <div className="container mx-auto px-4 py-4">
@@ -395,7 +698,6 @@ export default function BookingPage() {
               <div className="flex items-center gap-2 group cursor-pointer">
                 <div className="flex items-center gap-0.5">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400 group-hover:scale-110 transition-transform" />
-
                   <span className="font-semibold text-gray-800">
                     {stationData.ratings.length > 0
                       ? (
@@ -407,7 +709,6 @@ export default function BookingPage() {
                       : "0.0"}
                   </span>
                 </div>
-
                 <span className="text-xs text-gray-500">
                   ({stationData.ratings.length})
                 </span>
@@ -559,14 +860,25 @@ export default function BookingPage() {
                 walletBalance={walletBalance}
                 selectedTimeSlot={selectedTimeSlot}
                 estimatedTimeMin={estimatedTimeMin}
-                onBookingComplete={() => console.log("done")}
-                onConfirmPayment={handleProcessPayment}
+                applyPoints={applyPoints}
+                setApplyPoints={setApplyPoints}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
+                totalAmount={totalAmount}
+                pointsToUseAmount={pointsToUseAmount}
+                isBooking={isBooking}
+                bookingSuccess={bookingSuccess}
+                pointsPaymentSuccess={pointsPaymentSuccess}
+                walletLoading={walletLoading}
+                onOpenPayment={handleOpenPayment}
+                onRefreshBalances={() => dispatch(fetchUserWallet())}
               />
             </div>
           </div>
         </div>
       </div>
 
+      {/* Payment Dialog */}
       <PaymentDialog
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
@@ -588,6 +900,23 @@ export default function BookingPage() {
         cardDetails={cardDetails}
         setCardDetails={setCardDetails}
         onConfirmPayment={handleProcessPayment}
+      />
+
+      {/* Wallet Password Dialog */}
+      <WalletPasswordDialog
+        open={showWalletPassword}
+        onOpenChange={setShowWalletPassword}
+        walletPassword={walletPassword}
+        setWalletPassword={setWalletPassword}
+        passwordError={passwordError}
+        isVerifying={isVerifying}
+        totalAmount={totalAmount}
+        onConfirm={handleWalletPayment}
+        onCancel={() => {
+          setShowWalletPassword(false)
+          setWalletPassword("")
+          setPasswordError("")
+        }}
       />
     </div>
   )
@@ -737,5 +1066,233 @@ const TariffSelector = ({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// Wallet Password Dialog Component
+const WalletPasswordDialog = ({
+  open,
+  onOpenChange,
+  walletPassword,
+  setWalletPassword,
+  passwordError,
+  isVerifying,
+  totalAmount,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  walletPassword: string
+  setWalletPassword: (value: string) => void
+  passwordError: string
+  isVerifying: boolean
+  totalAmount: number
+  onConfirm: () => void
+  onCancel: () => void
+}) => {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg md:max-w-xl rounded-2xl overflow-hidden p-0 border-0 shadow-2xl">
+        <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-50">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+
+        <DialogHeader className="px-8 pt-8 pb-2">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                Wallet Authentication
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-gray-600 text-base">
+              Enter your 6-digit wallet password to complete the payment
+              securely
+            </DialogDescription>
+          </motion.div>
+        </DialogHeader>
+
+        <div className="px-8 py-4 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 backdrop-blur-sm rounded-xl p-4 border border-emerald-200/50"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-md">
+                  <Wallet className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Paying with
+                  </p>
+                  <p className="font-bold text-gray-800 text-lg">
+                    HabeshaGo Wallet
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 font-medium">
+                  Amount to Pay
+                </p>
+                <motion.p
+                  key={totalAmount}
+                  initial={{ scale: 1.1 }}
+                  animate={{ scale: 1 }}
+                  className="font-bold text-2xl bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent"
+                >
+                  {formatCurrencyIntl(totalAmount)}
+                </motion.p>
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="space-y-4">
+            <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+              <Key className="h-4 w-4 text-emerald-500" />
+              Wallet Password (6-digit code)
+            </Label>
+
+            <div className="flex justify-center">
+              <InputOTP
+                maxLength={6}
+                value={walletPassword}
+                onChange={(value) => {
+                  setWalletPassword(value)
+                }}
+                autoFocus={true}
+                render={({ slots }) => (
+                  <div className="flex gap-3 justify-center">
+                    {slots.map((slot, idx) => (
+                      <div key={idx} className="relative">
+                        <div
+                          className={`w-14 h-14 flex items-center justify-center text-2xl font-mono font-bold text-center rounded-xl border-2 transition-all duration-200 ${
+                            walletPassword.length === idx + 1
+                              ? "border-emerald-500 ring-4 ring-emerald-500/20 bg-emerald-50/50"
+                              : slot.isActive
+                                ? "border-emerald-400 ring-2 ring-emerald-500/20"
+                                : "border-gray-200 hover:border-emerald-300"
+                          }`}
+                        >
+                          {slot.char ?? slot.placeholderChar ?? ""}
+                          {slot.hasFakeCaret && (
+                            <div className="w-px h-5 bg-black animate-pulse" />
+                          )}
+                        </div>
+
+                        {idx < slots.length - 1 && (
+                          <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 w-1 h-1 rounded-full bg-gray-300"></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
+            </div>
+
+            {walletPassword.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="flex justify-center gap-1 mt-2"
+              >
+                <div className="flex gap-1 w-full max-w-[300px]">
+                  {[...Array(6)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                        i < walletPassword.length
+                          ? "bg-gradient-to-r from-emerald-500 to-green-500"
+                          : "bg-gray-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {passwordError && (
+              <motion.p
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-xs text-red-500 flex items-center justify-center gap-1.5 bg-red-50 p-2 rounded-lg"
+              >
+                <Info className="h-3 w-3" />
+                {passwordError}
+              </motion.p>
+            )}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex gap-2 justify-center"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setWalletPassword("")}
+              className="text-xs text-gray-500 hover:text-emerald-600"
+            >
+              Clear
+            </Button>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-r from-emerald-100 to-green-100 rounded-xl p-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                <Shield className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-900">
+                  Secure Transaction
+                </p>
+                <p className="text-xs text-emerald-800">
+                  Your wallet password is encrypted end-to-end using AES-256
+                  encryption. This is a PCI-DSS compliant secure transaction.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="flex gap-3 px-8 pb-8">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="flex-1 rounded-xl h-12 border-2 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={onConfirm}
+            disabled={walletPassword.length !== 6 || isVerifying}
+            className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl h-12 shadow-lg shadow-emerald-500/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isVerifying ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                Verifying...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">Confirm Payment</div>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

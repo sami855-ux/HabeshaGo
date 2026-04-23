@@ -604,7 +604,8 @@ model Vehicle {
   capacity        Int
   vehicleImageUrl String?     @default("")
 
-  status  VehicleStatus @default(ACTIVE)
+  status        VehicleStatus @default(ACTIVE)
+  connectorType ConnectorType @default(TESLA)
   mileage Int           @default(0)
 
   ownerId     String?
@@ -1330,9 +1331,20 @@ enum PaymentGateway {
 }
 
 enum PaymentFlow {
+  // Wallet related
   WALLET_TOPUP
   WALLET_PAYMENT
+
+  // Direct external payment only
   DIRECT_PAYMENT
+
+  // Hybrid flows (your system logic)
+  POINTS_ONLY
+  WALLET_ONLY
+  POINTS_WALLET
+  POINTS_EXTERNAL
+  WALLET_EXTERNAL
+  POINTS_WALLET_EXTERNAL
 }
 
 enum SeatType {

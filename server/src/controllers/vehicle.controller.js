@@ -1,4 +1,5 @@
 import prisma from "../prisma/client.js"
+import { uploadToCloudinary } from "../services/cloudinary.service.js"
 import { setLatestVehicleLocation } from "../services/redisService.service.js"
 import { emitToVehicle } from "../socket/index.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
@@ -16,8 +17,13 @@ export const createVehicle = async (req, res) => {
       status,
       mileage,
       gpsDeviceId,
+      connectorType,
+      ownerName,
+      ownerPhone,
+      ownerId,
     } = req.body
 
+    // VALIDATION
     if (!plateNumber || !type || !model || !capacity) {
       return res
         .status(400)
@@ -29,19 +35,45 @@ export const createVehicle = async (req, res) => {
         )
     }
 
+    // IMAGE UPLOAD (OPTIONAL)
+    let vehicleImageUrl = ""
+
+    if (req.file?.buffer) {
+      try {
+        vehicleImageUrl = await uploadToCloudinary(req.file.buffer, "vehicles")
+      } catch (uploadError) {
+        console.error("Image upload failed:", uploadError)
+        return res
+          .status(500)
+          .json(errorResponse("Failed to upload vehicle image", 500))
+      }
+    }
+
+    // CREATE VEHICLE
     const vehicle = await prisma.vehicle.create({
       data: {
         plateNumber: plateNumber.trim(),
-        vin: vin?.trim(),
+        vin: vin?.trim() || null,
         type,
         model: model.trim(),
-        manufacturer: manufacturer?.trim(),
+        manufacturer: manufacturer?.trim() || null,
 
-        year: year ? Number(year) : undefined,
+        year: year ? Number(year) : null,
         capacity: Number(capacity),
-        status,
+
+        status: status || "ACTIVE",
         mileage: mileage ? Number(mileage) : 0,
-        gpsDeviceId: gpsDeviceId?.trim(),
+
+        gpsDeviceId: gpsDeviceId?.trim() || null,
+        connectorType: connectorType || "TESLA",
+
+        ownerName: ownerName?.trim() || null,
+        ownerPhone: ownerPhone?.trim() || null,
+
+        ownerId: ownerId || req.user?.id || null,
+
+        //  CLOUDINARY IMAGE
+        vehicleImageUrl,
       },
     })
 
@@ -61,6 +93,7 @@ export const createVehicle = async (req, res) => {
           ),
         )
     }
+
     return res
       .status(500)
       .json(errorResponse("Failed to create vehicle", 500, err.message))
@@ -99,7 +132,7 @@ export const getVehicleById = async (req, res) => {
       where: { id },
       include: {
         driverAssignments: {
-          where: { endDate: null }, 
+          where: { endDate: null },
           include: {
             driver: {
               select: {
@@ -503,5 +536,30 @@ export const updateVehicleLocation = async (req, res) => {
     return res
       .status(500)
       .json(errorResponse("Failed to update vehicle location", 500))
+  }
+}
+
+export const getUserVehicles = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        ownerId: userId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+
+    return res
+      .status(200)
+      .json(successResponse("Vehicles fetched successfully", vehicles))
+  } catch (err) {
+    console.error("Get user vehicles error:", err)
+
+    return res
+      .status(500)
+      .json(errorResponse("Failed to fetch vehicles", 500, err.message))
   }
 }

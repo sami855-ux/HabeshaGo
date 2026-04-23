@@ -8,6 +8,7 @@ import {
   Wallet,
   History,
   ChevronRight,
+  Car,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import {
@@ -48,13 +49,13 @@ const quickActions = [
     shadow: "shadow-orange-600/20",
   },
   {
-    id: "employment",
-    title: "Shuttle Jobs",
-    description: "View job openings",
-    icon: Briefcase,
-    gradient: "from-orange-700 to-amber-700",
-    lightColor: "bg-orange-100 dark:bg-orange-500/20",
-    shadow: "shadow-orange-700/20",
+    id: "vehicles",
+    title: "My Vehicles",
+    description: "Add and manage your EV vehicles",
+    icon: Car,
+    gradient: "from-green-700 to-emerald-700",
+    lightColor: "bg-green-100 dark:bg-green-500/20",
+    shadow: "shadow-green-700/20",
   },
   {
     id: "wallet",

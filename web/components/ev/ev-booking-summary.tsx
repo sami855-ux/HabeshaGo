@@ -23,18 +23,47 @@ import {
   Leaf,
   CheckCircle,
   RefreshCw,
+  AlertCircle,
+  Clock,
+  Shield,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { formatCurrencyIntl } from "@/lib/utils"
 
+interface ChargingPoint {
+  id: number
+  slotNumber: string
+  connectorType: string
+  powerKw: number
+  status: string
+  chargingSpeed: string
+}
+
+interface Vehicle {
+  id: number
+  manufacturer: string
+  model: string
+  connectorType: string
+  capacity: number
+  plateNumber: string
+  year: number
+}
+
+interface TimeSlot {
+  id: string
+  startTime: Date
+  endTime: Date
+  isAvailable: boolean
+}
+
 interface BookingSummaryProps {
-  selectedPoint: any
+  selectedPoint: ChargingPoint | null
   energyKwh: number
   pricePerKwh: number
   stationData: any
   pointsBalance: number
   walletBalance: number
-  selectedTimeSlot: any
+  selectedTimeSlot: TimeSlot | null
   estimatedTimeMin?: number
   applyPoints: boolean
   setApplyPoints: (value: boolean) => void
@@ -48,6 +77,7 @@ interface BookingSummaryProps {
   walletLoading: boolean
   onOpenPayment: () => void
   onRefreshBalances: () => void
+  selectedVehicle?: Vehicle | null
 }
 
 export function BookingSummary({
@@ -61,46 +91,106 @@ export function BookingSummary({
   estimatedTimeMin,
   applyPoints,
   setApplyPoints,
+  pointsToUseAmount,
   paymentMethod,
   setPaymentMethod,
   totalAmount,
-  pointsToUseAmount,
   isBooking,
   bookingSuccess,
   pointsPaymentSuccess,
   walletLoading,
   onOpenPayment,
   onRefreshBalances,
+  selectedVehicle,
 }: BookingSummaryProps) {
   const subtotal = energyKwh * pricePerKwh
+  const POINTS_CONVERSION_RATE = 0.5
+  const pointsValue = pointsBalance * POINTS_CONVERSION_RATE
+  const pointsNeededForDiscount = Math.ceil(
+    pointsToUseAmount / POINTS_CONVERSION_RATE,
+  )
+
   const isWalletInsufficient =
     paymentMethod === "wallet" && walletBalance < totalAmount
+  const isPointsInsufficient = paymentMethod === "points" && pointsBalance === 0
+  const isVehicleCompatible =
+    selectedVehicle && selectedPoint
+      ? selectedVehicle.connectorType === selectedPoint.connectorType
+      : true
+  const isTimeSlotSelected = selectedTimeSlot !== null
 
-  // Get button text based on payment method
+  // Get button text based on payment method and status
   const getButtonText = () => {
     if (isBooking) {
       return (
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-          Processing Payment...
+          Processing...
         </div>
       )
     }
 
+    if (!selectedPoint) {
+      return "Select a Charging Point"
+    }
+
+    if (!isTimeSlotSelected) {
+      return "Select a Time Slot"
+    }
+
+    if (!isVehicleCompatible) {
+      return "Vehicle Incompatible"
+    }
+
     if (paymentMethod === "points") {
-      return "Pay with Points"
+      if (pointsBalance === 0) {
+        return "No Points Available"
+      }
+      if (!applyPoints) {
+        return "Apply Points First"
+      }
+      return `Pay with Points (${pointsBalance.toLocaleString()} pts)`
+    }
+
+    if (paymentMethod === "wallet" && walletBalance < totalAmount) {
+      return `Insufficient Balance - Need ${formatCurrencyIntl(totalAmount - walletBalance)} More`
     }
 
     return `Pay ${formatCurrencyIntl(totalAmount)}`
   }
 
   // Determine if button should be disabled
-  const isButtonDisabled =
-    !selectedPoint ||
-    isBooking ||
-    bookingSuccess ||
-    pointsPaymentSuccess ||
-    walletLoading
+  const isButtonDisabled = () => {
+    if (!selectedPoint) return true
+    if (!isTimeSlotSelected) return true
+    if (isBooking) return true
+    if (bookingSuccess) return true
+    if (pointsPaymentSuccess) return true
+    if (walletLoading) return true
+    if (!isVehicleCompatible) return true
+
+    if (paymentMethod === "points") {
+      if (pointsBalance === 0) return true
+      if (!applyPoints) return true
+    }
+
+    if (paymentMethod === "wallet" && walletBalance < totalAmount) return true
+
+    return false
+  }
+
+  // Handle payment method change
+  const handlePaymentMethodChange = (method: "wallet" | "points" | "card") => {
+    setPaymentMethod(method)
+    // Don't auto disable applyPoints when switching to points
+    // Allow points to be applied for both wallet and card payments
+  }
+
+  // Format time range
+  const formatTimeRange = () => {
+    if (!selectedTimeSlot) return "Not selected"
+    return `${selectedTimeSlot.startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - ${selectedTimeSlot.endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+  }
 
   return (
     <div className="space-y-6">
@@ -127,9 +217,43 @@ export function BookingSummary({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
+              {/* Compatibility Warning */}
+              {!isVehicleCompatible && selectedVehicle && (
+                <Alert className="mb-4 bg-red-50 border-red-200 text-red-800 rounded-xl">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="font-medium">
+                    Your {selectedVehicle.manufacturer} {selectedVehicle.model}{" "}
+                    requires {selectedVehicle.connectorType} connector, but this
+                    point has {selectedPoint.connectorType}. Please select a
+                    compatible charging point.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Time Slot Warning */}
+              {!isTimeSlotSelected && (
+                <Alert className="mb-4 bg-amber-50 border-amber-200 text-amber-800 rounded-xl">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="font-medium">
+                    Please select a time slot for your charging session.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Security Notice for Points Payment */}
+              {paymentMethod === "points" && applyPoints && (
+                <Alert className="mb-4 bg-blue-50 border-blue-200 text-blue-800 rounded-xl">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="font-medium text-sm">
+                    Points payment requires wallet password verification for
+                    security.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Selected Point Card */}
               <div className="bg-gradient-to-br from-emerald-50/80 to-green-50/60 rounded-xl p-4 pt-0 space-y-3 backdrop-blur-sm border border-emerald-100">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center pt-4">
                   <div className="flex items-center gap-3">
                     <div>
                       <div className="font-bold text-lg bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
@@ -141,20 +265,50 @@ export function BookingSummary({
                       </div>
                     </div>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                    Available
-                  </Badge>
+                  {selectedVehicle && (
+                    <Badge
+                      className={`${isVehicleCompatible ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-700 border-red-200"}`}
+                    >
+                      {isVehicleCompatible ? "Compatible" : "Incompatible"}
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Time slot info if selected */}
-                {selectedTimeSlot && (
+                {/* Vehicle Info */}
+                {selectedVehicle && (
                   <div className="text-xs text-gray-600 bg-white/50 rounded-lg p-2">
-                    <span className="font-medium">Scheduled:</span>{" "}
-                    {new Date(selectedTimeSlot.startTime).toLocaleTimeString()}{" "}
-                    - {new Date(selectedTimeSlot.endTime).toLocaleTimeString()}
-                    {estimatedTimeMin && ` (${estimatedTimeMin} min estimated)`}
+                    <span className="font-medium">Vehicle:</span>{" "}
+                    {selectedVehicle.manufacturer} {selectedVehicle.model} •{" "}
+                    {selectedVehicle.plateNumber}
+                    <span className="ml-2 text-emerald-600">
+                      ({selectedVehicle.connectorType})
+                    </span>
                   </div>
                 )}
+
+                {/* Time slot info - REQUIRED */}
+                <div
+                  className={`rounded-lg p-2 ${selectedTimeSlot ? "bg-emerald-100/50" : "bg-amber-50"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock
+                        className={`h-3.5 w-3.5 ${selectedTimeSlot ? "text-emerald-600" : "text-amber-600"}`}
+                      />
+                      <span className="text-xs font-medium">Time Slot:</span>
+                    </div>
+                    <span
+                      className={`text-xs font-semibold ${selectedTimeSlot ? "text-emerald-700" : "text-amber-700"}`}
+                    >
+                      {formatTimeRange()}
+                    </span>
+                  </div>
+                  {estimatedTimeMin && selectedTimeSlot && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Estimated charging duration: {estimatedTimeMin} minutes
+                    </div>
+                  )}
+                </div>
 
                 <Separator className="bg-emerald-100" />
 
@@ -162,7 +316,8 @@ export function BookingSummary({
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">
-                      Energy ({energyKwh} kWh)
+                      Energy ({energyKwh} kWh) ×{" "}
+                      {formatCurrencyIntl(pricePerKwh)}/kWh
                     </span>
                     <span className="font-medium">
                       {formatCurrencyIntl(subtotal)}
@@ -192,7 +347,8 @@ export function BookingSummary({
                           HabeshaGo Points
                         </span>
                         <div className="text-xs text-emerald-700">
-                          {pointsBalance.toLocaleString()} pts available
+                          {pointsBalance.toLocaleString()} pts available (
+                          {formatCurrencyIntl(pointsValue)})
                         </div>
                       </div>
                     </div>
@@ -219,7 +375,10 @@ export function BookingSummary({
                       animate={{ opacity: 1, height: "auto" }}
                       className="flex justify-between text-sm text-emerald-600 bg-emerald-50 p-2 rounded-lg"
                     >
-                      <span>Points discount applied</span>
+                      <span>
+                        Points discount applied (
+                        {pointsNeededForDiscount.toLocaleString()} pts)
+                      </span>
                       <span className="font-semibold">
                         -{formatCurrencyIntl(pointsToUseAmount)}
                       </span>
@@ -266,10 +425,7 @@ export function BookingSummary({
 
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={(val) => {
-                    setPaymentMethod(val as any)
-                    setApplyPoints(false)
-                  }}
+                  onValueChange={(val) => handlePaymentMethodChange(val as any)}
                   className="space-y-2"
                 >
                   {/* Wallet Payment */}
@@ -280,7 +436,7 @@ export function BookingSummary({
                         ? "border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-green-50/80 shadow-md"
                         : "border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/30"
                     }`}
-                    onClick={() => setPaymentMethod("wallet")}
+                    onClick={() => handlePaymentMethodChange("wallet")}
                   >
                     <div className="flex items-center gap-3">
                       <RadioGroupItem value="wallet" id="wallet" />
@@ -302,25 +458,36 @@ export function BookingSummary({
 
                   {isWalletInsufficient && (
                     <div className="text-xs text-amber-600 flex items-center justify-between px-3">
-                      <span>Insufficient balance</span>
+                      <span>
+                        Insufficient balance. Please load funds or use another
+                        method.
+                      </span>
                     </div>
                   )}
 
-                  {/* Points Payment */}
+                  {/* Points Payment - Updated to show password requirement */}
                   <motion.div
                     whileHover={{ scale: 1.01 }}
                     className={`flex items-center justify-between border-2 rounded-xl p-3 cursor-pointer transition-all ${
                       paymentMethod === "points"
                         ? "border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-green-50/80 shadow-md"
                         : "border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/30"
-                    }`}
-                    onClick={() => setPaymentMethod("points")}
+                    } ${pointsBalance === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                    onClick={() => {
+                      if (pointsBalance > 0) {
+                        handlePaymentMethodChange("points")
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
-                      <RadioGroupItem value="points" id="points" />
+                      <RadioGroupItem
+                        value="points"
+                        id="points"
+                        disabled={pointsBalance === 0}
+                      />
                       <Label
                         htmlFor="points"
-                        className="flex items-center gap-2 cursor-pointer"
+                        className={`flex items-center gap-2 ${pointsBalance === 0 ? "cursor-not-allowed" : "cursor-pointer"}`}
                       >
                         <Coins className="h-4 w-4 text-emerald-600" />
                         <span className="font-medium">HabeshaGo Points</span>
@@ -330,9 +497,30 @@ export function BookingSummary({
                       <span className="text-sm font-semibold text-emerald-600">
                         {pointsBalance.toLocaleString()} pts
                       </span>
-                      <div className="text-xs text-gray-500">available</div>
+                      <div className="text-xs text-gray-500">
+                        Value: {formatCurrencyIntl(pointsBalance * 0.01)}
+                      </div>
                     </div>
                   </motion.div>
+
+                  {paymentMethod === "points" && (
+                    <div className="text-xs text-blue-600 flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
+                      <Shield className="h-3 w-3" />
+                      <span>
+                        Wallet password required for security verification
+                      </span>
+                    </div>
+                  )}
+
+                  {paymentMethod === "points" &&
+                    !applyPoints &&
+                    pointsBalance > 0 && (
+                      <div className="text-xs text-amber-600 flex items-center justify-between px-3">
+                        <span>
+                          Click "Apply Points" above to use your points
+                        </span>
+                      </div>
+                    )}
 
                   {/* Card Payment */}
                   <motion.div
@@ -342,7 +530,7 @@ export function BookingSummary({
                         ? "border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-green-50/80 shadow-md"
                         : "border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/30"
                     }`}
-                    onClick={() => setPaymentMethod("card")}
+                    onClick={() => handlePaymentMethodChange("card")}
                   >
                     <div className="flex items-center gap-3">
                       <RadioGroupItem value="card" id="card" />
@@ -371,7 +559,7 @@ export function BookingSummary({
                   Idle fee of{" "}
                   {formatCurrencyIntl(
                     parseFloat(
-                      stationData.tariffs?.[0]?.idleFeePerMinute || "0.5",
+                      stationData?.tariffs?.[0]?.idleFeePerMinute || "0.5",
                     ),
                   )}
                   /min applies after 10 minutes grace period.
@@ -420,8 +608,9 @@ export function BookingSummary({
                     <Alert className="bg-gradient-to-r from-amber-50 to-emerald-50 border-amber-200 text-emerald-800 rounded-xl">
                       <Coins className="h-4 w-4 text-amber-500" />
                       <AlertDescription className="font-medium">
-                        Payment successful! {pointsToUseAmount.toFixed(2)}{" "}
-                        points redeemed. Your charging session has started!
+                        Payment successful!{" "}
+                        {formatCurrencyIntl(pointsToUseAmount)} points redeemed.
+                        Your charging session has started!
                       </AlertDescription>
                     </Alert>
                   </motion.div>
@@ -447,9 +636,9 @@ export function BookingSummary({
 
         <CardFooter className="pt-2 pb-6">
           <Button
-            className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg shadow-emerald-500/30 rounded-xl py-6 text-base font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg shadow-emerald-500/30 rounded-xl py-6 text-base font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
-            disabled={isButtonDisabled}
+            disabled={isButtonDisabled()}
             onClick={onOpenPayment}
           >
             {getButtonText()}

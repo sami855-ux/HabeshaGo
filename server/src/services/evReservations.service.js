@@ -1,9 +1,11 @@
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import { POINTS_CONVERSION_RATE } from "../utils/constants.js"
 
 /**
  * Create a new reservation
  */
+
 export const createReservationService = async (data) => {
   try {
     const {
@@ -14,122 +16,269 @@ export const createReservationService = async (data) => {
       userId,
       targetBatteryPercentage,
       targetKwh,
+
+      calculatedAmount,
+      paymentFlow = "POINTS_WALLET",
+      // POINTS_WALLET | POINTS_EXTERNAL | WALLET_ONLY | EXTERNAL_ONLY
+
+      paymentMethod = "MOBILE_MONEY",
     } = data
 
+    // VALIDATION
     const now = new Date()
     const start = new Date(startTime)
     const end = new Date(endTime)
 
-    // 0. Validate timeframe
-    const oneWeekFromNow = new Date(now)
-    oneWeekFromNow.setDate(now.getDate() + 7)
+    const oneWeek = new Date(now)
+    oneWeek.setDate(now.getDate() + 7)
 
-    if (start < now) {
+    if (start < now)
       return errorResponse("Reservation cannot start in the past", 400)
-    }
-    if (start > oneWeekFromNow || end > oneWeekFromNow) {
-      return errorResponse(
-        "Reservation cannot be more than 1 week from now",
-        400,
-      )
-    }
-    if (end <= start) {
-      return errorResponse("Reservation end time must be after start time", 400)
-    }
 
-    // 1. Check for overlapping reservations at the same charging point
-    const overlappingReservation = await prisma.eVReservation.findFirst({
+    if (start > oneWeek || end > oneWeek)
+      return errorResponse("Reservation cannot exceed 1 week", 400)
+
+    if (end <= start) return errorResponse("Invalid time range", 400)
+
+    console.log(calculatedAmount)
+    if (!calculatedAmount || Number(calculatedAmount) <= 0)
+      return errorResponse("Invalid payment amount", 400)
+
+    // OVERLAP CHECK
+    const overlap = await prisma.eVReservation.findFirst({
       where: {
         chargingPointId,
         status: { not: "CANCELLED" },
-        OR: [
-          {
-            startTime: { lte: end },
-            endTime: { gte: start },
+        OR: [{ startTime: { lte: end }, endTime: { gte: start } }],
+      },
+    })
+
+    if (overlap) return errorResponse("Charging point already reserved", 400)
+
+    // MAIN TRANSACTION
+    const result = await prisma.$transaction(async (tx) => {
+      let remainingAmount = Number(calculatedAmount)
+
+      let pointsUsed = 0
+      let pointsValueUsed = 0
+      let walletUsed = 0
+
+      const wallet = await tx.wallet.findUnique({
+        where: { userId },
+      })
+
+      if (!wallet) {
+        return errorResponse("Wallet not found", 404)
+      }
+
+      // Lock wallet
+      await tx.$executeRaw`
+        SELECT * FROM "Wallet" WHERE id = ${wallet.id} FOR UPDATE
+      `
+
+      // 1. POINTS (DISCOUNT LAYER)
+      if (
+        (paymentFlow === "POINTS_WALLET" ||
+          paymentFlow === "POINTS_EXTERNAL") &&
+        wallet.points > 0
+      ) {
+        const maxPointsValue = wallet.points * POINTS_CONVERSION_RATE
+
+        if (maxPointsValue >= remainingAmount) {
+          pointsValueUsed = remainingAmount
+          pointsUsed = Math.ceil(remainingAmount / POINTS_CONVERSION_RATE)
+          remainingAmount = 0
+        } else {
+          pointsValueUsed = maxPointsValue
+          pointsUsed = wallet.points
+          remainingAmount -= pointsValueUsed
+        }
+
+        await tx.pointTransaction.create({
+          data: {
+            walletId: wallet.id,
+            amount: -pointsUsed,
+            type: "SPEND",
+            reason: "EV Reservation",
           },
-        ],
-      },
-    })
+        })
 
-    if (overlappingReservation) {
-      return errorResponse(
-        "This charging point is already reserved during the selected time",
-        400,
-      )
-    }
-
-    // 2. Optional: Check if the vehicle already has a reservation at the same time
-    const vehicleOverlap = await prisma.eVReservation.findFirst({
-      where: {
-        vehicleId,
-        status: { not: "CANCELLED" },
-        OR: [
-          {
-            startTime: { lte: end },
-            endTime: { gte: start },
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            points: wallet.points - pointsUsed,
           },
-        ],
-      },
+        })
+      }
+
+      // 2. WALLET (PRIMARY PAYMENT)
+      if (
+        (paymentFlow === "POINTS_WALLET" || paymentFlow === "WALLET_ONLY") &&
+        remainingAmount > 0
+      ) {
+        const walletBalance = Number(wallet.balance)
+
+        walletUsed = Math.min(walletBalance, remainingAmount)
+        remainingAmount -= walletUsed
+
+        if (walletUsed > 0) {
+          const newBalance = wallet.balance - walletUsed
+
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: newBalance },
+          })
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: walletUsed,
+              type: "PAYMENT_OUT",
+              status: "SUCCESS",
+              serviceType: "EV_CHARGING",
+              balanceAfter: newBalance,
+              reference: `WT-${Date.now()}`,
+              description: "EV Reservation payment",
+            },
+          })
+        }
+      }
+
+      const isFullyPaid = remainingAmount === 0
+
+      // 3. RESERVATION
+      const reservation = await tx.eVReservation.create({
+        data: {
+          vehicleId,
+          chargingPointId,
+          startTime: start,
+          endTime: end,
+          userId,
+          targetBatteryPercentage,
+          targetKwh,
+          calculatedAmount,
+
+          paymentStatus: isFullyPaid ? "SUCCESS" : "PENDING",
+          preAuthorizedAmount: calculatedAmount,
+          reservationCode: `RES-${Date.now()}`,
+          isConnectorLocked: !isFullyPaid,
+        },
+      })
+
+      // 4. PAYMENT RECORD
+      const payment = await tx.payment.create({
+        data: {
+          userId,
+          amount: calculatedAmount,
+
+          method: isFullyPaid ? "WALLET" : paymentMethod,
+          gateway: isFullyPaid ? "INTERNAL" : "CHAPA",
+
+          flow: paymentFlow,
+
+          pointsUsed: pointsUsed || null,
+          pointsValue: pointsValueUsed || null,
+
+          status: isFullyPaid ? "SUCCESS" : "PENDING",
+
+          reference: `PAY-${Date.now()}`,
+          evReservationId: reservation.id,
+
+          metadata: {
+            walletUsed,
+            externalAmount: remainingAmount,
+            paymentFlow,
+          },
+        },
+      })
+
+      return {
+        reservation,
+        payment,
+        externalAmount: remainingAmount,
+        needsExternalPayment: remainingAmount > 0,
+      }
     })
 
-    if (vehicleOverlap) {
-      return errorResponse(
-        "This vehicle already has a reservation during the selected time",
-        400,
-      )
-    }
-
-    // 3. Generate unique reservation code
-    const reservationCode = `RES-${Date.now()}`
-
-    // 4. Calculate reservation cost
-    const calculatedAmount = calculateTariff({
-      targetBatteryPercentage,
-      targetKwh,
-      chargingPointId,
-    })
-
-    // 5. Create reservation
-    const reservation = await prisma.eVReservation.create({
-      data: {
-        vehicleId,
-        chargingPointId,
-        startTime: start,
-        endTime: end,
-        userId,
-        targetBatteryPercentage: targetBatteryPercentage ?? null,
-        targetKwh: targetKwh ?? null,
-        calculatedAmount,
-        paymentStatus: "PENDING",
-        preAuthorizedAmount: calculatedAmount,
-        reservationCode,
-        isConnectorLocked: true,
-      },
-      include: {
-        vehicle: true,
-        user: true,
-        chargingPoint: true,
-      },
-    })
-
-    return successResponse("Reservation created successfully", reservation, 201)
+    // RESPONSE
+    return successResponse(
+      result.remainingAmount === 0
+        ? "Reservation fully paid successfully"
+        : "Reservation created. External payment required",
+      result,
+      201,
+    )
   } catch (error) {
-    console.error("Error creating reservation:", error)
-    return errorResponse("Failed to create reservation", 500)
+    console.error("Reservation Error:", error)
+    return errorResponse(error?.message || "Failed to create reservation", 500)
   }
 }
 
-// Example tariff calculation function (replace with real logic)
-function calculateTariff({
-  targetBatteryPercentage,
-  targetKwh,
-  chargingPointId,
-}) {
-  const pricePerKwh = 0.5 // placeholder
-  const kwh =
-    targetKwh ?? (targetBatteryPercentage ? targetBatteryPercentage * 0.5 : 1) // placeholder logic
-  return kwh * pricePerKwh
-}
+// const res = await createReservation()
+
+// if (res.data.needsExternalPayment) {
+//   const paymentId = res.data.payment.id
+
+//   const external = await initializeExternalPayment(paymentId)
+
+//   window.location.href = external.checkoutUrl
+// }
+//EXTERNAL Paymnet
+// export const initializeExternalPaymentService = async (paymentId) => {
+//   const payment = await prisma.payment.findUnique({
+//     where: { id: paymentId },
+//   })
+
+//   if (!payment) {
+//     return errorResponse("Payment not found", 404)
+//   }
+
+//   const amount = payment.metadata?.externalAmount
+
+//   if (!amount || amount <= 0) {
+//     return errorResponse("No external payment needed", 400)
+//   }
+
+//   // Call Chapa / Telebirr
+//   const gatewayResponse = await initializeChapaPayment({
+//     amount,
+//     tx_ref: payment.reference,
+//     callback_url: `${process.env.BASE_URL}/api/payments/webhook`,
+//   })
+
+//   return successResponse("Redirect user to payment gateway", {
+//     checkoutUrl: gatewayResponse.checkout_url,
+//   })
+// }
+
+// export const paymentWebhook = async (req) => {
+//   const { tx_ref, status } = req.body
+
+//   const payment = await prisma.payment.findUnique({
+//     where: { reference: tx_ref },
+//   })
+
+//   if (!payment) return errorResponse("Payment not found", 404)
+
+//   if (status === "success") {
+//     await prisma.payment.update({
+//       where: { id: payment.id },
+//       data: { status: "COMPLETED" },
+//     })
+
+//     await prisma.eVReservation.update({
+//       where: { id: payment.evReservationId },
+//       data: {
+//         paymentStatus: "COMPLETED",
+//         isConnectorLocked: false,
+//       },
+//     })
+
+//     return successResponse("Payment completed", null, 200)
+//   }
+
+//   return errorResponse("Payment failed", 400)
+// }
 
 /**
  * Get all reservations

@@ -6,7 +6,7 @@ export type VehicleStatus =
   | "INACTIVE"
 
 export interface Vehicle {
-  id: string
+  id: number
   type: VehicleType
   vin: string
   model: string
@@ -25,6 +25,8 @@ export interface Vehicle {
   ownerPhone: string | null
   gpsDeviceId: string
   mileage: number
+  connectorType: "TYPE2" | "CCS" | "CHADEMO" | "TESLA" | "GBT"
+  vehicleImageUrl: string
 }
 
 export interface VehicleFormData {
@@ -61,4 +63,41 @@ export interface VehicleFilters {
   limit?: number
   sortBy?: string
   sortOrder?: "asc" | "desc"
+}
+
+export interface CreateVehiclePayload {
+  type: VehicleType
+  vin: string
+  model: string
+  plateNumber: string
+  capacity: number
+  manufacturer: string
+  year: number
+
+  connectorType: "TYPE2" | "CCS" | "CHADEMO" | "TESLA" | "GBT"
+
+  gpsDeviceId: string
+  mileage?: number
+
+  ownerName?: string | null
+  ownerPhone?: string | null
+}
+
+export interface VehicleUserFormData {
+  type: VehicleType
+  vin: string
+  model: string
+  plateNumber: string
+  capacity: number
+  manufacturer: string
+  year: number
+
+  connectorType: "TYPE2" | "CCS" | "CHADEMO" | "TESLA" | "GBT"
+
+  gpsDeviceId: string
+  mileage?: number
+
+  ownerName?: string
+  ownerPhone?: string
+  image?: File // 👈 NEW
 }

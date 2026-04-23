@@ -11,12 +11,21 @@ import {
   unassignDriver,
   getVehicleById,
   updateVehicleLocation,
+  getUserVehicles,
 } from "../controllers/vehicle.controller.js"
+import { upload } from "../config/multer.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
 // Create a new vehicle
-router.post("/", createVehicle)
+router.post(
+  "/",
+  upload.single("image"), // 👈 handles file upload (field name: "image")
+  createVehicle,
+)
+
+router.get("/user-vehicles", authenticate, getUserVehicles)
 
 //Get a vehicle by Id
 router.get("/:id", getVehicleById)

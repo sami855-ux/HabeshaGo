@@ -19,6 +19,7 @@ import {
   Zap,
   Lock,
   User,
+  History,
 } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { motion, AnimatePresence } from "framer-motion"
@@ -34,6 +35,7 @@ import {
   isBefore,
   isToday,
   differenceInMinutes,
+  isAfter,
 } from "date-fns"
 
 interface TimeSlot {
@@ -42,6 +44,7 @@ interface TimeSlot {
   endTime: Date
   isAvailable: boolean
   reservedBy?: string
+  isPast?: boolean
 }
 
 interface Reservation {
@@ -112,6 +115,15 @@ const isTimeRangeAvailable = (
 }
 
 /**
+ * Check if a time slot is in the past
+ */
+const isPastTimeSlot = (startTime: Date, endTime: Date): boolean => {
+  const now = new Date()
+  // Consider a slot as past if it ends before now
+  return endTime < now
+}
+
+/**
  * Generate dynamic time slots based on estimated time + buffer time
  * Each slot starts after the previous slot's end time + buffer time
  */
@@ -166,14 +178,19 @@ const generateDynamicTimeSlots = (
       date,
     )
 
+    // Check if the slot is in the past
+    const isPast = isPastTimeSlot(currentStart, currentEnd)
+
     // Only add the slot if it's available OR if we want to show reserved slots
     // We'll show both available and reserved slots for transparency
+    // But past slots are disabled regardless
     slots.push({
       id: `slot-${slotId++}-${format(currentStart, "HH:mm")}`,
       startTime: new Date(currentStart),
       endTime: currentEnd,
-      isAvailable,
+      isAvailable: isAvailable && !isPast, // Past slots are not available
       reservedBy,
+      isPast,
     })
 
     // Calculate next start time: current start + estimated time + buffer time
@@ -282,7 +299,8 @@ export function TimeSlotPicker({
 
   const handleSlotClick = useCallback(
     (slot: TimeSlot) => {
-      if (!slot.isAvailable) return
+      // Don't allow clicking on past or unavailable slots
+      if (!slot.isAvailable || slot.isPast) return
 
       if (isSlotSelected(slot)) {
         onTimeSlotSelect(null)
@@ -303,26 +321,6 @@ export function TimeSlotPicker({
   const isFullyBooked = useMemo(() => {
     return timeSlots.length > 0 && !timeSlots.some((slot) => slot.isAvailable)
   }, [timeSlots])
-
-  const handleConfirmBooking = useCallback(() => {
-    if (!selectedTimeSlot) return
-    console.log("Booking confirmed:", {
-      pointId: selectedPointId,
-      date: format(selectedDate, "yyyy-MM-dd"),
-      startTime: format(selectedTimeSlot.startTime, "HH:mm"),
-      endTime: format(selectedTimeSlot.endTime, "HH:mm"),
-      durationMinutes: estimatedTimeMin,
-    })
-    alert(
-      `✅ Booking confirmed!\n\nPoint: #${selectedPointId}\nDate: ${format(selectedDate, "MMMM d, yyyy")}\nTime: ${format(selectedTimeSlot.startTime, "h:mm a")} - ${format(selectedTimeSlot.endTime, "h:mm a")}\nDuration: ${formatDuration(estimatedTimeMin)}\nBuffer: ${bufferTimeMin} min before/after`,
-    )
-  }, [
-    selectedTimeSlot,
-    selectedPointId,
-    selectedDate,
-    estimatedTimeMin,
-    bufferTimeMin,
-  ])
 
   // Loading Skeleton Component
   const SlotSkeleton = () => (
@@ -519,7 +517,8 @@ export function TimeSlotPicker({
                 variant="outline"
                 className="bg-emerald-50 text-emerald-700 border-emerald-200"
               >
-                {timeSlots.filter((s) => s.isAvailable).length} slots available
+                {timeSlots.filter((s) => s.isAvailable && !s.isPast).length}{" "}
+                slots available
               </Badge>
             </div>
 
@@ -545,9 +544,13 @@ export function TimeSlotPicker({
                   {timeSlots.map((slot, index) => {
                     const isSelected = isSlotSelected(slot)
                     const isPeakHour = getPeakHourStatus(slot.startTime)
+                    const isPast = slot.isPast
 
                     let slotColor = ""
-                    if (isSelected) {
+                    if (isPast) {
+                      slotColor =
+                        "border-gray-300 bg-gradient-to-br from-gray-100 to-gray-200 cursor-not-allowed opacity-60"
+                    } else if (isSelected) {
                       slotColor =
                         "border-emerald-500 bg-gradient-to-br from-emerald-50 to-green-50 shadow-md ring-2 ring-emerald-500/20"
                     } else if (!slot.isAvailable) {
@@ -565,18 +568,24 @@ export function TimeSlotPicker({
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: index * 0.05 }}
                         whileHover={
-                          slot.isAvailable ? { scale: 1.02, y: -2 } : {}
+                          slot.isAvailable && !isPast
+                            ? { scale: 1.02, y: -2 }
+                            : {}
                         }
-                        whileTap={slot.isAvailable ? { scale: 0.98 } : {}}
+                        whileTap={
+                          slot.isAvailable && !isPast ? { scale: 0.98 } : {}
+                        }
                         onClick={() => handleSlotClick(slot)}
                         onMouseEnter={() => setHoveredSlot(slot.id)}
                         onMouseLeave={() => setHoveredSlot(null)}
-                        disabled={!slot.isAvailable}
+                        disabled={!slot.isAvailable || isPast}
                         className={`relative p-2 rounded-xl border-2 transition-all duration-200 ${slotColor}`}
                       >
                         <div className="text-center">
                           {/* Start Time */}
-                          <div className="font-bold text-gray-800">
+                          <div
+                            className={`font-bold ${isPast ? "text-gray-500" : "text-gray-800"}`}
+                          >
                             {format(slot.startTime, "h:mm a")}
                           </div>
 
@@ -588,7 +597,9 @@ export function TimeSlotPicker({
                           </div>
 
                           {/* End Time */}
-                          <div className="text-sm text-gray-600">
+                          <div
+                            className={`text-sm ${isPast ? "text-gray-400" : "text-gray-600"}`}
+                          >
                             → {format(slot.endTime, "h:mm a")}
                           </div>
 
@@ -598,7 +609,14 @@ export function TimeSlotPicker({
                           </div>
 
                           {/* Status Badges */}
-                          {!slot.isAvailable && (
+                          {isPast && (
+                            <Badge className="mt-2 bg-gray-500 text-white text-xs">
+                              <History className="h-3 w-3 mr-1" />
+                              Passed
+                            </Badge>
+                          )}
+
+                          {!isPast && !slot.isAvailable && (
                             <Badge
                               variant="destructive"
                               className="mt-2 text-xs bg-red-500"
@@ -607,13 +625,13 @@ export function TimeSlotPicker({
                             </Badge>
                           )}
 
-                          {isPeakHour && slot.isAvailable && (
+                          {!isPast && isPeakHour && slot.isAvailable && (
                             <Badge className="mt-2 bg-amber-500 text-white text-xs">
                               Peak Hour
                             </Badge>
                           )}
 
-                          {isSelected && (
+                          {isSelected && !isPast && (
                             <Badge className="mt-2 bg-emerald-500 text-white text-xs">
                               Selected
                             </Badge>
@@ -634,7 +652,19 @@ export function TimeSlotPicker({
                             </motion.div>
                           )}
 
-                        {isSelected && (
+                        {/* Tooltip for past slots */}
+                        {isPast && hoveredSlot === slot.id && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg px-3 py-1.5 whitespace-nowrap z-10 shadow-lg"
+                          >
+                            <History className="h-3 w-3 inline mr-1" />
+                            This time slot has already passed
+                          </motion.div>
+                        )}
+
+                        {isSelected && !isPast && (
                           <motion.div
                             layoutId="selectedSlotIndicator"
                             className="absolute -top-2 -right-2"
@@ -696,6 +726,10 @@ export function TimeSlotPicker({
               <span className="text-xs text-gray-600">Selected</span>
             </div>
             <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-gray-400"></div>
+              <span className="text-xs text-gray-600">Passed</span>
+            </div>
+            <div className="flex items-center gap-2">
               <Lock className="h-3 w-3 text-red-500" />
               <span className="text-xs text-gray-600">Locked by others</span>
             </div>
@@ -715,102 +749,11 @@ export function TimeSlotPicker({
             <br />
             📍 Slots start at: first available time, then every{" "}
             {formatDuration(estimatedTimeMin + bufferTimeMin)}
+            <br />
+            🕐 Past time slots are automatically disabled and cannot be selected
           </div>
         </CardContent>
       </Card>
     </div>
   )
 }
-
-// COMPLETELY REWORKED MOCK DATA WITH VISIBLE RESERVATIONS
-const today = new Date()
-const tomorrow = addDays(today, 1)
-
-export const mockReservations: Reservation[] = [
-  // Point #1 - Today's reservations (clearly visible)
-  {
-    id: "1",
-    pointId: 1,
-    userId: "user1",
-    userName: "John D.",
-    startTime: "09:00",
-    endTime: "10:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-  {
-    id: "2",
-    pointId: 1,
-    userId: "user2",
-    userName: "Sarah M.",
-    startTime: "11:00",
-    endTime: "12:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-  {
-    id: "3",
-    pointId: 1,
-    userId: "user3",
-    userName: "Mike R.",
-    startTime: "14:00",
-    endTime: "16:00",
-    date: format(today, "yyyy-MM-dd"),
-  },
-  {
-    id: "4",
-    pointId: 1,
-    userId: "user4",
-    userName: "Emma W.",
-    startTime: "17:00",
-    endTime: "18:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-  {
-    id: "7",
-    pointId: 1,
-    userId: "user7",
-    userName: "David C.",
-    startTime: "19:00",
-    endTime: "20:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-
-  // Point #1 - Tomorrow's reservations
-  {
-    id: "5",
-    pointId: 1,
-    userId: "user5",
-    userName: "Alex K.",
-    startTime: "10:00",
-    endTime: "11:30",
-    date: format(tomorrow, "yyyy-MM-dd"),
-  },
-  {
-    id: "8",
-    pointId: 1,
-    userId: "user8",
-    userName: "Sophia L.",
-    startTime: "15:00",
-    endTime: "16:30",
-    date: format(tomorrow, "yyyy-MM-dd"),
-  },
-
-  // Point #2 - Today's reservations
-  {
-    id: "6",
-    pointId: 2,
-    userId: "user6",
-    userName: "Lisa M.",
-    startTime: "13:00",
-    endTime: "14:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-  {
-    id: "9",
-    pointId: 2,
-    userId: "user9",
-    userName: "Robert K.",
-    startTime: "16:00",
-    endTime: "17:30",
-    date: format(today, "yyyy-MM-dd"),
-  },
-]

@@ -3,36 +3,29 @@ import { User } from "./user"
 export interface Ticket {
   id: number
   seatNumber: number | null
-
   boardingStop: string | null
   alightingStop: string | null
-
   qrCode: string | null
-
   checkedIn: boolean
   checkedInAt: string | null
   validUntil: string | null
-
   sharedTo: User | null
   sharedTicketUsed: boolean
   sharedAt: string
-
   cancelledAt: string | null
 }
 
-export type TripStatus = "CONFIRMED" | "COMPLETED" | "CANCELLED"
+export type TripStatus = "CONFIRMED" | "COMPLETED" | "CANCELLED" | "IN_PROGRESS"
+export type TripType = "BUS" | "EV" | "PARKING"
+export type TripCategory = "upcoming" | "past"
 
 export interface Trip {
   id: number
+  type: TripType
+  category?: TripCategory // upcoming or past
   userId?: string
   busId?: number
-
-  date: string
   status: TripStatus
-
-  origin: string
-  destination: string
-
   bookingCode: string
   cancelledAt?: string | null
 
@@ -48,29 +41,38 @@ export interface Trip {
   pointsValue?: string
   pointsConversionRate?: string
 
-  // Relations
-  paymentId?: number
+  // Dates
   bookedAt: string
   updatedAt?: string
+  date?: string // BUS departure date
+  startTime?: string // EV session start
+  endTime?: string // EV session end
+  createdAt?: string // EV reservation created at
 
-  // tickets array
-  tickets: Ticket[]
+  // Locations
+  origin?: string // BUS origin
+  destination?: string // BUS destination
 
-  bus: {
+  // EV specific
+  targetBatteryPercentage?: number
+  targetKwh?: number
+
+  // Relations
+  paymentId?: number
+  tickets?: Ticket[] // BUS tickets
+
+  // BUS specific
+  bus?: {
     id: number
     busNumber: string
     capacity: number
     status: string
-
     currentStop: string | null
     nextDestination: string | null
     isActive: boolean
-
     departureTime: string | null
     estimatedArrival: string | null
     delayMinutes: number
-
-    // ✅ driver nested
     driver: {
       id: string
       name: string
@@ -82,8 +84,6 @@ export interface Trip {
       status: string
       isOnDuty: boolean
     }
-
-    // ✅ vehicle nested
     vehicle: {
       id: number
       plateNumber: string
@@ -98,7 +98,39 @@ export interface Trip {
     }
   }
 
-  payment: {
+  // EV specific
+  vehicle?: {
+    id: number
+    plateNumber: string
+    model: string
+    manufacturer: string
+    year?: number
+    image?: string
+    type?: string
+    capacity?: number
+  }
+
+  chargingPoint?: {
+    id: number
+    name: string
+    status: string
+    connectorType?: string
+    powerKw?: number
+    slotNumber?: string
+  }
+
+  payments?: Array<{
+    id: number
+    amount: number
+    status: string
+    method: string
+    gateway?: string
+    reference?: string
+    createdAt?: string
+  }>
+
+  // Payment (BUS uses this, EV uses payments array)
+  payment?: {
     id: number
     userId: string
     amount: string
@@ -106,19 +138,27 @@ export interface Trip {
     method: string
     gateway: string
     flow: string
-
     pointsUsed: number
     pointsValue: string
-
     status: string
     gatewayRef: string | null
     reference: string
-
     metadata: string | null
     walletId: number
     minibusReservationId: string | null
-
     createdAt: string
     updatedAt: string
   }
 }
+
+export const isBusTrip = (trip: Trip): boolean => {
+  return trip.type === "BUS"
+}
+
+export const isEvTrip = (trip: Trip): boolean => {
+  return trip.type === "EV"
+}
+
+// export const isParkingTrip = (trip: Trip): boolean => {
+//   return trip.type === "PARKING"
+// }

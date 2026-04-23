@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Trip } from "@/types/trips"
+import { Trip, isBusTrip, isEvTrip } from "@/types/trips"
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -82,6 +82,11 @@ import {
   RefreshCw,
   Timer,
   XCircle,
+  Plug,
+  BatteryCharging,
+  Gauge,
+  Timer as TimerIcon,
+  Car,
 } from "lucide-react"
 import { format, formatDistanceToNow, isAfter, isBefore } from "date-fns"
 import {
@@ -112,7 +117,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useRouter } from "next/navigation"
@@ -151,43 +155,61 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
   const [ratingComment, setRatingComment] = useState("")
   const [isSubmittingRating, setIsSubmittingRating] = useState(false)
 
-  const departureDate = new Date(trip.date)
+  // Check if it's an EV trip
+  const isEv = isEvTrip(trip)
+  const isBus = isBusTrip(trip)
+
+  // Parse dates based on trip type
+  const departureDate =
+    isEv && trip.startTime
+      ? new Date(trip.startTime)
+      : new Date(trip.date || new Date())
   const now = new Date()
-  const createdAt = new Date(
-    trip.payment?.createdAt || trip.createdAt || new Date(),
-  )
+  const createdAt = new Date(trip.bookedAt || trip.createdAt || new Date())
 
-  // Get ticket-specific data from first ticket
-  const firstTicket = trip.tickets?.[0]
+  // Get ticket-specific data from first ticket (BUS only)
+  const firstTicket = !isEv ? trip.tickets?.[0] : null
 
-  // Check ticket status
+  // Check ticket status (BUS only)
   const isCheckedIn = firstTicket?.checkedIn || false
   const checkedInAt = firstTicket?.checkedInAt
     ? new Date(firstTicket.checkedInAt)
     : null
-  const isCancelled = !!firstTicket?.cancelledAt
-  const cancelledAt = firstTicket?.cancelledAt
-    ? new Date(firstTicket.cancelledAt)
-    : null
+  const isCancelled = trip.status === "CANCELLED"
+  const cancelledAt = trip.cancelledAt ? new Date(trip.cancelledAt) : null
   const isSharedTicketUsed = firstTicket?.sharedTicketUsed || false
   const sharedTo = firstTicket?.sharedTo || null
 
-  // Get validUntil from first ticket if available
-  const validUntil = firstTicket?.validUntil
-    ? new Date(firstTicket.validUntil)
-    : new Date(departureDate.getTime() + 4 * 60 * 60 * 1000) // Default 4 hours after departure
+  // For EV trips, check if session is completed
+  const isEvCompleted = isEv && trip.status === "COMPLETED"
+  const isEvInProgress = isEv && trip.status === "IN_PROGRESS"
+
+  // Get validUntil from first ticket if available (BUS only)
+  const validUntil =
+    !isEv && firstTicket?.validUntil
+      ? new Date(firstTicket.validUntil)
+      : isEv && trip.endTime
+        ? new Date(trip.endTime)
+        : new Date(departureDate.getTime() + 4 * 60 * 60 * 1000)
 
   // Check if ticket is expired
-  const isExpired = isAfter(now, validUntil)
+  const isExpired = isAfter(now, validUntil) && !isEv
 
   // Determine if ticket is usable
-  const isTicketUsable =
-    !isExpired && !isCheckedIn && !isCancelled && !isSharedTicketUsed
+  const isTicketUsable = isEv
+    ? !isEvCompleted && !isCancelled
+    : !isExpired && !isCheckedIn && !isCancelled && !isSharedTicketUsed
 
   // Estimate arrival time (default 5 hours if not specified)
-  const arrivalDate = new Date(departureDate)
-  const estimatedDuration = 300 // default 5 hours in minutes
-  arrivalDate.setMinutes(arrivalDate.getMinutes() + estimatedDuration)
+  const arrivalDate =
+    isEv && trip.endTime
+      ? new Date(trip.endTime)
+      : (() => {
+          const date = new Date(departureDate)
+          const estimatedDuration = 300 // default 5 hours in minutes
+          date.setMinutes(date.getMinutes() + estimatedDuration)
+          return date
+        })()
 
   const durationMs = arrivalDate.getTime() - departureDate.getTime()
   const durationHours = Math.floor(durationMs / (1000 * 60 * 60))
@@ -195,42 +217,63 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
     (durationMs % (1000 * 60 * 60)) / (1000 * 60),
   )
 
-  // Use first ticket's QR code or generate from booking code
+  // Get QR code (BUS only)
   const qrCode =
-    firstTicket?.qrCode ||
-    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${trip.bookingCode}`
+    !isEv && firstTicket?.qrCode
+      ? firstTicket.qrCode
+      : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${trip.bookingCode}`
   const qrData = `HABESHAGO:${trip.id}:${trip.bookingCode}:${departureDate.getTime()}`
 
-  // Calculate fare breakdown based on actual data
+  // Calculate fare breakdown
   const totalAmount = parseFloat(trip.totalAmount || "0")
   const amountPaid = parseFloat(trip.amountPaid || trip.payment?.amount || "0")
   const discount = parseFloat(trip.discount || "0")
-  const pointsUsed = trip.payment?.pointsUsed || 0
-  const pointsValue = parseFloat(trip.payment.pointsValue || "0")
+  const pointsUsed = trip.pointsUsed || trip.payment?.pointsUsed || 0
+  const pointsValue = parseFloat(
+    trip.pointsValue || trip.payment?.pointsValue || "0",
+  )
   const remainingBalance = totalAmount - amountPaid - pointsValue
 
-  const origin = trip.origin || "Unknown"
-  const destination = trip.destination || "Unknown"
+  // Get locations
+  const origin = isEv
+    ? trip.origin || "Charging Station"
+    : trip.origin || "Unknown"
+  const destination = isEv ? "EV Charging" : trip.destination || "Unknown"
+  const boardingStop = isEv
+    ? "Plug-in at station"
+    : firstTicket?.boardingStop || "Boarding point"
+  const alightingStop = isEv
+    ? "Disconnect after charging"
+    : firstTicket?.alightingStop || "Drop-off point"
 
-  // Get boarding and alighting stops from first ticket
-  const boardingStop = firstTicket?.boardingStop || "Boarding point"
-  const alightingStop = firstTicket?.alightingStop || "Drop-off point"
+  // Get seat numbers (BUS only)
+  const seatNumbers = !isEv
+    ? trip.tickets?.map((t) => t.seatNumber).join(", ") || "N/A"
+    : "N/A"
+  const seatsBooked = !isEv ? trip.tickets?.length || 1 : 0
 
-  // Get seat numbers from tickets
-  const seatNumbers = trip.tickets?.map((t) => t.seatNumber).join(", ") || "N/A"
-  const seatsBooked = trip.tickets?.length || 1
-
-  // Check if any ticket is shared
-  const isShared = trip.tickets?.some((t) => t.sharedAt) || false
-
-  // Get shared info from first shared ticket
-  const sharedTicket = trip.tickets?.find((t) => t.sharedAt)
+  // Check if any ticket is shared (BUS only)
+  const isShared = (!isEv && trip.tickets?.some((t) => t.sharedAt)) || false
+  const sharedTicket = !isEv ? trip.tickets?.find((t) => t.sharedAt) : null
   const sharedWith = sharedTicket?.sharedTo?.name
   const sharedAtDate = sharedTicket?.sharedAt
     ? new Date(sharedTicket.sharedAt)
     : null
 
-  // Get amenities icons and labels (from bus if available)
+  // Get EV specific details
+  const evDetails = isEv
+    ? {
+        batteryPercentage: trip.targetBatteryPercentage,
+        energyKwh: trip.targetKwh,
+        connectorType: trip.chargingPoint?.connectorType || "CCS2",
+        powerKw: trip.chargingPoint?.powerKw || 50,
+        chargingPointName: trip.chargingPoint?.name || trip.origin,
+        vehicleModel: trip.vehicle?.manufacturer + " " + trip.vehicle?.model,
+        vehiclePlate: trip.vehicle?.plateNumber,
+      }
+    : null
+
+  // Get bus amenities (if available)
   const amenities: string[] = [] // Add amenities to your Trip type if needed
   const amenityConfig: Record<string, { icon: any; label: string }> = {
     wifi: { icon: Wifi, label: "Free WiFi" },
@@ -265,6 +308,40 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
 
   // Get ticket status badge
   const getTicketStatusBadge = () => {
+    if (isEv) {
+      if (isCancelled) {
+        return {
+          label: "Cancelled",
+          icon: XCircle,
+          color: "bg-red-500 text-white",
+          description: "This charging session has been cancelled",
+        }
+      }
+      if (isEvCompleted) {
+        return {
+          label: "Completed",
+          icon: CheckCheck,
+          color: "bg-green-500 text-white",
+          description: "Charging session completed",
+        }
+      }
+      if (isEvInProgress) {
+        return {
+          label: "In Progress",
+          icon: Zap,
+          color: "bg-blue-500 text-white",
+          description: "Charging session in progress",
+        }
+      }
+      return {
+        label: "Upcoming",
+        icon: Clock,
+        color: "bg-purple-500 text-white",
+        description: "Charging session scheduled",
+      }
+    }
+
+    // BUS statuses
     if (isCancelled) {
       return {
         label: "Cancelled",
@@ -332,7 +409,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
     setIsSharing(true)
     setShareVia(method)
 
-    const shareText = `🚌 HabeshaGo Ticket\n\nFrom: ${origin}\nTo: ${destination}\nDate: ${format(departureDate, "MMM d, yyyy")}\nTime: ${format(departureDate, "h:mm a")}\nSeats: ${seatNumbers}\nBooking Code: ${trip.bookingCode}\n\nView ticket: https://habeshago.com/ticket/${trip.bookingCode}`
+    const shareText = isEv
+      ? `🔋 HabeshaGo EV Charging Reservation\n\nStation: ${origin}\nVehicle: ${evDetails?.vehicleModel || "EV"}\nDate: ${format(departureDate, "MMM d, yyyy")}\nTime: ${format(departureDate, "h:mm a")}\nReservation Code: ${trip.bookingCode}\nEnergy: ${evDetails?.energyKwh || "N/A"} kWh\n\nView details: https://habeshago.com/ev/${trip.bookingCode}`
+      : `🚌 HabeshaGo Bus Ticket\n\nFrom: ${origin}\nTo: ${destination}\nDate: ${format(departureDate, "MMM d, yyyy")}\nTime: ${format(departureDate, "h:mm a")}\nSeats: ${seatNumbers}\nBooking Code: ${trip.bookingCode}\n\nView ticket: https://habeshago.com/ticket/${trip.bookingCode}`
 
     try {
       switch (method) {
@@ -347,7 +426,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
           break
         case "email":
           window.open(
-            `mailto:?subject=My HabeshaGo Ticket&body=${encodeURIComponent(shareText)}`,
+            `mailto:?subject=My HabeshaGo ${isEv ? "EV Reservation" : "Ticket"}&body=${encodeURIComponent(shareText)}`,
             "_blank",
           )
           break
@@ -357,9 +436,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
         case "more":
           if (navigator.share) {
             await navigator.share({
-              title: "HabeshaGo Ticket",
+              title: isEv ? "HabeshaGo EV Reservation" : "HabeshaGo Ticket",
               text: shareText,
-              url: `https://habeshago.com/ticket/${trip.bookingCode}`,
+              url: `https://habeshago.com/${isEv ? "ev" : "ticket"}/${trip.bookingCode}`,
             })
           } else {
             handleCopyCode()
@@ -377,7 +456,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
   // Handle dedicated share with friends
   const handleShareWithFriends = () => {
     if (!isTicketUsable) {
-      alert("This ticket cannot be shared as it is expired, used, or cancelled")
+      alert(
+        "This reservation cannot be shared as it is expired, used, or cancelled",
+      )
       return
     }
     setShareDialogOpen(true)
@@ -387,17 +468,17 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
   const handleSendShare = () => {
     setIsSharing(true)
 
-    // Simulate sending
     setTimeout(() => {
       setIsSharing(false)
       setShareDialogOpen(false)
-      // Reset form
       setShareEmail("")
       setShareMessage("")
       setSelectedSocial(null)
-
-      // Show success toast or feedback
-      alert("Ticket shared successfully!")
+      alert(
+        isEv
+          ? "Reservation shared successfully!"
+          : "Ticket shared successfully!",
+      )
     }, 1500)
   }
 
@@ -410,15 +491,12 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
 
     setIsSubmittingRating(true)
 
-    // Simulate API call
     setTimeout(() => {
       setIsSubmittingRating(false)
       setRatingDialogOpen(false)
       setUserRating(0)
       setRatingCategory("")
       setRatingComment("")
-
-      // Show success message
       alert("Thank you for your rating!")
     }, 1500)
   }
@@ -428,16 +506,12 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
     // Implement actual download logic here
   }
 
-  // Handle print ticket
-  const handlePrint = () => {
-    window.print()
-  }
-
-  // Check if ticket is expiring soon
-  const hoursUntilExpiry = Math.floor(
-    (validUntil.getTime() - Date.now()) / (1000 * 60 * 60),
-  )
+  // Check if ticket is expiring soon (BUS only)
+  const hoursUntilExpiry = !isEv
+    ? Math.floor((validUntil.getTime() - Date.now()) / (1000 * 60 * 60))
+    : 0
   const isExpiringSoon =
+    !isEv &&
     hoursUntilExpiry > 0 &&
     hoursUntilExpiry < 24 &&
     !isExpired &&
@@ -446,19 +520,28 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
 
   // Calculate seat occupancy (if bus data available)
   const totalSeats = trip.bus?.capacity || 50
-  const bookedSeats = seatsBooked
-  const occupancyPercentage = (bookedSeats / totalSeats) * 100
+  const occupancyPercentage = (seatsBooked / totalSeats) * 100
 
-  // Get bus status color
-  const getBusStatusColor = () => {
+  // Get status color
+  const getStatusColor = () => {
     if (!isTicketUsable) return "text-gray-600 bg-gray-100"
+    if (isEv && isEvInProgress) return "text-blue-600 bg-blue-100"
     if (isCheckedIn) return "text-green-600 bg-green-100"
     if (isExpiringSoon) return "text-orange-600 bg-orange-100"
-    return "text-blue-600 bg-blue-100"
+    return isEv ? "text-purple-600 bg-purple-100" : "text-blue-600 bg-blue-100"
   }
 
-  // Get passenger name (you might want to get this from user data)
+  // Get passenger name
   const passengerName = user?.name || "John Doe"
+
+  // Get gradient based on trip type
+  const gradientClass = isEv
+    ? "bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600"
+    : "bg-gradient-to-r from-orange-600 via-orange-600 to-amber-600"
+
+  const iconGradientClass = isEv
+    ? "from-purple-500 to-indigo-500"
+    : "from-orange-500 to-amber-500"
 
   // Render star rating
   const renderStars = (rating: number, interactive = false) => {
@@ -508,7 +591,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               "sticky top-0 z-50 p-4 shadow-lg",
               !isTicketUsable
                 ? "bg-gradient-to-r from-gray-600 to-gray-500"
-                : "bg-gradient-to-r from-orange-600 via-orange-600 to-amber-600",
+                : gradientClass,
             )}
           >
             <SheetHeader>
@@ -518,11 +601,15 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     whileHover={{ scale: 1.1, rotate: 5 }}
                     className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"
                   >
-                    <TicketIcon className="h-6 w-6 text-white" />
+                    {isEv ? (
+                      <Smartphone className="h-6 w-6 text-white" />
+                    ) : (
+                      <TicketIcon className="h-6 w-6 text-white" />
+                    )}
                   </motion.div>
                   <div>
                     <SheetTitle className="text-xl font-bold text-white flex items-center gap-2">
-                      HabeshaGo E-Ticket
+                      {isEv ? "HabeshaGo EV Reservation" : "HabeshaGo E-Ticket"}
                       {ticketStatus && (
                         <Badge className={cn("border-0", ticketStatus.color)}>
                           <ticketStatus.icon className="h-3 w-3 mr-1" />
@@ -533,7 +620,8 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     <div className="flex items-center gap-2 text-amber-100 text-sm">
                       <ShieldCheck className="h-3 w-3" />
                       <span>
-                        Booking #{trip.bookingCode.slice(0, 8).toUpperCase()}
+                        {isEv ? "Reservation" : "Booking"} #
+                        {trip.bookingCode.slice(0, 8).toUpperCase()}
                       </span>
 
                       {/* Status Badge */}
@@ -547,14 +635,14 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                               : "bg-red-500 text-white",
                         )}
                       >
-                        {`${trip.status}`.charAt(0)}
-                        {`${trip.status}`.slice(1).toLowerCase()}
+                        {trip.status.charAt(0)}
+                        {trip.status.slice(1).toLowerCase()}
                       </Badge>
                     </div>
                   </div>
                 </div>
 
-                {/* Action Buttons - Disable if ticket is not usable */}
+                {/* Action Buttons */}
                 <div className="flex items-center gap-2">
                   {/* Share Dropdown */}
                   <DropdownMenu>
@@ -623,7 +711,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
-                      <p>Download Ticket</p>
+                      <p>Download {isEv ? "Reservation" : "Ticket"}</p>
                     </TooltipContent>
                   </Tooltip>
 
@@ -661,35 +749,16 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   <AlertCircle className="h-4 w-4" />
                   <p className="text-sm">
                     {isCancelled &&
-                      "This ticket has been cancelled and is no longer valid."}
+                      `This ${isEv ? "reservation" : "ticket"} has been cancelled.`}
                     {isExpired &&
                       "This ticket has expired and is no longer valid."}
                     {isCheckedIn && "This ticket has already been used."}
                     {isSharedTicketUsed &&
                       "This shared ticket has already been used."}
+                    {isEvCompleted &&
+                      "This charging session has been completed."}
                   </p>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Progress Bar for Expiry */}
-            {!isCheckedIn && !isCancelled && !isExpired && isExpiringSoon && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-3"
-              >
-                <div className="flex justify-between text-xs text-amber-100 mb-1">
-                  <span>Valid until {format(validUntil, "MMM d, h:mm a")}</span>
-                  <span>
-                    {formatDistanceToNow(validUntil, { addSuffix: true })}
-                  </span>
-                </div>
-                <Progress
-                  value={(hoursUntilExpiry / 24) * 100}
-                  className="h-1 bg-white/20"
-                />
               </motion.div>
             )}
           </motion.div>
@@ -697,45 +766,34 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
           {/* Main Content with Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="p-4">
             <TabsList className="grid grid-cols-5 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-              <TabsTrigger
-                value="ticket"
-                className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900"
-              >
-                <TicketIcon className="h-4 w-4 mr-2" />
-                Ticket
+              <TabsTrigger value="ticket" className="rounded-lg">
+                {isEv ? (
+                  <Smartphone className="h-4 w-4 mr-2" />
+                ) : (
+                  <TicketIcon className="h-4 w-4 mr-2" />
+                )}
+                {isEv ? "Reservation" : "Ticket"}
               </TabsTrigger>
-              <TabsTrigger
-                value="journey"
-                className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900"
-              >
+              <TabsTrigger value="journey" className="rounded-lg">
                 <Map className="h-4 w-4 mr-2" />
-                Journey
+                {isEv ? "Session" : "Journey"}
               </TabsTrigger>
-              <TabsTrigger
-                value="payment"
-                className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900"
-              >
+              <TabsTrigger value="payment" className="rounded-lg">
                 <Wallet className="h-4 w-4 mr-2" />
                 Payment
               </TabsTrigger>
-              <TabsTrigger
-                value="rating"
-                className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900"
-              >
+              <TabsTrigger value="rating" className="rounded-lg">
                 <Star className="h-4 w-4 mr-2" />
                 Ratings
               </TabsTrigger>
-              <TabsTrigger
-                value="support"
-                className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900"
-              >
+              <TabsTrigger value="support" className="rounded-lg">
                 <LifeBuoy className="h-4 w-4 mr-2" />
                 Support
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="ticket" className="space-y-4 mt-0">
-              {/* QR Code Card */}
+              {/* QR Code / EV Details Card */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -747,224 +805,184 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     : "border-gray-200 dark:border-gray-800 hover:shadow-md",
                 )}
               >
-                <div className="flex items-start gap-6">
-                  {/* QR Code Section */}
-                  <div className="flex-shrink-0">
-                    <motion.div
-                      whileHover={isTicketUsable ? { scale: 1.02 } : {}}
-                      className="relative"
-                    >
-                      <img
-                        src={qrCode}
-                        alt="Ticket QR Code"
-                        className={cn(
-                          "w-48 h-48 object-contain border-2 rounded-xl p-2 bg-white",
-                          !isTicketUsable
-                            ? "border-gray-300 dark:border-gray-700 grayscale"
-                            : "border-gray-200 dark:border-gray-700",
-                        )}
-                      />
-                      {isTicketUsable && (
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => setShowQRDetails(!showQRDetails)}
-                          className="absolute -top-2 -right-2 p-1.5 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-colors"
-                        >
-                          {showQRDetails ? (
-                            <EyeOff className="h-3 w-3" />
-                          ) : (
-                            <Eye className="h-3 w-3" />
-                          )}
-                        </motion.button>
-                      )}
-                    </motion.div>
-
-                    {/* QR Details */}
-                    <AnimatePresence>
-                      {showQRDetails && isTicketUsable && (
+                {isEv ? (
+                  // EV Reservation Details
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0">
                         <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs overflow-hidden"
+                          whileHover={{ scale: 1.05 }}
+                          className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-950/50 dark:to-indigo-950/50 flex items-center justify-center"
                         >
-                          <p className="font-mono text-gray-600 dark:text-gray-400 break-all">
-                            {qrData}
-                          </p>
+                          <BatteryCharging className="h-16 w-16 text-purple-500" />
                         </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Quick Actions */}
-                    <div className="flex gap-2 mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyCode}
-                        className="flex-1 gap-1 text-xs hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-all"
-                        disabled={!isTicketUsable}
-                      >
-                        {copied ? (
-                          <>
-                            <CheckCheck className="h-3 w-3" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            Copy Code
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(qrCode, "_blank")}
-                        className="flex-1 gap-1 text-xs hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-all"
-                        disabled={!isTicketUsable}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View Full
-                      </Button>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-xl text-gray-900 dark:text-white mb-2">
+                          {origin}
+                        </h3>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Zap className="h-4 w-4 text-purple-500" />
+                            <span>
+                              {evDetails?.energyKwh} kWh •{" "}
+                              {evDetails?.batteryPercentage}% target
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Plug className="h-4 w-4 text-purple-500" />
+                            <span>
+                              {evDetails?.connectorType} • {evDetails?.powerKw}{" "}
+                              kW
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Car className="h-4 w-4 text-purple-500" />
+                            <span>
+                              {evDetails?.vehicleModel} •{" "}
+                              {evDetails?.vehiclePlate}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Ticket Details */}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-                        {origin} → {destination}
-                      </h3>
-                      <Badge className={cn("border-0", getBusStatusColor())}>
-                        {!isTicketUsable && "Inactive"}
-                        {isTicketUsable && isCheckedIn && "Checked In"}
-                        {isTicketUsable &&
-                          !isCheckedIn &&
-                          isExpiringSoon &&
-                          "Expiring Soon"}
-                        {isTicketUsable &&
-                          !isCheckedIn &&
-                          !isExpiringSoon &&
-                          "Active"}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <p className="text-xs text-gray-500 mb-1">Passenger</p>
-                        <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1 capitalize">
-                          <User className="h-3 w-3 text-gray-400" />
-                          {passengerName}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <p className="text-xs text-gray-500 mb-1">Seats</p>
-                        <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                          <Users className="h-3 w-3 text-gray-400" />
-                          {seatNumbers}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Booking Date
-                        </p>
-                        <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-gray-400" />
-                          {format(createdAt, "MMM d, yyyy")}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Valid Until
-                        </p>
-                        <p
+                ) : (
+                  // BUS QR Code Section
+                  <div className="flex items-start gap-6">
+                    <div className="flex-shrink-0">
+                      <motion.div
+                        whileHover={isTicketUsable ? { scale: 1.02 } : {}}
+                        className="relative"
+                      >
+                        <img
+                          src={qrCode}
+                          alt="Ticket QR Code"
                           className={cn(
-                            "font-semibold flex items-center gap-1",
-                            isExpiringSoon && isTicketUsable
-                              ? "text-orange-600"
-                              : "text-gray-900 dark:text-white",
+                            "w-48 h-48 object-contain border-2 rounded-xl p-2 bg-white",
+                            !isTicketUsable
+                              ? "border-gray-300 dark:border-gray-700 grayscale"
+                              : "border-gray-200 dark:border-gray-700",
                           )}
+                        />
+                        {isTicketUsable && (
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setShowQRDetails(!showQRDetails)}
+                            className="absolute -top-2 -right-2 p-1.5 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-colors"
+                          >
+                            {showQRDetails ? (
+                              <EyeOff className="h-3 w-3" />
+                            ) : (
+                              <Eye className="h-3 w-3" />
+                            )}
+                          </motion.button>
+                        )}
+                      </motion.div>
+
+                      <AnimatePresence>
+                        {showQRDetails && isTicketUsable && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs overflow-hidden"
+                          >
+                            <p className="font-mono text-gray-600 dark:text-gray-400 break-all">
+                              {qrData}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyCode}
+                          className="flex-1 gap-1 text-xs hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-all"
+                          disabled={!isTicketUsable}
                         >
-                          <Clock className="h-3 w-3 text-gray-400" />
-                          {format(validUntil, "MMM d, h:mm a")}
-                        </p>
+                          {copied ? (
+                            <CheckCheck className="h-3 w-3" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                          {copied ? "Copied!" : "Copy Code"}
+                        </Button>
                       </div>
                     </div>
 
-                    {/* Check-in Info */}
-                    {isCheckedIn && checkedInAt && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <CheckCheck className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm text-blue-700 dark:text-blue-400">
-                            Checked in on{" "}
-                            {format(checkedInAt, "MMM d, yyyy 'at' h:mm a")}
-                          </span>
-                        </div>
-                      </motion.div>
-                    )}
+                    {/* Ticket Details */}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                          {origin} → {destination}
+                        </h3>
+                        <Badge className={cn("border-0", getStatusColor())}>
+                          {!isTicketUsable && "Inactive"}
+                          {isTicketUsable && isCheckedIn && "Checked In"}
+                          {isTicketUsable &&
+                            !isCheckedIn &&
+                            isExpiringSoon &&
+                            "Expiring Soon"}
+                          {isTicketUsable &&
+                            !isCheckedIn &&
+                            !isExpiringSoon &&
+                            "Active"}
+                        </Badge>
+                      </div>
 
-                    {/* Cancelled Info */}
-                    {isCancelled && cancelledAt && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4 text-red-600" />
-                          <span className="text-sm text-red-700 dark:text-red-400">
-                            Cancelled on{" "}
-                            {format(cancelledAt, "MMM d, yyyy 'at' h:mm a")}
-                          </span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Passenger
+                          </p>
+                          <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1 capitalize">
+                            <User className="h-3 w-3 text-gray-400" />
+                            {passengerName}
+                          </p>
                         </div>
-                      </motion.div>
-                    )}
-
-                    {/* Shared Ticket Used Info */}
-                    {isSharedTicketUsed && sharedTo && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-200 dark:border-purple-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <UsersRound className="h-4 w-4 text-purple-600" />
-                          <span className="text-sm text-purple-700 dark:text-purple-400">
-                            Used by {sharedTo.name}
-                          </span>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                          <p className="text-xs text-gray-500 mb-1">Seats</p>
+                          <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+                            <Users className="h-3 w-3 text-gray-400" />
+                            {seatNumbers}
+                          </p>
                         </div>
-                      </motion.div>
-                    )}
-
-                    {/* Shared Info */}
-                    {sharedWith && sharedAtDate && !isSharedTicketUsed && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-200 dark:border-purple-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Share2 className="h-4 w-4 text-purple-600" />
-                          <span className="text-sm text-purple-700 dark:text-purple-400">
-                            Shared with {sharedWith} •{" "}
-                            {formatDistanceToNow(sharedAtDate, {
-                              addSuffix: true,
-                            })}
-                          </span>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Booking Date
+                          </p>
+                          <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            {format(createdAt, "MMM d, yyyy")}
+                          </p>
                         </div>
-                      </motion.div>
-                    )}
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Valid Until
+                          </p>
+                          <p
+                            className={cn(
+                              "font-semibold flex items-center gap-1",
+                              isExpiringSoon && isTicketUsable
+                                ? "text-orange-600"
+                                : "text-gray-900 dark:text-white",
+                            )}
+                          >
+                            <Clock className="h-3 w-3 text-gray-400" />
+                            {format(validUntil, "MMM d, h:mm a")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </motion.div>
 
-              {/* Timeline */}
+              {/* Timeline / Session Details */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -977,14 +995,25 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 )}
               >
                 <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-orange-500" />
-                  Journey Timeline
+                  {isEv ? (
+                    <BatteryCharging className="h-4 w-4 text-purple-500" />
+                  ) : (
+                    <Clock className="h-4 w-4 text-orange-500" />
+                  )}
+                  {isEv ? "Charging Session Timeline" : "Journey Timeline"}
                 </h3>
                 <div className="relative">
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-orange-400 to-amber-400" />
+                  <div
+                    className={cn(
+                      "absolute left-4 top-0 bottom-0 w-0.5",
+                      isEv
+                        ? "bg-gradient-to-b from-purple-400 to-indigo-400"
+                        : "bg-gradient-to-b from-orange-400 to-amber-400",
+                    )}
+                  />
 
                   <div className="space-y-6">
-                    {/* Boarding */}
+                    {/* Start / Boarding */}
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
@@ -993,33 +1022,28 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     >
                       <div
                         className={cn(
-                          "absolute left-2.5 top-1 w-3 h-3 rounded-full ring-4 ring-orange-100 dark:ring-orange-900/30",
-                          isCheckedIn || !isTicketUsable
-                            ? "bg-gray-400"
-                            : "bg-orange-500",
+                          "absolute left-2.5 top-1 w-3 h-3 rounded-full ring-4",
+                          isEv
+                            ? "bg-purple-500 ring-purple-100 dark:ring-purple-900/30"
+                            : "bg-orange-500 ring-orange-100 dark:ring-orange-900/30",
                         )}
                       />
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Boarding at {boardingStop}
+                          {isEv
+                            ? "Charging Starts"
+                            : `Boarding at ${boardingStop}`}
                         </p>
                         <p className="text-xs text-gray-500">
                           {format(departureDate, "EEEE, MMMM d, yyyy")}
                         </p>
-                        <p
-                          className={cn(
-                            "text-sm font-medium mt-1",
-                            isCheckedIn || !isTicketUsable
-                              ? "text-gray-500"
-                              : "text-orange-600",
-                          )}
-                        >
+                        <p className="text-sm font-medium text-gray-600 mt-1">
                           {format(departureDate, "h:mm a")}
                         </p>
                       </div>
                     </motion.div>
 
-                    {/* Journey */}
+                    {/* In Progress / Journey */}
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
@@ -1029,41 +1053,59 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       <div
                         className={cn(
                           "absolute left-2.5 top-1 w-3 h-3 rounded-full",
-                          isCheckedIn
+                          isCheckedIn || (isEv && isEvCompleted)
                             ? "bg-green-500"
                             : isCancelled
                               ? "bg-red-500"
                               : isExpired
                                 ? "bg-gray-500"
-                                : "bg-amber-400",
+                                : isEv
+                                  ? "bg-purple-400"
+                                  : "bg-amber-400",
                         )}
                       />
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           {isCheckedIn
-                            ? "Journey Completed"
+                            ? isEv
+                              ? "Charging Completed"
+                              : "Journey Completed"
                             : isCancelled
-                              ? "Journey Cancelled"
+                              ? isEv
+                                ? "Charging Cancelled"
+                                : "Journey Cancelled"
                               : isExpired
-                                ? "Journey Expired"
-                                : "En Route"}
+                                ? "Ticket Expired"
+                                : isEv
+                                  ? "Charging in Progress"
+                                  : "En Route"}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Estimated travel time: {durationHours}h{" "}
-                          {durationMinutes}m
+                          {isEv
+                            ? `Estimated charging time: ${durationHours}h ${durationMinutes}m`
+                            : `Estimated travel time: ${durationHours}h ${durationMinutes}m`}
                         </p>
-                        {isTicketUsable && !isCheckedIn && !isCancelled && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Progress value={45} className="h-1.5 w-32" />
-                            <span className="text-xs text-gray-500">
-                              In progress
-                            </span>
-                          </div>
-                        )}
+                        {isTicketUsable &&
+                          !isCheckedIn &&
+                          !isCancelled &&
+                          !isExpired && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Progress
+                                value={45}
+                                className={cn(
+                                  "h-1.5 w-32",
+                                  isEv ? "bg-purple-100" : "bg-orange-100",
+                                )}
+                              />
+                              <span className="text-xs text-gray-500">
+                                In progress
+                              </span>
+                            </div>
+                          )}
                       </div>
                     </motion.div>
 
-                    {/* Alighting */}
+                    {/* End / Alighting */}
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
@@ -1073,12 +1115,16 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       <div
                         className={cn(
                           "absolute left-2.5 top-1 w-3 h-3 rounded-full",
-                          isCheckedIn ? "bg-green-500" : "bg-gray-300",
+                          isCheckedIn || (isEv && isEvCompleted)
+                            ? "bg-green-500"
+                            : "bg-gray-300",
                         )}
                       />
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Alight at {alightingStop}
+                          {isEv
+                            ? "Disconnect Vehicle"
+                            : `Alight at ${alightingStop}`}
                         </p>
                         <p className="text-xs text-gray-500">
                           {format(arrivalDate, "EEEE, MMMM d, yyyy")}
@@ -1086,7 +1132,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                         <p
                           className={cn(
                             "text-sm font-medium mt-1",
-                            isCheckedIn ? "text-green-600" : "text-amber-600",
+                            isCheckedIn || (isEv && isEvCompleted)
+                              ? "text-green-600"
+                              : "text-amber-600",
                           )}
                         >
                           {format(arrivalDate, "h:mm a")}
@@ -1097,7 +1145,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 </div>
               </motion.div>
 
-              {/* Bus Information */}
+              {/* Vehicle/Bus Information */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1110,81 +1158,119 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 )}
               >
                 <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Bus className="h-4 w-4 text-orange-500" />
-                  Bus Information
+                  {isEv ? (
+                    <Car className="h-4 w-4 text-purple-500" />
+                  ) : (
+                    <Bus className="h-4 w-4 text-orange-500" />
+                  )}
+                  {isEv ? "Vehicle Information" : "Bus Information"}
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <p className="text-xs text-gray-500">Bus Number</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {trip.bus?.busNumber || "N/A"}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <p className="text-xs text-gray-500">Capacity</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {trip.bus?.capacity || "N/A"} seats
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <p className="text-xs text-gray-500">Available Seats</p>
-                    <p className="font-semibold text-green-600">
-                      {trip.bus?.capacity
-                        ? trip.bus.capacity - seatsBooked
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <p className="text-xs text-gray-500">Occupancy</p>
-                    <div className="flex items-center gap-2">
-                      <Progress
-                        value={occupancyPercentage}
-                        className="h-2 w-16"
-                      />
-                      <span className="text-xs font-semibold">
-                        {Math.round(occupancyPercentage)}%
-                      </span>
+
+                {isEv ? (
+                  // EV Vehicle Details
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <p className="text-xs text-gray-500">Vehicle</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {evDetails?.vehicleModel || "Electric Vehicle"}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <p className="text-xs text-gray-500">Plate Number</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {evDetails?.vehiclePlate || "N/A"}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <p className="text-xs text-gray-500">Battery Capacity</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {trip.vehicle?.capacity || "N/A"} kWh
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <p className="text-xs text-gray-500">Connector Type</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {evDetails?.connectorType}
+                      </p>
                     </div>
                   </div>
-                </div>
-
-                {/* Driver Info if available */}
-                {trip.bus?.driver && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12 ring-2 ring-orange-200 dark:ring-orange-900">
-                        <AvatarFallback className="bg-orange-100 text-orange-600">
-                          {trip.bus.driver.name?.charAt(0) || "D"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-semibold flex items-center gap-2">
-                          {trip.bus.driver.name}
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-green-200 text-green-600"
-                          >
-                            {trip.bus.driver.experience} years exp
-                          </Badge>
-                        </p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {trip.bus.driver.phone}
+                ) : (
+                  // BUS Details
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <p className="text-xs text-gray-500">Bus Number</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {trip.bus?.busNumber || "N/A"}
                         </p>
                       </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <p className="text-xs text-gray-500">Capacity</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {trip.bus?.capacity || "N/A"} seats
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <p className="text-xs text-gray-500">Available Seats</p>
+                        <p className="font-semibold text-green-600">
+                          {trip.bus?.capacity
+                            ? trip.bus.capacity - seatsBooked
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <p className="text-xs text-gray-500">Occupancy</p>
+                        <div className="flex items-center gap-2">
+                          <Progress
+                            value={occupancyPercentage}
+                            className="h-2 w-16"
+                          />
+                          <span className="text-xs font-semibold">
+                            {Math.round(occupancyPercentage)}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </motion.div>
+
+                    {/* Driver Info if available */}
+                    {trip.bus?.driver && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-12 w-12 ring-2 ring-orange-200 dark:ring-orange-900">
+                            <AvatarFallback className="bg-orange-100 text-orange-600">
+                              {trip.bus.driver.name?.charAt(0) || "D"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-semibold flex items-center gap-2">
+                              {trip.bus.driver.name}
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-green-200 text-green-600"
+                              >
+                                {trip.bus.driver.experience} years exp
+                              </Badge>
+                            </p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {trip.bus.driver.phone}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </>
                 )}
               </motion.div>
             </TabsContent>
 
             <TabsContent value="journey" className="space-y-4 mt-0">
-              {/* Route Map Visualization */}
+              {/* Route / Session Visualization */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1197,19 +1283,15 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               >
                 <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Map className="h-4 w-4 text-orange-500" />
-                  Route Map
+                  {isEv ? "Charging Session Map" : "Route Map"}
                 </h3>
 
                 <div className="relative h-48 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-800 dark:to-gray-900 rounded-xl mb-6 overflow-hidden group">
-                  {/* Placeholder for actual map */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <motion.div
                       animate={
                         isTicketUsable
-                          ? {
-                              rotate: [0, 10, -10, 0],
-                              scale: [1, 1.1, 1],
-                            }
+                          ? { rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }
                           : {}
                       }
                       transition={{ duration: 5, repeat: Infinity }}
@@ -1218,7 +1300,11 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       <Compass
                         className={cn(
                           "h-12 w-12 mx-auto mb-2",
-                          isTicketUsable ? "text-orange-300" : "text-gray-400",
+                          isTicketUsable
+                            ? isEv
+                              ? "text-purple-300"
+                              : "text-orange-300"
+                            : "text-gray-400",
                         )}
                       />
                       <p className="text-sm text-gray-500">
@@ -1227,7 +1313,6 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     </motion.div>
                   </div>
 
-                  {/* Route line */}
                   <svg
                     className="absolute inset-0 w-full h-full"
                     preserveAspectRatio="none"
@@ -1240,7 +1325,13 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       y1="30%"
                       x2="80%"
                       y2="70%"
-                      stroke={isTicketUsable ? "#f97316" : "#9ca3af"}
+                      stroke={
+                        isTicketUsable
+                          ? isEv
+                            ? "#9333ea"
+                            : "#f97316"
+                          : "#9ca3af"
+                      }
                       strokeWidth="3"
                       strokeDasharray="5,5"
                     />
@@ -1251,7 +1342,13 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       cx="20%"
                       cy="30%"
                       r="6"
-                      fill={isTicketUsable ? "#f97316" : "#9ca3af"}
+                      fill={
+                        isTicketUsable
+                          ? isEv
+                            ? "#9333ea"
+                            : "#f97316"
+                          : "#9ca3af"
+                      }
                     />
                     <motion.circle
                       initial={{ scale: 0 }}
@@ -1260,7 +1357,13 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       cx="80%"
                       cy="70%"
                       r="6"
-                      fill={isTicketUsable ? "#fbbf24" : "#d1d5db"}
+                      fill={
+                        isTicketUsable
+                          ? isEv
+                            ? "#a855f7"
+                            : "#fbbf24"
+                          : "#d1d5db"
+                      }
                     />
                   </svg>
                 </div>
@@ -1271,17 +1374,23 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     className={cn(
                       "p-4 rounded-xl border",
                       isTicketUsable
-                        ? "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800"
+                        ? isEv
+                          ? "bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
+                          : "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800"
                         : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
                     )}
                   >
                     <p
                       className={cn(
                         "text-xs mb-1",
-                        isTicketUsable ? "text-orange-600" : "text-gray-500",
+                        isTicketUsable
+                          ? isEv
+                            ? "text-purple-600"
+                            : "text-orange-600"
+                          : "text-gray-500",
                       )}
                     >
-                      Departure
+                      {isEv ? "Charging Station" : "Departure"}
                     </p>
                     <p className="font-bold text-gray-900 dark:text-white">
                       {origin}
@@ -1293,17 +1402,23 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     className={cn(
                       "p-4 rounded-xl border",
                       isTicketUsable
-                        ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                        ? isEv
+                          ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800"
+                          : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
                         : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
                     )}
                   >
                     <p
                       className={cn(
                         "text-xs mb-1",
-                        isTicketUsable ? "text-amber-600" : "text-gray-500",
+                        isTicketUsable
+                          ? isEv
+                            ? "text-indigo-600"
+                            : "text-amber-600"
+                          : "text-gray-500",
                       )}
                     >
-                      Arrival
+                      {isEv ? "Vehicle Destination" : "Arrival"}
                     </p>
                     <p className="font-bold text-gray-900 dark:text-white">
                       {destination}
@@ -1313,75 +1428,110 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 </div>
               </motion.div>
 
-              {/* Weather & Conditions */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className={cn(
-                  "bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border",
-                  !isTicketUsable
-                    ? "border-gray-300 dark:border-gray-700 opacity-75"
-                    : "border-gray-200 dark:border-gray-800 hover:shadow-md",
-                )}
-              >
-                <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Thermometer className="h-4 w-4 text-orange-500" />
-                  Travel Conditions
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div
-                    className={cn(
-                      "text-center p-4 rounded-xl border",
-                      isTicketUsable
-                        ? "bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 border-blue-200 dark:border-blue-800"
-                        : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-                    )}
-                  >
-                    <p className="text-xs text-gray-500 mb-2">Weather</p>
-                    <motion.div
-                      animate={
-                        isTicketUsable
-                          ? {
-                              y: [0, -5, 0],
-                            }
-                          : {}
-                      }
-                      transition={{ duration: 3, repeat: Infinity }}
-                    >
-                      <p className="text-3xl mb-1">☀️</p>
-                    </motion.div>
-                    <p className="font-semibold">Sunny</p>
-                    <p className="text-xs text-gray-500">25°C / 77°F</p>
+              {/* Session Stats for EV */}
+              {isEv && evDetails && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-800"
+                >
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-purple-500" />
+                    Charging Session Stats
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl">
+                      <p className="text-xs text-gray-500">Energy Delivered</p>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {evDetails.energyKwh} kWh
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl">
+                      <p className="text-xs text-gray-500">Target Battery</p>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {evDetails.batteryPercentage}%
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl">
+                      <p className="text-xs text-gray-500">Charging Speed</p>
+                      <p className="text-lg font-bold text-purple-600">
+                        {evDetails.powerKw} kW
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-xl">
+                      <p className="text-xs text-gray-500">Connector Type</p>
+                      <p className="text-lg font-bold text-purple-600">
+                        {evDetails.connectorType}
+                      </p>
+                    </div>
                   </div>
-                  <div
-                    className={cn(
-                      "text-center p-4 rounded-xl border",
-                      isTicketUsable
-                        ? "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800"
-                        : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-                    )}
-                  >
-                    <p className="text-xs text-gray-500 mb-2">
-                      Road Conditions
-                    </p>
-                    <motion.div
-                      animate={
+                </motion.div>
+              )}
+
+              {/* Weather & Conditions (BUS only) */}
+              {!isEv && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className={cn(
+                    "bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border",
+                    !isTicketUsable
+                      ? "border-gray-300 dark:border-gray-700 opacity-75"
+                      : "border-gray-200 dark:border-gray-800 hover:shadow-md",
+                  )}
+                >
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Thermometer className="h-4 w-4 text-orange-500" />
+                    Travel Conditions
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div
+                      className={cn(
+                        "text-center p-4 rounded-xl border",
                         isTicketUsable
-                          ? {
-                              rotate: [0, 5, -5, 0],
-                            }
-                          : {}
-                      }
-                      transition={{ duration: 4, repeat: Infinity }}
+                          ? "bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 border-blue-200 dark:border-blue-800"
+                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                      )}
                     >
-                      <p className="text-3xl mb-1">🛣️</p>
-                    </motion.div>
-                    <p className="font-semibold">Good</p>
-                    <p className="text-xs text-gray-500">No delays reported</p>
+                      <p className="text-xs text-gray-500 mb-2">Weather</p>
+                      <motion.div
+                        animate={isTicketUsable ? { y: [0, -5, 0] } : {}}
+                        transition={{ duration: 3, repeat: Infinity }}
+                      >
+                        <p className="text-3xl mb-1">☀️</p>
+                      </motion.div>
+                      <p className="font-semibold">Sunny</p>
+                      <p className="text-xs text-gray-500">25°C / 77°F</p>
+                    </div>
+                    <div
+                      className={cn(
+                        "text-center p-4 rounded-xl border",
+                        isTicketUsable
+                          ? "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800"
+                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                      )}
+                    >
+                      <p className="text-xs text-gray-500 mb-2">
+                        Road Conditions
+                      </p>
+                      <motion.div
+                        animate={
+                          isTicketUsable ? { rotate: [0, 5, -5, 0] } : {}
+                        }
+                        transition={{ duration: 4, repeat: Infinity }}
+                      >
+                        <p className="text-3xl mb-1">🛣️</p>
+                      </motion.div>
+                      <p className="font-semibold">Good</p>
+                      <p className="text-xs text-gray-500">
+                        No delays reported
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              )}
             </TabsContent>
 
             <TabsContent value="payment" className="space-y-4 mt-0">
@@ -1404,7 +1554,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <span className="text-gray-600 dark:text-gray-400">
-                      Base Fare
+                      {isEv ? "Charging Fee" : "Base Fare"}
                     </span>
                     <span className="font-medium">
                       {trip.currency} {totalAmount.toLocaleString()}
@@ -1463,12 +1613,17 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                        Payment confirmed via {trip.payment?.method || "Wallet"}
+                        Payment confirmed via{" "}
+                        {trip.payment?.method ||
+                          trip.payments?.[0]?.method ||
+                          "Wallet"}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2 font-mono">
                       Transaction ID:{" "}
-                      {trip.payment?.reference || trip.paymentId}
+                      {trip.payment?.reference ||
+                        trip.paymentId ||
+                        trip.payments?.[0]?.reference}
                     </p>
                   </motion.div>
                 </div>
@@ -1535,11 +1690,16 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </h3>
                   <Button
                     onClick={() => setRatingDialogOpen(true)}
-                    className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl gap-2"
+                    className={cn(
+                      "text-white rounded-xl gap-2",
+                      isEv
+                        ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                        : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
+                    )}
                     disabled={!isTicketUsable}
                   >
                     <Star className="h-4 w-4" />
-                    Rate this Trip
+                    Rate this {isEv ? "Session" : "Trip"}
                   </Button>
                 </div>
 
@@ -1591,7 +1751,6 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   <h4 className="font-semibold text-gray-900 dark:text-white">
                     Recent Reviews
                   </h4>
-
                   {[1, 2, 3].map((review) => (
                     <motion.div
                       key={review}
@@ -1603,7 +1762,13 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-orange-100 text-orange-600">
+                            <AvatarFallback
+                              className={
+                                isEv
+                                  ? "bg-purple-100 text-purple-600"
+                                  : "bg-orange-100 text-orange-600"
+                              }
+                            >
                               U{review}
                             </AvatarFallback>
                           </Avatar>
@@ -1621,8 +1786,9 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Great experience! The bus was comfortable and on time.
-                        Will definitely use again.
+                        {isEv
+                          ? "Great charging experience! Fast and convenient location. Will definitely use again."
+                          : "Great experience! The bus was comfortable and on time. Will definitely use again."}
                       </p>
                     </motion.div>
                   ))}
@@ -1716,11 +1882,21 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </h4>
                   <div className="space-y-2">
                     {[
-                      "How do I change my boarding point?",
-                      "What items are allowed on board?",
-                      "Can I cancel my ticket?",
-                      "How do I contact the driver?",
-                      "What happens if the bus is delayed?",
+                      isEv
+                        ? "How do I start my charging session?"
+                        : "How do I change my boarding point?",
+                      isEv
+                        ? "What happens if the charger is occupied?"
+                        : "What items are allowed on board?",
+                      isEv
+                        ? "Can I cancel my charging reservation?"
+                        : "Can I cancel my ticket?",
+                      isEv
+                        ? "How do I contact station support?"
+                        : "How do I contact the driver?",
+                      isEv
+                        ? "What if my charging session is interrupted?"
+                        : "What happens if the bus is delayed?",
                     ].map((question, index) => (
                       <motion.div
                         key={index}
@@ -1745,22 +1921,41 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                        <Bell className="h-5 w-5 text-orange-600" />
+                      <div
+                        className={cn(
+                          "p-2 rounded-lg",
+                          isEv
+                            ? "bg-purple-100 dark:bg-purple-900/30"
+                            : "bg-orange-100 dark:bg-orange-900/30",
+                        )}
+                      >
+                        <Bell
+                          className={cn(
+                            "h-5 w-5",
+                            isEv ? "text-purple-600" : "text-orange-600",
+                          )}
+                        />
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          Journey Notifications
+                          {isEv
+                            ? "Session Notifications"
+                            : "Journey Notifications"}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Get real-time updates about your trip
+                          Get real-time updates about your{" "}
+                          {isEv ? "charging session" : "trip"}
                         </p>
                       </div>
                     </div>
                     <Switch
                       checked={notificationsEnabled}
                       onCheckedChange={setNotificationsEnabled}
-                      className="data-[state=checked]:bg-orange-500"
+                      className={
+                        isEv
+                          ? "data-[state=checked]:bg-purple-500"
+                          : "data-[state=checked]:bg-orange-500"
+                      }
                       disabled={!isTicketUsable}
                     />
                   </div>
@@ -1775,7 +1970,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1">
                   <Shield className="h-3 w-3" />
-                  Secure Ticket
+                  Secure
                 </span>
                 <span className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
@@ -1801,12 +1996,12 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               Share with Friends
             </DialogTitle>
             <DialogDescription>
-              Share your ticket details with friends and family
+              Share your {isEv ? "reservation" : "ticket"} details with friends
+              and family
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Share Method Selection */}
             <RadioGroup
               value={shareMethod}
               onValueChange={(value) => setShareMethod(value as any)}
@@ -1835,7 +2030,6 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
               ))}
             </RadioGroup>
 
-            {/* Share Content */}
             <AnimatePresence mode="wait">
               {shareMethod === "link" && (
                 <motion.div
@@ -1846,14 +2040,15 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                 >
                   <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <code className="flex-1 text-sm font-mono">
-                      https://habeshago.com/ticket/{trip.bookingCode}
+                      https://habeshago.com/{isEv ? "ev" : "ticket"}/
+                      {trip.bookingCode}
                     </code>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          `https://habeshago.com/ticket/${trip.bookingCode}`,
+                          `https://habeshago.com/${isEv ? "ev" : "ticket"}/${trip.bookingCode}`,
                         )
                         setCopied(true)
                         setTimeout(() => setCopied(false), 2000)
@@ -1974,7 +2169,12 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
             <Button
               onClick={handleSendShare}
               disabled={isSharing || (shareMethod === "email" && !shareEmail)}
-              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 gap-2"
+              className={cn(
+                "gap-2",
+                isEv
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                  : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
+              )}
             >
               {isSharing ? (
                 <>
@@ -1998,7 +2198,7 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-              Rate Your Trip
+              Rate Your {isEv ? "Charging Session" : "Trip"}
             </DialogTitle>
             <DialogDescription>
               How was your experience with HabeshaGo?
@@ -2082,7 +2282,12 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
             <Button
               onClick={handleSubmitRating}
               disabled={userRating === 0 || isSubmittingRating}
-              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 gap-2"
+              className={cn(
+                "gap-2",
+                isEv
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                  : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
+              )}
             >
               {isSubmittingRating ? (
                 <>

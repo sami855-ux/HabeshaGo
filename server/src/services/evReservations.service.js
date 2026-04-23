@@ -157,6 +157,7 @@ export const createReservationService = async (data) => {
           targetBatteryPercentage,
           targetKwh,
           calculatedAmount,
+          status: isFullyPaid ? "CONFIRMED" : "PENDING",
 
           paymentStatus: isFullyPaid ? "SUCCESS" : "PENDING",
           preAuthorizedAmount: calculatedAmount,

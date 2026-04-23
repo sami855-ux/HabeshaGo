@@ -26,7 +26,7 @@ router.post("/balance/deduct", authenticate, deductFromWallet)
 router.post("/deduct", authenticate, deductPoints)
 
 // Wallet transactions
-router.get("/transactions", getWalletTransactions)
+router.get("/transactions", authenticate, getWalletTransactions)
 
 // Create wallet + PIN
 router.post("/create", authenticate, createWallet)

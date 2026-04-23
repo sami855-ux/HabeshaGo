@@ -314,7 +314,18 @@ export const getUserBookingsService = async (userId) => {
       orderBy: { date: "desc" },
     })
 
+    const evReservations = await prisma.eVReservation.findMany({
+      where: { userId },
+      include: {
+        vehicle: true,
+        chargingPoint: true,
+        payments: true,
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
     const formattedBookings = bookings.map((booking) => ({
+      type: "BUS",
       id: booking.id,
       bookingCode: booking.bookingCode,
       date: booking.date,
@@ -329,21 +340,18 @@ export const getUserBookingsService = async (userId) => {
 
       bus: booking.bus
         ? {
-            // 🚌 Basic Bus Info
             id: booking.bus.id,
             busNumber: booking.bus.busNumber,
             capacity: booking.bus.capacity,
             status: booking.bus.status,
             isActive: booking.bus.isActive,
 
-            // 📍 Trip Info
             currentStop: booking.bus.currentStop,
             nextDestination: booking.bus.nextDestination,
             departureTime: booking.bus.departureTime,
             estimatedArrival: booking.bus.estimatedArrival,
             delayMinutes: booking.bus.delayMinutes,
 
-            // 🚗 Vehicle Details
             vehicle: booking.bus.vehicle
               ? {
                   id: booking.bus.vehicle.id,
@@ -359,7 +367,6 @@ export const getUserBookingsService = async (userId) => {
                 }
               : null,
 
-            // 👨‍✈️ Driver Details
             driver: booking.bus.driver
               ? {
                   id: booking.bus.driver.id,
@@ -373,15 +380,6 @@ export const getUserBookingsService = async (userId) => {
                   status: booking.bus.driver.status,
                 }
               : null,
-
-            // // 🛣 Route (optional but powerful)
-            // route: booking.bus.route
-            //   ? {
-            //       id: booking.bus.route.id,
-            //       name: booking.bus.route.name,
-            //       // add origin/destination if exists
-            //     }
-            //   : null,
           }
         : null,
 
@@ -411,7 +409,49 @@ export const getUserBookingsService = async (userId) => {
       })),
     }))
 
-    return successResponse("Bookings retrieved", formattedBookings)
+    const formattedEVReservations = evReservations.map((res) => ({
+      type: "EV",
+      id: res.id,
+      reservationCode: res.reservationCode,
+      status: res.status,
+      paymentStatus: res.paymentStatus,
+
+      startTime: res.startTime,
+      endTime: res.endTime,
+      createdAt: res.createdAt,
+
+      targetBatteryPercentage: res.targetBatteryPercentage,
+      targetKwh: res.targetKwh,
+
+      totalAmount: res.calculatedAmount,
+
+      vehicle: res.vehicle
+        ? {
+            id: res.vehicle.id,
+            plateNumber: res.vehicle.plateNumber,
+            model: res.vehicle.model,
+            manufacturer: res.vehicle.manufacturer,
+            image: res.vehicle.vehicleImageUrl,
+          }
+        : null,
+
+      chargingPoint: res.chargingPoint
+        ? {
+            id: res.chargingPoint.id,
+            name: res.chargingPoint.name,
+            status: res.chargingPoint.status,
+          }
+        : null,
+
+      payments: res.payments,
+    }))
+
+    const allBookings = [...formattedBookings, ...formattedEVReservations].sort(
+      (a, b) =>
+        new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date),
+    )
+
+    return successResponse("Bookings retrieved", allBookings)
   } catch (err) {
     console.error("Get user bookings service error:", err)
     return errorResponse("Failed to fetch bookings", 500)

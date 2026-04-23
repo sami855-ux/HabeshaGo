@@ -282,7 +282,11 @@ export const verifyOtpPhone = async (req, res) => {
 
 export const getTransportStats = async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user?.id
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" })
+    }
 
     const now = new Date()
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -292,8 +296,8 @@ export const getTransportStats = async (req, res) => {
       totalBusTrips,
       thisMonthTrips,
       lastMonthTrips,
-      evReservations,
-      parkingReservations,
+      activeBusReservations,
+      activeEVReservations,
       wallet,
     ] = await Promise.all([
       prisma.booking.count({
@@ -317,12 +321,20 @@ export const getTransportStats = async (req, res) => {
         },
       }),
 
-      prisma.eVReservation.count({
-        where: { userId, status: "CONFIRMED" },
+      prisma.booking.count({
+        where: {
+          userId,
+          status: "CONFIRMED",
+          date: { gte: now },
+        },
       }),
 
-      prisma.parkingReservation.count({
-        where: { userId },
+      prisma.eVReservation.count({
+        where: {
+          userId,
+          status: "CONFIRMED",
+          endTime: { gte: now },
+        },
       }),
 
       prisma.wallet.findUnique({
@@ -333,11 +345,19 @@ export const getTransportStats = async (req, res) => {
 
     const trend = thisMonthTrips - lastMonthTrips
 
+    const activeParkingReservations = 0
+
+    const totalActiveReservations =
+      activeBusReservations + activeEVReservations + activeParkingReservations
+
     const stats = {
       totalBusTrips,
       busTrend: trend >= 0 ? `+${trend} this month` : `${trend} this month`,
-      activeReservations: evReservations + parkingReservations,
-      reservationMessage: `${evReservations} EV charging, ${parkingReservations} parking session`,
+
+      activeReservations: totalActiveReservations,
+
+      reservationMessage: `${activeEVReservations} EV charging and ${activeParkingReservations} parking`,
+
       walletBalance: wallet ? Number(wallet.balance) : 0,
       currency: wallet?.currency || "ETB",
     }

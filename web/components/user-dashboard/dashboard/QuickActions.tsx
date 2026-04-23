@@ -53,9 +53,9 @@ const quickActions = [
     title: "My Vehicles",
     description: "Add and manage your EV vehicles",
     icon: Car,
-    gradient: "from-green-700 to-emerald-700",
-    lightColor: "bg-green-100 dark:bg-green-500/20",
-    shadow: "shadow-green-700/20",
+    gradient: "from-orange-600 to-amber-600",
+    lightColor: "bg-orange-100 dark:bg-orange-500/20",
+    shadow: "shadow-orange-600/20",
   },
   {
     id: "wallet",

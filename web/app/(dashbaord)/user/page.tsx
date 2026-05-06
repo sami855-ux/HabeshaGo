@@ -48,6 +48,10 @@ import { ProfileCompletionDialog } from "@/components/user-dashboard/ProfileComp
 import { motion, AnimatePresence } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getSocket } from "@/services/socket"
+import { RatingDialog } from "@/components/user-dashboard/bus/RatingDialog"
+import { submitRating } from "@/services/bus.api"
+import { toast } from "sonner"
 
 export default function UserDashboard() {
   const {
@@ -61,7 +65,8 @@ export default function UserDashboard() {
   const [showCompletionBadge, setShowCompletionBadge] = useState(true)
   const [badgeDismissed, setBadgeDismissed] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
-
+  const [showRating, setShowRating] = useState(false)
+  const [tripData, setTripData] = useState(null)
   // React Query for transport stats
   const {
     data: stats,
@@ -88,6 +93,60 @@ export default function UserDashboard() {
       return () => clearTimeout(timer)
     }
   }, [userLoading])
+
+  useEffect(() => {
+    const socket = getSocket()
+
+    const handleTripCompleted = (data: any) => {
+      console.log("Trip completed:", data)
+
+      switch (data.type) {
+        case "BUS": {
+          setTripData({
+            bookingId: data.id,
+            busId: data.metadata?.busId,
+            busNumber: data.metadata?.busNumber,
+            routeName: data.metadata?.routeName,
+          })
+
+          console.log(data)
+
+          queueMicrotask(() => {
+            setShowRating(true)
+          })
+          break
+        }
+
+        case "PARKING": {
+          // example: store parking info (create state if needed)
+          console.log("Parking completed:", data)
+
+          // optional UI trigger
+          // setShowParkingSummary(true)
+
+          break
+        }
+
+        case "EV_CHARGING": {
+          console.log("EV charging completed:", data)
+
+          // optional UI trigger
+          // setShowChargingSummary(true)
+
+          break
+        }
+
+        default:
+          console.warn("Unknown activity type:", data.type)
+      }
+    }
+
+    socket.on("trip:completed", handleTripCompleted)
+
+    return () => {
+      socket.off("trip:completed", handleTripCompleted)
+    }
+  }, [])
 
   // Check if profile is complete (email and phone verified)
   const isProfileComplete = user?.emailVerified && user?.phoneVerified
@@ -436,6 +495,44 @@ export default function UserDashboard() {
           />
         )}
       </AnimatePresence>
+
+      <RatingDialog
+        open={showRating}
+        onOpenChange={setShowRating}
+        busDetails={{
+          busNumber: tripData?.busNumber,
+          routeName: tripData?.routeName,
+          date: new Date().toLocaleDateString(),
+        }}
+        onSubmit={async (data) => {
+          console.log("Rating submitted:", data)
+
+          const payload = {
+            score: data.score,
+            comment: data.comment,
+
+            bookingId: tripData?.bookingId,
+            busId: tripData?.busId,
+          }
+
+          const result = await submitRating(payload)
+
+          if (result.success) {
+            console.log("Rating saved:", result.data)
+
+            // ✅ close dialog
+            setShowRating(false)
+
+            // ✅ optional: show success toast
+            toast.success("Thanks for your feedback!")
+          } else {
+            console.error(result.message)
+
+            // ❗ optional: show error toast
+            toast.error(result.message)
+          }
+        }}
+      />
     </>
   )
 }

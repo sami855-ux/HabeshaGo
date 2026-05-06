@@ -198,6 +198,7 @@ export default function HomePage() {
       }
 
       const buses = Array.isArray(res.data) ? res.data : []
+      console.log(buses)
       setBuses(buses)
 
       if (buses.length === 0) {
@@ -296,6 +297,8 @@ export default function HomePage() {
         passengers={searchParams.passengers}
         onBack={handleBackFromBooking}
         onBookingComplete={handleBookingComplete}
+        from={searchParams.from}
+        to={searchParams.to}
       />
     )
   }

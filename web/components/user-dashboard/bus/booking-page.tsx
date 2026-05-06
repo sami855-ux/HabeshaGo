@@ -190,6 +190,8 @@ interface BookingPageProps {
   schedule: BusSchedule
   selectedDate: Date
   selectedTime: string
+  from: string
+  to: string
   passengers: number
   onBack: () => void
   onBookingComplete: (booking: Booking) => void
@@ -221,6 +223,8 @@ export default function BookingPage({
   passengers,
   onBack,
   onBookingComplete,
+  from,
+  to,
 }: BookingPageProps) {
   const queryClient = useQueryClient()
 
@@ -472,6 +476,8 @@ export default function BookingPage({
         isPointUsed: usePoints,
         scheduleStartTime: schedule.startTime,
         seats: passengers,
+        boardingStop: from,
+        alightingStop: to,
       }
 
       // Add discount if applicable

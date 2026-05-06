@@ -54,110 +54,97 @@ import {
   CircleDot,
   Circle,
   Check,
+  Timer,
+  TrendingUp,
+  Award,
 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
-interface BusSchedule {
-  scheduleId: number
-  startTime: string
-  endTime: string
-  availableSeats: number
-  direction?: "FORWARD" | "REVERSE"
-  date?: string
+// Types based on actual API response
+interface RatingDistribution {
+  "1": number
+  "2": number
+  "3": number
+  "4": number
+  "5": number
 }
 
-interface BusRoute {
+interface Rating {
+  id: number
+  score: number
+  comment: string
+  userName: string
+  createdAt: string
+}
+
+interface Ratings {
+  averageRating: string
+  totalRatings: number
+  distribution: RatingDistribution
+  latest: Rating[]
+}
+
+interface Route {
   id: number
   name: string
-  price: string
+  price: number
   currency: string
   estimatedTimeMin: number
   midPoints: string[]
-  startPoint?: string
-  endPoint?: string
-  distance?: string
-  amenities?: string[]
-  distanceKm: string
+  origin: string
+  destination: string
+  distanceKm: number
 }
 
-interface BusVehicle {
+interface Vehicle {
   id: number
   plateNumber: string
-  vin: string
-  type: string
   model: string
-  manufacturer: string
   year: number
-  capacity: number
-  vehicleImageUrl: string
-  status: string
-  mileage: number
-  ownerName: string | null
-  ownerPhone: string | null
-  gpsDeviceId: string
-  createdAt: string
-  updatedAt: string
-  amenities?: string[]
-  features?: string[]
 }
 
-interface BusDriver {
+interface DriverUser {
   id: string
-  userId: string
-  licenseNo: string
-  experience: number
-  status: string
-  driverLicenseUrl: string
-  licenseStatus: string
-  idType: string
-  idFrontUrl: string
-  idBackUrl: string
-  idStatus: string
-  verifiedById: string | null
-  verifiedAt: string | null
-  rejectionReason: string | null
-  isOnDuty: boolean
-  lastActiveAt: string | null
-  rating: number
-  totalTrips: number
-  complaintsCount: number
-  createdAt: string
-  user?: {
-    name?: string
-    firstName?: string
-    lastName?: string
-    avaterUrl?: string
-    email?: string
-    phone?: string
-  }
+  name: string
+}
+
+interface Driver {
+  id: number
+  licenseNumber: string
+  phone: string
+  user: DriverUser
+}
+
+interface NearestSchedule {
+  scheduleId: number
+  startTime: string
+  endTime: string
+  direction: string
+  availableSeats: number
+  estimatedArrival: string
 }
 
 interface BusData {
   id: number
   busNumber: string
   capacity: number
-  reservedSeats: number
   currentStop: string | null
   nextDestination: string | null
   status: "ACTIVE" | "UNDER_MAINTENANCE" | "ON_TRIP" | "OFF_DUTY"
-  departureTime: string | null
-  estimatedArrival: string | null
-  delayMinutes: number
-  lastServiceDate: string
-  nextServiceDate: string
-  driverName?: string
-  driver: BusDriver
-  vehicle: BusVehicle
-  route: BusRoute
-  amenities?: string[]
-  rating?: number
-  totalReviews?: number
+  departureTime: string
+  driver: Driver
+  driverName: string
+  vehicle: Vehicle
+  route: Route
+  travelDirection: "UP" | "DOWN"
+  ratings: Ratings
+  nearestSchedule: NearestSchedule | null
 }
 
 interface BusDetailsSheetProps {
   bus: BusData | null
-  schedule?: BusSchedule | null
+  schedule?: NearestSchedule | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onBook: (busId: number, scheduleId: number) => void
@@ -187,13 +174,14 @@ export default function BusDetailsSheet({
 
   if (!bus) return null
 
-  const isForward = schedule?.direction === "FORWARD"
-  const pricePerSeat = parseFloat(bus.route.price) || 0
+  // Use nearestSchedule if provided, otherwise use bus departure time
+  const activeSchedule = schedule || bus.nearestSchedule
+  const isForward = bus.travelDirection === "UP"
+  const pricePerSeat = parseFloat(bus.route.price)
   const totalPrice = searchParams
     ? pricePerSeat * searchParams.passengers
     : pricePerSeat
-  const availableSeats =
-    schedule?.availableSeats || bus.capacity - bus.reservedSeats
+  const availableSeats = activeSchedule?.availableSeats || bus.capacity
   const hasEnoughSeats = searchParams
     ? availableSeats >= searchParams.passengers
     : availableSeats > 0
@@ -202,64 +190,49 @@ export default function BusDetailsSheet({
   const getDriverName = () => {
     if (bus.driverName) return bus.driverName
     if (bus.driver.user?.name) return bus.driver.user.name
-    if (bus.driver.user?.firstName) {
-      return `${bus.driver.user.firstName} ${bus.driver.user.lastName || ""}`
-    }
-    return `Driver (${bus.driver.licenseNo})`
+    return `Driver (${bus.driver.licenseNumber})`
   }
 
   // Get origin and destination based on direction
-  const origin = isForward
-    ? bus.route.startPoint || searchParams?.from || "Origin"
-    : bus.route.endPoint || searchParams?.to || "Destination"
+  const origin = bus.route.origin
+  const destination = bus.route.destination
 
-  const destination = isForward
-    ? bus.route.endPoint || searchParams?.to || "Destination"
-    : bus.route.startPoint || searchParams?.from || "Origin"
+  // Calculate rating percentage distribution
+  const getRatingPercentage = (score: number) => {
+    if (!bus.ratings.totalRatings) return 0
+    const count =
+      bus.ratings.distribution[score as keyof RatingDistribution] || 0
+    return (count / bus.ratings.totalRatings) * 100
+  }
 
-  // Mock amenities
+  // Format amenities based on bus features
   const amenities = [
-    { icon: Wifi, label: "WiFi", available: true },
-    { icon: Coffee, label: "Refreshments", available: true },
-    { icon: Wind, label: "AC", available: true },
     {
-      icon: Briefcase,
-      label: "Storage",
-      available: bus.vehicle.type === "LUXURY",
+      icon: Wifi,
+      label: "WiFi",
+      available: bus.vehicle.model?.includes("Luxury") || false,
     },
+    {
+      icon: Coffee,
+      label: "Refreshments",
+      available: bus.route.distanceKm > 100,
+    },
+    { icon: Wind, label: "Air Conditioning", available: true },
+    { icon: Briefcase, label: "Luggage Storage", available: true },
     { icon: Users, label: "Restroom", available: bus.capacity > 30 },
     { icon: Shield, label: "Security", available: true },
   ]
 
-  // Mock features
+  // Features based on bus type
   const features = [
     { label: "Power Outlets", available: true },
     { label: "Reclining Seats", available: true },
-    { label: "Entertainment", available: bus.vehicle.type === "LUXURY" },
-    { label: "Reading Light", available: true },
     { label: "USB Charging", available: true },
-    { label: "Foot Rest", available: bus.vehicle.type !== "STANDARD" },
-  ]
-
-  // Mock reviews
-  const recentReviews = [
+    { label: "Reading Light", available: true },
+    { label: "Extra Legroom", available: bus.route.distanceKm > 150 },
     {
-      user: "John D.",
-      rating: 5,
-      comment: "Very comfortable ride, on time!",
-      date: "2 days ago",
-    },
-    {
-      user: "Sarah M.",
-      rating: 4,
-      comment: "Clean bus, professional driver",
-      date: "1 week ago",
-    },
-    {
-      user: "Robert K.",
-      rating: 5,
-      comment: "Best bus service I've used",
-      date: "2 weeks ago",
+      label: "TV/Entertainment",
+      available: bus.vehicle.model?.includes("Luxury") || false,
     },
   ]
 
@@ -287,13 +260,16 @@ export default function BusDetailsSheet({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => onSave?.(bus.id)}
+                onClick={() => {
+                  setIsSaved(!isSaved)
+                  onSave?.(bus.id)
+                }}
                 className="rounded-full"
               >
                 <Heart
                   className={cn(
-                    "w-5 h-5",
-                    isSaved && "fill-red-500 text-red-500",
+                    "w-5 h-5 transition-all",
+                    isSaved && "fill-red-500 text-red-500 scale-110",
                   )}
                 />
               </Button>
@@ -313,85 +289,127 @@ export default function BusDetailsSheet({
         </div>
 
         {/* Hero Section */}
-        <div className="px-6 py-4 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+        <div className="px-6 py-4 bg-gradient-to-br from-orange-50 via-white to-amber-50 dark:from-gray-900 dark:to-gray-950">
           <div className="flex items-center justify-between mb-4">
             <Badge
               variant="outline"
               className={cn(
-                "px-3 py-1",
+                "px-3 py-1 font-medium",
                 isForward
                   ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400"
                   : "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-400",
               )}
             >
               <ArrowLeftRight className="w-3.5 h-3.5 mr-1" />
-              {isForward ? "Forward Trip" : "Return Trip"}
+              {isForward ? "Departure Trip" : "Return Trip"}
             </Badge>
-            <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-medium">{bus.rating || 4.8}</span>
-              <span className="text-sm text-gray-500">
-                ({bus.totalReviews || 128} reviews)
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-semibold">
+                  {bus.ratings.averageRating}
+                </span>
+                <span className="text-sm text-gray-500">
+                  ({bus.ratings.totalRatings} reviews)
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Route Timeline */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <CircleDot className="w-5 h-5 text-green-500" />
-                <div>
-                  <p className="font-medium">{origin}</p>
-                  <p className="text-sm text-gray-500">
-                    {schedule?.startTime || "10:00 AM"}
-                  </p>
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                      <CircleDot className="w-5 h-5 text-green-600" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-lg">{origin}</p>
+                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {activeSchedule?.startTime || bus.departureTime}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 text-center">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-dashed border-gray-300 dark:border-gray-700"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 py-1 bg-white dark:bg-gray-950 text-xs font-medium text-gray-600 rounded-full border">
+                      {bus.route.estimatedTimeMin} min
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {bus.route.distanceKm} km
+                </p>
+              </div>
+
+              <div className="flex-1 text-right">
+                <div className="flex items-center justify-end gap-3">
+                  <div>
+                    <p className="font-semibold text-lg">{destination}</p>
+                    <p className="text-sm text-gray-500 flex items-center gap-1 justify-end">
+                      <Clock className="w-3 h-3" />
+                      {activeSchedule?.endTime ||
+                        format(
+                          new Date(
+                            `2000-01-01T${bus.departureTime}:00`,
+                          ).getTime() +
+                            bus.route.estimatedTimeMin * 60000,
+                          "HH:mm",
+                        )}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <Circle className="w-5 h-5 text-red-600" />
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex-1 text-center">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-dashed border-gray-300 dark:border-gray-700"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="px-2 bg-white dark:bg-gray-950 text-xs text-gray-500">
-                    {bus.route.estimatedTimeMin} min
-                  </span>
+
+            {/* Midpoints */}
+            {bus.route.midPoints && bus.route.midPoints.length > 0 && (
+              <div className="ml-6 pl-6 border-l-2 border-dashed border-gray-200 dark:border-gray-700">
+                <p className="text-xs font-medium text-gray-500 mb-2">Via:</p>
+                <div className="flex flex-wrap gap-2">
+                  {bus.route.midPoints.map((point, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      {point}
+                    </Badge>
+                  ))}
                 </div>
               </div>
-            </div>
-            <div className="flex-1 text-right">
-              <div className="flex items-center justify-end gap-3">
-                <div>
-                  <p className="font-medium">{destination}</p>
-                  <p className="text-sm text-gray-500">
-                    {schedule?.endTime || "12:30 PM"}
-                  </p>
-                </div>
-                <Circle className="w-5 h-5 text-red-500" />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{bus.route.estimatedTimeMin}</p>
+          <div className="grid grid-cols-4 gap-4 pt-2">
+            <div className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+              <Timer className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+              <p className="text-xl font-bold">{bus.route.estimatedTimeMin}</p>
               <p className="text-xs text-gray-500">Minutes</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">{availableSeats}</p>
+            <div className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+              <Users className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+              <p className="text-xl font-bold">{availableSeats}</p>
               <p className="text-xs text-gray-500">Seats Left</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">{bus.capacity}</p>
+            <div className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+              <Bus className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+              <p className="text-xl font-bold">{bus.capacity}</p>
               <p className="text-xs text-gray-500">Total Seats</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">
-                {bus.route.distanceKm || "250"}
-              </p>
+            <div className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+              <Navigation className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+              <p className="text-xl font-bold">{bus.route.distanceKm}</p>
               <p className="text-xs text-gray-500">km</p>
             </div>
           </div>
@@ -403,367 +421,401 @@ export default function BusDetailsSheet({
           className="px-6"
           onValueChange={setActiveTab}
         >
-          <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-800 bg-transparent p-0">
+          <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-800 bg-transparent p-0 h-auto">
             <TabsTrigger
               value="overview"
-              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-300 bg-transparent px-4 py-3"
+              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-500 bg-transparent px-4 py-3 data-[state=active]:bg-orange-50 dark:data-[state=active]:bg-orange-950/20"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger
-              value="amenities"
-              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-300 bg-transparent px-4 py-3"
-            >
-              Amenities
-            </TabsTrigger>
-            <TabsTrigger
               value="reviews"
-              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-300 bg-transparent px-4 py-3"
+              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-500 bg-transparent px-4 py-3 data-[state=active]:bg-orange-50 dark:data-[state=active]:bg-orange-950/20"
             >
               Reviews
             </TabsTrigger>
             <TabsTrigger
               value="bus"
-              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-300 bg-transparent px-4 py-3"
+              className="rounded-lg border-b-2 border-transparent data-[state=active]:border-orange-500 bg-transparent px-4 py-3 data-[state=active]:bg-orange-50 dark:data-[state=active]:bg-orange-950/20"
             >
               Bus Info
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="pt-6 pb-20">
+          <TabsContent value="overview" className="pt-6 pb-20 space-y-6">
             {/* Journey Details */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-semibold mb-3">Journey Details</h3>
-                <div className="space-y-4">
-                  {/* Stops */}
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <div className="w-0.5 h-12 bg-gray-300 dark:bg-gray-700"></div>
-                      </div>
-                      <div className="flex-1 pb-3">
-                        <p className="font-medium">{origin}</p>
-                        <p className="text-sm text-gray-500">
-                          Departure • {schedule?.startTime}
-                        </p>
-                      </div>
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-orange-500" />
+                Journey Details
+              </h3>
+
+              <Card className="p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="min-w-[80px]">
+                    <p className="text-sm font-medium text-gray-500">From</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">{origin}</p>
+                    <p className="text-sm text-gray-500">
+                      Departure:{" "}
+                      {activeSchedule?.startTime || bus.departureTime}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="min-w-[80px]">
+                    <p className="text-sm font-medium text-gray-500">To</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">{destination}</p>
+                    <p className="text-sm text-gray-500">
+                      Arrival:{" "}
+                      {activeSchedule?.endTime ||
+                        format(
+                          new Date(
+                            `2000-01-01T${bus.departureTime}:00`,
+                          ).getTime() +
+                            bus.route.estimatedTimeMin * 60000,
+                          "HH:mm",
+                        )}
+                    </p>
+                  </div>
+                </div>
+
+                {bus.currentStop && (
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-[80px]">
+                      <p className="text-sm font-medium text-gray-500">
+                        Current
+                      </p>
                     </div>
-
-                    {/* Midpoints */}
-                    {bus.route.midPoints &&
-                      bus.route.midPoints.length > 0 &&
-                      (isForward
-                        ? bus.route.midPoints
-                        : [...bus.route.midPoints].reverse()
-                      )
-                        .filter((m) => m !== origin && m !== destination)
-                        .slice(0, 2)
-                        .map((midpoint, idx) => (
-                          <div key={idx} className="flex gap-3">
-                            <div className="flex flex-col items-center">
-                              <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                              {idx < 1 && (
-                                <div className="w-0.5 h-12 bg-gray-300 dark:bg-gray-700"></div>
-                              )}
-                            </div>
-                            <div className="flex-1 pb-3">
-                              <p className="font-medium">{midpoint}</p>
-                              <p className="text-sm text-gray-500">
-                                Intermediate Stop
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-
-                    <div className="flex gap-3">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      <div className="flex-1">
-                        <p className="font-medium">{destination}</p>
-                        <p className="text-sm text-gray-500">
-                          Arrival • {schedule?.endTime}
-                          {bus.delayMinutes > 0 && (
-                            <span className="text-amber-600 ml-2">
-                              +{bus.delayMinutes} min delay
-                            </span>
-                          )}
-                        </p>
-                      </div>
+                    <div>
+                      <Badge variant="outline" className="bg-blue-50">
+                        {bus.currentStop}
+                      </Badge>
                     </div>
                   </div>
-
-                  {/* Driver Info Card */}
-                  <Card className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={bus.driver.user?.avaterUrl} />
-                        <AvatarFallback className="bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300">
-                          {getDriverName().charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{getDriverName()}</p>
-                            <p className="text-sm text-gray-500">
-                              {bus.driver.experience} years experience
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              bus.driver.isOnDuty ? "default" : "secondary"
-                            }
-                          >
-                            {bus.driver.isOnDuty ? "On Duty" : "Off Duty"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Price Breakdown */}
-                  <Card className="p-4 bg-orange-50 dark:bg-orange-950/20">
-                    <h4 className="font-medium mb-3">Price Breakdown</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Base fare ({bus.route.currency})
-                        </span>
-                        <span>{pricePerSeat.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Service fee
-                        </span>
-                        <span>{(pricePerSeat * 0.1).toFixed(2)}</span>
-                      </div>
-                      <Separator />
-                      <div className="flex justify-between font-semibold">
-                        <span>
-                          Total for {searchParams?.passengers || 1} passenger(s)
-                        </span>
-                        <span className="text-orange-600 dark:text-orange-400">
-                          {bus.route.currency} {(totalPrice * 1.1).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              </div>
+                )}
+              </Card>
             </div>
-          </TabsContent>
 
-          <TabsContent value="amenities" className="pt-6 pb-20">
-            <div className="space-y-6">
-              {/* Amenities Grid */}
-              <div>
-                <h3 className="font-semibold mb-3">Amenities</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {amenities.map((amenity, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 p-3 border rounded-lg"
-                    >
-                      <amenity.icon
-                        className={cn(
-                          "w-5 h-5",
-                          amenity.available
-                            ? "text-green-500"
-                            : "text-gray-400",
-                        )}
-                      />
+            {/* Driver Info */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <User className="w-4 h-4 text-orange-500" />
+                Driver Information
+              </h3>
+
+              <Card className="p-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-14 h-14 border-2 border-orange-200">
+                    <AvatarImage
+                      src={bus.driver?.user?.avaterUrl || "/default-avatar.png"}
+                      alt={getDriverName()}
+                    />
+
+                    <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-500 text-white text-lg">
+                      {getDriverName().charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
-                        <p className="font-medium">{amenity.label}</p>
-                        <p className="text-xs text-gray-500">
-                          {amenity.available ? "Available" : "Not Available"}
+                        <p className="font-semibold text-lg capitalize">
+                          {getDriverName()}
+                        </p>
+                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />+{bus.driver.user.phone}
                         </p>
                       </div>
+                      <Badge variant="default" className="bg-green-500">
+                        Licensed
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Features */}
-              <div>
-                <h3 className="font-semibold mb-3">Features</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {features.map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      {feature.available ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-gray-400" />
-                      )}
-                      <span
-                        className={cn(
-                          "text-sm",
-                          !feature.available && "text-gray-400",
-                        )}
-                      >
-                        {feature.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="reviews" className="pt-6 pb-20">
-            <div className="space-y-6">
-              {/* Rating Summary */}
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <p className="text-4xl font-bold">{bus.rating || 4.8}</p>
-                  <div className="flex items-center gap-0.5 mt-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={cn(
-                          "w-4 h-4",
-                          star <= Math.floor(bus.rating || 4.8)
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "text-gray-300 dark:text-gray-600",
-                        )}
-                      />
-                    ))}
+                    <p className="text-xs text-gray-400 mt-2">
+                      Experience: {bus.driver.experience} Years
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {bus.totalReviews || 128} reviews
+                </div>
+              </Card>
+            </div>
+
+            {/* Price Breakdown */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-orange-500" />
+                Price Breakdown
+              </h3>
+
+              <Card className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border-orange-200 dark:border-orange-800">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Base fare per passenger
+                    </span>
+                    <span className="font-medium">
+                      {bus.route.currency} {pricePerSeat.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Service fee (10%)
+                    </span>
+                    <span className="font-medium">
+                      {bus.route.currency} {(pricePerSeat * 0.1).toFixed(2)}
+                    </span>
+                  </div>
+                  <Separator className="bg-orange-200 dark:bg-orange-800" />
+                  <div className="flex justify-between font-semibold">
+                    <span>
+                      Total for {searchParams?.passengers || 1} passenger(s)
+                    </span>
+                    <span className="text-orange-600 dark:text-orange-400 text-lg">
+                      {bus.route.currency} {(totalPrice * 1.1).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    *Includes all taxes and service fees
                   </p>
                 </div>
-                <div className="flex-1 space-y-2">
-                  {[5, 4, 3, 2, 1].map((rating) => (
-                    <div key={rating} className="flex items-center gap-2">
-                      <span className="text-sm w-8">{rating} ★</span>
-                      <Progress
-                        value={rating === 5 ? 70 : rating === 4 ? 20 : 5}
-                        className="h-2"
-                      />
-                      <span className="text-sm text-gray-500 w-8">
-                        {rating === 5 ? "70%" : rating === 4 ? "20%" : "5%"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </Card>
+            </div>
+          </TabsContent>
 
-              {/* Recent Reviews */}
-              <div>
-                <h3 className="font-semibold mb-3">Recent Reviews</h3>
-                <div className="space-y-4">
-                  {recentReviews.map((review, idx) => (
-                    <Card key={idx} className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium">{review.user}</p>
-                        <p className="text-sm text-gray-500">{review.date}</p>
+          <TabsContent value="reviews" className="pt-6 pb-20 space-y-6">
+            {/* Rating Summary */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+                Rating Summary
+              </h3>
+
+              <Card className="p-4">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="text-center md:border-r md:pr-6">
+                    <p className="text-5xl font-bold text-orange-600">
+                      {bus.ratings.averageRating}
+                    </p>
+                    <div className="flex items-center justify-center gap-0.5 mt-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={cn(
+                            "w-4 h-4",
+                            star <=
+                              Math.floor(parseFloat(bus.ratings.averageRating))
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300 dark:text-gray-600",
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {bus.ratings.totalRatings} total reviews
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    {[5, 4, 3, 2, 1].map((rating) => (
+                      <div key={rating} className="flex items-center gap-2">
+                        <span className="text-sm w-12">{rating} ★</span>
+                        <Progress
+                          value={getRatingPercentage(rating)}
+                          className="h-2 flex-1"
+                          indicatorClassName="bg-yellow-400"
+                        />
+                        <span className="text-sm text-gray-500 w-12">
+                          {getRatingPercentage(rating).toFixed(0)}%
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 mb-2">
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Recent Reviews */}
+            <div>
+              <h3 className="font-semibold mb-3">Recent Reviews</h3>
+              <div className="space-y-3">
+                {bus.ratings.latest.map((review, idx) => (
+                  <Card
+                    key={idx}
+                    className="p-4 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xs">
+                            {review.userName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">
+                            {review.userName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {format(new Date(review.createdAt), "MMM dd, yyyy")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
                             className={cn(
                               "w-3 h-3",
-                              star <= review.rating
+                              star <= review.score
                                 ? "fill-yellow-400 text-yellow-400"
                                 : "text-gray-300 dark:text-gray-600",
                             )}
                           />
                         ))}
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {review.comment}
-                      </p>
-                    </Card>
-                  ))}
-                </div>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                      {review.comment}
+                    </p>
+                  </Card>
+                ))}
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="bus" className="pt-6 pb-20">
-            <div className="space-y-6">
-              {/* Bus Details */}
-              <div>
-                <h3 className="font-semibold mb-3">Bus Information</h3>
-                <Card className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Model</span>
-                      <span className="font-medium">
-                        {bus.vehicle.manufacturer} {bus.vehicle.model}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Year</span>
-                      <span className="font-medium">{bus.vehicle.year}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Plate Number</span>
-                      <span className="font-medium">
-                        {bus.vehicle.plateNumber}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Capacity</span>
-                      <span className="font-medium">
-                        {bus.vehicle.capacity} seats
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Mileage</span>
-                      <span className="font-medium">
-                        {bus.vehicle.mileage.toLocaleString()} km
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Last Service</span>
-                      <span className="font-medium">
-                        {bus.lastServiceDate
-                          ? format(
-                              new Date(bus.lastServiceDate),
-                              "MMM do, yyyy",
-                            )
-                          : "N/A"}
-                      </span>
+          <TabsContent value="bus" className="pt-6 pb-20 space-y-6">
+            {/* Vehicle Details */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Car className="w-4 h-4 text-orange-500" />
+                Vehicle Information
+              </h3>
+
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-gray-500">Model</span>
+                    <span className="font-medium">{bus.vehicle.model}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-gray-500">Year</span>
+                    <span className="font-medium">{bus.vehicle.year}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-gray-500">Plate Number</span>
+                    <Badge variant="outline">{bus.vehicle.plateNumber}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-gray-500">Capacity</span>
+                    <span className="font-medium">{bus.capacity} seats</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-500">Status</span>
+                    <Badge
+                      className={cn(
+                        bus.status === "ACTIVE" && "bg-green-500",
+                        bus.status === "ON_TRIP" && "bg-blue-500",
+                        bus.status === "UNDER_MAINTENANCE" && "bg-red-500",
+                        bus.status === "OFF_DUTY" && "bg-gray-500",
+                      )}
+                    >
+                      {bus.status.replace("_", " ")}
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Bus Service Status */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Info className="w-4 h-4 text-orange-500" />
+                Service Status
+              </h3>
+
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Schedule Time</p>
+                      <p className="text-sm text-gray-500">
+                        Departs at {bus.departureTime} daily
+                      </p>
                     </div>
                   </div>
-                </Card>
-              </div>
 
-              {/* Owner Info */}
-              {bus.vehicle.ownerName && (
-                <div>
-                  <h3 className="font-semibold mb-3">Owner Information</h3>
-                  <Card className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Name</span>
-                        <span className="font-medium">
-                          {bus.vehicle.ownerName}
-                        </span>
+                  {bus.currentStop && (
+                    <div className="flex items-start gap-3">
+                      <Navigation className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">Current Location</p>
+                        <p className="text-sm text-gray-500">
+                          {bus.currentStop}
+                        </p>
                       </div>
-                      {bus.vehicle.ownerPhone && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Phone</span>
-                          <span className="font-medium">
-                            {bus.vehicle.ownerPhone}
-                          </span>
-                        </div>
-                      )}
                     </div>
-                  </Card>
+                  )}
+
+                  {bus.nextDestination && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">Next Destination</p>
+                        <p className="text-sm text-gray-500">
+                          {bus.nextDestination}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </Card>
+            </div>
+
+            {/* Route Info */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                Route Information
+              </h3>
+
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Route Name</span>
+                    <span className="font-medium text-sm">
+                      {bus.route.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Distance</span>
+                    <span className="font-medium">
+                      {bus.route.distanceKm} km
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Est. Duration</span>
+                    <span className="font-medium">
+                      {bus.route.estimatedTimeMin} minutes
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Base Price</span>
+                    <span className="font-medium">
+                      {bus.route.currency} {bus.route.price}
+                    </span>
+                  </div>
+                </div>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
 
         {/* Bottom Action Bar */}
-        <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm dark:bg-gray-950/95 border-t border-gray-200 dark:border-gray-800 px-6 py-4 shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
               <p className="text-sm text-gray-500">Total Price</p>
               <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {bus.route.currency} {(totalPrice * 1.1).toFixed(2)}
@@ -780,25 +832,25 @@ export default function BusDetailsSheet({
               </Button>
               <Button
                 onClick={() => {
-                  if (schedule) {
-                    onBook(bus.id, schedule.scheduleId)
+                  if (activeSchedule) {
+                    onBook(bus.id, activeSchedule.scheduleId)
                     onOpenChange(false)
                   }
                 }}
                 disabled={
                   !hasEnoughSeats ||
                   bus.status === "UNDER_MAINTENANCE" ||
-                  !schedule
+                  !activeSchedule
                 }
-                className="bg-orange-500 hover:bg-orange-600 text-white min-w-[140px]"
+                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white min-w-[140px] shadow-lg transition-all duration-200 hover:shadow-xl"
               >
-                {!schedule
+                {!activeSchedule
                   ? "No Schedule"
                   : bus.status === "UNDER_MAINTENANCE"
                     ? "Unavailable"
                     : !hasEnoughSeats
                       ? "Sold Out"
-                      : "Book Now"}
+                      : `Book Now${searchParams?.passengers && searchParams.passengers > 1 ? ` (${searchParams.passengers} seats)` : ""}`}
               </Button>
             </div>
           </div>

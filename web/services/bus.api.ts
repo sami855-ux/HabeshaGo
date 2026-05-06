@@ -100,3 +100,17 @@ export const recordBusPosition = async (
   })
   return res.data
 }
+
+export const submitRating = async (payload) => {
+  try {
+    const response = await axiosInstance.post("/buses/ratings", payload)
+    return response.data
+  } catch (error) {
+    console.error("Submit rating error:", error)
+
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to submit rating",
+    }
+  }
+}

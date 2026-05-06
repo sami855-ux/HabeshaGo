@@ -45,7 +45,7 @@ export const mockUsers: User[] = Array.from({ length: 50 }, (_, i) => {
           "COMPLETED",
         ]),
         createdAt: faker.date.recent().toISOString(),
-      })
+      }),
     ),
     minibusReservations:
       role === "PASSENGER"
@@ -60,7 +60,7 @@ export const mockUsers: User[] = Array.from({ length: 50 }, (_, i) => {
                 "CONFIRMED",
                 "CANCELLED",
               ]),
-            })
+            }),
           )
         : [],
     parkingReservations:
@@ -72,7 +72,7 @@ export const mockUsers: User[] = Array.from({ length: 50 }, (_, i) => {
               slotNumber: faker.number.int({ min: 1, max: 50 }),
               startTime: faker.date.recent().toISOString(),
               endTime: faker.date.soon().toISOString(),
-            })
+            }),
           )
         : [],
     sessions: Array.from(
@@ -81,7 +81,7 @@ export const mockUsers: User[] = Array.from({ length: 50 }, (_, i) => {
         id: `session_${faker.string.uuid()}`,
         expiresAt: faker.date.future().toISOString(),
         createdAt: faker.date.recent().toISOString(),
-      })
+      }),
     ),
     accounts: [
       {
@@ -178,3 +178,92 @@ export const generateBuses = (count: number): Bus[] => {
 
 // Generate initial data
 export const dummyBuses = generateBuses(35)
+
+export interface BusDetails {
+  id: string
+  routeName: string
+  routeId: string
+  driverName: string
+  driverPhone: string
+  capacity: number
+  passengersCount: number
+  speed: number
+  fuelLevel: number
+  lastMaintenance: string
+  nextStop: string
+  estimatedArrival: string
+  status: "on-time" | "delayed" | "early"
+}
+
+export const fetchBusDetails = async (busId: string): Promise<BusDetails> => {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 500))
+
+  // Mock data for different buses
+  const mockBusData: Record<string, BusDetails> = {
+    BUS001: {
+      id: "BUS001",
+      routeName: "Express A",
+      routeId: "RTE-101",
+      driverName: "John Smith",
+      driverPhone: "+1 (555) 123-4567",
+      capacity: 50,
+      passengersCount: 32,
+      speed: 45,
+      fuelLevel: 78,
+      lastMaintenance: "2024-03-15",
+      nextStop: "Central Station",
+      estimatedArrival: "5 min",
+      status: "on-time",
+    },
+    BUS002: {
+      id: "BUS002",
+      routeName: "City Loop B",
+      routeId: "RTE-102",
+      driverName: "Sarah Johnson",
+      driverPhone: "+1 (555) 234-5678",
+      capacity: 40,
+      passengersCount: 28,
+      speed: 35,
+      fuelLevel: 62,
+      lastMaintenance: "2024-03-10",
+      nextStop: "Market Square",
+      estimatedArrival: "8 min",
+      status: "delayed",
+    },
+    BUS003: {
+      id: "BUS003",
+      routeName: "Airport Shuttle",
+      routeId: "RTE-103",
+      driverName: "Mike Wilson",
+      driverPhone: "+1 (555) 345-6789",
+      capacity: 60,
+      passengersCount: 45,
+      speed: 55,
+      fuelLevel: 45,
+      lastMaintenance: "2024-03-12",
+      nextStop: "Airport Terminal",
+      estimatedArrival: "12 min",
+      status: "on-time",
+    },
+  }
+
+  // Return mock data or default if bus not found
+  return (
+    mockBusData[busId] || {
+      id: busId,
+      routeName: "Local Route",
+      routeId: "RTE-000",
+      driverName: "Unknown",
+      driverPhone: "N/A",
+      capacity: 40,
+      passengersCount: 20,
+      speed: 30,
+      fuelLevel: 50,
+      lastMaintenance: "N/A",
+      nextStop: "Unknown",
+      estimatedArrival: "N/A",
+      status: "on-time",
+    }
+  )
+}

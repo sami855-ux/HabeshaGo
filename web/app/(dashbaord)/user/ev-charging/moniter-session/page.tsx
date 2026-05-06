@@ -1,49 +1,93 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { ArrowLeft, Wallet } from "lucide-react"
+import { AlertCircleIcon, ArrowLeft, Wallet } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+
 import SessionMonitor from "@/components/user-dashboard/ev-charging/SessionMonitor"
 import SessionControls from "@/components/user-dashboard/ev-charging/SessionControls"
 import SessionDialogs from "@/components/user-dashboard/ev-charging/SessionDialogs"
-import { useRouter } from "next/navigation"
+import { axiosInstance } from "@/services/axiosInstance"
 
-// Mock session data (API ready)
-const MOCK_SESSION = {
-  id: "sess_789012",
-  stationName: "EV Gateway Station",
-  chargerId: "CH-42",
-  connectorType: "CCS Combo 2",
-  address: "123 Electric Ave, Silicon Valley, CA 94025",
-  startedAt: new Date().toISOString(),
-  vehicleInfo: {
-    model: "Tesla Model Y",
-    batteryCapacity: 75,
-    currentBattery: 42,
-    estimatedRange: 168,
-  },
-  chargingStats: {
-    currentPower: 142,
-    voltage: 408,
-    current: 348,
-    energyDelivered: 0,
-    sessionCost: 0,
-    carbonSaved: 0,
-    maxPower: 250,
-  },
-  status: "charging",
-  targetEnergy: 3,
-  pricePerKwh: 0.45,
+// API service functions (replace with your actual API calls)
+export const fetchSessionById = async (sessionId: string) => {
+  if (!sessionId) throw new Error("Session ID is required")
+
+  const response = await axiosInstance.get(`/ev/session/${sessionId}`)
+
+  return response.data.data
 }
 
-// Mock wallet balance
-let MOCK_WALLET_BALANCE = 45.5
+const fetchWalletBalance = async () => {
+  // TODO: Replace with actual API call
+  // const response = await fetch('/api/user/wallet')
+  // return response.json()
+
+  return { balance: 45.5 }
+}
+
+const processPaymentMutation = async ({
+  amount,
+  sessionId,
+}: {
+  amount: number
+  sessionId: string
+}) => {
+  // TODO: Replace with actual API call
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+  return { success: true, newBalance: 45.5 - amount }
+}
 
 const MainPage: React.FC = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get("sessionId")
+  const queryClient = useQueryClient()
 
-  const [session, setSession] = useState(MOCK_SESSION)
+  // Fetch session data
+  const {
+    data: sessionData,
+    isLoading: isSessionLoading,
+    isError: isSessionError,
+    error: sessionError,
+    refetch: refetchSession,
+  } = useQuery({
+    queryKey: ["charging-session", sessionId],
+    queryFn: () => fetchSessionById(sessionId!),
+    enabled: !!sessionId,
+    refetchInterval: (data) => {
+      // Refetch every 5 seconds if session is active
+      return data?.status === "charging" || data?.status === "paused"
+        ? 5000
+        : false
+    },
+  })
+
+  // Fetch wallet balance
+  const {
+    data: walletData,
+    isLoading: isWalletLoading,
+    refetch: refetchWallet,
+  } = useQuery({
+    queryKey: ["wallet-balance"],
+    queryFn: fetchWalletBalance,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  })
+
+  // Payment mutation
+  const paymentMutation = useMutation({
+    mutationFn: processPaymentMutation,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] })
+      queryClient.invalidateQueries({
+        queryKey: ["charging-session", sessionId],
+      })
+    },
+  })
+
+  const [session, setSession] = useState(sessionData)
   const [timeElapsed, setTimeElapsed] = useState("00:00:00")
-  const [walletBalance, setWalletBalance] = useState(MOCK_WALLET_BALANCE)
   const [finalCost, setFinalCost] = useState(0)
 
   // Dialog states
@@ -64,9 +108,17 @@ const MainPage: React.FC = () => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const startTimeRef = useRef<Date>(new Date(session.startedAt))
+  const startTimeRef = useRef<Date>(new Date())
   const pausedDurationRef = useRef<number>(0)
   const pauseStartTimeRef = useRef<number | null>(null)
+
+  // Update session when data changes
+  useEffect(() => {
+    if (sessionData) {
+      setSession(sessionData)
+      startTimeRef.current = new Date(sessionData.startedAt)
+    }
+  }, [sessionData])
 
   // Format time helper
   const formatTime = (seconds: number): string => {
@@ -79,7 +131,7 @@ const MainPage: React.FC = () => {
 
   // Update elapsed time
   const updateElapsedTime = () => {
-    if (session.status === "charging") {
+    if (session?.status === "charging") {
       const now = new Date()
       const elapsed =
         (now.getTime() - startTimeRef.current.getTime()) / 1000 -
@@ -91,40 +143,42 @@ const MainPage: React.FC = () => {
   // Timer effects
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current)
-    if (session.status === "charging") {
+    if (session?.status === "charging") {
       timerRef.current = setInterval(updateElapsedTime, 1000)
       updateElapsedTime()
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [session.status])
+  }, [session?.status])
 
   useEffect(() => {
-    if (session.status === "paused" && pauseStartTimeRef.current === null) {
+    if (session?.status === "paused" && pauseStartTimeRef.current === null) {
       pauseStartTimeRef.current = Date.now()
     } else if (
-      session.status === "charging" &&
+      session?.status === "charging" &&
       pauseStartTimeRef.current !== null
     ) {
       pausedDurationRef.current +=
         (Date.now() - pauseStartTimeRef.current) / 1000
       pauseStartTimeRef.current = null
     }
-  }, [session.status])
+  }, [session?.status])
 
-  // Simulate real-time data updates
+  // Simulate real-time data updates (replace with WebSocket)
   useEffect(() => {
     if (updateIntervalRef.current) clearInterval(updateIntervalRef.current)
+
     const targetReached =
-      session.chargingStats.energyDelivered >= session.targetEnergy
+      session?.chargingStats?.energyDelivered >= session?.targetEnergy
 
-    if (session.status === "charging" && !targetReached) {
+    if (session?.status === "charging" && !targetReached) {
       updateIntervalRef.current = setInterval(() => {
-        const power = 142 + (Math.random() - 0.5) * 15
-        const energyIncrement = (power / 3600) * 3
-
         setSession((prev) => {
+          if (!prev) return prev
+
+          const power = 142 + (Math.random() - 0.5) * 15
+          const energyIncrement = (power / 3600) * 3
           const newEnergyDelivered =
             prev.chargingStats.energyDelivered + energyIncrement
           const newBatteryPercentage = Math.min(
@@ -162,54 +216,54 @@ const MainPage: React.FC = () => {
     return () => {
       if (updateIntervalRef.current) clearInterval(updateIntervalRef.current)
     }
-  }, [session.status])
+  }, [session?.status])
 
   // Auto-stop when target is reached
   useEffect(() => {
     const targetReached =
-      session.chargingStats.energyDelivered >= session.targetEnergy
+      session?.chargingStats?.energyDelivered >= (session?.targetEnergy || 0)
     if (
       targetReached &&
-      session.status === "charging" &&
+      session?.status === "charging" &&
       !showTargetReachedDialog
     ) {
       setShowTargetReachedDialog(true)
-      setSession((prev) => ({ ...prev, status: "completed" }))
+      setSession((prev) => (prev ? { ...prev, status: "completed" } : prev))
     }
   }, [
-    session.chargingStats.energyDelivered,
-    session.status,
-    session.targetEnergy,
+    session?.chargingStats?.energyDelivered,
+    session?.status,
+    session?.targetEnergy,
     showTargetReachedDialog,
   ])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    await Promise.all([refetchSession(), refetchWallet()])
     setIsRefreshing(false)
   }
 
   const handlePauseResume = () => {
-    if (session.status === "charging") {
+    if (session?.status === "charging") {
       setAlertConfig({
         type: "pause",
         onConfirm: async () => {
           setShowModernAlert(false)
-          // Pause logic
           await new Promise((resolve) => setTimeout(resolve, 800))
-          setSession((prev) => ({ ...prev, status: "paused" }))
+          // TODO: Call API to pause session
+          setSession((prev) => (prev ? { ...prev, status: "paused" } : prev))
           setAlertConfig(null)
         },
       })
       setShowModernAlert(true)
-    } else if (session.status === "paused") {
+    } else if (session?.status === "paused") {
       setAlertConfig({
         type: "resume",
         onConfirm: async () => {
           setShowModernAlert(false)
-          // Resume logic
           await new Promise((resolve) => setTimeout(resolve, 800))
-          setSession((prev) => ({ ...prev, status: "charging" }))
+          // TODO: Call API to resume session
+          setSession((prev) => (prev ? { ...prev, status: "charging" } : prev))
           setAlertConfig(null)
         },
       })
@@ -223,8 +277,9 @@ const MainPage: React.FC = () => {
       onConfirm: async () => {
         setShowModernAlert(false)
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        setSession((prev) => ({ ...prev, status: "completed" }))
-        setFinalCost(session.chargingStats.sessionCost)
+        // TODO: Call API to stop session
+        setSession((prev) => (prev ? { ...prev, status: "completed" } : prev))
+        setFinalCost(session?.chargingStats?.sessionCost || 0)
         setShowCompletionDialog(true)
         setAlertConfig(null)
       },
@@ -233,23 +288,11 @@ const MainPage: React.FC = () => {
   }
 
   const checkSufficientFunds = (amount: number): boolean => {
-    return walletBalance >= amount
-  }
-
-  const processPayment = async (amount: number): Promise<boolean> => {
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    if (walletBalance >= amount) {
-      const newBalance = walletBalance - amount
-      setWalletBalance(newBalance)
-      MOCK_WALLET_BALANCE = newBalance
-      return true
-    }
-    return false
+    return (walletData?.balance || 0) >= amount
   }
 
   const handleResumeWithNewTarget = async () => {
-    const additionalCost = resumeAmount * session.pricePerKwh
+    const additionalCost = resumeAmount * (session?.pricePerKwh || 0)
 
     if (!checkSufficientFunds(additionalCost)) {
       setShowResumeDialog(false)
@@ -257,39 +300,87 @@ const MainPage: React.FC = () => {
       return
     }
 
-    const paymentSuccess = await processPayment(additionalCost)
+    setIsDialogLoading(true)
 
-    if (paymentSuccess) {
-      setSession((prev) => ({
-        ...prev,
-        status: "charging",
-        targetEnergy: prev.targetEnergy + resumeAmount,
-      }))
+    try {
+      await paymentMutation.mutateAsync({
+        amount: additionalCost,
+        sessionId: sessionId!,
+      })
+
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "charging",
+              targetEnergy: prev.targetEnergy + resumeAmount,
+            }
+          : prev,
+      )
+
       setShowResumeDialog(false)
       setResumeAmount(10)
-    } else {
+    } catch (error) {
       setShowResumeDialog(false)
       setShowInsufficientFundsDialog(true)
+    } finally {
+      setIsDialogLoading(false)
     }
   }
 
   const handleBack = () => {
-    console.log("Navigate back to dashboard")
     router.back()
   }
 
+  // Loading state
+  if (isSessionLoading || !session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+          <p className="mt-4 text-gray-600">Loading session data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (isSessionError || !sessionId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md px-4">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Session Not Found
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {sessionError instanceof Error
+              ? sessionError.message
+              : "Unable to load charging session. Please check your connection and try again."}
+          </p>
+          <button
+            onClick={handleBack}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const targetReached =
-    session.chargingStats.energyDelivered >= session.targetEnergy
+    session.chargingStats?.energyDelivered >= session.targetEnergy
   const remainingToTarget = Math.max(
     0,
-    session.targetEnergy - session.chargingStats.energyDelivered,
+    session.targetEnergy - (session.chargingStats?.energyDelivered || 0),
   )
   const targetProgress =
-    (session.chargingStats.energyDelivered / session.targetEnergy) * 100
+    (session.chargingStats?.energyDelivered / session.targetEnergy) * 100
 
   return (
-    <div className="min-h-screen ">
-      <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-8">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-8">
           <button
@@ -303,7 +394,11 @@ const MainPage: React.FC = () => {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200 shadow-sm">
               <Wallet className="w-4 h-4 text-green-600" />
               <span className="text-sm font-medium text-gray-900">
-                ETB {walletBalance.toFixed(2)}
+                {isWalletLoading ? (
+                  <span className="inline-block w-16 h-4 bg-gray-200 animate-pulse rounded"></span>
+                ) : (
+                  `ETB ${walletData?.balance?.toFixed(2) || "0.00"}`
+                )}
               </span>
             </div>
             <button
@@ -348,7 +443,7 @@ const MainPage: React.FC = () => {
           <div className="space-y-6">
             <SessionControls
               session={session}
-              walletBalance={walletBalance}
+              walletBalance={walletData?.balance || 0}
               onPauseResume={handlePauseResume}
               onStop={handleManualStop}
             />
@@ -365,14 +460,14 @@ const MainPage: React.FC = () => {
         showModernAlert={showModernAlert}
         session={session}
         timeElapsed={timeElapsed}
-        walletBalance={walletBalance}
+        walletBalance={walletData?.balance || 0}
         finalCost={finalCost}
         resumeAmount={resumeAmount}
         isDialogLoading={isDialogLoading}
         alertConfig={alertConfig}
         onCloseTargetDialog={() => {
           setShowTargetReachedDialog(false)
-          setFinalCost(session.chargingStats.sessionCost)
+          setFinalCost(session.chargingStats?.sessionCost || 0)
           setShowCompletionDialog(true)
         }}
         onResumeFromTarget={() => {
@@ -387,11 +482,8 @@ const MainPage: React.FC = () => {
           setShowInsufficientFundsDialog(false)
         }
         onAddFunds={() => {
-          const newBalance = walletBalance + 50
-          setWalletBalance(newBalance)
-          MOCK_WALLET_BALANCE = newBalance
-          setShowInsufficientFundsDialog(false)
-          setShowResumeDialog(true)
+          // TODO: Navigate to add funds page or open modal
+          console.log("Add funds clicked")
         }}
         onCloseModernAlert={() => {
           setShowModernAlert(false)
@@ -443,8 +535,22 @@ const StatusBadge = ({ status }: { status: string }) => {
       color: "bg-blue-50 text-blue-700",
       icon: <CheckIcon className="w-3 h-3" />,
     },
+    idle: {
+      label: "Idle",
+      color: "bg-gray-50 text-gray-700",
+      icon: <ZapIcon className="w-3 h-3" />,
+    },
+    error: {
+      label: "Error",
+      color: "bg-red-50 text-red-700",
+      icon: <AlertCircleIcon className="w-3 h-3" />,
+    },
   }
-  const config = statusConfig[status as keyof typeof statusConfig]
+
+  // Default to idle if status doesn't exist
+  const config =
+    statusConfig[status as keyof typeof statusConfig] || statusConfig.idle
+
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.color}`}

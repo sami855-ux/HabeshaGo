@@ -716,24 +716,44 @@ export default function TicketSheet({ trip }: TicketSheetProps) {
                   </Tooltip>
 
                   {/* Share with Friends Button */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="default"
-                        onClick={() =>
-                          router.push(`/user/booking/share/${trip.id}`)
-                        }
-                        className="rounded-xl"
-                        disabled={!isTicketUsable}
-                      >
-                        <UsersRound className="h-4 w-4 text-white cursor-pointer" />{" "}
-                        Share with Friends
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Share with Friends</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {isEv ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          onClick={() =>
+                            router.push(`/user/ev-charging/start-charging/${trip.id}`)
+                          }
+                          className="rounded-xl"
+                          disabled={!isTicketUsable}
+                        >
+                          I am here, Start Charging
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Start Charging</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          onClick={() =>
+                            router.push(`/user/booking/share/${trip.id}`)
+                          }
+                          className="rounded-xl"
+                          disabled={!isTicketUsable}
+                        >
+                          <UsersRound className="h-4 w-4 text-white cursor-pointer" />{" "}
+                          Share with Friends
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Share with Friends</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
             </SheetHeader>

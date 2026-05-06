@@ -96,7 +96,7 @@ const ReservationDetails: React.FC<ReservationDetailsProps> = ({
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Estimated rate</span>
               <span className="font-semibold text-gray-900">
-                ${reservation.pricePerKwh}/kWh
+                ETB {reservation.pricePerKwh}/kWh
               </span>
             </div>
           </div>

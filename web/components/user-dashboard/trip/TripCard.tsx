@@ -86,7 +86,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
-import { SharedTicketsIndicator } from "./SharedTicketsIndicator"
 import { AllSharedOverlay } from "./AllSharedOverlay"
 
 interface TripCardProps {

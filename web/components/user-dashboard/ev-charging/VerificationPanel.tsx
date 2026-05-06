@@ -67,7 +67,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
             </p>
             <button
               onClick={onBack}
-              className="mt-3 text-sm font-medium text-amber-800 hover:text-amber-900 underline-offset-2 underline"
+              className="mt-3 text-sm font-medium text-amber-800 hover:text-amber-900 underline-offset-2 underline cursor-pointer"
             >
               Find available stations →
             </button>

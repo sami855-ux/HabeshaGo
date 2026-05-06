@@ -19,6 +19,7 @@ import {
   Zap,
   Award,
   Sparkles,
+  Pointer,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -173,12 +174,12 @@ export function WalletBalanceCard({
                     {showPoints ? formattedPoints : "••••••"}
                   </div>
                   <div className="flex items-center gap-1 text-lg font-medium text-purple-600 dark:text-purple-400">
-                    <Star className="size-4 fill-purple-600 dark:fill-purple-400" />
+                    <Pointer className="size-4 fill-purple-600 dark:fill-purple-400" />
                     Points
                   </div>
                 </div>
                 <div className="text-xs font-medium text-purple-600 dark:text-purple-400 font-mozilla">
-                  ≈ {(habeshaPoints * 0.01).toFixed(2)} {currency} value
+                  ≈ {(habeshaPoints * 0.5).toFixed(2)} {currency} value
                 </div>
               </div>
 

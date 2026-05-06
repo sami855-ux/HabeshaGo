@@ -71,25 +71,79 @@ import {
   ArrowDown,
   Receipt,
   ArrowRightLeft,
+  Star,
+  Gift,
+  Coins,
+  Ticket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { DateRange } from "react-day-picker"
-import { getWalletTransactions } from "@/services/wallet.api"
-import {
-  WalletTransactionDTO,
-  TransactionType,
-  TransactionStatus,
-} from "@/types/transaction"
 import { useRouter } from "next/navigation"
+import { axiosInstance } from "@/services/axiosInstance"
 
-// API Service - now uses actual API types
-const fetchTransactions = async (): Promise<{
-  transactions: WalletTransactionDTO[]
-}> => {
-  // Using the actual API service
-  const response = await getWalletTransactions()
-  return { transactions: response.transactions || [] }
+// Types based on actual API response
+type TransactionCategory = "WALLET" | "POINT"
+
+type WalletTransaction = {
+  id: string
+  walletId: number
+  category: TransactionCategory
+  amount: string
+  type: string
+  status: string
+  balanceAfter: string | null
+  reference: string | null
+  description: string
+  metadata: Record<string, any> | null
+  createdAt: string
+  recipientName: string
+}
+
+type ApiResponse = {
+  success: boolean
+  message: string
+  data: {
+    transactions: WalletTransaction[]
+    total: number
+  }
+}
+
+// Transaction Types
+const WalletTransactionType = {
+  DEPOSIT: "DEPOSIT",
+  WITHDRAW: "WITHDRAW",
+  REFUND: "REFUND",
+  ADJUSTMENT: "ADJUSTMENT",
+  TRANSFER_OUT: "TRANSFER_OUT",
+  TRANSFER_IN: "TRANSFER_IN",
+  PAYMENT_OUT: "PAYMENT_OUT",
+  PAYMENT_IN: "PAYMENT_IN",
+  COMMISSION: "COMMISSION",
+} as const
+
+const PointTransactionType = {
+  EARN: "EARN",
+  SPEND: "SPEND",
+  EXPIRE: "EXPIRE",
+  ADJUSTMENT: "ADJUSTMENT",
+  EARN_BOOKING: "EARN_BOOKING",
+  SPEND_TICKET: "SPEND_TICKET",
+} as const
+
+type TransactionStatus = "SUCCESS" | "PENDING" | "FAILED" | "REVERSED"
+
+// API Service
+const fetchTransactions = async () => {
+  const response = await axiosInstance.get("/wallet/transactions")
+
+  const data: ApiResponse = response.data // ✅ axios uses .data
+
+  if (!data.success) {
+    throw new Error(data.message || "Failed to fetch transactions")
+  }
+
+  return data.data.transactions
 }
 
 // Helper functions
@@ -103,6 +157,11 @@ const formatCurrency = (amount: string) => {
   }).format(numAmount)
 }
 
+const formatPoints = (amount: string) => {
+  const numAmount = parseFloat(amount)
+  return `${Math.abs(numAmount).toLocaleString()} points`
+}
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
   return new Intl.DateTimeFormat("en-US", {
@@ -114,106 +173,228 @@ const formatDate = (dateString: string) => {
   }).format(date)
 }
 
-const getStatusConfig = (status: TransactionStatus) => {
+const getStatusConfig = (status: string) => {
   const configs = {
-    [TransactionStatus.SUCCESS]: {
+    SUCCESS: {
       color:
         "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
       icon: CheckCircle,
       label: "Success",
     },
-    [TransactionStatus.PENDING]: {
+    PENDING: {
       color:
         "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
       icon: Clock,
       label: "Pending",
     },
-    [TransactionStatus.FAILED]: {
+    FAILED: {
       color:
         "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
       icon: XCircle,
       label: "Failed",
     },
-    [TransactionStatus.REVERSED]: {
+    REVERSED: {
       color:
         "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
       icon: RefreshCw,
       label: "Reversed",
     },
   }
-  return configs[status] || configs[TransactionStatus.PENDING]
+  return configs[status as TransactionStatus] || configs.SUCCESS
 }
 
-const getTypeConfig = (type: TransactionType) => {
+const getCategoryConfig = (category: TransactionCategory) => {
   const configs = {
-    [TransactionType.DEPOSIT]: {
+    WALLET: {
+      color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+      icon: Wallet,
+      label: "Wallet",
+    },
+    POINT: {
+      color:
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+      icon: Star,
+      label: "Points",
+    },
+  }
+  return configs[category]
+}
+
+const getTypeConfig = (type: string, category: TransactionCategory) => {
+  // Point transactions
+  if (category === "POINT") {
+    const pointConfigs: Record<string, any> = {
+      EARN: {
+        color:
+          "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
+        icon: PlusCircle,
+        label: "Earn Points",
+        trend: "positive",
+        valueSuffix: "points",
+      },
+      EARN_BOOKING: {
+        color:
+          "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
+        icon: Gift,
+        label: "Points from Booking",
+        trend: "positive",
+        valueSuffix: "points",
+      },
+      SPEND: {
+        color: "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
+        icon: MinusCircle,
+        label: "Spend Points",
+        trend: "negative",
+        valueSuffix: "points",
+      },
+      SPEND_TICKET: {
+        color: "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
+        icon: Ticket,
+        label: "Points for Ticket",
+        trend: "negative",
+        valueSuffix: "points",
+      },
+      EXPIRE: {
+        color:
+          "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20",
+        icon: AlertCircle,
+        label: "Points Expired",
+        trend: "negative",
+        valueSuffix: "points",
+      },
+      ADJUSTMENT: {
+        color:
+          "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20",
+        icon: Coins,
+        label: "Points Adjustment",
+        trend: "neutral",
+        valueSuffix: "points",
+      },
+    }
+    return (
+      pointConfigs[type] || {
+        color: "",
+        icon: Star,
+        label: type,
+        trend: "neutral",
+        valueSuffix: "points",
+      }
+    )
+  }
+
+  // Wallet transactions
+  const walletConfigs: Record<string, any> = {
+    DEPOSIT: {
       color:
         "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
       icon: PlusCircle,
       label: "Deposit",
       trend: "positive",
+      valuePrefix: "ETB",
     },
-    [TransactionType.WITHDRAW]: {
+    WITHDRAW: {
       color: "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
       icon: MinusCircle,
       label: "Withdrawal",
       trend: "negative",
+      valuePrefix: "ETB",
     },
-    [TransactionType.REFUND]: {
+    REFUND: {
       color:
         "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20",
       icon: RefreshCw,
       label: "Refund",
       trend: "positive",
+      valuePrefix: "ETB",
     },
-    [TransactionType.ADJUSTMENT]: {
+    ADJUSTMENT: {
       color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20",
       icon: Receipt,
       label: "Adjustment",
       trend: "neutral",
+      valuePrefix: "ETB",
     },
-    [TransactionType.TRANSFER_OUT]: {
+    TRANSFER_OUT: {
       color:
         "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20",
       icon: ArrowUp,
       label: "Transfer Out",
       trend: "negative",
+      valuePrefix: "ETB",
     },
-    [TransactionType.TRANSFER_IN]: {
+    TRANSFER_IN: {
       color:
         "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
       icon: ArrowDown,
       label: "Transfer In",
       trend: "positive",
+      valuePrefix: "ETB",
     },
-    [TransactionType.PAYMENT_OUT]: {
+    PAYMENT_OUT: {
       color: "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20",
       icon: CreditCard,
       label: "Payment Out",
       trend: "negative",
+      valuePrefix: "ETB",
     },
-    [TransactionType.PAYMENT_IN]: {
+    PAYMENT_IN: {
       color:
         "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20",
       icon: CreditCard,
       label: "Payment In",
       trend: "positive",
+      valuePrefix: "ETB",
+    },
+    COMMISSION: {
+      color:
+        "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20",
+      icon: TrendingUp,
+      label: "Commission",
+      trend: "positive",
+      valuePrefix: "ETB",
     },
   }
   return (
-    configs[type] || { color: "", icon: Wallet, label: type, trend: "neutral" }
+    walletConfigs[type] || {
+      color: "",
+      icon: Wallet,
+      label: type,
+      trend: "neutral",
+      valuePrefix: "ETB",
+    }
   )
 }
 
-// Check if transaction is positive (money in) or negative (money out)
-const isPositiveTransaction = (type: TransactionType) => {
+// Check if transaction is positive (money/points in) or negative (money/points out)
+const isPositiveTransaction = (type: string, category: TransactionCategory) => {
+  if (category === "POINT") {
+    const positiveTypes = ["EARN", "EARN_BOOKING"]
+    return positiveTypes.includes(type)
+  }
+
   const positiveTypes = [
-    TransactionType.DEPOSIT,
-    TransactionType.REFUND,
-    TransactionType.TRANSFER_IN,
-    TransactionType.PAYMENT_IN,
+    "DEPOSIT",
+    "REFUND",
+    "TRANSFER_IN",
+    "PAYMENT_IN",
+    "COMMISSION",
   ]
   return positiveTypes.includes(type)
+}
+
+const formatAmount = (
+  amount: string,
+  category: TransactionCategory,
+  type: string,
+) => {
+  const config = getTypeConfig(type, category)
+  const absAmount = Math.abs(parseFloat(amount))
+
+  if (category === "POINT") {
+    return `${absAmount.toLocaleString()} ${config.valueSuffix}`
+  }
+
+  return formatCurrency(absAmount.toFixed(2))
 }
 
 // Loading Skeleton
@@ -222,6 +403,12 @@ const LoadingSkeleton = () => (
     <div className="flex items-center justify-between">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-10 w-32" />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-24 w-full" />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Skeleton className="h-10 w-full" />
@@ -247,7 +434,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
 
   // React Query for data fetching
   const {
-    data: transactionsData,
+    data: transactions = [],
     isLoading,
     isError,
     error,
@@ -263,19 +450,18 @@ export default function RecentTransactions({ userId }: { userId: string }) {
   })
 
   // Handle view transaction details
-  const handleViewDetails = (transaction: WalletTransactionDTO) => {
+  const handleViewDetails = (transaction: WalletTransaction) => {
     toast.info("Transaction Details", {
-      description: `Viewing transaction ${transaction.reference}`,
+      description: `Viewing ${transaction.category} transaction ${transaction.reference || transaction.id}`,
     })
-    // In real app: open modal or navigate to detail page
     console.log("Transaction details:", transaction)
   }
 
   // Filter transactions by date range
   const filteredTransactions = useMemo(() => {
-    if (!transactionsData?.transactions) return []
+    if (!transactions.length) return []
 
-    let filtered = transactionsData.transactions
+    let filtered = [...transactions]
 
     if (dateRange?.from && dateRange?.to) {
       filtered = filtered.filter((transaction) => {
@@ -287,12 +473,31 @@ export default function RecentTransactions({ userId }: { userId: string }) {
     }
 
     return filtered
-  }, [transactionsData?.transactions, dateRange])
+  }, [transactions, dateRange])
 
   // Define columns
   const createColumns = (
-    onViewDetails: (transaction: WalletTransactionDTO) => void,
-  ): ColumnDef<WalletTransactionDTO>[] => [
+    onViewDetails: (transaction: WalletTransaction) => void,
+  ): ColumnDef<WalletTransaction>[] => [
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) => {
+        const category = row.getValue("category") as TransactionCategory
+        const config = getCategoryConfig(category)
+        const Icon = config.icon
+        return (
+          <Badge variant="outline" className={cn("gap-1.5", config.color)}>
+            <Icon className="h-3 w-3" />
+            {config.label}
+          </Badge>
+        )
+      },
+      filterFn: (row, columnId, filterValue) => {
+        if (!filterValue || filterValue === "all") return true
+        return row.getValue(columnId) === filterValue
+      },
+    },
     {
       accessorKey: "type",
       header: ({ column }) => (
@@ -314,8 +519,9 @@ export default function RecentTransactions({ userId }: { userId: string }) {
         </div>
       ),
       cell: ({ row }) => {
-        const type = row.getValue("type") as TransactionType
-        const config = getTypeConfig(type)
+        const type = row.getValue("type") as string
+        const category = row.original.category
+        const config = getTypeConfig(type, category)
         const Icon = config.icon
         return (
           <div className="flex items-center gap-2">
@@ -342,10 +548,19 @@ export default function RecentTransactions({ userId }: { userId: string }) {
               {transaction.description || "No description"}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mozilla bg-muted px-1.5 py-0.5 rounded">
-                {transaction.reference}
-              </span>
-              {transaction.metadata && <FileText className="h-3 w-3" />}
+              {transaction.reference && (
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {transaction.reference}
+                </span>
+              )}
+              {transaction.metadata && (
+                <div className="flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {transaction.metadata.bookingId && (
+                    <span>Booking #{transaction.metadata.bookingId}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )
@@ -353,14 +568,10 @@ export default function RecentTransactions({ userId }: { userId: string }) {
     },
     {
       accessorKey: "recipientName",
-      header: "Recipient Name",
+      header: "Recipient",
       cell: ({ row }) => {
-        const recipientName = row.getValue("recipientName") as string | null
-        return <p>{recipientName ?? "No recipient name"}</p>
-      },
-      filterFn: (row, columnId, filterValue) => {
-        if (!filterValue || filterValue === "all") return true
-        return row.getValue(columnId) === filterValue
+        const recipientName = row.getValue("recipientName") as string
+        return <span>{recipientName || "N/A"}</span>
       },
     },
     {
@@ -382,14 +593,16 @@ export default function RecentTransactions({ userId }: { userId: string }) {
         </Button>
       ),
       cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("amount") as string)
+        const amount = row.getValue("amount") as string
         const type = row.original.type
-        const isPositive = isPositiveTransaction(type)
+        const category = row.original.category
+        const isPositive = isPositiveTransaction(type, category)
+        const formattedAmount = formatAmount(amount, category, type)
 
         return (
           <div
             className={cn(
-              "font-semibold flex items-center gap-1 font-grotesk ",
+              "font-semibold flex items-center gap-1",
               isPositive
                 ? "text-green-600 dark:text-green-400"
                 : "text-red-600 dark:text-red-400",
@@ -400,7 +613,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
             ) : (
               <Minus className="h-4 w-4" />
             )}
-            {formatCurrency(Math.abs(amount).toFixed(2))}
+            {formattedAmount}
           </div>
         )
       },
@@ -414,7 +627,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("status") as TransactionStatus
+        const status = row.getValue("status") as string
         const config = getStatusConfig(status)
         const Icon = config.icon
         return (
@@ -432,28 +645,20 @@ export default function RecentTransactions({ userId }: { userId: string }) {
         return row.getValue(columnId) === filterValue
       },
     },
-
     {
       accessorKey: "balanceAfter",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="hover:bg-transparent p-0 font-medium"
-        >
-          Balance After
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-2 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-2 h-4 w-4" />
-          ) : (
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          )}
-        </Button>
-      ),
+      header: "Balance After",
       cell: ({ row }) => {
-        const balance = row.getValue("balanceAfter") as string
-        return <div className="font-medium">{formatCurrency(balance)}</div>
+        const balance = row.getValue("balanceAfter") as string | null
+        const category = row.original.category
+
+        if (!balance) return <span className="text-muted-foreground">—</span>
+
+        if (category === "POINT") {
+          return <span>{parseFloat(balance).toLocaleString()} points</span>
+        }
+
+        return <span className="font-medium">{formatCurrency(balance)}</span>
       },
     },
     {
@@ -492,14 +697,15 @@ export default function RecentTransactions({ userId }: { userId: string }) {
         const transaction = row.original
         return (
           <Button
-            variant={"default"}
-            className=" cursor-pointer"
+            variant="default"
+            size="sm"
+            className="cursor-pointer"
             onClick={() =>
               router.push(`/user/wallet/transaction/${transaction.id}`)
             }
             title="View details"
           >
-            <Eye className="h-4 w-4" /> View
+            <Eye className="h-4 w-4 mr-1" /> View
           </Button>
         )
       },
@@ -519,6 +725,11 @@ export default function RecentTransactions({ userId }: { userId: string }) {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
     state: {
       sorting,
       columnFilters,
@@ -541,31 +752,48 @@ export default function RecentTransactions({ userId }: { userId: string }) {
 
   // Calculate statistics
   const statistics = useMemo(() => {
-    if (!transactionsData?.transactions) return null
+    if (!transactions.length) return null
 
-    const successful = transactionsData.transactions.filter(
-      (t) => t.status === TransactionStatus.SUCCESS,
-    ).length
+    const successful = transactions.filter((t) => t.status === "SUCCESS").length
 
-    const pending = transactionsData.transactions.filter(
-      (t) => t.status === TransactionStatus.PENDING,
-    ).length
+    const pending = transactions.filter((t) => t.status === "PENDING").length
 
-    const failed = transactionsData.transactions.filter(
-      (t) => t.status === TransactionStatus.FAILED,
-    ).length
+    const failed = transactions.filter((t) => t.status === "FAILED").length
 
-    // Calculate total inflow and outflow
-    const inflow = transactionsData.transactions
-      .filter((t) => isPositiveTransaction(t.type))
+    // Calculate total inflow and outflow for wallet
+    const walletTransactions = transactions.filter(
+      (t) => t.category === "WALLET",
+    )
+    const inflow = walletTransactions
+      .filter((t) => isPositiveTransaction(t.type, t.category))
       .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0)
 
-    const outflow = transactionsData.transactions
-      .filter((t) => !isPositiveTransaction(t.type))
+    const outflow = walletTransactions
+      .filter((t) => !isPositiveTransaction(t.type, t.category))
       .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0)
 
-    return { successful, pending, failed, inflow, outflow }
-  }, [transactionsData])
+    // Calculate points earned and spent
+    const pointTransactions = transactions.filter((t) => t.category === "POINT")
+    const pointsEarned = pointTransactions
+      .filter((t) => isPositiveTransaction(t.type, t.category))
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0)
+
+    const pointsSpent = pointTransactions
+      .filter((t) => !isPositiveTransaction(t.type, t.category))
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0)
+
+    return {
+      successful,
+      pending,
+      failed,
+      inflow,
+      outflow,
+      pointsEarned,
+      pointsSpent,
+      totalWallet: walletTransactions.length,
+      totalPoints: pointTransactions.length,
+    }
+  }, [transactions])
 
   return (
     <Card className="border-none shadow-lg bg-gradient-to-br from-white to-orange-50/50 dark:from-gray-900 dark:to-gray-800/50 overflow-hidden">
@@ -577,7 +805,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
               Transaction History
             </CardTitle>
             <CardDescription>
-              Monitor and manage your wallet transactions
+              Monitor and manage your wallet and points transactions
             </CardDescription>
           </div>
 
@@ -606,65 +834,6 @@ export default function RecentTransactions({ userId }: { userId: string }) {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Statistics Cards */}
-        {statistics && !isLoading && !isError && (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-100 dark:border-green-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Successful</p>
-                  <p className="text-2xl font-bold">{statistics.successful}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/10 dark:to-amber-900/10 border border-yellow-100 dark:border-yellow-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending</p>
-                  <p className="text-2xl font-bold">{statistics.pending}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-500" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/10 dark:to-rose-900/10 border border-red-100 dark:border-red-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Failed</p>
-                  <p className="text-2xl font-bold">{statistics.failed}</p>
-                </div>
-                <XCircle className="h-8 w-8 text-red-500" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border border-blue-100 dark:border-blue-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Inflow</p>
-                  <p className="text-2xl font-bold">
-                    {formatCurrency(statistics.inflow.toFixed(2))}
-                  </p>
-                </div>
-                <ArrowDown className="h-8 w-8 text-blue-500" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10 border border-purple-100 dark:border-purple-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Outflow</p>
-                  <p className="text-2xl font-bold">
-                    {formatCurrency(statistics.outflow.toFixed(2))}
-                  </p>
-                </div>
-                <ArrowUp className="h-8 w-8 text-purple-500" />
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Error State */}
         {isError && (
           <Alert
@@ -697,7 +866,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
           <>
             {/* Search and Filter Bar */}
             <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -707,6 +876,26 @@ export default function RecentTransactions({ userId }: { userId: string }) {
                     className="pl-9"
                   />
                 </div>
+
+                <Select
+                  value={
+                    (table.getColumn("category")?.getFilterValue() as string) ??
+                    "all"
+                  }
+                  onValueChange={(value) =>
+                    table.getColumn("category")?.setFilterValue(value)
+                  }
+                >
+                  <SelectTrigger>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filter by category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="WALLET">Wallet</SelectItem>
+                    <SelectItem value="POINT">Points</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 <Select
                   value={
@@ -723,30 +912,26 @@ export default function RecentTransactions({ userId }: { userId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value={TransactionType.DEPOSIT}>
-                      Deposit
+                    {/* Wallet Types */}
+                    <SelectItem value="DEPOSIT">Deposit</SelectItem>
+                    <SelectItem value="WITHDRAW">Withdrawal</SelectItem>
+                    <SelectItem value="REFUND">Refund</SelectItem>
+                    <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                    <SelectItem value="TRANSFER_OUT">Transfer Out</SelectItem>
+                    <SelectItem value="TRANSFER_IN">Transfer In</SelectItem>
+                    <SelectItem value="PAYMENT_OUT">Payment Out</SelectItem>
+                    <SelectItem value="PAYMENT_IN">Payment In</SelectItem>
+                    <SelectItem value="COMMISSION">Commission</SelectItem>
+                    {/* Point Types */}
+                    <SelectItem value="EARN">Earn Points</SelectItem>
+                    <SelectItem value="EARN_BOOKING">
+                      Points from Booking
                     </SelectItem>
-                    <SelectItem value={TransactionType.WITHDRAW}>
-                      Withdrawal
+                    <SelectItem value="SPEND">Spend Points</SelectItem>
+                    <SelectItem value="SPEND_TICKET">
+                      Points for Ticket
                     </SelectItem>
-                    <SelectItem value={TransactionType.REFUND}>
-                      Refund
-                    </SelectItem>
-                    <SelectItem value={TransactionType.ADJUSTMENT}>
-                      Adjustment
-                    </SelectItem>
-                    <SelectItem value={TransactionType.TRANSFER_OUT}>
-                      Transfer Out
-                    </SelectItem>
-                    <SelectItem value={TransactionType.TRANSFER_IN}>
-                      Transfer In
-                    </SelectItem>
-                    <SelectItem value={TransactionType.PAYMENT_OUT}>
-                      Payment Out
-                    </SelectItem>
-                    <SelectItem value={TransactionType.PAYMENT_IN}>
-                      Payment In
-                    </SelectItem>
+                    <SelectItem value="EXPIRE">Points Expired</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -765,23 +950,15 @@ export default function RecentTransactions({ userId }: { userId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value={TransactionStatus.SUCCESS}>
-                      Success
-                    </SelectItem>
-                    <SelectItem value={TransactionStatus.PENDING}>
-                      Pending
-                    </SelectItem>
-                    <SelectItem value={TransactionStatus.FAILED}>
-                      Failed
-                    </SelectItem>
-                    <SelectItem value={TransactionStatus.REVERSED}>
-                      Reversed
-                    </SelectItem>
+                    <SelectItem value="SUCCESS">Success</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="FAILED">Failed</SelectItem>
+                    <SelectItem value="REVERSED">Reversed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Date Range Filter (if you have a DateRangePicker component) */}
+              {/* Date Range Filter placeholder */}
               {/* <div className="flex items-center gap-4">
                 <DateRangePicker
                   date={dateRange}
@@ -858,7 +1035,7 @@ export default function RecentTransactions({ userId }: { userId: string }) {
                                 columnFilters.length > 0 ||
                                 dateRange
                                   ? "Try adjusting your filters"
-                                  : "No transactions in your wallet yet"}
+                                  : "No transactions in your account yet"}
                               </p>
                             </div>
                             {(globalFilter ||
@@ -887,7 +1064,8 @@ export default function RecentTransactions({ userId }: { userId: string }) {
             {/* Pagination Controls */}
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Showing {filteredTransactions.length} transactions
+                Showing {filteredTransactions.length} of {transactions.length}{" "}
+                transactions
               </div>
               <div className="flex items-center space-x-2">
                 <Button
@@ -911,7 +1089,24 @@ export default function RecentTransactions({ userId }: { userId: string }) {
 
             {/* Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-              <div>Total transactions: {filteredTransactions.length}</div>
+              <div className="flex gap-4">
+                <span className="flex items-center gap-1">
+                  <Wallet className="h-4 w-4" />
+                  Wallet:{" "}
+                  {
+                    transactions.filter((t) => t.category === "WALLET").length
+                  }{" "}
+                  transactions
+                </span>
+                <span className="flex items-center gap-1">
+                  <Star className="h-4 w-4" />
+                  Points:{" "}
+                  {
+                    transactions.filter((t) => t.category === "POINT").length
+                  }{" "}
+                  transactions
+                </span>
+              </div>
 
               <div className="flex items-center gap-2">
                 {(globalFilter || columnFilters.length > 0 || dateRange) && (

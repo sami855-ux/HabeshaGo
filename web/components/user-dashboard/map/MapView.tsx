@@ -32,6 +32,51 @@ export default function MapView() {
 
   const [mapReady, setMapReady] = useState(false)
 
+  // Inject CSS to disable all tooltips globally
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const style = document.createElement("style")
+      style.textContent = `
+        /* Completely disable all Leaflet tooltips */
+        .leaflet-tooltip,
+        .leaflet-tooltip-pane,
+        .leaflet-popup,
+        .leaflet-popup-pane,
+        .leaflet-tooltip-top,
+        .leaflet-tooltip-bottom,
+        .leaflet-tooltip-left,
+        .leaflet-tooltip-right {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          animation: none !important;
+          transition: none !important;
+        }
+        
+        /* Disable any hover tooltips */
+        .leaflet-marker-icon:hover::before,
+        .leaflet-marker-icon:hover::after,
+        [data-tooltip],
+        [title] {
+          pointer-events: none !important;
+        }
+        
+        /* Ensure no pseudo-element tooltips appear */
+        .bus-marker:hover::after,
+        .bus-marker div:hover::after,
+        .custom-marker:hover::after {
+          display: none !important;
+        }
+      `
+      document.head.appendChild(style)
+
+      return () => {
+        document.head.removeChild(style)
+      }
+    }
+  }, [])
+
   // Fix leaflet marker icons
   useEffect(() => {
     if (!L) return
@@ -70,6 +115,11 @@ export default function MapView() {
       13,
     )
 
+    // Disable all tooltips on the map instance
+    map.tooltip = undefined as any
+    map.closeTooltip = () => {}
+    map.openTooltip = () => map
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
       maxZoom: 25,
@@ -96,22 +146,6 @@ export default function MapView() {
       mapRef.current.setView([userLocation.lat, userLocation.lng], 14)
     }
   }, [userLocation, getParam])
-
-  // Center map on shared location
-  useEffect(() => {
-    if (!mapRef.current || !mapReady) return
-
-    const lat = parseFloat(getParam("lat") || "")
-    const lng = parseFloat(getParam("lng") || "")
-
-    if (!isNaN(lat) && !isNaN(lng)) {
-      mapRef.current.setView([lat, lng], 18)
-
-      const marker = L.marker([lat, lng]).addTo(mapRef.current)
-
-      marker.bindPopup("Shared Location").openPopup()
-    }
-  }, [getParam, mapReady])
 
   const handleDestinationSelect = (destination: Coordinates) => {
     setSelectedDestination(destination)
@@ -153,11 +187,11 @@ export default function MapView() {
             userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
           />
 
-          <ParkingStationsLayer
+          {/* <ParkingStationsLayer
             map={mapRef.current}
             userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
             onDestinationSelect={handleDestinationSelect}
-          />
+          /> */}
 
           <BusLayer map={mapRef.current} />
 

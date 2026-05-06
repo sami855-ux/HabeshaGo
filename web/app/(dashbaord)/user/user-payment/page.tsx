@@ -168,9 +168,9 @@ export default function PaymentsPage() {
         header: "User",
         cell: ({ row }) => (
           <div>
-            <div className="font-medium">{row.original.user.name || "N/A"}</div>
+            <div className="font-medium">{row.original.user?.name || "-"}</div>
             <div className="text-xs text-gray-500">
-              {row.original.user.email}
+              {row.original.user?.email || "-"}
             </div>
           </div>
         ),

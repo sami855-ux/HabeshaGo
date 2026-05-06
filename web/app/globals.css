@@ -150,7 +150,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground ;
+    @apply bg-background text-foreground;
     font-family: var(--font-geist);
   }
 }
@@ -517,7 +517,6 @@ html {
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-
 /* IntroOverlay.css */
 
 .intro-overlay {
@@ -572,13 +571,19 @@ html {
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 0 0 rgba(66, 153, 225, 0.7);
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.7),
+      0 0 0 0 rgba(66, 153, 225, 0.7);
   }
   70% {
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 0 10px rgba(66, 153, 225, 0);
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.7),
+      0 0 0 10px rgba(66, 153, 225, 0);
   }
   100% {
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 0 0 rgba(66, 153, 225, 0);
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.7),
+      0 0 0 0 rgba(66, 153, 225, 0);
   }
 }
 
@@ -614,7 +619,7 @@ html {
 
 /* Tooltip arrow */
 .intro-tooltip::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 0;
   height: 0;
@@ -739,4 +744,12 @@ html {
 
 .skip-btn:hover {
   color: #666;
+}
+
+.bus-marker {
+  pointer-events: auto;
+}
+
+.bus-marker-inner {
+  pointer-events: none; /* 🔥 allows marker click to work */
 }

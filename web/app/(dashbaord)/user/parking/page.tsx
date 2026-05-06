@@ -17,9 +17,23 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, Menu, X, Search, SlidersHorizontal } from "lucide-react"
 import { mockParkingLots } from "@/data/mockData"
 import { ParkingLotList } from "@/components/user-dashboard/parking/ParkingLotList"
-import { MapSection } from "@/components/user-dashboard/parking/ParkingMapSection"
+// import { MapSection } from "@/components/user-dashboard/parking/ParkingMapSection"
 import { ParkingLotDetailsSheet } from "@/components/user-dashboard/parking/ParkingLotDetailsSheet"
 import { FilterBar } from "@/components/user-dashboard/parking/FilterBar"
+
+import dynamic from "next/dynamic"
+
+const MapSection = dynamic(
+  () => import("@/components/user-dashboard/parking/ParkingMapSection").then(mod => mod.MapSection),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    ),
+  }
+)
 
 export type TabType = "ALL" | "NEARBY" | "PREMIUM"
 

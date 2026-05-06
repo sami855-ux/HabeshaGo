@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import dynamic from "next/dynamic"
 
-// Import map dynamically with no SSR to avoid hydration issues
 const MapView = dynamic(
   () => import("@/components/user-dashboard/map/MapView"),
   {
@@ -21,8 +20,9 @@ const MapView = dynamic(
         </div>
       </div>
     ),
-  },
+  }
 )
+
 export default function MapPage() {
   return (
     <div className="relative h-screen w-full">
@@ -40,15 +40,21 @@ export default function MapPage() {
       <div className="absolute top-4 right-0 z-[50] space-y-2 md:right-8 md:left-auto md:w-[440px]">
         <Card className="p-4 shadow-lg">
           <div className="space-y-2">
-            <MapFilters />
-            <MapSearch />
+            <Suspense fallback={<div className="h-8 w-full animate-pulse rounded bg-muted" />}>
+              <MapFilters />
+            </Suspense>
+            <Suspense fallback={<div className="h-8 w-full animate-pulse rounded bg-muted" />}>
+              <MapSearch />
+            </Suspense>
           </div>
         </Card>
       </div>
 
       {/* Share Button */}
       <div className="absolute bottom-4 right-4 z-[70]">
-        <ShareLocationButton />
+        <Suspense fallback={null}>
+          <ShareLocationButton />
+        </Suspense>
       </div>
     </div>
   )

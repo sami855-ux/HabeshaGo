@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import {
   useReactTable,
@@ -26,6 +26,7 @@ import {
   Download,
   Filter,
   X,
+  Loader2, 
 } from "lucide-react"
 
 import { StatusBadge } from "@/components/user-dashboard/payment/StatusBadge"
@@ -61,7 +62,7 @@ const formatDate = (dateString: string) => {
   })
 }
 
-export default function PaymentsPage() {
+ function PaymentsPage() {
   const {
     data,
     filteredData,
@@ -690,4 +691,19 @@ export default function PaymentsPage() {
       </div>
     </div>
   )
+}
+
+
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <PaymentsPage />
+    </Suspense>
+  );
 }

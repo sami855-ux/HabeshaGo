@@ -21,7 +21,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import React, { useState, useTransition, useEffect, useRef } from "react"
+import React, { useState, useTransition, useEffect, useRef, Suspense } from "react"
 import { toast } from "sonner"
 import { useDispatch } from "react-redux"
 import { setAccessToken, setUser } from "@/store/slices/userSlice"
@@ -31,7 +31,7 @@ import { AuthSlider } from "@/components/AuthSlider"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-function VerifyPage() {
+function VerifyPageContent() {
   const dispatch = useDispatch<AppDispatch>()
   const params = useSearchParams()
   const router = useRouter()
@@ -553,4 +553,14 @@ function VerifyPage() {
   )
 }
 
-export default VerifyPage
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <VerifyPageContent />
+    </Suspense>
+  )
+}

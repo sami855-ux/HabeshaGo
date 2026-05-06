@@ -1,10 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { QRCode } from "react-qrcode-logo";
+import { Loader } from "lucide-react";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -13,7 +15,6 @@ export default function PaymentSuccessPage() {
   const total = searchParams.get("total") || "0";
   const seats = searchParams.get("seats")?.split(",") || [];
 
-  // QR code will encode essential info
   const qrValue = JSON.stringify({ bookingId, paymentId, seats, total });
 
   return (
@@ -36,7 +37,6 @@ export default function PaymentSuccessPage() {
             </p>
             <p className="font-bold text-lg mt-2">Total Paid: {total} ETB</p>
           </div>
-
           <Button
             className="mt-6 bg-gradient-to-r from-orange-500 to-amber-500"
             onClick={() => router.push("/user/bus")}
@@ -53,14 +53,27 @@ export default function PaymentSuccessPage() {
             fgColor="#16a34a"
             bgColor="#f9fafb"
             quietZone={10}
-            logoImage="" // optional: tiny logo
+            logoImage=""
           />
         </div>
       </div>
-
       <p className="mt-4 text-sm text-gray-500">
         Show this QR code at the bus counter for boarding.
       </p>
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader className="h-8 w-8 animate-spin text-green-600" />
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

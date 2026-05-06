@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
-import { AlertCircleIcon, ArrowLeft, Wallet } from "lucide-react"
+import React, { useState, useRef, useEffect, Suspense } from "react"
+import { AlertCircleIcon, ArrowLeft, Wallet, Loader2 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -598,4 +598,16 @@ const PauseIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-export default MainPage
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <MainPage />
+    </Suspense>
+  )
+}

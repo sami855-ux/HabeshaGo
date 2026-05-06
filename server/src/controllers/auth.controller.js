@@ -14,6 +14,7 @@ import { verifyTOTP, generate2FASecret } from "../services/2fa.service.js"
 import dotenv from "dotenv"
 import { errorResponse, successResponse } from "../utils/apiResponse.js"
 import admin from "../config/firebaseAdmin.js"
+import { generateReferralCode } from "../utils/qrcode.js"
 dotenv.config()
 
 // Registration
@@ -51,12 +52,14 @@ export const verifyOtpPhone = async (req, res) => {
     // 2. Find the user in your Neon DB
     let user = await prisma.user.findUnique({ where: { phone } })
 
+    const referralCode = generateReferralCode(user.name || "USR")
     // 3. If the user doesn't exist, create them
     if (!user) {
       user = await prisma.user.create({
         data: {
           phone,
           role: "PASSENGER",
+          referralCode,
         },
       })
     }
@@ -73,6 +76,7 @@ export const verifyOtpPhone = async (req, res) => {
 export const verifyOTP = async (req, res) => {
   try {
     const { email, code } = req.body
+
     if (!email || !code)
       return res
         .status(400)

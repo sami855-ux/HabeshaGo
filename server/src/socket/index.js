@@ -1,5 +1,6 @@
 import { Server } from "socket.io"
 import { getLatestVehicleLocation } from "../services/redisService.service.js"
+import { chargingSocketHandler } from "./charging.socket.js"
 
 let io = null
 
@@ -33,6 +34,8 @@ export const initSocket = (server) => {
     socket.on("leaveVehicle", (vehicleId) => {
       socket.leave(`vehicle-${vehicleId}`)
     })
+
+    chargingSocketHandler(socket)
 
     // Join map room
     socket.on("joinMap", async (vehicleIds) => {
@@ -72,7 +75,6 @@ export const initSocket = (server) => {
     // Join user notification room
     socket.on("joinUserNotification", (userId) => {
       if (!userId) return
-      console.log("Joining user notification room:", userId)
       socket.join(`user-${userId}`)
     })
 
@@ -168,4 +170,9 @@ export const emitToAdminNotification = (adminId, notification) => {
   io.to(`admin-${adminId}`).emit("notification:new", {
     notification,
   })
+}
+
+export const emitTripCompleted = (userId, payload) => {
+  if (!io) return
+  io.to(`user-${userId}`).emit("trip:completed", payload)
 }

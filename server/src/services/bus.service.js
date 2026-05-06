@@ -623,6 +623,12 @@ export const searchBusesService = async (
         vehicle: true,
         route: { include: { midPoints: true } },
         schedules: true,
+        ratings: {
+          include: {
+            user: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     })
 
@@ -746,6 +752,7 @@ export const searchBusesService = async (
             driver: bus.driver,
             driverName: bus.driver.user?.name || "",
             vehicle: bus.vehicle,
+
             route: {
               id: bus.route.id,
               name: bus.route.name,
@@ -757,8 +764,39 @@ export const searchBusesService = async (
               destination: bus.route.destination,
               distanceKm: bus.route.distanceKm,
             },
+
             travelDirection: requiredDirection,
+
+            // ⭐ NEW: ratings section
+            ratings: {
+              averageRating:
+                bus.ratings.length > 0
+                  ? (
+                      bus.ratings.reduce((sum, r) => sum + r.score, 0) /
+                      bus.ratings.length
+                    ).toFixed(1)
+                  : 0,
+
+              totalRatings: bus.ratings.length,
+
+              distribution: {
+                1: bus.ratings.filter((r) => r.score === 1).length,
+                2: bus.ratings.filter((r) => r.score === 2).length,
+                3: bus.ratings.filter((r) => r.score === 3).length,
+                4: bus.ratings.filter((r) => r.score === 4).length,
+                5: bus.ratings.filter((r) => r.score === 5).length,
+              },
+
+              latest: bus.ratings.slice(0, 5).map((r) => ({
+                id: r.id,
+                score: r.score,
+                comment: r.comment,
+                userName: r.user.name,
+                createdAt: r.createdAt,
+              })),
+            },
           },
+
           nearestSchedule: {
             scheduleId: nearest.schedule.id,
             startTime: nearest.schedule.startTime,
@@ -766,7 +804,6 @@ export const searchBusesService = async (
             direction: nearest.schedule.direction,
             availableSeats: nearest.availableSeats,
             estimatedArrival: nearest.estimatedArrival,
-            direction: nearest.direction,
           },
         }
       }),
@@ -827,5 +864,108 @@ export const getAllMidPointsService = async () => {
     return successResponse("Midpoint names fetched successfully", uniqueNames)
   } catch (error) {
     return errorResponse("Failed to fetch midpoints", 500, error.message)
+  }
+}
+
+export const createRatingService = async (payload, userId) => {
+  try {
+    const { score, comment, bookingId, busId, stationId, parkingLotId } =
+      payload
+
+    // 🔴 1. Validate score
+    if (!score || score < 1 || score > 5) {
+      return errorResponse("Score must be between 1 and 5", 400)
+    }
+
+    // 🔴 2. Ensure at least one target exists
+    if (!bookingId && !stationId && !parkingLotId) {
+      return errorResponse("Invalid rating target", 400)
+    }
+
+    // 🔴 3. Prevent duplicate rating (handled by DB unique but we check early)
+    const existing = await prisma.rating.findFirst({
+      where: {
+        userId,
+        ...(bookingId && { bookingId }),
+        ...(stationId && { stationId }),
+        ...(parkingLotId && { parkingLotId }),
+      },
+    })
+
+    if (existing) {
+      return errorResponse("You have already rated this", 400)
+    }
+
+    // 🔵 4. Create rating
+    const rating = await prisma.rating.create({
+      data: {
+        userId,
+        score,
+        comment,
+
+        bookingId: bookingId || null,
+        busId: busId || null,
+        stationId: stationId || null,
+        parkingLotId: parkingLotId || null,
+      },
+    })
+
+    // 🚌 5. Update Bus Rating (IMPORTANT)
+    if (busId) {
+      const bus = await prisma.bus.findUnique({
+        where: { id: busId },
+      })
+
+      if (bus) {
+        const newTotalRatings = bus.totalRatings + 1
+        const newAverage =
+          (bus.averageRating * bus.totalRatings + score) / newTotalRatings
+
+        await prisma.bus.update({
+          where: { id: busId },
+          data: {
+            totalRatings: newTotalRatings,
+            averageRating: newAverage,
+          },
+        })
+      }
+    }
+
+    // ⚡ 6. (Optional) Update Charging Station Rating
+    if (stationId) {
+      const ratings = await prisma.rating.findMany({
+        where: { stationId },
+      })
+
+      const avg = ratings.reduce((acc, r) => acc + r.score, 0) / ratings.length
+
+      await prisma.chargingStation.update({
+        where: { id: stationId },
+        data: {
+          averageRating: avg,
+        },
+      })
+    }
+
+    // 🅿️ 7. (Optional) Update Parking Lot Rating
+    if (parkingLotId) {
+      const ratings = await prisma.rating.findMany({
+        where: { parkingLotId },
+      })
+
+      const avg = ratings.reduce((acc, r) => acc + r.score, 0) / ratings.length
+
+      await prisma.parkingLot.update({
+        where: { id: parkingLotId },
+        data: {
+          averageRating: avg,
+        },
+      })
+    }
+
+    return successResponse("Rating submitted successfully", rating, 201)
+  } catch (error) {
+    console.error("createRatingService error:", error)
+    return errorResponse("Failed to submit rating", 500)
   }
 }

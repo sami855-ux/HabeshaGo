@@ -35,16 +35,94 @@ export const getAllSessionsService = async () => {
   }
 }
 
-export const getSessionByIdService = async (id) => {
+export const getChargingSessionViewService = async (sessionId) => {
   try {
     const session = await prisma.chargingSession.findUnique({
-      where: { id: Number(id) },
-      include: { vehicle: true, station: true, chargingPoint: true },
+      where: { id: Number(sessionId) },
+      include: {
+        chargingPoint: {
+          include: {
+            station: {
+              include: {
+                tariffs: true,
+              },
+            },
+          },
+        },
+        vehicle: true,
+        meterLogs: {
+          orderBy: {
+            recordedAt: "asc",
+          },
+        },
+      },
     })
-    if (!session) return errorResponse("Session not found", 404)
-    return successResponse("Session retrieved successfully", session, 200)
+
+    if (!session) {
+      return errorResponse("Charging session not found", 404)
+    }
+
+    const station = session.chargingPoint.station
+    const tariff = station?.tariffs?.find((t) => {
+      const now = new Date()
+      return (
+        new Date(t.validFrom) <= now &&
+        (!t.validTo || new Date(t.validTo) >= now)
+      )
+    })
+
+    const energyDelivered =
+      session.meterLogs?.length > 0
+        ? session.meterLogs[session.meterLogs.length - 1].meterValue
+        : 0
+
+    const viewModel = {
+      id: session.id,
+
+      stationName: station?.name,
+      address: station?.address,
+
+      chargerId: `CH-${session.chargingPointId}`,
+      connectorType: session.chargingPoint?.connectorType,
+
+      startedAt: session.startTime,
+      endTime: session.endTime,
+
+      vehicleInfo: {
+        model: session.vehicle?.model,
+        batteryCapacity: session.vehicle?.batteryCapacity,
+        currentBattery: session.vehicle?.currentBattery,
+        estimatedRange: session.vehicle?.estimatedRange,
+      },
+
+      chargingStats: {
+        currentPower: session.chargingPoint?.powerKw || 0,
+        voltage: session.chargingPoint?.maxVoltage || 400,
+        current: session.chargingPoint?.maxCurrent || 100,
+
+        energyDelivered: Number(energyDelivered),
+
+        sessionCost: Number(session.totalCost || 0),
+
+        carbonSaved: Number((energyDelivered * 0.35).toFixed(2)),
+
+        maxPower: session.chargingPoint?.powerKw || 0,
+      },
+
+      status: session.status.toLowerCase(),
+
+      targetEnergy: session.energyConsumedKwh || 3,
+
+      pricePerKwh: Number(tariff?.pricePerKwh || 0),
+    }
+
+    return successResponse(
+      "Charging session retrieved successfully",
+      viewModel,
+      200,
+    )
   } catch (error) {
-    console.error("Error fetching session:", error)
+    console.error("getChargingSessionViewService error:", error)
     return errorResponse("Failed to fetch session", 500)
   }
 }
@@ -233,4 +311,64 @@ export const getManagerStationsSessionsService = async (managerId) => {
     console.error("Error fetching manager sessions:", error)
     return errorResponse("Failed to fetch sessions", 500)
   }
+}
+
+export const startChargingService = async (reservationId) => {
+  // STEP 1: Fetch reservation
+  const reservation = await prisma.eVReservation.findUnique({
+    where: { id: reservationId },
+    include: {
+      chargingPoint: true,
+      vehicle: true,
+    },
+  })
+
+  if (!reservation) {
+    throw new Error("Reservation not found")
+  }
+
+  // STEP 2: Validations
+  if (reservation.isUsed) {
+    throw new Error("Reservation already used")
+  }
+
+  if (reservation.paymentStatus !== "SUCCESS") {
+    throw new Error("Payment not completed")
+  }
+
+  if (new Date() > reservation.endTime) {
+    throw new Error("Reservation expired")
+  }
+
+  return reservation
+}
+
+export const createChargingSession = async (reservation) => {
+  const session = await prisma.chargingSession.create({
+    data: {
+      vehicleId: reservation.vehicleId,
+      stationId: reservation.chargingPoint.stationId,
+      chargingPointId: reservation.chargingPointId,
+      startTime: new Date(),
+      status: "ACTIVE",
+      userId: reservation.userId,
+    },
+  })
+
+  // update charging point
+  await prisma.chargingPoint.update({
+    where: { id: reservation.chargingPointId },
+    data: { status: "OCCUPIED" },
+  })
+
+  // link reservation
+  await prisma.eVReservation.update({
+    where: { id: reservation.id },
+    data: {
+      chargingSessionId: session.id,
+      isUsed: true,
+    },
+  })
+
+  return session
 }

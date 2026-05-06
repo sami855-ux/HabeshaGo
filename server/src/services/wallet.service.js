@@ -65,7 +65,7 @@ export const getMyWalletService = async (userId) => {
 
 export const getWalletTransactionsService = async (userId) => {
   try {
-    // 1️⃣ Find the user's wallet
+    // 1️⃣ Get wallet
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
       select: { id: true },
@@ -75,49 +75,106 @@ export const getWalletTransactionsService = async (userId) => {
       return errorResponse("Wallet not found", 404)
     }
 
-    // 2️⃣ Fetch transactions including recipient wallet and recipient user
-    const transactions = await prisma.walletTransaction.findMany({
-      where: { walletId: wallet.id },
-      orderBy: { createdAt: "desc" },
-      include: {
-        recipientWallet: {
-          select: {
-            user: {
-              select: {
-                name: true, // recipient user name
+    // 2️⃣ Fetch both
+    const [walletTxs, pointTxs] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: "desc" },
+        include: {
+          recipientWallet: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-    })
+      }),
 
-    // 3️⃣ Map Prisma data → formatted response
-    const formattedTransactions = transactions.map((tx) => ({
-      id: tx.id,
+      prisma.pointTransaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: "desc" },
+      }),
+    ])
+
+    // 3️⃣ Wallet transactions
+    const formattedWallet = walletTxs.map((tx) => ({
+      id: `wallet-${tx.id}`,
       walletId: tx.walletId,
+
+      category: "WALLET",
+
       amount: tx.amount.toString(),
-      type: tx.type,
+      type: tx.type, // keep original type
       status: tx.status,
       balanceAfter: tx.balanceAfter.toString(),
       reference: tx.reference,
+
       description:
         tx.description ||
         `${tx.type}`.charAt(0).toUpperCase() +
           `${tx.type}`.slice(1).toLowerCase() +
           " transaction",
+
       metadata: tx.metadata,
-      createdAt: tx.createdAt.toISOString(),
-      recipientName: tx.recipientWallet?.user?.name || null,
+      createdAt: tx.createdAt,
+
+      recipientName:
+        tx.recipientWallet?.user?.id === userId
+          ? "You"
+          : tx.recipientWallet?.user?.name || null,
     }))
 
-    return successResponse("Wallet transactions retrieved successfully", {
-      transactions: formattedTransactions,
-      total: formattedTransactions.length,
+    // 4️⃣ Point transactions
+    const formattedPoints = pointTxs.map((tx) => ({
+      id: `point-${tx.id}`,
+      walletId: tx.walletId,
+
+      category: "POINT",
+
+      amount: tx.amount.toString(),
+      type: tx.type,
+
+      status: "SUCCESS",
+
+      // points don’t have balanceAfter → null for table
+      balanceAfter: null,
+
+      reference: null,
+
+      description:
+        tx.reason ||
+        `${tx.type}`.charAt(0).toUpperCase() +
+          `${tx.type}`.slice(1).toLowerCase() +
+          " points",
+
+      metadata: null,
+      createdAt: tx.createdAt,
+
+      recipientName: "You",
+    }))
+
+    // 5️⃣ Merge + sort
+    const combined = [...formattedWallet, ...formattedPoints].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    )
+
+    // 6️⃣ Final format
+    const finalTransactions = combined.map((tx) => ({
+      ...tx,
+      createdAt: new Date(tx.createdAt).toISOString(),
+    }))
+
+    return successResponse("Transactions retrieved successfully", {
+      transactions: finalTransactions,
+      total: finalTransactions.length,
     })
   } catch (error) {
-    console.error("Error fetching wallet transactions:", error)
-    return errorResponse("Failed to fetch wallet transactions", 500)
+    console.error("Error fetching transactions:", error)
+    return errorResponse("Failed to fetch transactions", 500)
   }
 }
 
@@ -331,4 +388,41 @@ export const deductFromWalletService = async (userId, payload) => {
     console.error("Wallet deduction service error:", error)
     return errorResponse("Failed to deduct wallet", 500)
   }
+}
+
+export const addPointsToUser = async ({
+  tx, // ✅ pass transaction
+  userId,
+  amount,
+  type,
+  reason,
+  reference = null,
+  metadata = null,
+}) => {
+  if (!tx) throw new Error("Transaction (tx) is required")
+
+  const wallet = await tx.wallet.findUnique({
+    where: { userId },
+  })
+
+  if (!wallet) throw new Error("Wallet not found")
+
+  const newBalance = wallet.points + amount
+  if (newBalance < 0) throw new Error("Insufficient points")
+
+  const pointTx = await tx.pointTransaction.create({
+    data: {
+      walletId: wallet.id,
+      amount,
+      type,
+      reason,
+    },
+  })
+
+  await tx.wallet.update({
+    where: { id: wallet.id },
+    data: { points: newBalance },
+  })
+
+  return pointTx
 }

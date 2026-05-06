@@ -1,6 +1,17 @@
 import cron from "node-cron"
 
-import { getUpcomingTrips, sendPassengerReminder } from "./cron-services.js"
+import {
+  getUpcomingTrips,
+  processEVRefund,
+  processRefund,
+  sendPassengerReminder,
+} from "./cron-services.js"
+import prisma from "../prisma/client.js"
+import {
+  completeEVChargingSessions,
+  completeParkingSessions,
+  completeTripsJob,
+} from "./completeTrips.job.js"
 
 // Passenger reminders (24h & 2h before departure)
 // Run every 15 mins
@@ -9,22 +20,43 @@ cron.schedule(
   async () => {
     try {
       console.log("🕒 Running passenger reminders...")
+
       const trips = await getUpcomingTrips()
-      console.log("🕒 Upcoming trips:", trips.length)
+      console.log(`🕒 Upcoming trips: ${trips.length}`)
 
       const now = new Date()
-      trips.forEach(async (trip) => {
-        const validDateTrip = trip.tickets[0]?.validUntil
-        const diffMins = (new Date(validDateTrip) - now) / (1000 * 60)
 
-        console.log(diffMins)
-        if (diffMins <= 1440 && !trip.reminder24Sent) {
-          await sendPassengerReminder(trip, "24h")
-        }
-        if (diffMins <= 120 && !trip.reminder2hSent) {
-          await sendPassengerReminder(trip, "2h")
-        }
-      })
+      await Promise.all(
+        trips.map(async (trip) => {
+          try {
+            const validDateTrip = trip.tickets[0]?.validUntil
+
+            if (!validDateTrip) {
+              console.warn(
+                `⚠️ Trip ${trip.id} has no valid validUntil date. Skipping.`,
+              )
+              return
+            }
+
+            const diffMins = (new Date(validDateTrip) - now) / (1000 * 60)
+            console.log(
+              `🗓️ Trip ${trip.id} — ${diffMins.toFixed(1)} mins until departure`,
+            )
+
+            if (diffMins <= 1440 && diffMins > 0 && !trip.reminder24Sent) {
+              await sendPassengerReminder(trip, "24h")
+              console.log(`✅ 24h reminder sent for trip ${trip.id}`)
+            }
+
+            if (diffMins <= 120 && diffMins > 0 && !trip.reminder2hSent) {
+              await sendPassengerReminder(trip, "2h")
+              console.log(`✅ 2h reminder sent for trip ${trip.id}`)
+            }
+          } catch (tripErr) {
+            console.error(`❌ Failed to process trip ${trip.id}:`, tripErr)
+          }
+        }),
+      )
     } catch (err) {
       console.error("❌ Passenger reminders failed:", err)
     }
@@ -47,49 +79,61 @@ cron.schedule(
   { timezone: "Africa/Addis_Ababa" },
 )
 
-// Trip updates & driver notifications
-// Run every 10 mins
-// cron.schedule("*/10 * * * *", async () => {
-//   try {
-//     console.log("🕒 Sending trip updates & driver notifications...");
-//     await notifyTripUpdates();
-//     await notifyDrivers();
-//   } catch (err) {
-//     console.error("❌ Trip updates/driver notifications failed:", err);
-//   }
-// }, { timezone: "Africa/Addis_Ababa" });
+//Bus ticketing
+cron.schedule("*/5 * * * *", async () => {
+  const now = new Date()
 
-// Promotions / Discounts
-// Run daily at 8:00 AM
-// cron.schedule("0 8 * * *", async () => {
-//   try {
-//     console.log("🕒 Sending promotions...");
-//     await sendPromotions();
-//   } catch (err) {
-//     console.error("❌ Promotions failed:", err);
-//   }
-// }, { timezone: "Africa/Addis_Ababa" });
+  const expiredTickets = await prisma.ticket.findMany({
+    where: {
+      validUntil: { lt: now },
+      checkedIn: false,
+      refundProcessed: false,
+    },
+    include: {
+      booking: true,
+    },
+  })
 
-// Automated refunds
-// Run every hour
-// cron.schedule("0 * * * *", async () => {
-//   try {
-//     console.log("🕒 Processing automated refunds...");
-//     await processRefunds();
-//   } catch (err) {
-//     console.error("❌ Refunds processing failed:", err);
-//   }
-// }, { timezone: "Africa/Addis_Ababa" });
+  for (const ticket of expiredTickets) {
+    await processRefund(ticket.booking)
 
-// Payment reminders
-// Run every hour
-// cron.schedule("0 * * * *", async () => {
-//   try {
-//     console.log("🕒 Sending payment reminders...");
-//     await sendPaymentReminders();
-//   } catch (err) {
-//     console.error("❌ Payment reminders failed:", err);
-//   }
-// }, { timezone: "Africa/Addis_Ababa" });
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { refundProcessed: true },
+    })
+  }
+})
 
-console.log("✅ HabeshaGo cron scheduler started")
+//EV refunded
+cron.schedule("*/1 * * * *", async () => {
+  const now = new Date()
+
+  const expiredReservations = await prisma.eVReservation.findMany({
+    where: {
+      endTime: { lt: now },
+      isUsed: false,
+      refundProcessed: false,
+      paymentStatus: "SUCCESS",
+    },
+  })
+
+  for (const reservation of expiredReservations) {
+    await processEVRefund(reservation)
+
+    await prisma.eVReservation.update({
+      where: { id: reservation.id },
+      data: {
+        refundProcessed: true,
+        paymentStatus: "REFUNDED",
+        status: "EXPIRED",
+      },
+    })
+  }
+})
+
+cron.schedule("*/1 * * * *", async () => {
+  console.log("Running trip completion job...")
+  await completeTripsJob()
+  // await completeEVChargingSessions()
+  // await completeParkingSessions()
+})

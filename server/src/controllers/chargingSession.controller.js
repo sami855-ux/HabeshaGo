@@ -1,13 +1,13 @@
 import {
   startSessionService,
   getAllSessionsService,
-  getSessionByIdService,
   updateSessionService,
   deleteSessionService,
   getSessionsByVehicleService,
   getSessionsByStationService,
   getSessionsByUserService,
   getManagerStationsSessionsService,
+  getChargingSessionViewService,
 } from "../services/chargingSession.service.js"
 
 // Start a session
@@ -43,7 +43,7 @@ export const getAllSessions = async (req, res) => {
 
 export const getSessionById = async (req, res) => {
   try {
-    const result = await getSessionByIdService(req.params.id)
+    const result = await getChargingSessionViewService(req.params.id)
     return res.status(result.statusCode).json(result)
   } catch (error) {
     console.error("Get session by ID error:", error)

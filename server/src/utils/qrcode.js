@@ -17,3 +17,8 @@ export const generateQRCode = async (text = null) => {
     throw new Error("Failed to generate QR code")
   }
 }
+
+export function generateReferralCode(name) {
+  const random = Math.random().toString(36).substring(2, 7).toUpperCase()
+  return `${name.slice(0, 3).toUpperCase()}${random}`
+}

@@ -13,6 +13,7 @@ import {
   searchBusesService,
   getRouteMidPointsService,
   getAllMidPointsService,
+  createRatingService,
 } from "../services/bus.service.js"
 
 // Helper function to handle controller errors
@@ -127,3 +128,18 @@ export const searchBuses = asyncHandler(async (req) => {
     time,
   )
 }, "Search buses")
+
+export const createRating = async (req, res) => {
+  try {
+    const result = await createRatingService(req.body, req.user.id)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Create rating error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error",
+      data: null,
+    })
+  }
+}

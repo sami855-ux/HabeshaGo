@@ -53,7 +53,7 @@ export const transferFundsService = async (
       senderTxn = await tx.walletTransaction.create({
         data: {
           walletId: senderWallet.id,
-          recipientWalletId: recipientWallet.id, // <-- link recipient wallet
+          recipientWalletId: recipientWallet.id,
           amount,
           type: "TRANSFER_OUT",
           status: "SUCCESS",
@@ -73,6 +73,7 @@ export const transferFundsService = async (
       await tx.walletTransaction.create({
         data: {
           walletId: recipientWallet.id,
+          recipientWalletId: recipientWallet.id,
           amount,
           type: "TRANSFER_IN",
           status: "SUCCESS",

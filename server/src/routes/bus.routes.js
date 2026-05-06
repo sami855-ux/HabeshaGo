@@ -14,7 +14,9 @@ import {
   searchBuses,
   getRouteMidPointsController,
   getAllMidPointsController,
+  createRating,
 } from "../controllers/bus.controller.js"
+import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
@@ -39,6 +41,8 @@ router.get("/midpoints", getAllMidPointsController)
 // Get a single bus by ID
 // GET /api/buses/:busId
 router.get("/:busId", getBusById)
+
+router.post("/ratings", authenticate, createRating)
 
 // Update a bus by ID
 // PUT /api/buses/:busId

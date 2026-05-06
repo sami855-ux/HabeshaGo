@@ -322,7 +322,16 @@ export const getReservationByIdService = async (id) => {
       include: {
         vehicle: true,
         user: true,
-        chargingPoint: true,
+        chargingPoint: {
+          include: {
+            station: {
+              include: {
+                tariffs: true,
+              },
+            },
+          },
+        },
+        payments: true,
       },
     })
 

@@ -2,11 +2,12 @@ import { validateBooking } from "../controllers/booking.controller.js"
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
 import { generateQRCode } from "../utils/qrcode.js"
+import { addPointsToUser } from "./wallet.service.js"
 
 export const POINTS_CONVERSION_RATE = 0.5
-const ADMIN_WALLET_ID = 6
+const ADMIN_WALLET_ID = 1
 const COMMISSION_RATE = 0.1
-const DEFAULT_DRIVER_ID = "cmmhx2xt70000bpqgk6bb1kbq"
+const DEFAULT_DRIVER_ID = "cmocj1iy50003d6k3v1mfq0y8"
 const MAX_TICKETS_PER_USER = 5
 
 /**
@@ -132,6 +133,21 @@ export const createBookingService = async ({
           },
         })
         walletId = wallet.id
+
+        if (isPointUsed && pointsUsed > 0) {
+          await tx.pointTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: -pointsUsed,
+              type: "SPEND",
+              reason: "Used points for ticket discount",
+              reference: `BOOKING_${Date.now()}`,
+              metadata: {
+                pointsUsed,
+              },
+            },
+          })
+        }
       }
 
       return tx.payment.create({
@@ -268,6 +284,20 @@ export const createBookingService = async ({
             reference: `TX-${Date.now()}`,
             serviceType: "BUS_TICKET",
             description: "Bus ticket commission retained by admin",
+          },
+        })
+
+        await addPointsToUser({
+          tx,
+          userId,
+          amount: 100,
+          type: "EARN",
+          reason: "Bus ticket booking reward",
+          reference: `BOOKING_${booking.id}`,
+          metadata: {
+            bookingId: booking.id,
+            busId,
+            seats,
           },
         })
       }

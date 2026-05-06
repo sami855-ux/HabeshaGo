@@ -41,6 +41,10 @@ model User {
   sharedBookingsSent     BookingShare[] @relation("ShareOwner")
   sharedBookingsReceived BookingShare[] @relation("ShareReceiver")
 
+  referralCode String  @default(cuid())
+  referredById String?
+  referredBy   User?   @relation("UserReferrals", fields: [referredById], references: [id])
+
   // RELATIONS 
   wallet   Wallet?
   bookings Booking[] @relation("UserBookings") // tickets owned
@@ -66,6 +70,8 @@ model User {
 
   supportChatsAsUser  SupportChatSession[] @relation("UserSupportChats")
   supportChatsAsAgent SupportChatSession[] @relation("AgentSupportChats")
+
+  referredUsers User[] @relation("UserReferrals")
 
   typingStatuses ChatTypingStatus[]
   agentStatus    SupportAgentStatus?
@@ -450,9 +456,13 @@ model Booking {
   pointsValue          Decimal?
   pointsConversionRate Decimal?
 
+  refundStatus String? // NONE | PARTIAL | FULL
+  refundedAt   DateTime?
+
   // Relations
   tickets Ticket[]
   shares  BookingShare[]
+  ratings Rating[]
 
   scheduleId Int?
   paymentId  Int?
@@ -490,7 +500,8 @@ model Ticket {
   sharedTicketUsed Boolean   @default(false)
 
   // cancellation
-  cancelledAt DateTime?
+  cancelledAt     DateTime?
+  refundProcessed Boolean   @default(false)
 
   booking Booking @relation(fields: [bookingId], references: [id])
   user    User    @relation("UserTickets", fields: [userId], references: [id])
@@ -527,6 +538,9 @@ model Bus {
   driverId String? @unique
   routeId  Int?
 
+  averageRating Float @default(0)
+  totalRatings  Int   @default(0)
+
   currentStop     String?
   nextDestination String?
   isActive        Boolean @default(true)
@@ -547,6 +561,7 @@ model Bus {
   seats     Seat[]
 
   schedules BusSchedule[]
+  ratings   Rating[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -606,7 +621,7 @@ model Vehicle {
 
   status        VehicleStatus @default(ACTIVE)
   connectorType ConnectorType @default(TESLA)
-  mileage Int           @default(0)
+  mileage       Int           @default(0)
 
   ownerId     String?
   owner       User?   @relation(fields: [ownerId], references: [id])
@@ -753,7 +768,6 @@ model PromoCode {
 model Rating {
   id Int @id @default(autoincrement())
 
-  // Who is giving the rating
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
@@ -763,7 +777,12 @@ model Rating {
   parkingLotId String?
   parkingLot   ParkingLot? @relation(fields: [parkingLotId], references: [id])
 
-  // Rating value & feedback
+  bookingId Int?
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+
+  busId Int?
+  bus   Bus? @relation(fields: [busId], references: [id])
+
   score   Int     @db.SmallInt // 1 to 5
   comment String?
 
@@ -772,9 +791,12 @@ model Rating {
 
   @@unique([userId, stationId])
   @@unique([userId, parkingLotId])
+  @@unique([userId, bookingId])
   @@index([userId])
   @@index([stationId])
   @@index([parkingLotId])
+  @@index([bookingId])
+  @@index([busId])
   @@map("ratings")
 }
 
@@ -789,7 +811,7 @@ model ChargingStation {
   status     StationStatus @default(ACTIVE)
   isVerified Boolean       @default(false)
 
-  managerId String  @default("cmo38u4ub00007zvj8qcqu4qn")
+  managerId String @default("cmo38u4ub00007zvj8qcqu4qn")
   manager   User   @relation(fields: [managerId], references: [id], onDelete: Cascade)
 
   chargingPoints ChargingPoint[]
@@ -965,6 +987,10 @@ model EVReservation {
   // Reservation reference
   reservationCode String?           @unique
   status          ReservationStatus @default(PENDING)
+
+  isUsed          Boolean   @default(false)
+  expiresAt       DateTime?
+  refundProcessed Boolean   @default(false)
 
   // User input: target charge
   targetBatteryPercentage Int? // e.g., 80% battery
@@ -1380,11 +1406,11 @@ enum ConnectorType {
 }
 
 enum ReservationStatus {
-  PENDING        // created but not confirmed
-  CONFIRMED      // slot reserved/approved
-  CANCELLED      // user/system cancelled
-  EXPIRED        // not used within time window
-  COMPLETED      // charging finished successfully
+  PENDING // created but not confirmed
+  CONFIRMED // slot reserved/approved
+  CANCELLED // user/system cancelled
+  EXPIRED // not used within time window
+  COMPLETED // charging finished successfully
 }
 
 enum LedgerStatus {
@@ -1412,6 +1438,7 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+  REFUNDED
 }
 
 enum BusStatus {
@@ -1432,6 +1459,7 @@ enum NotificationType {
   PAYMENT
   ROUTE
   BUS
+  TRIP
   WALLET
   ALERT
   REMINDER

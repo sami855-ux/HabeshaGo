@@ -49,10 +49,14 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: "http://localhost:3000", // frontend URL
+    origin: [
+      'https://habesha-go-v2.vercel.app',  // production frontend
+      'http://localhost:3000',               
+      'http://localhost:3001',               
+    ],
     credentials: true,
-  }),
-)
+  })
+);
 
 app.use(express.json())
 

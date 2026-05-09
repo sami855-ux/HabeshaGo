@@ -11,6 +11,7 @@ import {
   LogOut,
   Search,
   Zap,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,6 +47,7 @@ import { PiGearSix } from "react-icons/pi"
 import { MdSupportAgent } from "react-icons/md"
 import { useQuery } from "@tanstack/react-query"
 import { fetchAllNotification } from "@/services/notification.api"
+import { useSidebar } from "@/context/sidebar-context"
 
 const notificationKeys = {
   all: ["notifications"] as const,
@@ -56,6 +58,7 @@ function Header({ className }: { className?: string }) {
   const router = useRouter()
   const dispatch = useDispatch()
   const { user, loading } = useSelector((state: RootState) => state.user)
+  const { toggleMobileSidebar, isMobileOpen } = useSidebar()
 
   const { data: notifications = [] } = useQuery({
     queryKey: notificationKeys.lists(),
@@ -107,6 +110,10 @@ function Header({ className }: { className?: string }) {
     // Handle search logic here
   }
 
+  const handleMobileMenuToggle = () => {
+    toggleMobileSidebar() // Use toggleMobileSidebar instead of toggleSidebar
+  }
+
   return (
     <>
       <motion.header
@@ -140,7 +147,29 @@ function Header({ className }: { className?: string }) {
         />
 
         <div className="w-full h-full">
-          <div className="flex items-center justify-end h-full px-4">
+          <div className="flex items-center justify-between h-full px-4">
+            {/* Left Section - Menu Toggle Button (Mobile) & Logo (Optional) */}
+            <div className="flex items-center gap-3">
+              {/* Hamburger Menu Button - Mobile only */}
+              <motion.div whileTap={{ scale: 0.95 }}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden hover:bg-white/10 dark:hover:bg-white/5 relative"
+                  onClick={handleMobileMenuToggle}
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </motion.div>
+
+              {/* Logo / Brand Name - Optional for mobile */}
+              <div className="lg:hidden flex items-center">
+                <span className="text-lg font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+                  HabeshaGo
+                </span>
+              </div>
+            </div>
+
             {/* Right Section */}
             <div className="flex items-center gap-2">
               {/* Deposit Button - Desktop with morphism hover effect */}
@@ -195,7 +224,7 @@ function Header({ className }: { className?: string }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 relative overflow-hidden"
+                  className="hidden sm:flex md:hidden bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 relative overflow-hidden"
                   onClick={() => router.push("/user/wallet")}
                 >
                   <motion.div
@@ -213,7 +242,7 @@ function Header({ className }: { className?: string }) {
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsSearchDialogOpen(true)}
-                  className="md:hidden hover:bg-white/10 dark:hover:bg-white/5"
+                  className="hover:bg-white/10 dark:hover:bg-white/5"
                 >
                   <Search className="w-5 h-5" />
                 </Button>

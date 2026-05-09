@@ -45,7 +45,6 @@ export const completeTripsJob = async () => {
         booking.tickets?.filter((t) => t.checkedIn && !t.cancelledAt) || []
 
       if (validTickets.length === 0) {
-        console.log(`Skipping booking ${booking.id} - no checked-in passengers`)
         continue
       }
 

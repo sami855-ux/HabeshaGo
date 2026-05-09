@@ -13,6 +13,7 @@ import BusLayer from "./BusLayer"
 import NavigationRoute from "./NavigationRoute"
 
 import { Coordinates } from "@/types/map-user"
+import { axiosInstance } from "@/services/axiosInstance"
 
 let L: typeof LeafletType
 
@@ -23,6 +24,8 @@ if (typeof window !== "undefined") {
 export default function MapView() {
   const mapRef = useRef<LeafletType.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
+  const [vehicleIds, setVehicleIds] = useState<number[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   const { userLocation, loading, error } = useUserLocation()
   const { getParam } = useQueryParams()
@@ -147,12 +150,28 @@ export default function MapView() {
     }
   }, [userLocation, getParam])
 
-  const handleDestinationSelect = (destination: Coordinates) => {
-    setSelectedDestination(destination)
-  }
+  useEffect(() => {
+    const fetchVehicleIds = async () => {
+      try {
+        setIsLoading(true)
+        console.log("Fetching vehicle IDs...")
+
+        const { data } = await axiosInstance.get("/vehicles/ids")
+
+        setVehicleIds(data.data)
+        console.log("Vehicle IDs set:", data.data)
+      } catch (err) {
+        console.error("Failed to fetch vehicle IDs", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVehicleIds()
+  }, [])
 
   // Loading UI
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center flex flex-col items-center">
@@ -182,10 +201,10 @@ export default function MapView() {
             />
           )}
 
-          <EVStationsLayer
+          {/* <EVStationsLayer
             map={mapRef.current}
             userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
-          />
+          /> */}
 
           {/* <ParkingStationsLayer
             map={mapRef.current}
@@ -193,7 +212,7 @@ export default function MapView() {
             onDestinationSelect={handleDestinationSelect}
           /> */}
 
-          <BusLayer map={mapRef.current} />
+          <BusLayer map={mapRef.current} vehicleIds={vehicleIds} />
 
           {selectedDestination && userLocation && (
             <NavigationRoute

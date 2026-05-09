@@ -99,17 +99,17 @@ export function HeroSection() {
   ]
 
   return (
-    <section className="relative w-full min-h-screen overflow-hidden pt-16">
+    <section className="relative w-full min-h-[100dvh] overflow-hidden pt-16 md:pt-20 lg:pt-28 pb-4 ">
       {/* Gradient Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-yellow-500/10" />
 
       {/* Floating Particles (SSR SAFE) */}
       {mounted && (
-        <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {particles.map((p, i) => (
             <motion.div
               key={i}
-              className="absolute w-1 h-1 bg-orange-500/30 rounded-full"
+              className="absolute w-0.5 h-0.5 sm:w-1 sm:h-1 bg-orange-500/30 rounded-full"
               style={{
                 left: `${p.left}%`,
                 top: `${p.top}%`,
@@ -144,12 +144,12 @@ export function HeroSection() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10 h-screen flex flex-col justify-center items-center text-center px-6 max-w-6xl mx-auto"
+        className="relative z-10 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] flex flex-col justify-center items-center text-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
       >
         {/* Badge */}
-        <motion.div variants={itemVariants} className="mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-            <span className="text-sm font-medium text-white/90 font-jakarta">
+        <motion.div variants={itemVariants} className="mb-4 sm:mb-6 md:mb-8">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <span className="text-xs sm:text-sm font-medium text-white/90 font-jakarta whitespace-nowrap">
               Revolutionizing Addis Abeba's Mobility
             </span>
           </div>
@@ -157,14 +157,14 @@ export function HeroSection() {
 
         <motion.h1
           variants={itemVariants}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-4"
+          className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white mb-3 sm:mb-4 md:mb-6 px-2"
         >
-          <span className="bg-gradient-to-r from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent font-grotesk">
+          <span className="bg-gradient-to-r from-white via-orange-100 to-yellow-100 bg-clip-text text-transparent font-grotesk block sm:inline">
             Smarter Journeys for
           </span>
-          <br />
+          <br className="hidden sm:block" />
           <motion.span
-            className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent"
+            className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent inline-block mt-1 sm:mt-0"
             animate={{ backgroundPosition: ["0%", "100%", "0%"] }}
             transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
             style={{ backgroundSize: "200%" }}
@@ -174,7 +174,10 @@ export function HeroSection() {
         </motion.h1>
 
         {/* Rotating Text */}
-        <motion.div variants={itemVariants} className="h-12 mb-8">
+        <motion.div
+          variants={itemVariants}
+          className="h-10 sm:h-12 md:h-14 mb-6 sm:mb-8 md:mb-10"
+        >
           <AnimatePresence mode="wait">
             <motion.p
               key={textIndex}
@@ -182,7 +185,7 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="text-lg md:text-xl lg:text-2xl text-white/90 font-jakarta"
+              className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 font-jakarta px-4"
             >
               {texts[textIndex]}
             </motion.p>
@@ -192,32 +195,41 @@ export function HeroSection() {
         {/* Features */}
         <motion.div
           variants={itemVariants}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 max-w-2xl"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-8 sm:mb-10 md:mb-12 max-w-3xl mx-auto w-full px-2"
         >
           {features.map((f, i) => (
             <motion.div
               key={f.text}
               custom={i}
               variants={featureVariants}
-              className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-xs border-none"
+              className="flex flex-col items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl bg-white/5 backdrop-blur-xs border border-white/10 hover:bg-white/10 transition-all duration-300"
             >
-              <span className="text-sm text-white/80">{f.text}</span>
+              <f.icon
+                className={`w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ${f.color} mb-1`}
+              />
+              <span className="text-xs sm:text-sm text-white/80 font-medium whitespace-nowrap">
+                {f.text}
+              </span>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* CTA */}
-        <motion.div variants={itemVariants} className="flex gap-5 flex-wrap">
-          <Link href="/login">
-            <Button className="px-16 w-38 py-6 text-lg rounded-xl  bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-              Join Us <ChevronRight className="ml-2 w-5 h-5" />
+        {/* CTA Buttons */}
+        <motion.div
+          variants={itemVariants}
+          className="flex gap-3 sm:gap-4 md:gap-5 flex-wrap justify-center px-4"
+        >
+          <Link href="/login" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto px-6 sm:px-12 md:px-16 py-3 sm:py-5 md:py-6 text-sm sm:text-base md:text-lg rounded-xl bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-300">
+              Join Us{" "}
+              <ChevronRight className="ml-1 sm:ml-2 w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
           </Link>
 
-          <Link href="/learn-more">
+          <Link href="/learn-more" className="w-full sm:w-auto">
             <Button
               variant="outline"
-              className="px-12 py-6 text-lg rounded-2xl text-white border-white/30 bg-white/5"
+              className="w-full sm:w-auto px-6 sm:px-10 md:px-12 py-3 sm:py-5 md:py-6 text-sm sm:text-base md:text-lg rounded-xl text-white border-white/30 bg-white/5 hover:bg-white/10 hover:border-white/50 transition-all duration-300 border-none"
             >
               Learn More
             </Button>

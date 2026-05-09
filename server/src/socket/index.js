@@ -39,19 +39,64 @@ export const initSocket = (server) => {
 
     // Join map room
     socket.on("joinMap", async (vehicleIds) => {
+      // 1. Input validation with client feedback
+      if (!Array.isArray(vehicleIds) || vehicleIds.length === 0) {
+        socket.emit("map:error", {
+          message: "vehicleIds must be a non-empty array",
+        })
+        return
+      }
+
+      // 2. Filter to valid positive integers only
+      const validIds = vehicleIds
+        .slice(0, 100) // safety cap
+        .filter((id) => Number.isInteger(id) && id > 0)
+
+      if (validIds.length === 0) {
+        socket.emit("map:error", { message: "No valid vehicle IDs provided" })
+        return
+      }
+
       socket.join("map")
 
       try {
-        if (Array.isArray(vehicleIds) && vehicleIds.length > 0) {
-          const latestLocations = await Promise.all(
-            vehicleIds.map(getLatestVehicleLocation),
-          )
+        // 3. Promise.allSettled so one Redis failure doesn't kill the whole init
+        const results = await Promise.allSettled(
+          validIds.map(getLatestVehicleLocation),
+        )
 
-          socket.emit("map:init", latestLocations.filter(Boolean))
-        }
+        console.log("Promise results:", results)
+
+        const locations = []
+        results.forEach((result, index) => {
+          if (result.status === "fulfilled" && result.value) {
+            locations.push(result.value)
+          } else if (result.status === "rejected") {
+            console.error(
+              `Failed to fetch location for vehicle ${validIds[index]}:`,
+              result.reason,
+            )
+          }
+        })
+
+        socket.emit("map:init", locations)
+
+        // 4. Track which vehicles this socket is watching (for disconnect cleanup)
+        socket.data.trackedVehicleIds = validIds
       } catch (error) {
         console.error("Map init error", error)
+        socket.emit("map:error", { message: "Failed to initialize map" })
       }
+    })
+
+    // 5. Cleanup on leave / disconnect
+    socket.on("leaveMap", () => {
+      socket.leave("map")
+      socket.data.trackedVehicleIds = []
+    })
+
+    socket.on("disconnect", () => {
+      socket.data.trackedVehicleIds = []
     })
 
     // Join charging session
@@ -145,6 +190,11 @@ export const emitReservationConfirmed = (userId, reservation) => {
 export const emitAdminTelemetry = (payload) => {
   if (!io) return
   io.to("admin-dashboard").emit("telemetry:update", payload)
+}
+
+export const emitToMap = (payload) => {
+  if (!io) return
+  io.to("map").emit("map:vehicleUpdate", payload)
 }
 
 // Emit charger fault

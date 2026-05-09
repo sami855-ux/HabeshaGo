@@ -92,7 +92,7 @@ export default function MapFilters() {
   return (
     <div
       className={cn(
-        "sticky top-4 z-50 transition-all duration-500 ",
+        "sticky top-4 z-40 transition-all duration-500 ",
         scrolled && "top-2",
       )}
     >

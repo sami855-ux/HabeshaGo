@@ -1,8 +1,12 @@
 import prisma from "../prisma/client.js"
 import { uploadToCloudinary } from "../services/cloudinary.service.js"
-import { setLatestVehicleLocation } from "../services/redisService.service.js"
-import { emitToVehicle } from "../socket/index.js"
+import {
+  checkVehicleExists,
+  setLatestVehicleLocation,
+} from "../services/redisService.service.js"
+import { emitToMap, emitToVehicle } from "../socket/index.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import { enqueueLocation } from "../utils/locationQueue.js"
 
 export const createVehicle = async (req, res) => {
   try {
@@ -471,68 +475,63 @@ export const updateVehicleLocation = async (req, res) => {
     let { vehicleId, lat, lng, speed, heading, accuracy } = req.body
 
     // required fields
-    if (!vehicleId)
+    if (vehicleId === undefined || vehicleId === null)
       return res.status(400).json(errorResponse("vehicleId is required", 400))
+    if (lat === undefined || lat === null)
+      return res.status(400).json(errorResponse("lat is required", 400))
+    if (lng === undefined || lng === null)
+      return res.status(400).json(errorResponse("lng is required", 400))
 
-    if (lat === undefined || lng === undefined)
-      return res
-        .status(400)
-        .json(errorResponse("lat and lng are required", 400))
-
-    // convert types
+    // type coercion
     vehicleId = Number(vehicleId)
     lat = Number(lat)
     lng = Number(lng)
-    speed = speed ? Number(speed) : null
-    heading = heading ? Number(heading) : null
-    accuracy = accuracy ? Number(accuracy) : null
+    speed = speed != null ? Number(speed) : null
+    heading = heading != null ? Number(heading) : null
+    accuracy = accuracy != null ? Number(accuracy) : null
 
-    // validate numbers
-    if (Number.isNaN(vehicleId) || vehicleId <= 0)
+    // validation
+    if (!Number.isInteger(vehicleId) || vehicleId <= 0)
       return res.status(400).json(errorResponse("Invalid vehicleId", 400))
-
     if (Number.isNaN(lat) || lat < -90 || lat > 90)
       return res.status(400).json(errorResponse("Invalid latitude", 400))
-
     if (Number.isNaN(lng) || lng < -180 || lng > 180)
       return res.status(400).json(errorResponse("Invalid longitude", 400))
+    if (speed != null && (Number.isNaN(speed) || speed < 0))
+      return res.status(400).json(errorResponse("Invalid speed", 400))
+    if (
+      heading != null &&
+      (Number.isNaN(heading) || heading < 0 || heading > 360)
+    )
+      return res.status(400).json(errorResponse("Invalid heading", 400))
+    if (accuracy != null && (Number.isNaN(accuracy) || accuracy < 0))
+      return res.status(400).json(errorResponse("Invalid accuracy", 400))
 
-    // check vehicle exists
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: { id: true },
-    })
-
-    if (!vehicle)
+    // vehicle existence (Redis cache → DB fallback)
+    const exists = await checkVehicleExists(vehicleId)
+    if (!exists)
       return res.status(404).json(errorResponse("Vehicle not found", 404))
 
-    // save history in DB
-    const location = await prisma.vehicleLocation.create({
-      data: {
-        vehicleId,
-        lat,
-        lng,
-        speed,
-        heading,
-        accuracy,
-      },
+    // build payload
+    const timestamp = new Date()
+    const payload = { vehicleId, lat, lng, speed, heading, accuracy, timestamp }
+
+    // Redis + socket (respond fast, client gets update immediately)
+    await setLatestVehicleLocation(vehicleId, {
+      ...payload,
+      createdAt: timestamp,
     })
+    emitToVehicle(vehicleId, "vehicle:location", payload)
+    emitToMap(payload)
 
-    console.log(location)
+    // DB write via queue (fire and forget, batched every 2s)
+    enqueueLocation({ vehicleId, lat, lng, speed, heading, accuracy })
 
-    // save latest in Redis via service
-    await setLatestVehicleLocation(vehicleId, location)
-
-    // realtime socket emit
-    emitToVehicle(vehicleId, "vehicle:location", location)
-
-    // success response
     return res
       .status(201)
-      .json(successResponse("Location updated successfully", location, 201))
+      .json(successResponse("Location updated successfully", payload, 201))
   } catch (error) {
     console.error("GPS update error:", error)
-
     return res
       .status(500)
       .json(errorResponse("Failed to update vehicle location", 500))
@@ -561,5 +560,33 @@ export const getUserVehicles = async (req, res) => {
     return res
       .status(500)
       .json(errorResponse("Failed to fetch vehicles", 500, err.message))
+  }
+}
+
+export const getVehicleIds = async (req, res) => {
+  try {
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        status: "ACTIVE",
+        buses: {
+          // only vehicles that have a Bus linked
+          some: {},
+        },
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    const ids = vehicles.map((v) => v.id)
+
+    return res
+      .status(200)
+      .json(successResponse("Vehicle IDs fetched successfully", ids, 200))
+  } catch (error) {
+    console.error("Failed to fetch vehicle IDs", error)
+    return res
+      .status(500)
+      .json(errorResponse("Failed to fetch vehicle IDs", 500))
   }
 }

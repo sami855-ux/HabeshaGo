@@ -9,15 +9,8 @@ import {
   HelpCircle,
   Currency,
   Wallet,
-  ArrowUpDown,
-  Menu,
-  X,
   ChevronFirst,
   ChevronLast,
-  LogOut,
-  Bus,
-  Receipt,
-  Ticket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
@@ -29,7 +22,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { FaMapMarkedAlt } from "react-icons/fa"
 import { MdOutlinePayments } from "react-icons/md"
 import { PiTicketLight } from "react-icons/pi"
@@ -46,9 +38,13 @@ function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
 
-  const { isCollapsed, toggleSidebar } = useSidebar()
+  const { isCollapsed, toggleSidebar, isMobileOpen, closeMobileSidebar, isMobile } =
+    useSidebar()
+
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // For mobile, we want to ignore the collapsed state and always show full menu
+  const shouldShowCollapsed = !isMobile && isCollapsed
 
   // Load expanded items from localStorage on mount
   useEffect(() => {
@@ -146,6 +142,12 @@ function Sidebar() {
     }
   }
 
+  const handleNavigation = (path: string) => {
+    router.push(`/user${path}`)
+    // Close mobile sidebar after navigation
+    closeMobileSidebar()
+  }
+
   const menuItems: MenuItem[] = [
     {
       id: "home",
@@ -181,28 +183,16 @@ function Sidebar() {
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        className="fixed left-4 top-4 z-50 lg:hidden rounded-md bg-primary p-2 text-primary-foreground shadow-md"
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        {isMobileOpen ? (
-          <X className="h-5 w-5" />
-        ) : (
-          <Menu className="h-5 w-5" />
-        )}
-      </button>
-
       {/* Sidebar Container */}
       <div
         className={cn(
           "fixed left-0 top-0 z-40 h-screen bg-background border-r border-border transition-all duration-300 flex flex-col",
-          // Mobile: slide in/out
+          // Mobile: slide in/out (controlled by isMobileOpen from context)
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
           // Desktop: always visible
           "lg:translate-x-0",
-          // Width based on collapsed state
-          isCollapsed ? "w-20" : "w-64",
+          // Width based on state: on mobile always w-64, on desktop based on collapsed state
+          isMobile ? "w-64" : (isCollapsed ? "w-20" : "w-64"),
         )}
       >
         {/* Sidebar Content */}
@@ -211,17 +201,18 @@ function Sidebar() {
           <div
             className={cn(
               "flex items-center gap-3 p-6 cursor-pointer transition-all duration-300 flex-shrink-0",
-              isCollapsed && "lg:justify-center lg:p-4",
+              // Only apply desktop centering when not on mobile
+              !isMobile && shouldShowCollapsed && "lg:justify-center lg:p-4",
             )}
             onClick={() => {
-              router.push("/user")
-              setIsMobileOpen(false)
+              handleNavigation("/")
             }}
           >
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-r from-primary to-primary/80 shadow-md flex-shrink-0">
-              <Currency className="h-6 w-6 text-primary-foreground" />
+            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 shadow-md flex-shrink-0">
+              <Currency className="h-6 w-6 text-white" />
             </div>
-            {!isCollapsed && (
+            {/* Show logo text on mobile always, on desktop based on collapsed state */}
+            {(isMobile || !shouldShowCollapsed) && (
               <div className="flex flex-col">
                 <span className="text-xl text-foreground font-bold">
                   HabeshaGo
@@ -232,7 +223,8 @@ function Sidebar() {
 
           {/* Scrollable Menu */}
           <div className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-            {!isCollapsed && (
+            {/* Only show section header on desktop when not collapsed */}
+            {!isMobile && !shouldShowCollapsed && (
               <p className="text-[11px] font-semibold py-2 text-muted-foreground">
                 MAIN MENU
               </p>
@@ -249,21 +241,21 @@ function Sidebar() {
                   return (
                     <div key={item.id} className="mb-1">
                       {/* Main Menu Item */}
-                      {isCollapsed ? (
+                      {shouldShowCollapsed && !isMobile ? (
+                        // Desktop collapsed view - show only icons with tooltips
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               onClick={() => {
                                 if (item.path && !item.subItems) {
-                                  router.push(`/user${item.path}`)
-                                  setIsMobileOpen(false)
+                                  handleNavigation(item.path)
                                 } else if (item.subItems) {
                                   toggleSubmenu(item.id)
                                 }
                               }}
                               className={cn(
                                 "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground group",
-                                isCollapsed && "lg:justify-center lg:px-3",
+                                "lg:justify-center lg:px-3",
                                 isActive &&
                                   "bg-primary/10 text-primary hover:bg-primary/20",
                                 hasActiveSubItem &&
@@ -272,8 +264,7 @@ function Sidebar() {
                             >
                               <div
                                 className={cn(
-                                  "transition-colors duration-200",
-                                  isCollapsed && "lg:mx-auto",
+                                  "transition-colors duration-200 lg:mx-auto",
                                   isActive && "text-primary",
                                   hasActiveSubItem && "text-primary",
                                   !isActive &&
@@ -295,13 +286,13 @@ function Sidebar() {
                           </TooltipContent>
                         </Tooltip>
                       ) : (
+                        // Mobile or desktop expanded view - show full menu with text
                         <button
                           onClick={() => {
                             if (item.subItems) {
                               toggleSubmenu(item.id)
                             } else if (item.path) {
-                              router.push(`/user${item.path}`)
-                              setIsMobileOpen(false)
+                              handleNavigation(item.path)
                             }
                           }}
                           className={cn(
@@ -347,9 +338,9 @@ function Sidebar() {
                         </button>
                       )}
 
-                      {/* Submenu Items - Only show when not collapsed and expanded */}
+                      {/* Submenu Items - Only show when expanded and not collapsed */}
                       {item.subItems &&
-                        !isCollapsed &&
+                        !shouldShowCollapsed &&
                         expandedItems.has(item.id) && (
                           <div className="ml-5 mt-1 space-y-1 border-l border-border pl-3 py-1">
                             {item.subItems.map((subItem) => {
@@ -367,8 +358,7 @@ function Sidebar() {
                                   )}
                                   onClick={() => {
                                     if (subItem.path) {
-                                      router.push(`/user${subItem.path}`)
-                                      setIsMobileOpen(false)
+                                      handleNavigation(subItem.path)
                                     }
                                   }}
                                 >
@@ -404,7 +394,8 @@ function Sidebar() {
               </nav>
             </TooltipProvider>
 
-            {!isCollapsed && (
+            {/* Tools section header */}
+            {!isMobile && !shouldShowCollapsed && (
               <p className="text-[11px] font-semibold py-2 text-muted-foreground mt-6">
                 TOOLS
               </p>
@@ -412,7 +403,8 @@ function Sidebar() {
 
             {/* Additional Links Section */}
             <div className="space-y-1">
-              {isCollapsed ? (
+              {shouldShowCollapsed && !isMobile ? (
+                // Desktop collapsed view
                 <>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -422,8 +414,7 @@ function Sidebar() {
                           "lg:justify-center lg:px-3",
                         )}
                         onClick={() => {
-                          router.push("/user/settings")
-                          setIsMobileOpen(false)
+                          handleNavigation("/settings")
                         }}
                       >
                         <Settings className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
@@ -441,8 +432,7 @@ function Sidebar() {
                           "lg:justify-center lg:px-3",
                         )}
                         onClick={() => {
-                          router.push("/user/support")
-                          setIsMobileOpen(false)
+                          handleNavigation("/support")
                         }}
                       >
                         <HelpCircle className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
@@ -454,6 +444,7 @@ function Sidebar() {
                   </Tooltip>
                 </>
               ) : (
+                // Mobile or desktop expanded view - show full menu with text
                 <>
                   <button
                     className={cn(
@@ -462,8 +453,7 @@ function Sidebar() {
                       "text-foreground hover:text-accent-foreground",
                     )}
                     onClick={() => {
-                      router.push("/user/settings")
-                      setIsMobileOpen(false)
+                      handleNavigation("/settings")
                     }}
                   >
                     <Settings className="h-5 w-5" />
@@ -476,8 +466,7 @@ function Sidebar() {
                       "text-foreground hover:text-accent-foreground",
                     )}
                     onClick={() => {
-                      router.push("/user/support")
-                      setIsMobileOpen(false)
+                      handleNavigation("/support")
                     }}
                   >
                     <HelpCircle className="h-5 w-5" />
@@ -488,29 +477,29 @@ function Sidebar() {
             </div>
           </div>
 
-          {/* Bottom Section - Collapse Button */}
+          {/* Bottom Section - Collapse Button (Desktop only) */}
           <div className="p-4 border-t border-border mt-auto">
             <div
               className={cn(
                 "transition-all duration-300",
-                isCollapsed ? "flex justify-center" : "space-y-4",
+                shouldShowCollapsed ? "flex justify-center" : "space-y-4",
               )}
             >
-              {/* Collapse Button - Similar to Neon's Design */}
+              {/* Collapse Button - Only visible on desktop */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="outline"
-                      size={isCollapsed ? "icon" : "default"}
+                      size={shouldShowCollapsed ? "icon" : "default"}
                       className={cn(
-                        "w-full border-none transition-all duration-200 rounded-sm",
+                        "hidden lg:flex w-full border-none transition-all duration-200 rounded-sm",
                         "hover:bg-accent hover:text-accent-foreground",
-                        isCollapsed && "justify-center",
+                        shouldShowCollapsed && "justify-center",
                       )}
                       onClick={toggleSidebar}
                     >
-                      {isCollapsed ? (
+                      {shouldShowCollapsed ? (
                         <ChevronLast className="h-4 w-4" />
                       ) : (
                         <>
@@ -521,7 +510,7 @@ function Sidebar() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    {shouldShowCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -534,7 +523,7 @@ function Sidebar() {
       {isMobileOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-          onClick={() => setIsMobileOpen(false)}
+          onClick={closeMobileSidebar}
         />
       )}
     </>

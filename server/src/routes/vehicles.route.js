@@ -12,45 +12,28 @@ import {
   getVehicleById,
   updateVehicleLocation,
   getUserVehicles,
+  getVehicleIds,
 } from "../controllers/vehicle.controller.js"
 import { upload } from "../config/multer.js"
 import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
-// Create a new vehicle
-router.post(
-  "/",
-  upload.single("image"), // 👈 handles file upload (field name: "image")
-  createVehicle,
-)
-
+// Static routes first (before any /:id)
+// router.post("/", upload.single("image"), createVehicle)
+router.post("/location", updateVehicleLocation)
 router.get("/user-vehicles", authenticate, getUserVehicles)
+router.get("/ids", getVehicleIds) // ← before /:id
+router.get("/stats", getVehicleStats) // ← before /:id
 
-//Get a vehicle by Id
+//  Dynamic routes after
 router.get("/:id", getVehicleById)
-
-// Get all vehicles
 router.get("/", getAllVehicles)
-
-// Update a vehicle by ID
 router.put("/:id", updateVehicle)
-
-// Delete a vehicle by ID
 router.delete("/:id", deleteVehicle)
-
-//satas
-router.get("/stats", getVehicleStats)
-
-/* ---------------- STATUS ---------------- */
 router.patch("/:id/status", updateVehicleStatus)
 router.patch("/:id/mileage", updateVehicleMileage)
-
-/* ---------------- DRIVER ---------------- */
 router.post("/:id/assign-driver", assignDriver)
 router.patch("/:id/unassign-driver", unassignDriver)
-
-//Save gps LOcation
-router.post("/location", updateVehicleLocation)
 
 export default router

@@ -9,16 +9,43 @@ import BusDetailsSheet from "./BusDetailsSheet"
 
 interface BusLayerProps {
   map: L.Map
+  vehicleIds: number[]
 }
 
-export default function BusLayer({ map }: BusLayerProps) {
-  const { buses, isConnected } = useSocket()
+export default function BusLayer({ map, vehicleIds }: BusLayerProps) {
+  const { buses, isConnected } = useSocket({ vehicleIds })
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
   const { getParam } = useQueryParams()
   const [selectedBus, setSelectedBus] = useState<{
     id: string
     name: string
   } | null>(null)
+
+  useEffect(() => {
+    console.log("=".repeat(50))
+    console.log("🚌 BusLayer — buses updated, total:", buses.length)
+    if (buses.length === 0) {
+      console.log("⚠️ No buses yet")
+      return
+    }
+    buses.forEach((bus) => {
+      console.log(`\n--- Bus ID: ${bus.id} ---`)
+      console.table({
+        id: bus.id,
+        lat: bus.location?.lat,
+        lng: bus.location?.lng,
+        speed: bus.speed,
+        heading: bus.heading,
+        busNumber: bus.busNumber,
+        status: bus.status,
+        currentStop: bus.currentStop,
+        nextDestination: bus.nextDestination,
+        driverName: bus.driverName,
+        routeName: bus.routeName,
+      })
+    })
+    console.log("=".repeat(50))
+  }, [buses])
 
   useEffect(() => {
     if (!map) return
@@ -30,74 +57,93 @@ export default function BusLayer({ map }: BusLayerProps) {
       return
     }
 
-    // Create custom icon for buses - with NO tooltip attributes
+    console.log("🗺️ Rendering markers for", buses.length, "buses")
+
     const busIcon = (bus: Bus) =>
       L.divIcon({
-        className: "bus-marker",
+        className: "",
         html: `
-      <div class="bus-marker-inner">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-          <line x1="8" y1="16" x2="16" y2="16"/>
-          <line x1="8" y1="8" x2="16" y2="8"/>
-        </svg>
+      <div style="
+        position: relative;
+        width: 36px;
+        height: 36px;
+      ">
+        <div style="
+          width: 36px;
+          height: 36px;
+          background: #185FA5;
+          border-radius: 50% 50% 50% 4px;
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transform: rotate(${bus.heading ?? 0}deg);
+        ">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="13" rx="2"/>
+            <path d="M3 10h18"/>
+            <path d="M8 19v2M16 19v2"/>
+            <circle cx="7.5" cy="15.5" r="1" fill="white" stroke="none"/>
+            <circle cx="16.5" cy="15.5" r="1" fill="white" stroke="none"/>
+          </svg>
+        </div>
+        <div style="
+          position: absolute;
+          bottom: -18px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #185FA5;
+          color: white;
+          font-size: 10px;
+          font-weight: 600;
+          font-family: sans-serif;
+          padding: 1px 5px;
+          border-radius: 4px;
+          white-space: nowrap;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+        ">${bus.busNumber ?? bus.id}</div>
       </div>
     `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [36, 54],
+        iconAnchor: [18, 18],
       })
 
     const onBusClick = (bus: Bus) => {
-      console.log("first")
-      setSelectedBus({
-        id: bus.id,
-        name: `Bus ${bus.routeName}`,
-      })
+      console.log("🖱️ Bus clicked:", bus.id, bus.busNumber)
+      setSelectedBus(bus)
     }
 
     buses.forEach((bus) => {
       const existingMarker = markersRef.current.get(bus.id)
 
       if (existingMarker) {
+        console.log(
+          `📍 Updating marker for bus ${bus.id} → ${bus.location.lat}, ${bus.location.lng}`,
+        )
         existingMarker.setLatLng([bus.location.lat, bus.location.lng])
-
-        // Completely remove any binding
-        if (existingMarker.getPopup()) existingMarker.unbindPopup()
-        if (existingMarker.getTooltip()) existingMarker.unbindTooltip()
-
-        // Remove title attribute if any
-        const element = existingMarker.getElement()
-        if (element) element.removeAttribute("title")
-
-        existingMarker.off()
+        existingMarker.setIcon(busIcon(bus))
+        existingMarker.off("click")
         existingMarker.on("click", () => onBusClick(bus))
       } else {
+        console.log(
+          `➕ Adding new marker for bus ${bus.id} at ${bus.location.lat}, ${bus.location.lng}`,
+        )
         const marker = L.marker([bus.location.lat, bus.location.lng], {
           icon: busIcon(bus),
           interactive: true,
         }).addTo(map)
 
-        // Remove any potential tooltip elements
         const element = marker.getElement()
         if (element) {
           element.removeAttribute("title")
           element.setAttribute("data-no-tooltip", "true")
         }
 
-        // Override tooltip methods
         marker.bindTooltip = () => marker
         marker.openTooltip = () => marker
         marker.closeTooltip = () => marker
-
-        marker.off("click")
-
-        map.on("click", () => {
-          console.log("MAP CLICK WORKS")
-        })
-        marker.on("click", () => {
-          console.log("CLICK WORKS") // test this
-          onBusClick(bus)
-        })
+        marker.on("click", () => onBusClick(bus))
         markersRef.current.set(bus.id, marker)
       }
     })
@@ -105,26 +151,28 @@ export default function BusLayer({ map }: BusLayerProps) {
     const activeBusIds = new Set(buses.map((b) => b.id))
     markersRef.current.forEach((marker, id) => {
       if (!activeBusIds.has(id)) {
+        console.log(`🗑️ Removing marker for bus ${id}`)
         marker.remove()
         markersRef.current.delete(id)
       }
     })
-
-    return () => {
-      markersRef.current.forEach((marker) => {
-        marker.off()
-        marker.remove()
-      })
-      markersRef.current.clear()
-    }
   }, [map, buses, getParam])
+
+  // useEffect(() => {
+  //   return () => {
+  //     markersRef.current.forEach((marker) => {
+  //       marker.off()
+  //       marker.remove()
+  //     })
+  //     markersRef.current.clear()
+  //   }
+  // }, [])
 
   return (
     <BusDetailsSheet
       isOpen={!!selectedBus}
       onClose={() => setSelectedBus(null)}
-      busId={selectedBus?.id || null}
-      busName={selectedBus?.name}
+      bus={selectedBus}
     />
   )
 }

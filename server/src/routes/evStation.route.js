@@ -5,6 +5,7 @@ import {
   deleteStation,
   getAllStations,
   getMyStations,
+  getNearbyStations,
   getStationById,
   getStationPoints,
   getStationRatings,
@@ -29,6 +30,7 @@ router.post(
 router.get("/ev-manager", authenticate, getMyStations)
 //Get all points for all station for a manager
 router.get("/points", authenticate, getStationPoints)
+router.get("/nearby", getNearbyStations)
 router.get("/", getAllStations) // get all
 router.get("/:id", getStationById) // get by id
 router.put("/:id", updateStation) // update

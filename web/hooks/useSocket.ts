@@ -20,7 +20,7 @@ export function useSocket({ vehicleIds }: UseSocketProps) {
 
     const fetchBusDetails = async () => {
       try {
-        console.log("Fetching bus details for vehicleIds:", vehicleIds)
+        // console.log("Fetching bus details for vehicleIds:", vehicleIds)
         const { data } = await axiosInstance.get("/buses/by-vehicle-ids", {
           params: { vehicleIds: vehicleIds.join(",") },
         })
@@ -32,10 +32,10 @@ export function useSocket({ vehicleIds }: UseSocketProps) {
           }
         })
         busDetailsRef.current = detailMap
-        console.log(
-          "Bus details map built:",
-          Object.fromEntries(detailMap), // converts Map → plain object so console shows contents
-        )
+        // console.log(
+        //   "Bus details map built:",
+        //   Object.fromEntries(detailMap), // converts Map → plain object so console shows contents
+        // )
 
         // if we already have locations, merge details in
         setBuses((prev) => {
@@ -161,15 +161,15 @@ export function useSocket({ vehicleIds }: UseSocketProps) {
     }
   }, [vehicleIds, joinMap])
 
-  useEffect(() => {
-    console.log(
-      "Current buses state:",
-      Array.from(buses.entries()).map(([id, bus]) => ({
-        vehicleId: id,
-        ...bus,
-      })),
-    )
-  }, [buses])
+  // useEffect(() => {
+  //   console.log(
+  //     "Current buses state:",
+  //     Array.from(buses.entries()).map(([id, bus]) => ({
+  //       vehicleId: id,
+  //       ...bus,
+  //     })),
+  //   )
+  // }, [buses])
 
   return { buses: Array.from(buses.values()), isConnected }
 }

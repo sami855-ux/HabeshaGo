@@ -4,10 +4,151 @@ import { useEffect, useRef } from "react"
 import L from "leaflet"
 import { Coordinates } from "@/types/map-user"
 
+const LOCATION_CACHE_KEY = "user_location_cache"
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+interface CachedLocation {
+  lat: number
+  lng: number
+  accuracy: number
+  timestamp: number
+}
+
 interface UserLocationMarkerProps {
   map: L.Map
   userLocation: Coordinates
-  accuracy?: number // Optional accuracy radius in meters
+  accuracy?: number
+}
+
+function getCachedLocation(): CachedLocation | null {
+  try {
+    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!raw) return null
+    const parsed: CachedLocation = JSON.parse(raw)
+    if (Date.now() - parsed.timestamp > CACHE_TTL_MS) {
+      localStorage.removeItem(LOCATION_CACHE_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function setCachedLocation(lat: number, lng: number, accuracy: number) {
+  try {
+    const payload: CachedLocation = {
+      lat,
+      lng,
+      accuracy,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // localStorage unavailable — silently ignore
+  }
+}
+
+function buildUserIcon() {
+  return L.divIcon({
+    className: "",
+    html: `
+      <div style="
+        position: relative;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <!-- Outer pulse -->
+        <div style="
+          position: absolute;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: rgba(59, 130, 246, 0.15);
+          animation: user-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+
+        <!-- Mid ring -->
+        <div style="
+          position: absolute;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(59, 130, 246, 0.2);
+          animation: user-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+          animation-delay: 0.4s;
+        "></div>
+
+        <!-- Core dot -->
+        <div style="
+          position: relative;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #3b82f6;
+          border: 3px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(59,130,246,0.6), 0 0 0 1px rgba(59,130,246,0.3);
+          z-index: 10;
+        "></div>
+      </div>
+
+      <style>
+        @keyframes user-ping {
+          0%   { transform: scale(0.8); opacity: 0.8; }
+          70%  { transform: scale(1.4); opacity: 0; }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
+      </style>
+    `,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+    popupAnchor: [0, -28],
+  })
+}
+
+function buildPopupContent(
+  lat: number,
+  lng: number,
+  accuracy: number,
+  fromCache: boolean,
+) {
+  return `
+    <div style="min-width: 200px; font-family: system-ui, sans-serif; padding: 4px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></div>
+        <p style="font-weight: 600; font-size: 14px; color: #111; margin: 0;">Your location</p>
+        ${fromCache ? `<span style="margin-left: auto; font-size: 10px; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 99px;">Cached</span>` : ""}
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280;">Latitude</span>
+          <span style="font-weight: 500; font-family: monospace;">${lat.toFixed(6)}°</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280;">Longitude</span>
+          <span style="font-weight: 500; font-family: monospace;">${lng.toFixed(6)}°</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280;">Accuracy</span>
+          <span style="font-weight: 500; color: #22c55e;">±${accuracy}m</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280;">Updated</span>
+          <span style="font-weight: 500;">${new Date().toLocaleTimeString()}</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f3f4f6;">
+        <p style="font-size: 11px; color: #9ca3af; margin: 0;">
+          Blue circle indicates GPS accuracy radius.
+        </p>
+      </div>
+    </div>
+  `
 }
 
 export default function UserLocationMarker({
@@ -16,170 +157,97 @@ export default function UserLocationMarker({
   accuracy = 10,
 }: UserLocationMarkerProps) {
   const markerRef = useRef<L.Marker | null>(null)
-  const accuracyCircleRef = useRef<L.Circle | null>(null)
+  const circleRef = useRef<L.Circle | null>(null)
+  const pulseCircleRef = useRef<L.Circle | null>(null)
 
   useEffect(() => {
     if (!map) return
 
     let isMounted = true
 
-    const initializeMarker = () => {
+    const init = () => {
       if (!isMounted) return
 
       try {
-        // Check if map is still valid and has container
-        if (!map.getContainer()) {
-          console.warn("Map container not available")
-          return
-        }
+        // Clean up previous
+        markerRef.current?.remove()
+        circleRef.current?.remove()
+        pulseCircleRef.current?.remove()
+        markerRef.current = null
+        circleRef.current = null
+        pulseCircleRef.current = null
 
-        // Remove existing marker and accuracy circle if any
-        if (markerRef.current) {
-          markerRef.current.remove()
-          markerRef.current = null
-        }
+        const cached = getCachedLocation()
+        const fromCache =
+          cached !== null &&
+          cached.lat === userLocation.lat &&
+          cached.lng === userLocation.lng
 
-        // if (accuracyCircleRef.current) {
-        //   accuracyCircleRef.current.remove()
-        //   accuracyCircleRef.current = null
-        // }
+        // Cache the current location
+        setCachedLocation(userLocation.lat, userLocation.lng, accuracy)
 
-        // Create accuracy circle (shows location precision)
-        const accuracyCircle = L.circle([userLocation.lat, userLocation.lng], {
+        // Accuracy circle
+        const circle = L.circle([userLocation.lat, userLocation.lng], {
           radius: accuracy,
           color: "#3b82f6",
           weight: 1,
-          opacity: 0.3,
+          opacity: 0.4,
           fillColor: "#3b82f6",
-          fillOpacity: 0.1,
+          fillOpacity: 0.08,
           interactive: false,
         }).addTo(map)
 
-        accuracyCircleRef.current = accuracyCircle
+        circleRef.current = circle
 
-        // Create enhanced custom icon for user location
-        const userIcon = L.divIcon({
-          className: "user-location-marker",
-          html: `
-            <div class="relative flex items-center justify-center">
-              <!-- Outer pulse ring -->
-              <div class="absolute h-16 w-16 rounded-full bg-blue-400/30 animate-ping"></div>
-              
-              <!-- Inner pulse ring (delayed) -->
-              <div class="absolute h-8 w-8 rounded-full bg-blue-500/40 animate-ping" style="animation-delay: 0.5s"></div>
-              
-              <!-- Core marker -->
-              <div class="relative h-7 w-7 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 border-2 border-white shadow-lg flex items-center justify-center">
-                <!-- Inner dot for depth -->
-                <div class="h-3 w-3 rounded-full bg-white"></div>
-              </div>
-              
-              <!-- Direction indicator (optional - shows heading if available) -->
-              <div class="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full">
-                <div class="w-0.5 h-2 bg-blue-500 rounded-full"></div>
-              </div>
-            </div>
-          `,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-          popupAnchor: [0, -20],
-          // className: "cursor-pointer transition-transform hover:scale-110",
-        })
-
-        // Create and add marker
+        // Marker
         const marker = L.marker([userLocation.lat, userLocation.lng], {
-          icon: userIcon,
+          icon: buildUserIcon(),
           zIndexOffset: 1000,
+          interactive: true,
         }).addTo(map)
 
-        // Enhanced popup with more information
-        marker
-          .bindPopup(
-            `
-          <div class="p- min-w-[200px]">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="h-3 w-3 rounded-full bg-green-500 animate-pulse"></div>
-              <h3 class="font-semibold text-gray-900 font-geist">Your Location</h3>
-            </div>
-            
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Latitude:</span>
-                <span class="font-grotesk not-only:font-medium">${userLocation.lat.toFixed(6)}°</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Longitude:</span>
-                <span class="font-medium font-grotesk">${userLocation.lng.toFixed(6)}°</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Accuracy:</span>
-                <span class="font-medium text-green-600 font-grotesk">±${accuracy}m</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Updated:</span>
-                <span class="font-medium font-grotesk">${new Date().toLocaleTimeString()}</span>
-              </div>
-            </div>
-            
-            <div class="mt-3 pt-2 border-t border-gray-100">
-              <p class="text-xs text-gray-400">
-                This is your current location. The blue circle shows accuracy radius.
-              </p>
-            </div>
-          </div>
-        `,
-            {
-              className: "custom-popup rounded-lg shadow-xl",
-              maxWidth: 280,
-              minWidth: 200,
-            },
-          )
-          .openPopup()
+        marker.bindPopup(
+          buildPopupContent(
+            userLocation.lat,
+            userLocation.lng,
+            accuracy,
+            fromCache,
+          ),
+          {
+            className: "modern-popup",
+            maxWidth: 260,
+            minWidth: 210,
+            closeButton: true,
+          },
+        )
 
         markerRef.current = marker
-
-        console.log("User location marker added successfully")
-      } catch (error) {
-        console.error("Error adding user location marker:", error)
+      } catch (err) {
+        console.error("UserLocationMarker error:", err)
       }
     }
 
-    // Check map readiness
-    const checkMapReady = () => {
-      try {
-        if (map.getPane("markerPane")) {
-          initializeMarker()
-        } else {
-          map.whenReady(() => {
-            setTimeout(initializeMarker, 50)
-          })
-        }
-      } catch (error) {
-        console.warn("Error checking map readiness:", error)
-        setTimeout(initializeMarker, 200)
-      }
+    // Wait for map to be ready
+    if (map.getPane("markerPane")) {
+      init()
+    } else {
+      map.whenReady(() => setTimeout(init, 50))
     }
-
-    checkMapReady()
 
     return () => {
       isMounted = false
-      if (markerRef.current) {
-        try {
-          markerRef.current.remove()
-        } catch (error) {
-          console.warn("Error removing marker:", error)
-        }
-        markerRef.current = null
-      }
-      if (accuracyCircleRef.current) {
-        try {
-          accuracyCircleRef.current.remove()
-        } catch (error) {
-          console.warn("Error removing accuracy circle:", error)
-        }
-        accuracyCircleRef.current = null
-      }
+      try {
+        markerRef.current?.remove()
+      } catch {}
+      try {
+        circleRef.current?.remove()
+      } catch {}
+      try {
+        pulseCircleRef.current?.remove()
+      } catch {}
+      markerRef.current = null
+      circleRef.current = null
+      pulseCircleRef.current = null
     }
   }, [map, userLocation, accuracy])
 

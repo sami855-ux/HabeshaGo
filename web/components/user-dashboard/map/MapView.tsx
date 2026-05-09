@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css"
 
 import { useUserLocation } from "@/hooks/useUserLocation"
 import { useQueryParams } from "@/hooks/useQueryParams"
+
 import UserLocationMarker from "./UserLocationMarker"
 import EVStationsLayer from "./EVStationsLayer"
 import ParkingStationsLayer from "./ParkingStationsLayer"
@@ -23,9 +24,11 @@ if (typeof window !== "undefined") {
 
 export default function MapView() {
   const mapRef = useRef<LeafletType.Map | null>(null)
-  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapContainerRef = useRef<HTMLDivElement | null>(null)
+
   const [vehicleIds, setVehicleIds] = useState<number[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [mapReady, setMapReady] = useState(false)
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true)
 
   const { userLocation, loading, error } = useUserLocation()
   const { getParam } = useQueryParams()
@@ -33,54 +36,42 @@ export default function MapView() {
   const [selectedDestination, setSelectedDestination] =
     useState<Coordinates | null>(null)
 
-  const [mapReady, setMapReady] = useState(false)
-
-  // Inject CSS to disable all tooltips globally
+  // =========================
+  // Disable tooltips globally
+  // =========================
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      const style = document.createElement("style")
-      style.textContent = `
-        /* Completely disable all Leaflet tooltips */
-        .leaflet-tooltip,
-        .leaflet-tooltip-pane,
-        .leaflet-popup,
-        .leaflet-popup-pane,
-        .leaflet-tooltip-top,
-        .leaflet-tooltip-bottom,
-        .leaflet-tooltip-left,
-        .leaflet-tooltip-right {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          animation: none !important;
-          transition: none !important;
-        }
-        
-        /* Disable any hover tooltips */
-        .leaflet-marker-icon:hover::before,
-        .leaflet-marker-icon:hover::after,
-        [data-tooltip],
-        [title] {
-          pointer-events: none !important;
-        }
-        
-        /* Ensure no pseudo-element tooltips appear */
-        .bus-marker:hover::after,
-        .bus-marker div:hover::after,
-        .custom-marker:hover::after {
-          display: none !important;
-        }
-      `
-      document.head.appendChild(style)
+    if (typeof document === "undefined") return
 
-      return () => {
-        document.head.removeChild(style)
+    const style = document.createElement("style")
+
+    style.innerHTML = `
+      .leaflet-tooltip,
+      .leaflet-tooltip-pane,
+      .leaflet-tooltip-top,
+      .leaflet-tooltip-bottom,
+      .leaflet-tooltip-left,
+      .leaflet-tooltip-right {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
+
+      .leaflet-popup-close-button {
+        outline: none !important;
+      }
+    `
+
+    document.head.appendChild(style)
+
+    return () => {
+      document.head.removeChild(style)
     }
   }, [])
 
-  // Fix leaflet marker icons
+  // =========================
+  // Fix leaflet default icons
+  // =========================
   useEffect(() => {
     if (!L) return
 
@@ -93,107 +84,136 @@ export default function MapView() {
     })
   }, [])
 
+  // =========================
   // Initialize map
+  // =========================
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current || !L) return
+    if (!L) return
+    if (!mapContainerRef.current) return
+
+    // prevent duplicate initialization
+    if (mapRef.current) return
 
     const latParam = parseFloat(getParam("lat") || "")
     const lngParam = parseFloat(getParam("lng") || "")
 
-    const hasQueryLocation = !isNaN(latParam) && !isNaN(lngParam)
+    const hasQueryLocation = !Number.isNaN(latParam) && !Number.isNaN(lngParam)
 
     let initialCenter: Coordinates = {
-      lat: 9.03, // Addis Ababa fallback
+      lat: 9.03,
       lng: 38.74,
     }
 
+    // Priority:
+    // query params -> user location -> fallback
     if (hasQueryLocation) {
-      initialCenter = { lat: latParam, lng: lngParam }
+      initialCenter = {
+        lat: latParam,
+        lng: lngParam,
+      }
     } else if (userLocation) {
       initialCenter = userLocation
     }
 
-    const map = L.map(mapContainerRef.current).setView(
-      [initialCenter.lat, initialCenter.lng],
-      13,
-    )
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: true,
+      attributionControl: true,
+    }).setView([initialCenter.lat, initialCenter.lng], 13)
 
-    // Disable all tooltips on the map instance
-    map.tooltip = undefined as any
-    map.closeTooltip = () => {}
-    map.openTooltip = () => map
-
+    // Tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
       maxZoom: 25,
     }).addTo(map)
 
-    mapRef.current = map
-    setMapReady(true)
+    // Wait for map to fully initialize
+    map.whenReady(() => {
+      mapRef.current = map
+
+      setTimeout(() => {
+        map.invalidateSize()
+        setMapReady(true)
+      }, 150)
+    })
 
     return () => {
-      map.remove()
-      mapRef.current = null
       setMapReady(false)
+
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
     }
   }, [userLocation, getParam])
 
-  // Center map on user location
+  // =========================
+  // Recenter map on user location
+  // =========================
   useEffect(() => {
-    if (!mapRef.current || !userLocation) return
+    if (!mapRef.current) return
+    if (!userLocation) return
 
     const latParam = getParam("lat")
     const lngParam = getParam("lng")
 
+    // Only auto-center if no query params
     if (!latParam && !lngParam) {
-      mapRef.current.setView([userLocation.lat, userLocation.lng], 14)
+      mapRef.current.setView([userLocation.lat, userLocation.lng], 14, {
+        animate: true,
+      })
     }
   }, [userLocation, getParam])
 
+  // =========================
+  // Fetch vehicle ids
+  // =========================
   useEffect(() => {
     const fetchVehicleIds = async () => {
       try {
-        setIsLoading(true)
-        console.log("Fetching vehicle IDs...")
+        setIsLoadingVehicles(true)
 
         const { data } = await axiosInstance.get("/vehicles/ids")
 
-        setVehicleIds(data.data)
-        console.log("Vehicle IDs set:", data.data)
+        setVehicleIds(data?.data || [])
       } catch (err) {
         console.error("Failed to fetch vehicle IDs", err)
       } finally {
-        setIsLoading(false)
+        setIsLoadingVehicles(false)
       }
     }
 
     fetchVehicleIds()
   }, [])
 
-  // Loading UI
-  if (loading || isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center flex flex-col items-center">
-          <div className="mb-2 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p>Getting your location...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    console.warn("Location error:", error)
-  }
+  // =========================
+  // Handle location errors
+  // =========================
+  useEffect(() => {
+    if (error) {
+      console.warn("Location error:", error)
+    }
+  }, [error])
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-screen w-full overflow-hidden">
       {/* Map container */}
       <div ref={mapContainerRef} className="h-full w-full" />
 
-      {/* Map layers */}
+      {/* Loading overlay */}
+      {(loading || isLoadingVehicles || !mapReady) && (
+        <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-3 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+
+            <p className="text-sm font-medium">Loading map...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Layers */}
       {mapRef.current && mapReady && (
         <>
+          {/* User marker */}
           {userLocation && (
             <UserLocationMarker
               map={mapRef.current}
@@ -201,19 +221,37 @@ export default function MapView() {
             />
           )}
 
-          {/* <EVStationsLayer
+          {/* EV stations */}
+          <EVStationsLayer
             map={mapRef.current}
-            userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
-          /> */}
+            userLocation={
+              userLocation || {
+                lat: 9.03,
+                lng: 38.74,
+              }
+            }
+          />
 
-          {/* <ParkingStationsLayer
+          {/* Parking */}
+          {/* 
+          <ParkingStationsLayer
             map={mapRef.current}
-            userLocation={userLocation || { lat: 9.03, lng: 38.74 }}
-            onDestinationSelect={handleDestinationSelect}
-          /> */}
+            userLocation={
+              userLocation || {
+                lat: 9.03,
+                lng: 38.74,
+              }
+            }
+            onDestinationSelect={(destination) =>
+              setSelectedDestination(destination)
+            }
+          />
+          */}
 
+          {/* Buses */}
           <BusLayer map={mapRef.current} vehicleIds={vehicleIds} />
 
+          {/* Navigation */}
           {selectedDestination && userLocation && (
             <NavigationRoute
               map={mapRef.current}

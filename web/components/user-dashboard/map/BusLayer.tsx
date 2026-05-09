@@ -21,31 +21,31 @@ export default function BusLayer({ map, vehicleIds }: BusLayerProps) {
     name: string
   } | null>(null)
 
-  useEffect(() => {
-    console.log("=".repeat(50))
-    console.log("🚌 BusLayer — buses updated, total:", buses.length)
-    if (buses.length === 0) {
-      console.log("⚠️ No buses yet")
-      return
-    }
-    buses.forEach((bus) => {
-      console.log(`\n--- Bus ID: ${bus.id} ---`)
-      console.table({
-        id: bus.id,
-        lat: bus.location?.lat,
-        lng: bus.location?.lng,
-        speed: bus.speed,
-        heading: bus.heading,
-        busNumber: bus.busNumber,
-        status: bus.status,
-        currentStop: bus.currentStop,
-        nextDestination: bus.nextDestination,
-        driverName: bus.driverName,
-        routeName: bus.routeName,
-      })
-    })
-    console.log("=".repeat(50))
-  }, [buses])
+  // useEffect(() => {
+  //   console.log("=".repeat(50))
+  //   console.log("🚌 BusLayer — buses updated, total:", buses.length)
+  //   if (buses.length === 0) {
+  //     console.log("⚠️ No buses yet")
+  //     return
+  //   }
+  //   buses.forEach((bus) => {
+  //     console.log(`\n--- Bus ID: ${bus.id} ---`)
+  //     console.table({
+  //       id: bus.id,
+  //       lat: bus.location?.lat,
+  //       lng: bus.location?.lng,
+  //       speed: bus.speed,
+  //       heading: bus.heading,
+  //       busNumber: bus.busNumber,
+  //       status: bus.status,
+  //       currentStop: bus.currentStop,
+  //       nextDestination: bus.nextDestination,
+  //       driverName: bus.driverName,
+  //       routeName: bus.routeName,
+  //     })
+  //   })
+  //   console.log("=".repeat(50))
+  // }, [buses])
 
   useEffect(() => {
     if (!map) return

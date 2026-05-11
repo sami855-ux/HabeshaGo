@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { connectSocket } from "@/services/index";
 import { useDispatch } from "react-redux";
 
-import { reservationRealtime } from "@/store/slices/parkingUserSlice";
+import { slotRealtime, reservationRealtime } from "@/store/slices/parkingUserSlice";
 import { updateSlotRealtime } from "@/store/slices/parkingAdminSlice";
 
 export default function useSocket(userId, lotId) {
@@ -23,6 +23,10 @@ export default function useSocket(userId, lotId) {
     // =============================
     // 🔥 USER EVENTS
     // =============================
+    socket.on("parking:slot:update", (slot) => {
+      dispatch(slotRealtime(slot));
+    });
+    
     socket.on("parking:reservation:created", (data) => {
       dispatch(reservationRealtime(data));
     });

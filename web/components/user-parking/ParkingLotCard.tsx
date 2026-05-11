@@ -42,13 +42,8 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
         address: lot?.address || lot?.location || "Unknown",
         distance: lot?.distance || "—",
         pricePerMinute: lot?.pricePerMinute || 0,
-        totalSlots:
-          lot?.totalSlots || (Array.isArray(lot?.slots) ? lot.slots.length : 0),
-        availableSlots:
-          lot?.availableSlots ||
-          (Array.isArray(lot?.slots)
-            ? lot.slots.filter((s: any) => s?.status === "AVAILABLE").length
-            : 0),
+        availableSlots: lot?.availableSlots ?? 0,
+        totalSlots: lot?.totalSlots ?? 0,
         rating: lot?.rating || 4.0,
         operatingHours: lot?.operatingHours || "24/7",
       }))
@@ -67,34 +62,44 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
   };
 
   // Helper to get badge style without "Full" wording
-  const getStatusBadge = (available: number, total: number) => {
-    if (available === 0) {
-      return {
-        text: "No spots",
-        color:
-          "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 ring-red-200",
-      };
-    }
-    if (available < total * 0.2) {
-      return {
-        text: "Very limited",
-        color:
-          "text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 ring-orange-200",
-      };
-    }
-    if (available < total * 0.5) {
-      return {
-        text: "Limited",
-        color:
-          "text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 ring-amber-200",
-      };
-    }
+ const getStatusBadge = (available, total) => {
+  if (!total) {
     return {
-      text: "Good space",
-      color:
-        "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 ring-green-200",
+      text: "Loading...",
+      color: "text-gray-400 bg-gray-100 dark:bg-gray-800",
     };
+  }
+
+  if (available === 0) {
+    return {
+      text: "No spots",
+      color:
+        "text-red-600 bg-red-100 dark:bg-red-950/30 dark:text-red-400",
+    };
+  }
+
+  if (available < total * 0.2) {
+    return {
+      text: "Very limited",
+      color:
+        "text-orange-600 bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400",
+    };
+  }
+
+  if (available < total * 0.5) {
+    return {
+      text: "Limited",
+      color:
+        "text-amber-600 bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400",
+    };
+  }
+
+  return {
+    text: "Available",
+    color:
+      "text-green-600 bg-green-100 dark:bg-green-950/30 dark:text-green-400",
   };
+};
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-US", {

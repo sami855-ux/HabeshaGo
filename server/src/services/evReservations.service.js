@@ -1,6 +1,6 @@
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
-import { POINTS_CONVERSION_RATE } from "../utils/constants.js"
+import { COMMISSION_RATE, POINTS_CONVERSION_RATE } from "../utils/constants.js"
 
 /**
  * Create a new reservation
@@ -16,11 +16,9 @@ export const createReservationService = async (data) => {
       userId,
       targetBatteryPercentage,
       targetKwh,
-
       calculatedAmount,
       paymentFlow = "POINTS_WALLET",
       // POINTS_WALLET | POINTS_EXTERNAL | WALLET_ONLY | EXTERNAL_ONLY
-
       paymentMethod = "MOBILE_MONEY",
     } = data
 
@@ -55,9 +53,46 @@ export const createReservationService = async (data) => {
 
     if (overlap) return errorResponse("Charging point already reserved", 400)
 
+    // FETCH CHARGING POINT → STATION → MANAGER
+    // We need the station manager before the main transaction
+    const chargingPoint = await prisma.chargingPoint.findUnique({
+      where: { id: chargingPointId },
+      include: {
+        station: {
+          include: {
+            manager: {
+              include: {
+                wallet: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!chargingPoint) return errorResponse("Charging point not found", 404)
+    if (!chargingPoint.station)
+      return errorResponse("Charging station not found", 404)
+
+    const managerId = chargingPoint.station.managerId
+    const managerWallet = chargingPoint.station.manager?.wallet
+
+    if (!managerWallet)
+      return errorResponse("Station manager wallet not found", 404)
+
+    // MONEY SPLIT
+    // Admin keeps COMMISSION_RATE (e.g. 20%), provider gets the rest
+    const totalPaid = Number(calculatedAmount)
+    const commission = new Decimal(totalPaid * COMMISSION_RATE).toDecimalPlaces(
+      2,
+    )
+    const providerAmount = new Decimal(totalPaid)
+      .minus(commission)
+      .toDecimalPlaces(2)
+
     // MAIN TRANSACTION
     const result = await prisma.$transaction(async (tx) => {
-      let remainingAmount = Number(calculatedAmount)
+      let remainingAmount = totalPaid
 
       let pointsUsed = 0
       let pointsValueUsed = 0
@@ -158,7 +193,6 @@ export const createReservationService = async (data) => {
           targetKwh,
           calculatedAmount,
           status: isFullyPaid ? "CONFIRMED" : "PENDING",
-
           paymentStatus: isFullyPaid ? "SUCCESS" : "PENDING",
           preAuthorizedAmount: calculatedAmount,
           reservationCode: `RES-${Date.now()}`,
@@ -171,20 +205,14 @@ export const createReservationService = async (data) => {
         data: {
           userId,
           amount: calculatedAmount,
-
           method: isFullyPaid ? "WALLET" : paymentMethod,
           gateway: isFullyPaid ? "INTERNAL" : "CHAPA",
-
           flow: paymentFlow,
-
           pointsUsed: pointsUsed || null,
           pointsValue: pointsValueUsed || null,
-
           status: isFullyPaid ? "SUCCESS" : "PENDING",
-
           reference: `PAY-${Date.now()}`,
           evReservationId: reservation.id,
-
           metadata: {
             walletUsed,
             externalAmount: remainingAmount,
@@ -192,6 +220,98 @@ export const createReservationService = async (data) => {
           },
         },
       })
+
+      // 5. TRANSACTION LEDGER
+      await tx.transactionLedger.create({
+        data: {
+          userId,
+          providerId: managerId,
+          paymentId: payment.id,
+          totalAmount: new Decimal(totalPaid),
+          commission,
+          providerAmount,
+          serviceType: "EV_CHARGING",
+          referenceId: String(reservation.id),
+          referenceType: "EV_RESERVATION",
+          paymentMethod: isFullyPaid ? "WALLET" : paymentMethod,
+          currency: "ETB",
+          status: isFullyPaid ? "COMPLETED" : "PENDING",
+          isSettled: isFullyPaid,
+          externalRef: `LEDGER-EV-${Date.now()}`,
+          description: "EV charging reservation payment",
+          metadata: {
+            chargingPointId,
+            stationId: chargingPoint.station.id,
+            stationName: chargingPoint.station.name,
+            managerId,
+            vehicleId,
+            startTime,
+            endTime,
+            targetBatteryPercentage: targetBatteryPercentage ?? null,
+            targetKwh: targetKwh ?? null,
+            walletUsed,
+            pointsUsed,
+            pointsValueUsed,
+            paymentFlow,
+          },
+        },
+      })
+
+      if (isFullyPaid) {
+        // 6a. ADMIN WALLET — receives commission
+        const updatedAdmin = await tx.wallet.update({
+          where: { id: ADMIN_WALLET_ID },
+          data: { balance: { increment: commission } },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: ADMIN_WALLET_ID,
+            amount: commission,
+            type: "COMMISSION",
+            status: "SUCCESS",
+            serviceType: "EV_CHARGING",
+            balanceAfter: updatedAdmin.balance,
+            reference: `TX-EV-ADMIN-${reservation.id}`,
+            description: "EV reservation commission",
+          },
+        })
+
+        // 6b. PROVIDER (STATION MANAGER) WALLET — receives providerAmount
+        const updatedManager = await tx.wallet.update({
+          where: { id: managerWallet.id },
+          data: { balance: { increment: providerAmount } },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: ADMIN_WALLET_ID,
+            recipientWalletId: managerWallet.id,
+            amount: providerAmount,
+            type: "PAYMENT_OUT",
+            status: "SUCCESS",
+            serviceType: "EV_CHARGING",
+            balanceAfter: updatedManager.balance,
+            reference: `TX-EV-MGR-${reservation.id}`,
+            description: `EV reservation payout to station manager`,
+          },
+        })
+
+        // 6c. LOYALTY POINTS
+        await addPointsToUser({
+          tx,
+          userId,
+          amount: 100,
+          type: "EARN",
+          reason: "EV reservation reward",
+          reference: `EV_RESERVATION_${reservation.id}`,
+          metadata: {
+            reservationId: reservation.id,
+            chargingPointId,
+            vehicleId,
+          },
+        })
+      }
 
       return {
         reservation,
@@ -203,9 +323,9 @@ export const createReservationService = async (data) => {
 
     // RESPONSE
     return successResponse(
-      result.remainingAmount === 0
-        ? "Reservation fully paid successfully"
-        : "Reservation created. External payment required",
+      result.needsExternalPayment
+        ? "Reservation created. External payment required"
+        : "Reservation fully paid successfully",
       result,
       201,
     )

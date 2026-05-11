@@ -52,7 +52,7 @@ export const verifyOtpPhone = async (req, res) => {
     // 2. Find the user in your Neon DB
     let user = await prisma.user.findUnique({ where: { phone } })
 
-    const referralCode = generateReferralCode(user.name || "USR")
+    const referralCode = generateReferralCode(user?.name || "USR")
     // 3. If the user doesn't exist, create them
     if (!user) {
       user = await prisma.user.create({
@@ -60,6 +60,7 @@ export const verifyOtpPhone = async (req, res) => {
           phone,
           role: "PASSENGER",
           referralCode,
+          phoneVerified: true,
         },
       })
     }

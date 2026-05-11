@@ -5,7 +5,7 @@ import { generateQRCode } from "../utils/qrcode.js"
 import { addPointsToUser } from "./wallet.service.js"
 
 export const POINTS_CONVERSION_RATE = 0.5
-const ADMIN_WALLET_ID = 1
+const ADMIN_WALLET_ID = 2
 const COMMISSION_RATE = 0.1
 const DEFAULT_DRIVER_ID = "cmocj1iy50003d6k3v1mfq0y8"
 const MAX_TICKETS_PER_USER = 5
@@ -211,11 +211,6 @@ export const createBookingService = async ({
     // 6️⃣ Calculate commission & provider amount
     const commission = totalAmount * COMMISSION_RATE
     const providerAmount = totalAmount - commission
-    const providerId = bus.vehicle.ownerId || DEFAULT_DRIVER_ID
-    const providerWallet = await prisma.wallet.findUnique({
-      where: { userId: providerId },
-    })
-    if (!providerWallet) throw new Error("Provider wallet not found")
 
     // 7️⃣ Ledger & payouts (atomic)
     await prisma.$transaction(async (tx) => {
@@ -223,7 +218,7 @@ export const createBookingService = async ({
       await tx.transactionLedger.create({
         data: {
           userId,
-          providerId,
+          providerId: null,
           paymentId: payment.id,
           totalAmount: finalAmount,
           commission,
@@ -236,54 +231,35 @@ export const createBookingService = async ({
           status: payment.status === "SUCCESS" ? "COMPLETED" : "PENDING",
           isSettled: payment.status === "SUCCESS",
           externalRef: `LEDGER-${Date.now()}`,
-          description: "Bus ticket booking",
+          description: "Government bus ticket — full revenue to admin",
           metadata: {
             busId,
             scheduleId: schedule.id,
             seats,
             boardingStop,
             alightingStop,
+            ownershipType: "GOVERNMENT",
           },
         },
       })
 
       if (payment.status === "SUCCESS") {
-        // b) Provider wallet
-        const updatedProvider = await tx.wallet.update({
-          where: { id: providerWallet.id },
-          data: { balance: { increment: providerAmount } },
-        })
-
-        await tx.walletTransaction.create({
-          data: {
-            walletId: ADMIN_WALLET_ID,
-            recipientWalletId: providerWallet.id,
-            amount: providerAmount,
-            type: "PAYMENT_OUT",
-            status: "SUCCESS",
-            balanceAfter: updatedProvider.balance,
-            reference: `TX-${Date.now()}`,
-            serviceType: "BUS_TICKET",
-            description: "Bus ticket payout to provider",
-          },
-        })
-
         // c) Admin commission
         const updatedAdmin = await tx.wallet.update({
           where: { id: ADMIN_WALLET_ID },
-          data: { balance: { increment: commission } },
+          data: { balance: { increment: finalAmount } },
         })
 
         await tx.walletTransaction.create({
           data: {
             walletId: ADMIN_WALLET_ID,
-            amount: commission,
-            type: "COMMISSION",
+            amount: finalAmount,
+            type: "PAYMENT_IN",
             status: "SUCCESS",
             balanceAfter: updatedAdmin.balance,
-            reference: `TX-${Date.now()}`,
+            reference: `TX-BUS-${booking.id}`,
             serviceType: "BUS_TICKET",
-            description: "Bus ticket commission retained by admin",
+            description: "Government bus ticket revenue",
           },
         })
 

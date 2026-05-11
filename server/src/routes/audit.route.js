@@ -2,6 +2,7 @@ import express from "express"
 import {
   getAuditLogs,
   getAuditLogsByEntity,
+  getParkingLotsForMap,
 } from "../controllers/auditLog.controller.js"
 import { authenticate, requireAdmin } from "../middlewares/authenticate.js"
 
@@ -14,5 +15,8 @@ router.get(
   requireAdmin,
   getAuditLogsByEntity,
 )
+
+// Map view endpoint
+router.get("/map-view", getParkingLotsForMap)
 
 export default router

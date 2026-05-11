@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Wallet,
   Clock,
@@ -66,6 +66,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import {
+  EarningDataPoint,
+  fetchWalletDashboardData,
+  fetchWithdrawals,
+  WalletSummary,
+  WithdrawalsResponse,
+} from "@/services/admin-stats"
 
 // --- Mock Data ---
 const earningsData = [
@@ -371,38 +378,31 @@ export default function AdminWalletDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const itemsPerPage = 5
 
-  // Wallet calculations
-  const availableBalance = 24850 // Current available balance
-  const pendingBalance = withdrawals
-    .filter((w) => w.status === "PENDING")
-    .reduce((sum, w) => sum + w.amount, 0)
-  const totalEarned = 185750 // Total platform earnings
-  const totalWithdrawn = withdrawals
-    .filter((w) => w.status === "COMPLETED")
-    .reduce((sum, w) => sum + w.amount, 0)
+  const [summary, setSummary] = useState<WalletSummary | null>(null)
+  const [earningsData, setEarningsData] = useState<EarningDataPoint[]>([])
+  const [withdrawalsData, setWithdrawalsData] =
+    useState<WithdrawalsResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filter withdrawals by status
-  const filteredWithdrawals = withdrawals.filter((w) =>
-    statusFilter === "all" ? true : w.status === statusFilter.toUpperCase(),
-  )
+  const paginatedWithdrawals = withdrawalsData?.data ?? []
+  const totalPages = withdrawalsData?.totalPages ?? 1
+  const totalWithdrawals = withdrawalsData?.total ?? 0
 
-  // Sort by date (latest first)
-  const sortedWithdrawals = [...filteredWithdrawals].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  )
-
-  // Pagination
-  const totalPages = Math.ceil(sortedWithdrawals.length / itemsPerPage)
-  const paginatedWithdrawals = sortedWithdrawals.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  )
-
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-    }, 1000)
+    const result = await fetchWalletDashboardData(14, {
+      status: statusFilter as "all" | "completed" | "pending" | "failed",
+      page: currentPage,
+      limit: itemsPerPage,
+    })
+
+    if (result.success) {
+      setSummary(result.data.summary)
+      setEarningsData(result.data.earnings)
+      setWithdrawalsData(result.data.withdrawals)
+    }
+    setIsRefreshing(false)
   }
 
   const handleWithdrawalRequest = (amount: number) => {
@@ -423,33 +423,81 @@ export default function AdminWalletDashboard() {
   const walletCards = [
     {
       title: "Available Balance",
-      amount: availableBalance,
+      amount: summary?.availableBalance ?? 0,
       icon: Wallet,
       trend: "Ready for withdrawal",
-      gradient: "bg-gradient-to-br from-emerald-500 to-teal-600",
     },
     {
       title: "Pending Balance",
-      amount: pendingBalance,
+      amount: summary?.pendingBalance ?? 0,
       icon: Clock,
       trend: "Awaiting processing",
-      gradient: "bg-gradient-to-br from-amber-500 to-orange-600",
     },
     {
       title: "Total Earned",
-      amount: totalEarned,
+      amount: summary?.totalEarned ?? 0,
       icon: TrendingUp,
       trend: "All-time earnings",
-      gradient: "bg-gradient-to-br from-blue-500 to-indigo-600",
-    },
-    {
-      title: "Total Withdrawn",
-      amount: totalWithdrawn,
-      icon: ArrowDownCircle,
-      trend: "Lifetime withdrawals",
-      gradient: "bg-gradient-to-br from-purple-500 to-pink-600",
     },
   ]
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true)
+      const result = await fetchWalletDashboardData(14, {
+        status: "all",
+        page: currentPage,
+        limit: itemsPerPage,
+      })
+
+      if (result.success) {
+        setSummary(result.data.summary)
+        setEarningsData(result.data.earnings)
+        setWithdrawalsData(result.data.withdrawals)
+      } else {
+        setError(result.message)
+      }
+      setIsLoading(false)
+    }
+
+    load()
+  }, [])
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true)
+      const result = await fetchWithdrawals({
+        status: statusFilter as "all" | "completed" | "pending" | "failed",
+        page: currentPage,
+        limit: itemsPerPage,
+      })
+
+      if (result.success) {
+        setWithdrawalsData(result.data)
+      } else {
+        setError(result.message)
+      }
+      setIsLoading(false)
+    }
+
+    load()
+  }, [statusFilter, currentPage])
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  if (isLoading && !summary) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <RefreshCw className="h-8 w-8 animate-spin text-emerald-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen ">
@@ -482,7 +530,7 @@ export default function AdminWalletDashboard() {
 
           <div className="flex items-center gap-3">
             <WithdrawalDialog
-              availableBalance={availableBalance}
+              availableBalance={summary?.availableBalance ?? 0}
               onRequest={handleWithdrawalRequest}
             />
 
@@ -501,7 +549,7 @@ export default function AdminWalletDashboard() {
         </header>
 
         {/* Wallet Overview Cards */}
-        <div className="mb-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-2 sm:grid-cols-1 lg:grid-cols-3">
           {walletCards.map((card, idx) => (
             <WalletCard key={card.title} {...card} delay={idx * 0.1} />
           ))}
@@ -697,11 +745,8 @@ export default function AdminWalletDashboard() {
                     <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-800">
                       <p className="text-sm text-gray-500">
                         Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                        {Math.min(
-                          currentPage * itemsPerPage,
-                          sortedWithdrawals.length,
-                        )}{" "}
-                        of {sortedWithdrawals.length} transactions
+                        {Math.min(currentPage * itemsPerPage, totalWithdrawals)}{" "}
+                        of {totalWithdrawals} transactions
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -747,8 +792,11 @@ export default function AdminWalletDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Last withdrawal</span>
                 <span className="text-sm font-medium">
-                  {withdrawals[0]
-                    ? format(new Date(withdrawals[0].date), "MMM dd, yyyy")
+                  {summary?.lastWithdrawalDate
+                    ? format(
+                        new Date(summary.lastWithdrawalDate),
+                        "MMM dd, yyyy",
+                      )
                     : "N/A"}
                 </span>
               </div>
@@ -761,7 +809,7 @@ export default function AdminWalletDashboard() {
                   Pending withdrawals
                 </span>
                 <span className="text-sm font-medium text-amber-600">
-                  {withdrawals.filter((w) => w.status === "PENDING").length}
+                  {summary?.pendingWithdrawalsCount ?? 0}
                 </span>
               </div>
             </CardContent>
@@ -771,13 +819,7 @@ export default function AdminWalletDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Success rate</span>
                 <span className="text-sm font-medium text-emerald-600">
-                  {Math.round(
-                    (withdrawals.filter((w) => w.status === "COMPLETED")
-                      .length /
-                      withdrawals.length) *
-                      100,
-                  )}
-                  %
+                  {summary?.successRate ?? 0}%
                 </span>
               </div>
             </CardContent>

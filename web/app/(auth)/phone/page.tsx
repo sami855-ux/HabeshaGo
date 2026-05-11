@@ -73,24 +73,22 @@ export default function PhoneLoginPage() {
     }
   }, [countdown])
 
-  useEffect(() => {
-    if (!recaptchaRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(
-        auth,
-        "recaptcha-container",
-        {
-          size: "invisible",
-        },
-      )
+  const getRecaptchaVerifier = () => {
+    if (recaptchaRef.current) {
+      recaptchaRef.current.clear()
+      recaptchaRef.current = null
     }
 
-    // Cleanup
-    return () => {
-      if (recaptchaRef.current) {
-        recaptchaRef.current.clear()
-      }
-    }
-  }, [])
+    // Clear any leftover DOM the previous widget injected
+    const container = document.getElementById("recaptcha-container")
+    if (container) container.innerHTML = ""
+
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+    })
+
+    return recaptchaRef.current
+  }
 
   // Format Ethiopian phone number
   const formatEthiopianPhone = (value: string) => {
@@ -128,13 +126,9 @@ export default function PhoneLoginPage() {
 
     startSendOtp(async () => {
       try {
-        if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready")
+        const verifier = getRecaptchaVerifier()
 
-        const confirmation = await signInWithPhoneNumber(
-          auth,
-          phone,
-          recaptchaRef.current,
-        )
+        const confirmation = await signInWithPhoneNumber(auth, phone, verifier)
 
         confirmationResultRef.current = confirmation
 
@@ -146,6 +140,8 @@ export default function PhoneLoginPage() {
         })
       } catch (error: any) {
         console.error(error)
+        recaptchaRef.current?.clear()
+        recaptchaRef.current = null
         toast.error("Failed to send OTP", {
           description:
             error.message || "Please check your phone number and try again",
@@ -219,13 +215,9 @@ export default function PhoneLoginPage() {
     const phone = countryCode + phoneNumber.replace(/\D/g, "")
 
     try {
-      if (!recaptchaRef.current) throw new Error("reCAPTCHA not ready")
+      const verifier = getRecaptchaVerifier()
 
-      const confirmation = await signInWithPhoneNumber(
-        auth,
-        phone,
-        recaptchaRef.current,
-      )
+      const confirmation = await signInWithPhoneNumber(auth, phone, verifier)
 
       confirmationResultRef.current = confirmation
       setCountdown(60)
@@ -237,6 +229,8 @@ export default function PhoneLoginPage() {
       })
     } catch (error: any) {
       console.error(error)
+      recaptchaRef.current?.clear()
+      recaptchaRef.current = null
       toast.error("Failed to resend OTP", {
         description: error.message || "Please try again",
       })

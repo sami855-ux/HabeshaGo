@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import L from "leaflet"
 import { ParkingStation, Coordinates } from "@/types/map-user"
 import { calculateDistance, cn, formatDistance } from "@/lib/utils"
@@ -8,7 +8,7 @@ import { useQueryParams } from "@/hooks/useQueryParams"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { createRoot } from "react-dom/client"
-import { fetchParkingStations } from "@/data/api"
+import { axiosInstance } from "@/services/axiosInstance"
 
 interface ParkingStationsLayerProps {
   map: L.Map
@@ -16,20 +16,241 @@ interface ParkingStationsLayerProps {
   onDestinationSelect: (destination: Coordinates) => void
 }
 
-// Example station object with images array
-const stationData = {
-  name: "Downtown Parking Plaza",
-  address: "123 Main Street, Downtown",
-  distance: 0.5,
-  availableSpaces: 15,
-  totalSpaces: 50,
-  pricing: "$2.50",
-  location: { lat: 40.7128, lng: -74.006 },
-  images: [
-    "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=300&h=150&fit=crop",
-    "https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=300&h=150&fit=crop",
-    "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=300&h=150&fit=crop",
-  ],
+// ─── Popup card for a single station ────────────────────────────────────────
+function StationPopup({
+  station,
+  onDestinationSelect,
+}: {
+  station: ParkingStation
+  onDestinationSelect: (destination: Coordinates) => void
+}) {
+  const occupancyPct = Math.round(
+    ((station.totalSlots - station.availableSlots) / station.totalSlots) * 100,
+  )
+
+  const occupancyColor =
+    station.availableSlots === 0
+      ? "destructive"
+      : station.availableSlots <= station.totalSlots * 0.2
+        ? "destructive"
+        : station.availableSlots <= station.totalSlots * 0.5
+          ? "secondary"
+          : "default"
+
+  return (
+    <div className="min-w-[230px] max-w-[260px] font-sans">
+      {/* Header strip */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-500 rounded-t-lg px-3 py-2 -mx-[1px] -mt-[1px]">
+        <h3 className="text-white font-semibold text-sm leading-tight line-clamp-1">
+          {station.name}
+        </h3>
+        <p className="text-purple-200 text-xs mt-0.5 line-clamp-1">
+          {station.address}, {station.city}
+        </p>
+      </div>
+
+      <div className="p-3 space-y-2">
+        {/* Occupancy bar */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-500">Occupancy</span>
+            <span className="text-xs font-medium text-gray-700">
+              {occupancyPct}%
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                occupancyPct >= 80
+                  ? "bg-red-500"
+                  : occupancyPct >= 50
+                    ? "bg-amber-400"
+                    : "bg-emerald-500",
+              )}
+              style={{ width: `${occupancyPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-gray-50 rounded-md px-2 py-1.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+              Available
+            </p>
+            <Badge variant={occupancyColor} className="mt-0.5 text-xs h-5">
+              {station.availableSlots}/{station.totalSlots}
+            </Badge>
+          </div>
+
+          <div className="bg-gray-50 rounded-md px-2 py-1.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+              Price
+            </p>
+            <p className="text-sm font-semibold text-gray-800 mt-0.5">
+              {station.pricePerMinute != null
+                ? `$${station.pricePerMinute}/min`
+                : "—"}
+            </p>
+          </div>
+
+          {station.distance != null && (
+            <div className="bg-gray-50 rounded-md px-2 py-1.5">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                Distance
+              </p>
+              <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                {formatDistance(station.distance)}
+              </p>
+            </div>
+          )}
+
+          {/* Features */}
+          <div className="bg-gray-50 rounded-md px-2 py-1.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+              Features
+            </p>
+            <div className="flex gap-1 mt-0.5 flex-wrap">
+              {station.features?.hasCCTV && (
+                <span
+                  title="CCTV"
+                  className="text-[10px] bg-blue-100 text-blue-700 rounded px-1 py-0.5 font-medium"
+                >
+                  📹 CCTV
+                </span>
+              )}
+              {station.features?.hasSecurity && (
+                <span
+                  title="Security"
+                  className="text-[10px] bg-green-100 text-green-700 rounded px-1 py-0.5 font-medium"
+                >
+                  🛡 Guard
+                </span>
+              )}
+              {!station.features?.hasCCTV && !station.features?.hasSecurity && (
+                <span className="text-[10px] text-gray-400">None listed</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-1">
+          <Button
+            className="flex-1 bg-violet-600 hover:bg-violet-700 text-white h-8 text-xs"
+            size="sm"
+            onClick={() => onDestinationSelect(station.location)}
+          >
+            Route
+          </Button>
+          <Button
+            className="flex-1 h-8 text-xs"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              window.open(
+                `https://www.google.com/maps/dir/?api=1&destination=${station.location.lat},${station.location.lng}`,
+                "_blank",
+              )
+            }
+          >
+            Navigate
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Parking icon factory ────────────────────────────────────────────────────
+function createParkingIcon(availableSlots: number, totalSlots: number) {
+  const pct = totalSlots > 0 ? availableSlots / totalSlots : 0
+  const ringColor =
+    pct === 0
+      ? "#ef4444"
+      : pct <= 0.2
+        ? "#f97316"
+        : pct <= 0.5
+          ? "#eab308"
+          : "#22c55e"
+  const bgColor =
+    pct === 0
+      ? "#dc2626"
+      : pct <= 0.2
+        ? "#ea580c"
+        : pct <= 0.5
+          ? "#ca8a04"
+          : "#7c3aed"
+
+  return L.divIcon({
+    className: "",
+    html: `
+      <div style="
+        position: relative;
+        width: 38px;
+        height: 38px;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
+      ">
+        <!-- Outer pulse ring -->
+        <div style="
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 2px solid ${ringColor};
+          opacity: 0.5;
+          animation: parking-pulse 2s ease-in-out infinite;
+        "></div>
+
+        <!-- Main circle -->
+        <div style="
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: ${bgColor};
+          border: 2.5px solid white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        ">
+          <!-- P letter -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5h4.5a3.5 3.5 0 0 1 0 7H9"/>
+          </svg>
+        </div>
+
+        <!-- Availability dot -->
+        <div style="
+          position: absolute;
+          bottom: -1px;
+          right: -1px;
+          width: 13px;
+          height: 13px;
+          border-radius: 50%;
+          background: ${ringColor};
+          border: 2px solid white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 7px;
+          font-weight: 700;
+          color: white;
+          line-height: 1;
+        ">${availableSlots > 99 ? "99+" : availableSlots}</div>
+      </div>
+
+      <style>
+        @keyframes parking-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.5; }
+          50% { transform: scale(1.3); opacity: 0.15; }
+        }
+      </style>
+    `,
+    iconSize: [38, 38],
+    iconAnchor: [19, 38],
+    popupAnchor: [0, -42],
+  })
 }
 
 export default function ParkingStationsLayer({
@@ -41,17 +262,15 @@ export default function ParkingStationsLayer({
   const markersRef = useRef<L.Marker[]>([])
   const { getParam } = useQueryParams()
 
-  const [currentImage, setCurrentImage] = useState(0)
-
+  // Load stations from API
   useEffect(() => {
     const loadStations = async () => {
       try {
-        const data = await fetchParkingStations(
-          userLocation.lat,
-          userLocation.lng,
-        )
+        const response = await axiosInstance.get("/audit/map-view", {
+          params: { lat: userLocation.lat, lng: userLocation.lng },
+        })
 
-        const stationsWithDistance = data.map((station) => ({
+        const stationsWithDistance = response.data.data.map((station) => ({
           ...station,
           distance: calculateDistance(
             userLocation.lat,
@@ -70,256 +289,60 @@ export default function ParkingStationsLayer({
     loadStations()
   }, [userLocation])
 
+  // Build markers whenever stations or filters change
   useEffect(() => {
     if (!map || !map.getPane || stations.length === 0) return
 
-    /* Remove existing markers */
-    markersRef.current.forEach((marker) => marker.remove())
+    // Clean up previous markers
+    markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
 
     const markerType = getParam("type") || "all"
     const searchQuery = getParam("search")?.toLowerCase()
 
-    /* Filter stations */
     const filteredStations = stations.filter((station) => {
       if (markerType !== "all" && markerType !== "parking") return false
-
       if (searchQuery) {
         return (
           station.name.toLowerCase().includes(searchQuery) ||
-          station.address.toLowerCase().includes(searchQuery)
+          station.address.toLowerCase().includes(searchQuery) ||
+          station.city?.toLowerCase().includes(searchQuery)
         )
       }
-
       return true
-    })
-
-    /*
-    ----------------------------------
-    PARKING ICON
-    ----------------------------------
-    */
-    const parkingIcon = L.divIcon({
-      className: "parking-station-marker",
-      html: `
-      <div class="bg-purple-500 p-1 rounded-full shadow-lg">
-        <svg xmlns="http://www.w3.org/2000/svg"
-          width="22" height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="white"
-          stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2"/>
-          <path d="M9 16V8h4a2 2 0 0 1 0 4H9"/>
-        </svg>
-      </div>
-      `,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32],
     })
 
     const newMarkers: L.Marker[] = []
 
-    /*
-    ----------------------------------
-    CREATE MARKERS
-    ----------------------------------
-    */
     filteredStations.forEach((station) => {
+      const icon = createParkingIcon(station.availableSlots, station.totalSlots)
+
       const marker = L.marker([station.location.lat, station.location.lng], {
-        icon: parkingIcon,
+        icon,
       }).addTo(map)
 
-      /*
-      ----------------------------------
-      POPUP CONTENT (REACT)
-      ----------------------------------
-      */
-      const popupContent = document.createElement("div")
-      const root = createRoot(popupContent)
-
+      // Render React popup
+      const container = document.createElement("div")
+      const root = createRoot(container)
       root.render(
-        <div className=" min-w-[200px]">
-          {/* Image Slider */}
-          <div className="mb-3 rounded-lg overflow-hidden relative">
-            <div className="relative">
-              <img
-                src={
-                  stationData.images?.[currentImage] ||
-                  "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=300&h=150&fit=crop"
-                }
-                alt={stationData.name}
-                className="w-full h-32 object-cover transition-opacity duration-300"
-              />
-
-              {/* Navigation Arrows */}
-              {stationData.images && stationData.images.length > 1 && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setCurrentImage((prev) =>
-                        prev === 0 ? stationData.images.length - 1 : prev - 1,
-                      )
-                    }}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-all"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setCurrentImage((prev) =>
-                        prev === stationData.images.length - 1 ? 0 : prev + 1,
-                      )
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-all"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Dots Indicator */}
-            {stationData.images && stationData.images.length > 1 && (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {stationData.images.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setCurrentImage(idx)
-                    }}
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full transition-all",
-                      currentImage === idx
-                        ? "bg-white w-3"
-                        : "bg-white/50 hover:bg-white/70",
-                    )}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <h3 className="font-semibold text-lg">{stationData.name}</h3>
-
-          {/* Static Rating Stars */}
-          <div className="flex items-center gap-1 mt-1 mb-2">
-            <div className="flex items-center gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <svg
-                  key={i}
-                  className={cn(
-                    "w-4 h-4",
-                    i < 4
-                      ? "text-yellow-400 fill-current"
-                      : "text-gray-300 fill-current",
-                  )}
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
-              ))}
-            </div>
-            <span className="text-xs text-gray-500">(24 reviews)</span>
-          </div>
-
-          <p className="text-sm text-gray-600">{stationData.address}</p>
-
-          <div className="mt-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Distance:</span>
-              <span className="font-medium">
-                {formatDistance(stationData.distance!)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Available:</span>
-              <Badge
-                variant={
-                  stationData.availableSpaces > 20 ? "default" : "destructive"
-                }
-              >
-                {stationData.availableSpaces}/{stationData.totalSpaces}
-              </Badge>
-            </div>
-
-            {stationData.pricing && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Pricing:</span>
-                <span className="font-medium">{stationData.pricing}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2 mt-3">
-            <Button
-              className="flex-1 "
-              size="sm"
-              onClick={() => onDestinationSelect(stationData.location)}
-            >
-              Route
-            </Button>
-
-            <Button
-              className="flex-1"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                window.open(
-                  `https://www.google.com/maps/dir/?api=1&destination=${stationData.location.lat},${stationData.location.lng}`,
-                  "_blank",
-                )
-              }}
-            >
-              Navigate
-            </Button>
-          </div>
-        </div>,
+        <StationPopup
+          station={station}
+          onDestinationSelect={onDestinationSelect}
+        />,
       )
-      marker.bindPopup(popupContent)
+
+      marker.bindPopup(container, {
+        maxWidth: 280,
+        className: "parking-popup",
+      })
 
       newMarkers.push(marker)
     })
 
     markersRef.current = newMarkers
 
-    /*
-    ----------------------------------
-    CLEANUP
-    ----------------------------------
-    */
     return () => {
-      markersRef.current.forEach((marker) => marker.remove())
+      markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
     }
   }, [map, stations, getParam, onDestinationSelect])

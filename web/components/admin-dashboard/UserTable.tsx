@@ -59,6 +59,8 @@ import {
   UserX,
   Circle,
   Zap,
+  Battery,
+  ParkingSquare,
 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
@@ -168,19 +170,31 @@ const ModernRoleBadge = ({ role }: { role: string }) => {
       icon: Shield,
       label: "Admin",
       className:
-        "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800",
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
     },
     DRIVER: {
       icon: User2,
       label: "Driver",
       className:
-        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800",
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
     },
     PASSENGER: {
       icon: Users,
       label: "Passenger",
       className:
-        "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800",
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+    },
+    EV_CHARGER_MANAGER: {
+      icon: Battery, // or any appropriate icon
+      label: "EV Charger Manager",
+      className:
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+    },
+    PARKING_MANAGER: {
+      icon: ParkingSquare, // or any appropriate icon
+      label: "Parking Manager",
+      className:
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
     },
   }
 

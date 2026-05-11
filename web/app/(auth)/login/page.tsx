@@ -262,21 +262,13 @@ export default function LoginPage() {
               Continue with Google
             </Button>
 
-            <Button
-              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer transition-all"
-              onClick={signInWithApple}
-            >
-              <FaApple className="mr-3 h-5 w-5" />
-              Continue with Apple
-            </Button>
-
             {/* Continue with Phone Button */}
             <Button
               onClick={() => router.push("/phone")}
               variant="outline"
-              className="w-full h-12 cursor-pointer hover:bg-muted transition-all"
+              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer transition-all"
             >
-              <Phone className="mr-3 h-5 w-5 text-primary" />
+              <Phone className="mr-3 h-5 w-5" />
               Continue with Phone
             </Button>
 

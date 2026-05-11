@@ -59,6 +59,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
+import { fetchCommissionReportData } from "@/services/admin-stats"
 
 // --- Enhanced Mock Data Generation ---
 const generateDetailedMockData = (
@@ -287,35 +288,65 @@ export default function CommissionReportDashboard() {
     generateDetailedMockData("day", dateRange),
   )
 
+  const [totalCommission, setTotalCommission] = useState(0)
+  const [totalTransactions, setTotalTransactions] = useState(0)
+  const [previousPeriodCommission, setPreviousPeriodCommission] = useState(0)
+  const [previousPeriodTransactions, setPreviousPeriodTransactions] =
+    useState(0)
+  const [error, setError] = useState("")
+
+  // real growth calculations replacing the hardcoded ones
+  const growth =
+    previousPeriodCommission > 0
+      ? (
+          ((totalCommission - previousPeriodCommission) /
+            previousPeriodCommission) *
+          100
+        ).toFixed(1)
+      : "0.0"
+
+  const transactionGrowth =
+    previousPeriodTransactions > 0
+      ? (
+          ((totalTransactions - previousPeriodTransactions) /
+            previousPeriodTransactions) *
+          100
+        ).toFixed(1)
+      : "0.0"
   // Simulate data refresh
-  const refreshData = () => {
+  const fetchData = async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      setChartData(generateDetailedMockData(groupBy, dateRange))
-      setIsLoading(false)
-    }, 800)
+
+    const result = await fetchCommissionReportData({
+      from: dateRange.from,
+      to: dateRange.to,
+      groupBy,
+    })
+
+    if (result.success) {
+      setChartData(result.data.report)
+
+      // replace the hardcoded * 0.88 and +8.2% with real values
+      const {
+        totalCommission,
+        totalTransactions,
+        previousPeriodCommission,
+        previousPeriodTransactions,
+      } = result.data.summary
+      setTotalCommission(totalCommission)
+      setTotalTransactions(totalTransactions)
+      setPreviousPeriodCommission(previousPeriodCommission)
+      setPreviousPeriodTransactions(previousPeriodTransactions)
+    } else {
+      setError(result.message)
+    }
+
+    setIsLoading(false)
   }
 
   useEffect(() => {
-    refreshData()
+    fetchData()
   }, [groupBy, dateRange])
-
-  // Calculate summary statistics
-  const totalCommission = chartData.reduce(
-    (sum, item) => sum + item.totalCommission,
-    0,
-  )
-  const totalTransactions = chartData.reduce(
-    (sum, item) => sum + (item.transactions || 0),
-    0,
-  )
-  const avgCommission =
-    totalTransactions > 0 ? totalCommission / totalTransactions : 0
-  const previousPeriodTotal = totalCommission * 0.88 // Simulated previous period
-  const growth = (
-    ((totalCommission - previousPeriodTotal) / previousPeriodTotal) *
-    100
-  ).toFixed(1)
 
   const summaryCards = [
     {
@@ -331,13 +362,16 @@ export default function CommissionReportDashboard() {
       title: "Total Transactions",
       value: totalTransactions.toLocaleString(),
       icon: CreditCard,
-      trend: "up" as "up" | "down",
-      trendValue: "+8.2% from last period",
+      // ✅ was hardcoded "up" and "+8.2%", now uses real data
+      trend:
+        parseFloat(transactionGrowth) > 0 ? "up" : ("down" as "up" | "down"),
+      trendValue: `${transactionGrowth}% from previous period`,
       gradient: "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700",
     },
     {
       title: "Average Commission",
-      value: `ETB ${Math.round(avgCommission).toLocaleString()}`,
+      // ✅ was computed from local chartData reduce, now comes from real summary state
+      value: `ETB ${Math.round(totalTransactions > 0 ? totalCommission / totalTransactions : 0).toLocaleString()}`,
       icon: TrendingUp,
       trend: "up" as "up" | "down",
       trendValue: "per booking",
@@ -514,7 +548,7 @@ export default function CommissionReportDashboard() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={refreshData}
+            onClick={fetchData}
             disabled={isLoading}
             className="rounded-xl"
           >
@@ -723,7 +757,7 @@ export default function CommissionReportDashboard() {
                     Peak commission day
                   </span>
                   <span className="text-sm font-semibold text-emerald-600">
-                    $
+                    ETB{" "}
                     {Math.max(
                       ...chartData.map((d) => d.totalCommission),
                     ).toLocaleString()}
@@ -742,7 +776,7 @@ export default function CommissionReportDashboard() {
                     Projected this period
                   </span>
                   <span className="text-sm font-semibold text-amber-600">
-                    ${(totalCommission * 1.12).toLocaleString()}
+                    ETB {(totalCommission * 1.12).toLocaleString()}
                   </span>
                 </div>
               </div>

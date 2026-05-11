@@ -636,7 +636,7 @@ export default function BookingPage({
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="md:text-3xl text-xl font-bold text-gray-900 dark:text-white">
                 Complete Your Booking
               </h1>
               <p className="text-gray-600 dark:text-gray-400">

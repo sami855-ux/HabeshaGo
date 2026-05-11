@@ -616,7 +616,7 @@ export default function BusSearchForm({
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8 px-10">
+          <form onSubmit={handleSubmit} className="space-y-8 px-2 md:px-8">
             {/* Route Selection */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -637,7 +637,7 @@ export default function BusSearchForm({
                 )}
               </AnimatePresence>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 md:gap-4 relative z-10">
                 {/* From Location - ComboBox */}
                 <div className="lg:col-span-5">
                   <div className="flex items-center gap-2 mb-2">

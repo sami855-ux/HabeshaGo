@@ -59,6 +59,7 @@ import {
   ChevronLeft,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { fetchAdminDashboardData } from "@/services/admin-stats"
 
 // --- TypeScript Interfaces ---
 interface RevenueOverview {
@@ -82,82 +83,6 @@ interface ProviderRevenue {
   totalCommission: number
   growth?: number
   rank?: number
-}
-
-// --- Mock API Functions ---
-const getRevenueOverviewAPI = async (): Promise<RevenueOverview> => {
-  await new Promise((resolve) => setTimeout(resolve, 1500))
-  return {
-    totalRevenue: 124560.75,
-    totalCommission: 12456.07,
-    adminWalletBalance: 24890.32,
-    previousPeriodRevenue: 98750.25,
-    revenueGrowth: 26.1,
-    activeProviders: 5,
-  }
-}
-
-const getDailyRevenueAPI = async (days: number): Promise<DailyRevenue[]> => {
-  await new Promise((resolve) => setTimeout(resolve, 1500))
-  const data: DailyRevenue[] = []
-  const today = new Date()
-  for (let i = days; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
-    const dateStr = date.toISOString().split("T")[0]
-    const dayOfWeek = date.getDay()
-    let revenue = 3000 + Math.random() * 4000
-    if (dayOfWeek === 0 || dayOfWeek === 6) revenue *= 1.3
-    if (dayOfWeek === 2 || dayOfWeek === 3) revenue *= 0.9
-    data.push({ date: dateStr, revenue: Math.round(revenue * 100) / 100 })
-  }
-  return data
-}
-
-const getProviderRevenueAPI = async (): Promise<ProviderRevenue[]> => {
-  await new Promise((resolve) => setTimeout(resolve, 1500))
-  return [
-    {
-      providerId: "1",
-      providerName: "StreamMaster Pro",
-      totalRevenue: 45230.5,
-      totalCommission: 4523.05,
-      growth: 15.2,
-      rank: 1,
-    },
-    {
-      providerId: "2",
-      providerName: "MediaHub Plus",
-      totalRevenue: 38760.25,
-      totalCommission: 3876.02,
-      growth: 8.7,
-      rank: 2,
-    },
-    {
-      providerId: "3",
-      providerName: "GlobalStream Network",
-      totalRevenue: 29540.8,
-      totalCommission: 2954.08,
-      growth: -2.3,
-      rank: 3,
-    },
-    {
-      providerId: "4",
-      providerName: "FastCast Media",
-      totalRevenue: 18730.45,
-      totalCommission: 1873.04,
-      growth: 22.5,
-      rank: 4,
-    },
-    {
-      providerId: "5",
-      providerName: "Premium Content Co.",
-      totalRevenue: 12340.6,
-      totalCommission: 1234.06,
-      growth: 5.1,
-      rank: 5,
-    },
-  ]
 }
 
 // --- Helper Components ---
@@ -454,20 +379,21 @@ export default function RevenueOverviewPage() {
   const fetchData = async () => {
     setLoading(true)
     setError(null)
-    try {
-      const [overviewData, dailyData, providerData] = await Promise.all([
-        getRevenueOverviewAPI(),
-        getDailyRevenueAPI(parseInt(daysFilter)),
-        getProviderRevenueAPI(),
-      ])
-      setOverview(overviewData)
-      setDailyRevenue(dailyData)
-      setProviders(providerData)
-    } catch (err) {
-      setError("Failed to load revenue data. Please try again later.")
-    } finally {
-      setLoading(false)
+
+    const result = await fetchAdminDashboardData(parseInt(daysFilter))
+
+    if (result.success) {
+      setOverview(result.data.financialSummary)
+      setDailyRevenue(result.data.revenueTrends)
+      setProviders(result.data.providersPerformance)
+    } else {
+      setError(
+        result.message ||
+          "Failed to load revenue data. Please try again later.",
+      )
     }
+
+    setLoading(false)
   }
 
   useEffect(() => {

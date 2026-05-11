@@ -164,9 +164,7 @@ export default function MapView() {
     }
   }, [userLocation, getParam])
 
-  // =========================
   // Fetch vehicle ids
-  // =========================
   useEffect(() => {
     const fetchVehicleIds = async () => {
       try {
@@ -185,9 +183,7 @@ export default function MapView() {
     fetchVehicleIds()
   }, [])
 
-  // =========================
   // Handle location errors
-  // =========================
   useEffect(() => {
     if (error) {
       console.warn("Location error:", error)
@@ -204,8 +200,6 @@ export default function MapView() {
         <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-white/70 backdrop-blur-sm">
           <div className="flex flex-col items-center text-center">
             <div className="mb-3 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-
-            <p className="text-sm font-medium">Loading map...</p>
           </div>
         </div>
       )}
@@ -233,7 +227,7 @@ export default function MapView() {
           />
 
           {/* Parking */}
-          {/* 
+
           <ParkingStationsLayer
             map={mapRef.current}
             userLocation={
@@ -246,7 +240,6 @@ export default function MapView() {
               setSelectedDestination(destination)
             }
           />
-          */}
 
           {/* Buses */}
           <BusLayer map={mapRef.current} vehicleIds={vehicleIds} />

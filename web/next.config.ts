@@ -1,13 +1,21 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from "next"
+
+const nextConfig: NextConfig = {
   images: {
-    domains: ["images.unsplash.com", "res.cloudinary.com"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+    ],
   },
-  eslint: {
-    ignoreDuringBuilds: true,  
-  },
+
   typescript: {
-    ignoreBuildErrors: true,  
+    ignoreBuildErrors: true,
   },
 }
 

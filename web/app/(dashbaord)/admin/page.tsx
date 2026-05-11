@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { fetchKpis, KpiItem } from "@/services/admin-stats"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   LineChart,
   Line,
@@ -80,9 +82,11 @@ import {
   Calendar,
   MoreHorizontal,
   ChevronRight,
+  Tag,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { RootState } from "@/store"
+import { useQuery } from "@tanstack/react-query"
 
 // Chart data
 const ticketSalesData = [
@@ -276,14 +280,14 @@ const quickAccessPanels = [
     path: "/admin/manage-staff",
   },
   {
-    title: "View Tickets",
-    icon: Ticket,
-    description: "Ticket sales & validations",
+    title: "Promo Codes",
+    icon: Tag,
+    description: "Create and manage discount promo codes",
     color: "bg-red-500",
     count: "2.8K",
     colSpan: 2,
     rowSpan: 1,
-    path: "/admin/view-ticket",
+    path: "/admin/add-promo-code",
   },
 ]
 
@@ -292,49 +296,40 @@ export default function DashboardWithCharts() {
   const router = useRouter()
   const { user } = useSelector((state: RootState) => state.user)
 
-  // KPI Data
-  const kpis = [
-    {
-      title: "Buses in Operation",
-      value: "142",
-      subtitle: "Active today",
-      change: "+8.2%",
-      trend: "up",
-      icon: Bus,
-      details: "128 on-time • 14 delayed",
-      color: "bg-primary",
+  const {
+    data: kpis = [],
+    isLoading: kpisLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin-kpis"],
+    queryFn: async () => {
+      const result = await fetchKpis()
+
+      if (!result.success) {
+        throw new Error(result.message)
+      }
+
+      return result.data
     },
-    {
-      title: "Parking Occupancy",
-      value: "78%",
-      subtitle: "Spots occupied",
-      change: "+2.1%",
-      trend: "up",
-      icon: Car,
-      details: "1,240/1,600 spots",
-      color: "bg-primary",
-    },
-    {
-      title: "EV Charging Usage",
-      value: "45",
-      subtitle: "Active stations",
-      change: "+12.5%",
-      trend: "up",
-      icon: Zap,
-      details: "32 charging • 13 available",
-      color: "bg-primary",
-    },
-    {
-      title: "Tickets Issued",
-      value: "2,847",
-      subtitle: "Today",
-      change: "-3.4%",
-      trend: "down",
-      icon: Ticket,
-      details: "Online: 1,892 • Physical: 955",
-      color: "bg-primary",
-    },
+
+    staleTime: 1000 * 60 * 5, // cache for 5 min
+    gcTime: 1000 * 60 * 10, // keep in memory for 10 min
+    refetchOnWindowFocus: false,
+  })
+
+  const KPI_META = [
+    { icon: Bus, color: "bg-primary" },
+    { icon: Car, color: "bg-primary" },
+    { icon: Zap, color: "bg-primary" },
+    { icon: Ticket, color: "bg-primary" },
   ]
+
+  const mergedKpis = kpis.map((kpi, idx) => ({
+    ...kpi,
+    icon: KPI_META[idx]?.icon ?? Bus,
+    color: KPI_META[idx]?.color ?? "bg-primary",
+  }))
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -406,96 +401,107 @@ export default function DashboardWithCharts() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
         </div>
 
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {(error as Error).message}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-5 mb-8 sm:grid-cols-2 lg:grid-cols-4">
-          {kpis.map((kpi, index) => (
-            <div key={index} className="h-full">
-              <Card className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900/90">
-                {/* Gradient background on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
-                {/* Subtle border gradient on hover */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400/20 to-teal-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
-                <CardContent className="relative p-6">
-                  {/* Header with Icon and Trend */}
-                  <div className="mb-4 flex items-start justify-between">
-                    {/* Icon with gradient background */}
-                    <div className="relative">
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
-                      <div className="relative rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 p-3 shadow-lg transition-transform duration-300 group-hover:scale-110">
-                        <kpi.icon className="h-5 w-5 text-white" />
+          {kpisLoading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <Card
+                  key={i}
+                  className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/90"
+                >
+                  <CardContent className="p-6">
+                    {/* Icon + trend row */}
+                    <div className="mb-4 flex items-start justify-between">
+                      <Skeleton className="h-11 w-11 rounded-xl" />
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                    {/* Title + value */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-8 w-20" />
+                      {/* Divider section */}
+                      <div className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-3 w-36" />
                       </div>
                     </div>
-
-                    {/* Trend Badge */}
-                    <div
-                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-                        kpi.trend === "up"
-                          ? "bg-emerald-50 dark:bg-emerald-950/30"
-                          : "bg-red-50 dark:bg-red-950/30"
-                      }`}
-                    >
-                      {kpi.trend === "up" ? (
-                        <TrendingUp
-                          className={`h-3.5 w-3.5 ${
+                  </CardContent>
+                </Card>
+              ))
+            : mergedKpis.map((kpi, index) => (
+                <div key={index} className="h-full">
+                  <Card className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900/90">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400/20 to-teal-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <CardContent className="relative p-6">
+                      <div className="mb-4 flex items-start justify-between">
+                        <div className="relative">
+                          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
+                          <div className="relative rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 p-3 shadow-lg transition-transform duration-300 group-hover:scale-110">
+                            <kpi.icon className="h-5 w-5 text-white" />
+                          </div>
+                        </div>
+                        <div
+                          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
                             kpi.trend === "up"
-                              ? "text-emerald-500"
-                              : "text-red-500"
+                              ? "bg-emerald-50 dark:bg-emerald-950/30"
+                              : "bg-red-50 dark:bg-red-950/30"
                           }`}
-                        />
-                      ) : (
-                        <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                      )}
-                      <span
-                        className={`text-xs font-semibold ${
-                          kpi.trend === "up"
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-red-700 dark:text-red-400"
-                        }`}
-                      >
-                        {kpi.change}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">
-                      {kpi.title}
-                    </p>
-                    <div className="flex items-baseline gap-1">
-                      <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                        {kpi.value}
-                      </p>
-                    </div>
-
-                    {/* Additional info */}
-                    {(kpi.subtitle || kpi.details) && (
-                      <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-                        {kpi.subtitle && (
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {kpi.subtitle}
-                          </p>
-                        )}
-                        {kpi.details && (
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                            {kpi.details}
-                          </p>
+                        >
+                          {kpi.trend === "up" ? (
+                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                          )}
+                          <span
+                            className={`text-xs font-semibold ${
+                              kpi.trend === "up"
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-red-700 dark:text-red-400"
+                            }`}
+                          >
+                            {kpi.change}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">
+                          {kpi.title}
+                        </p>
+                        <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                          {kpi.value}
+                        </p>
+                        {(kpi.subtitle || kpi.details) && (
+                          <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                            {kpi.subtitle && (
+                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {kpi.subtitle}
+                              </p>
+                            )}
+                            {kpi.details && (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                {kpi.details}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
         </div>
 
         {/* Quick Access Panels */}

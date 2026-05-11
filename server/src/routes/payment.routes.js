@@ -1,30 +1,47 @@
-import express from "express"
+import express from "express";
 import {
   initiatePayment,
   paymentCallback,
   getPaymentHistory,
   topUpMpesa,
   mpesaCallback,
-} from "../controllers/payment.controller.js"
-import { authenticate } from "../middlewares/authenticate.js"
+  payForParking,
+} from "../controllers/payment.controller.js";
 
-const router = express.Router()
+import { authenticate } from "../middlewares/authenticate.js";
 
-// Initiate a new payment (top-up wallet or direct) => this will work after deployment
-router.post("/initiate", initiatePayment)
+const router = express.Router();
 
-// Callback from payment gateway (webhook) => this will work after deployment
-router.post("/callback", paymentCallback)
+// =============================
+// GENERAL PAYMENT (CHAPA / WALLET)
+// =============================
+router.post("/initiate", authenticate, initiatePayment);
 
-// Get user payment history
-router.get("/history", getPaymentHistory)
+// webhook (NO auth - external gateway)
+router.post("/callback", paymentCallback);
 
-// Mepesa
-router.post("/mpesa/topup", topUpMpesa)
-router.post("/mpesa/callback", mpesaCallback)
+// =============================
+// PAYMENT HISTORY
+// =============================
+router.get("/history", authenticate, getPaymentHistory);
 
-//Telebirr
-// router.post("/telebirr/topup", authenticate, topUpTelebirr);
-// router.post("/telebirr/callback", telebirrCallback);
+// =============================
+// PARKING PAYMENT (NEW ⭐)
+// =============================
+router.post("/parking/pay", authenticate, payForParking);
 
-export default router
+// =============================
+// M-PESA
+// =============================
+router.post("/mpesa/topup", authenticate, topUpMpesa);
+
+// webhook (NO auth - M-Pesa server)
+router.post("/mpesa/callback", mpesaCallback);
+
+// =============================
+// TELEBIRR (future ready)
+// =============================
+// router.post("/telebirr/topup", authenticate, topUpTelebirr)
+// router.post("/telebirr/callback", telebirrCallback)
+
+export default router;

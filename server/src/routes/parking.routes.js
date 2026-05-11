@@ -1,87 +1,137 @@
-import express from "express"
-import { authenticate, requireAdmin } from "../middlewares/authenticate.js"
-import {
-  createParkingLot,
-  getAllParkingLots,
-  getNearbyParkingLots,
-  getParkingLotById,
-  updateParkingLot,
-  deleteParkingLot,
+import express from "express";
+import { authenticate, requireAdmin } from "../middlewares/authenticate.js";
+import * as controller from "../controllers/parking.controller.js";
 
-  createSlots,
-  getSlotsByLot,
-  getAvailableSlots,
-  updateSlotStatus,
-  deleteSlot,
+const router = express.Router();
 
-  createReservation,
-  getMyReservations,
-  getReservationById,
-  cancelReservation,
-  checkInReservation,
-  checkOutReservation,
-  markNoShow,
+// ================= LOT =================
 
-  createSession,
-  getActiveSessions,
-  getMySessions,
-  getSessionById,
-  endSession,
-  getSessionCost,
-  getLotStats,
-  getDailyReport,
-  getPeakHoursReport,
+router.post("/lots", authenticate, requireAdmin, controller.createParkingLot);
+router.get("/lots", controller.getAllParkingLots);
+router.get("/lots/nearby", controller.getNearbyParkingLots);
 
-} from "../controllers/parking.controller.js"
-
-const router = express.Router()
-
-// ================= PARKING LOT =================
-
-router.post("/lots", authenticate, requireAdmin, createParkingLot)
-router.get("/lots", getAllParkingLots)
-
-router.get("/lots/nearby", getNearbyParkingLots)
-
-router.get("/lots/:id", getParkingLotById)
-router.patch("/lots/:id", authenticate, requireAdmin, updateParkingLot)
-router.delete("/lots/:id", authenticate, requireAdmin, deleteParkingLot)
+router.get("/lots/:id", controller.getParkingLotById);
+router.patch(
+  "/lots/:id",
+  authenticate,
+  requireAdmin,
+  controller.updateParkingLot,
+);
+router.delete(
+  "/lots/:id",
+  authenticate,
+  requireAdmin,
+  controller.deleteParkingLot,
+);
 
 // ================= SLOT =================
 
-router.post("/lots/:lotId/slots", authenticate, requireAdmin, createSlots)
-router.get("/lots/:lotId/slots", getSlotsByLot)
-router.get("/lots/:lotId/slots/available", getAvailableSlots)
+router.post(
+  "/lots/:lotId/slots",
+  authenticate,
+  requireAdmin,
+  controller.createSlots,
+);
 
-router.patch("/slots/:slotId/status", authenticate, requireAdmin, updateSlotStatus)
-router.delete("/slots/:slotId", authenticate, requireAdmin, deleteSlot)
+router.get("/lots/:lotId/slots", controller.getSlotsByLot);
+router.get("/lots/:lotId/slots/available", controller.getAvailableSlots);
+
+router.patch(
+  "/slots/:slotId/status",
+  authenticate,
+  requireAdmin,
+  controller.updateSlotStatus,
+);
+router.delete(
+  "/slots/:slotId",
+  authenticate,
+  requireAdmin,
+  controller.deleteSlot,
+);
 
 // ================= RESERVATION =================
 
-router.post("/reservations", authenticate, createReservation)
-router.get("/reservations/me", authenticate, getMyReservations)
-router.get("/reservations/:id", authenticate, getReservationById)
+router.get(
+  "/reservations",
+  authenticate,
+  requireAdmin,
+  controller.getAllReservations,
+);
 
-router.patch("/reservations/:id/cancel", authenticate, cancelReservation)
+router.post("/reservations", authenticate, controller.createReservation);
 
-router.post("/reservations/:id/check-in", authenticate, checkInReservation)
-router.post("/reservations/:id/check-out", authenticate, checkOutReservation)
-router.patch("/reservations/:id/no-show", authenticate, markNoShow)
+router.get("/reservations/me", authenticate, controller.getMyReservations);
+router.get("/reservations/:id", authenticate, controller.getReservationById);
+
+router.patch(
+  "/reservations/:id/cancel",
+  authenticate,
+  controller.cancelReservation,
+);
+router.patch("/reservations/:id/no-show", authenticate, controller.markNoShow);
+
+// ✅ CHECK-IN → creates session
+router.post(
+  "/reservations/:id/check-in",
+  authenticate,
+  controller.checkInReservation,
+);
+
+// ✅ CHECK-OUT → ends session
+router.post(
+  "/reservations/:id/check-out",
+  authenticate,
+  controller.checkOutReservation,
+);
 
 // ================= SESSION =================
 
-router.post("/sessions", authenticate, createSession)
-router.get("/sessions/active", authenticate, getActiveSessions)
-router.get("/sessions/me", authenticate, getMySessions)
-router.get("/sessions/:id", authenticate, getSessionById)
+router.get(
+  "/sessions/all",
+  authenticate,
+  requireAdmin,
+  controller.getAllSessionsAdmin,
+);
 
-router.post("/sessions/:id/end", authenticate, endSession)
-router.get("/sessions/:id/cost", authenticate, getSessionCost)
+router.get(
+  "/sessions/stats",
+  authenticate,
+  requireAdmin,
+  controller.getSessionStats,
+);
+
+router.get("/sessions/active", authenticate, controller.getActiveSessions);
+router.get("/sessions/me", authenticate, controller.getMySessions);
+
+router.get("/sessions/:id", authenticate, controller.getSessionById);
+
+// ✅ ONLY END (no create)
+router.post("/sessions/:id/end", authenticate, controller.endSession);
+
+router.get("/sessions/:id/cost", authenticate, controller.getSessionCost);
+
+router.post("/sessions/pay", authenticate, controller.payParkingSession);
 
 // ================= ANALYTICS =================
 
-router.get("/lots/:id/stats", authenticate, requireAdmin, getLotStats)
-router.get("/reports/daily", authenticate, requireAdmin, getDailyReport)
-router.get("/reports/peak-hours", authenticate, requireAdmin, getPeakHoursReport)
+router.get(
+  "/lots/:id/stats",
+  authenticate,
+  requireAdmin,
+  controller.getLotStats,
+);
 
-export default router
+router.get(
+  "/reports/daily",
+  authenticate,
+  requireAdmin,
+  controller.getDailyReport,
+);
+router.get(
+  "/reports/peak-hours",
+  authenticate,
+  requireAdmin,
+  controller.getPeakHoursReport,
+);
+
+export default router;

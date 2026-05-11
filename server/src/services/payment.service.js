@@ -1,70 +1,69 @@
-import { successResponse, errorResponse } from "../utils/apiResponse.js"
-import { handleSuccessfulTopup } from "../utils/paymentHelper.js"
-import prisma from "../prisma/client.js"
-import chapa from "../config/chapa.js"
+import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import { handleSuccessfulTopup } from "../utils/paymentHelper.js";
+import prisma from "../prisma/client.js";
+import chapa from "../config/chapa.js";
+import crypto from "crypto";
+import { stkPush } from "./mpesa.service.js";
 
-import crypto from "crypto"
-import { stkPush } from "./mpesa.service.js"
-
-/**
- * Generate unique transaction reference
- */
+/* ==============================
+   GENERATE REFERENCE
+============================== */
 const generateReference = (prefix = "payment") =>
-  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-// INITIATE PAYMENT
+/* ==============================
+   INITIATE PAYMENT
+============================== */
 export const initiatePaymentService = async (
   userId,
-  { amount, gateway, type, flow, bookingId, userInfo },
+  { amount, gateway, type, flow, bookingId, sessionId, userInfo },
 ) => {
   try {
-    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
+    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400);
 
-    if (!gateway) return errorResponse("Payment gateway is required", 400)
+    if (!gateway) return errorResponse("Payment gateway is required", 400);
 
-    if (!type) return errorResponse("Payment type is required", 400)
+    if (!type) return errorResponse("Payment type is required", 400);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true, email: true, phone: true },
-    })
+    });
 
-    if (!user) return errorResponse("User not found", 404)
+    if (!user) return errorResponse("User not found", 404);
 
-    const reference = generateReference(type.toLowerCase())
+    const reference = generateReference(type.toLowerCase());
 
-    // Create payment record
+    // CREATE PAYMENT RECORD
     const payment = await prisma.payment.create({
       data: {
         userId,
         amount: parseFloat(amount),
         currency: "ETB",
         gateway: "CHAPA",
-        method: "WALLET", // actual method unknown until Chapa confirms
+        method: "WALLET",
         status: "PENDING",
-        flow, // WALLET_TOPUP | WALLET_PAYMENT | DIRECT_PAYMENT
+        flow,
         reference,
+
         metadata: {
           type,
           bookingId: bookingId || null,
-          preferredMethod: userInfo?.preferredMethod || null, // UI choice
+          sessionId: sessionId || null, // 🔥 PARKING SUPPORT
+          preferredMethod: userInfo?.preferredMethod || null,
           userInfo: {
             name: user.name,
             email: user.email,
             phone: user.phone,
           },
         },
-        ...(bookingId && {
-          bookings: { connect: { id: parseInt(bookingId) } },
-        }),
       },
-    })
+    });
 
-    // Only Chapa supported here
     if (gateway.toLowerCase() !== "chapa")
-      return errorResponse("Unsupported gateway", 400)
+      return errorResponse("Unsupported gateway", 400);
 
-    const chapaResult = await createChapaPayment(payment, user)
+    const chapaResult = await createChapaPayment(payment, user);
 
     return successResponse(
       "Payment initiated successfully",
@@ -81,33 +80,32 @@ export const initiatePaymentService = async (
         expiresIn: "15 minutes",
       },
       201,
-    )
+    );
   } catch (error) {
-    console.error("Initiate payment error:", error)
-    return errorResponse("Failed to initiate payment", 500)
+    console.error("Initiate payment error:", error);
+    return errorResponse("Failed to initiate payment", 500);
   }
-}
+};
 
-// ===================================================
-// CHAPA CALLBACK / WEBHOOK
-// ===================================================
+/* ==============================
+   CHAPA CALLBACK
+============================== */
 export const paymentCallbackService = async (data) => {
   try {
-    const reference = data.tx_ref || data.trx_ref
+    const reference = data.tx_ref || data.trx_ref;
 
-    if (!reference) return errorResponse("Transaction reference missing", 400)
+    if (!reference) return errorResponse("Transaction reference missing", 400);
 
     const payment = await prisma.payment.findUnique({
       where: { reference },
-    })
+    });
 
-    if (!payment) return errorResponse("Payment not found", 404)
+    if (!payment) return errorResponse("Payment not found", 404);
 
     if (payment.status === "SUCCESS")
-      return successResponse("Payment already processed")
+      return successResponse("Payment already processed");
 
-    // Verify with Chapa (SOURCE OF TRUTH)
-    const verification = await chapa.verify(reference)
+    const verification = await chapa.verify(reference);
 
     if (
       verification.status !== "success" ||
@@ -123,15 +121,17 @@ export const paymentCallbackService = async (data) => {
             verificationResponse: verification,
           },
         },
-      })
-      return errorResponse("Payment verification failed", 400)
+      });
+
+      return errorResponse("Payment verification failed", 400);
     }
 
     const actualMethod =
-      verification.data.payment_method || verification.data.channel || "UNKNOWN"
+      verification.data.payment_method ||
+      verification.data.channel ||
+      "UNKNOWN";
 
     await prisma.$transaction(async (tx) => {
-      // Update payment
       await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -145,75 +145,86 @@ export const paymentCallbackService = async (data) => {
             completedAt: new Date(),
           },
         },
-      })
+      });
 
-      await handleSuccessfulPayment(tx, payment)
-    })
+      await handleSuccessfulPayment(tx, payment);
+    });
 
     return successResponse("Payment processed successfully", {
       reference,
       amount: payment.amount,
       method: actualMethod,
-    })
+    });
   } catch (error) {
-    console.error("Payment callback error:", error)
-    return errorResponse("Failed to process payment", 500)
+    console.error("Payment callback error:", error);
+    return errorResponse("Failed to process payment", 500);
   }
-}
+};
 
-// ===================================================
-// HANDLE SUCCESSFUL PAYMENT
-// ===================================================
+/* ==============================
+   HANDLE SUCCESS PAYMENT
+============================== */
 const handleSuccessfulPayment = async (tx, payment) => {
-  const { type, bookingId } = payment.metadata
+  const { type, bookingId, sessionId } = payment.metadata;
 
   switch (type) {
     case "WALLET_TOPUP":
-      return handleSuccessfulTopup(tx, payment)
+      return handleSuccessfulTopup(tx, payment);
 
     case "BUS_BOOKING":
-      return handleBusBookingPayment(tx, payment, bookingId)
+      return handleBusBookingPayment(tx, payment, bookingId);
 
     case "MINIBUS_BOOKING":
-      return handleMinibusBookingPayment(tx, payment, bookingId)
+      return handleMinibusBookingPayment(tx, payment, bookingId);
+
+    // 🚗 PARKING PAYMENT
+    case "PARKING_PAYMENT":
+      return handleParkingPayment(tx, payment, sessionId);
 
     default:
-      console.warn("Unhandled payment type:", type)
+      console.warn("Unhandled payment type:", type);
   }
-}
+};
 
-// ---------------- BUS BOOKING ----------------
-const handleBusBookingPayment = async (tx, payment, bookingId) => {
-  if (!bookingId) return
+/* ==============================
+   PARKING PAYMENT HANDLER
+============================== */
+const handleParkingPayment = async (tx, payment, sessionId) => {
+  if (!sessionId) return;
 
-  await tx.booking.update({
-    where: { id: parseInt(bookingId) },
-    data: {
-      status: "CONFIRMED",
-      paymentId: payment.id,
-      amountPaid: payment.amount,
+  const session = await tx.parkingSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      slot: { include: { parkingLot: true } },
     },
-  })
-}
+  });
 
-// ---------------- MINIBUS BOOKING ----------------
-const handleMinibusBookingPayment = async (tx, payment, bookingId) => {
-  if (!bookingId) return
+  if (!session) throw new Error("Parking session not found");
 
-  await tx.minibusReservation.update({
-    where: { id: parseInt(bookingId) },
+  const pricePerMinute = session.slot.parkingLot.pricePerMinute;
+
+  const duration = (new Date().getTime() - session.entryTime.getTime()) / 60000;
+
+  const cost = duration * pricePerMinute;
+
+  await tx.parkingSession.update({
+    where: { id: sessionId },
     data: {
-      status: "CONFIRMED",
-      paymentId: payment.id,
+      status: "COMPLETED",
+      exitTime: new Date(),
+      durationMinutes: Math.round(duration),
+      payments: {
+        connect: { id: payment.id },
+      },
     },
-  })
-}
+  });
+};
 
-// ===================================================
-// CHAPA INITIALIZATION
-// ===================================================
+/* ==============================
+   CHAPA INIT
+============================== */
 const createChapaPayment = async (payment, user) => {
-  const nameParts = (user.name || "User").split(" ")
+  const nameParts = (user.name || "User").split(" ");
 
   const payload = {
     amount: payment.amount.toString(),
@@ -225,38 +236,38 @@ const createChapaPayment = async (payment, user) => {
     phone_number: user.phone,
 
     tx_ref: payment.reference,
-    callback_url: "http://localhost:5000/api/payments/chapa/callback",
+    callback_url: "http://localhost:5000/api/payments/callback",
     return_url: `http://localhost:3000/payment/success?ref=${payment.reference}`,
 
-    // ✅ FLATTENED customization
-    "customization[title]": "HabeshaGo Payment",
+    "customization[title]": "Parking System Payment",
     "customization[description]": payment.metadata.type,
 
-    // ✅ FLATTENED meta (strings only)
     "meta[payment_id]": payment.id.toString(),
     "meta[user_id]": payment.userId.toString(),
     "meta[type]": payment.metadata.type,
-  }
+  };
 
-  const response = await chapa.initialize(payload)
+  const response = await chapa.initialize(payload);
 
   if (response.status !== "success")
-    throw new Error(response.message || "Chapa init failed")
+    throw new Error(response.message || "Chapa init failed");
 
   return {
     paymentUrl: response.data.checkout_url,
-  }
-}
+  };
+};
 
-// M-Pesa Top-up Service
+/* ==============================
+   M-PESA TOPUP (UNCHANGED)
+============================== */
 export const mpesaTopUpService = async ({ amount, phone, userId }) => {
   try {
-    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
-    if (!phone) return errorResponse("Phone number required", 400)
+    if (!amount || amount <= 0) return errorResponse("Invalid amount", 400);
 
-    const reference = crypto.randomBytes(8).toString("hex")
+    if (!phone) return errorResponse("Phone number required", 400);
 
-    // 1️⃣ Create pending payment
+    const reference = crypto.randomBytes(8).toString("hex");
+
     await prisma.payment.create({
       data: {
         userId,
@@ -269,88 +280,20 @@ export const mpesaTopUpService = async ({ amount, phone, userId }) => {
         status: "PENDING",
         metadata: { phone },
       },
-    })
+    });
 
-    // 2️⃣ Call shared STK Push service
-    const stkResponse = await stkPush({ phone, amount, reference })
+    const stkResponse = await stkPush({
+      phone,
+      amount,
+      reference,
+    });
 
     return successResponse("STK push initiated", {
       reference,
       response: stkResponse,
-    })
+    });
   } catch (error) {
-    console.error(
-      "M-Pesa Top-up service error:",
-      error.response?.data || error.message,
-    )
-    return errorResponse("Failed to initiate M-Pesa top-up", 500)
+    console.error("M-Pesa error:", error);
+    return errorResponse("Failed M-Pesa payment", 500);
   }
-}
-
-// M-Pesa Callback Service
-export const mpesaCallbackService = async (data) => {
-  try {
-    const callback = data?.Body?.stkCallback
-    if (!callback) return errorResponse("Invalid callback structure", 400)
-
-    const resultCode = callback.ResultCode
-    const metadata = callback.CallbackMetadata?.Item || []
-    const getValue = (name) => metadata.find((i) => i.Name === name)?.Value
-    const reference = getValue("AccountReference")
-
-    if (!reference) return errorResponse("Transaction reference missing", 400)
-
-    const payment = await prisma.payment.findUnique({ where: { reference } })
-    if (!payment) return errorResponse("Payment not found", 404)
-    if (payment.status === "SUCCESS")
-      return successResponse("Payment already processed")
-
-    if (resultCode !== 0) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: "FAILED",
-          metadata: {
-            ...payment.metadata,
-            callbackData: data,
-            failedAt: new Date(),
-          },
-        },
-      })
-      return errorResponse("Payment failed", 400)
-    }
-
-    const mpesaReceipt = getValue("MpesaReceiptNumber")
-    const phone = getValue("PhoneNumber")
-
-    await prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: "SUCCESS",
-          gatewayRef: mpesaReceipt,
-          method: "MOBILE_MONEY",
-          metadata: {
-            ...payment.metadata,
-            phone,
-            callbackData: data,
-            completedAt: new Date(),
-          },
-        },
-      })
-
-      // ✅ Use your shared function to update wallet, transactions, and points
-      await handleSuccessfulPayment(tx, payment)
-    })
-
-    return successResponse("Payment processed successfully", {
-      reference,
-      amount: payment.amount,
-      receipt: mpesaReceipt,
-      phone,
-    })
-  } catch (error) {
-    console.error("M-Pesa callback service error:", error)
-    return errorResponse("Failed to process M-Pesa payment", 500)
-  }
-}
+};

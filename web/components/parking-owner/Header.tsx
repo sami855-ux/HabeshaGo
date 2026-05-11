@@ -150,20 +150,6 @@ function Header({ className }: { className?: string }) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Button
-                  className="hidden md:flex gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md relative overflow-hidden"
-                  onClick={() => router.push("/parking-manager/vehicles/add")}
-                >
-                  {/* Animated overlay for morphism effect */}
-                  <motion.div
-                    className="absolute inset-0 bg-white/20"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "100%" }}
-                    transition={{ duration: 0.5 }}
-                  />
-                  <Plus className="w-4 h-4" />
-                  <span>Add Vehicle</span>
-                </Button>
               </motion.div>
 
               {/* Search Input (Desktop) with morphism */}

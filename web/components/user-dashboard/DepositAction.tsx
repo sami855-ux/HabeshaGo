@@ -46,30 +46,6 @@ export default function DepositAction() {
       hoverEffect: "shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40",
       onClick: () => router.push("/user/wallet/send"),
     },
-    {
-      label: "Pay",
-      icon: CreditCard,
-      variant: "default" as const,
-      color: "amber",
-      className:
-        "group relative overflow-hidden bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 hover:from-amber-600 hover:via-amber-700 hover:to-orange-700 text-white",
-      glow: "from-amber-400/40 via-orange-400/20 to-transparent",
-      iconBg: "bg-amber-100/20 text-white",
-      hoverEffect: "shadow-lg shadow-amber-500/30 hover:shadow-amber-500/40",
-      onClick: () => console.log("Pay clicked"),
-    },
-    {
-      label: "Withdraw",
-      icon: ArrowUpCircle,
-      variant: "default" as const,
-      color: "violet",
-      className:
-        "group relative overflow-hidden bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 hover:from-violet-600 hover:via-violet-700 hover:to-purple-700 text-white",
-      glow: "from-violet-400/40 via-purple-400/20 to-transparent",
-      iconBg: "bg-violet-100/20 text-white",
-      hoverEffect: "shadow-lg shadow-violet-500/30 hover:shadow-violet-500/40",
-      onClick: () => console.log("Withdraw clicked"),
-    },
   ]
 
   const stats = [
@@ -113,7 +89,7 @@ export default function DepositAction() {
         <div className="absolute bottom-1/4 left-1/3 w-28 h-28 bg-violet-500/5 rounded-full blur-3xl animate-pulse delay-700" />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
         {buttons.map((btn, index) => (
           <motion.div
             key={btn.label}

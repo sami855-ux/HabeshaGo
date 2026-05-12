@@ -361,7 +361,7 @@ export default function BookingPage() {
       } else {
         paymentFlow = "EXTERNAL_ONLY"
       }
-      paymentMethodAPI = "CARD"
+      paymentMethodAPI = "MOBILE_MONEY"
     }
 
     const reservationData = {
@@ -385,7 +385,13 @@ export default function BookingPage() {
         "/ev/reservation",
         reservationData,
       )
+      console.log(data)
 
+      if (data.data.needsExternalPayment) {
+        if (data.data.paymentUrl) {
+          window.location.href = data.data.paymentUrl
+        }
+      }
       if (data?.success) {
         setReservationDetails({
           ...reservationData,
@@ -419,13 +425,6 @@ export default function BookingPage() {
         ) {
           setPointsPaymentSuccess(true)
           setTimeout(() => setPointsPaymentSuccess(false), 3000)
-        }
-
-        // If external payment is needed (card payment), redirect to payment gateway
-        if (data.data.needsExternalPayment && paymentMethod === "card") {
-          if (data.data.payment?.paymentUrl) {
-            window.location.href = data.data.payment.paymentUrl
-          }
         }
       } else {
         throw new Error(data?.message || "Failed to create reservation")

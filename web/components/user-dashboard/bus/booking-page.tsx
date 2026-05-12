@@ -404,18 +404,50 @@ export default function BookingPage({
     setIsLoading(true)
     setStep("processing")
 
+    const adjustedDate = new Date(selectedDate)
+    adjustedDate.setHours(adjustedDate.getHours() + 4)
+
     try {
-      // Here you would integrate with Chapa API
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      const checkoutUrl = `https://checkout.chapa.co/checkout/payment/${Math.random().toString(36).substr(2, 9)}`
-      setChapaCheckoutUrl(checkoutUrl)
+      const bookingData: BookingRequest = {
+        busId: bus.id,
+        date: adjustedDate.toISOString(),
+        totalAmount: totalBeforeDiscount,
+        currency: bus.route.currency,
+        isPointUsed: usePoints,
+        scheduleStartTime: schedule.startTime,
+        seats: passengers,
+        boardingStop: from,
+        alightingStop: to,
+        paymentMethod: "CHAPA",
+      }
 
-      // In a real app, you would redirect to Chapa checkout
-      // window.location.href = checkoutUrl
+      if (discountAmount > 0 && promoSuccess) {
+        bookingData.discount = discountAmount
+        bookingData.promoCode = promoSuccess.code
+      }
 
-      // For demo, we'll complete the booking after redirect simulation
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      await completeBooking("CHAPA")
+      if (usePoints && pointsUsed > 0) {
+        bookingData.pointsUsed = pointsUsed
+        bookingData.pointsConversionRate = 0.5
+        bookingData.isPointUsed = true
+      }
+
+      const response = await createNewBooking(bookingData)
+
+      if (!response.success) {
+        toast.error(response.message || "Booking failed")
+        setStep("payment")
+        return
+      }
+
+      const paymentUrl = response.data?.paymentUrl
+      if (!paymentUrl) {
+        toast.error("No payment URL returned")
+        setStep("payment")
+        return
+      }
+
+      window.location.href = paymentUrl
     } catch (error) {
       console.error("Chapa payment failed:", error)
       toast.error("Payment processing failed. Please try again.")
@@ -478,6 +510,7 @@ export default function BookingPage({
         seats: passengers,
         boardingStop: from,
         alightingStop: to,
+        paymentMethod,
       }
 
       // Add discount if applicable

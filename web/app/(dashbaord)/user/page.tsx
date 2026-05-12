@@ -53,7 +53,6 @@ import { getSocket } from "@/services/socket"
 import { RatingDialog } from "@/components/user-dashboard/bus/RatingDialog"
 import { submitRating } from "@/services/bus.api"
 import { toast } from "sonner"
-import { SidebarTrigger } from "@/components/ui/sidebar-trigger"
 
 export default function UserDashboard() {
   const {

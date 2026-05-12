@@ -539,7 +539,7 @@ export function BookingSummary({
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <CreditCard className="h-4 w-4 text-emerald-600" />
-                        <span className="font-medium">Credit/Debit Card</span>
+                        <span className="font-medium">Chapa Payment</span>
                       </Label>
                     </div>
                     <div className="flex gap-1">

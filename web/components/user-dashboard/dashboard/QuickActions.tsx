@@ -66,15 +66,6 @@ const quickActions = [
     lightColor: "bg-amber-100 dark:bg-amber-500/20",
     shadow: "shadow-amber-500/20",
   },
-  {
-    id: "history",
-    title: "Trip History",
-    description: "View past trips & receipts",
-    icon: History,
-    gradient: "from-orange-600 to-red-500",
-    lightColor: "bg-orange-100 dark:bg-orange-500/20",
-    shadow: "shadow-orange-600/20",
-  },
 ]
 
 export function QuickActions() {

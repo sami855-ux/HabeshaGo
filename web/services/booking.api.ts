@@ -34,6 +34,7 @@ export interface BookingRequest {
   currency?: string
   scheduleStartTime: string
   seats: number
+  paymentMethod: "CHAPA" | "WALLET" | "CARD" | "BANK"
 }
 
 export interface BookingResponse {

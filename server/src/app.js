@@ -109,7 +109,7 @@ const locationLimiter = rateLimit({
 app.use(globalLimiter)
 
 //  General middleware
-app.use(cookieParser(process.env.SESSION_SECRET))
+app.use(cookieParser("some-key-for-the-secrete"))
 app.use(express.json({ limit: "10kb" })) // reject oversized payloads
 app.use(express.urlencoded({ extended: true, limit: "10kb" }))
 app.use(compression()) // gzip responses
@@ -117,7 +117,7 @@ app.use(morgan(isProduction ? "combined" : "dev"))
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: "some-key-for-the-secrete",
     resave: false,
     saveUninitialized: false,
     cookie: {

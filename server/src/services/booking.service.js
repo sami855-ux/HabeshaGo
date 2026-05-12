@@ -1,11 +1,17 @@
+import chapa from "../config/chapa.js"
 import { validateBooking } from "../controllers/booking.controller.js"
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
+import { ADMIN_WALLET_ID } from "../utils/constants.js"
 import { generateQRCode } from "../utils/qrcode.js"
+import {
+  createChapaPayment,
+  generateReference,
+  handleSuccessfulPayment,
+} from "./payment.service.js"
 import { addPointsToUser } from "./wallet.service.js"
 
 export const POINTS_CONVERSION_RATE = 0.5
-const ADMIN_WALLET_ID = 2
 const COMMISSION_RATE = 0.1
 const DEFAULT_DRIVER_ID = "cmocj1iy50003d6k3v1mfq0y8"
 const MAX_TICKETS_PER_USER = 5
@@ -26,7 +32,7 @@ export const createBookingService = async ({
   promoCode,
   pointsUsed = 0,
   isPointUsed = false,
-  paymentMethod = "WALLET",
+  paymentMethod = "WALLET", //CHAPA or WALLET
   currency = "ETB",
 }) => {
   try {
@@ -49,6 +55,15 @@ export const createBookingService = async ({
     const schedule = bus.schedules.find(
       (s) => s.startTime === scheduleStartTime && s.isActive,
     )
+
+    // console.log("Incoming scheduleStartTime:", scheduleStartTime)
+    // console.log(
+    //   "Bus schedules:",
+    //   bus.schedules.map((s) => ({
+    //     startTime: s.startTime,
+    //     isActive: s.isActive,
+    //   })),
+    // )
     if (!schedule) return errorResponse("Schedule not found", 404)
 
     const midPoints = bus.route.midPoints.map((mp) => mp.name)
@@ -155,10 +170,11 @@ export const createBookingService = async ({
           userId,
           amount: finalAmount,
           method: paymentMethod,
+          gateway: paymentMethod === "CHAPA" ? "CHAPA" : null,
           flow:
             paymentMethod === "WALLET" ? "WALLET_PAYMENT" : "DIRECT_PAYMENT",
           status: paymentMethod === "WALLET" ? "SUCCESS" : "PENDING",
-          reference: `PAY-${Date.now()}`,
+          reference: generateReference(),
           walletId,
           currency,
           pointsUsed: isPointUsed ? pointsUsed : 0,
@@ -187,97 +203,145 @@ export const createBookingService = async ({
           pointsValue: isPointUsed ? pointsValue : 0,
           pointsConversionRate: isPointUsed ? POINTS_CONVERSION_RATE : 0,
           paymentId: payment.id,
+          status: paymentMethod === "CHAPA" ? "PENDING" : "CONFIRMED",
         },
       })
 
-      const ticketsData = Array.from({ length: seats }).map((index) => ({
-        bookingId: newBooking.id,
-        userId,
-        seatNumber: index + 1,
-        boardingStop,
-        alightingStop,
-        qrCode,
-        validUntil,
-      }))
-      await tx.ticket.createMany({ data: ticketsData })
-
+      if (paymentMethod === "WALLET") {
+        const ticketsData = Array.from({ length: seats }).map((index) => ({
+          bookingId: newBooking.id,
+          userId,
+          seatNumber: index + 1,
+          boardingStop,
+          alightingStop,
+          qrCode,
+          validUntil,
+        }))
+        await tx.ticket.createMany({ data: ticketsData })
+      }
       return newBooking
     })
 
-    const tickets = await prisma.ticket.findMany({
-      where: { bookingId: booking.id },
-    })
-
-    // 6️⃣ Calculate commission & provider amount
-    const commission = totalAmount * COMMISSION_RATE
-    const providerAmount = totalAmount - commission
-
-    // 7️⃣ Ledger & payouts (atomic)
-    await prisma.$transaction(async (tx) => {
-      // a) TransactionLedger
-      await tx.transactionLedger.create({
+    if (paymentMethod === "CHAPA") {
+      await prisma.payment.update({
+        where: { id: payment.id },
         data: {
-          userId,
-          providerId: null,
-          paymentId: payment.id,
-          totalAmount: finalAmount,
-          commission,
-          providerAmount,
-          serviceType: "BUS_TICKET",
-          referenceId: String(booking.id),
-          referenceType: "BOOKING",
-          paymentMethod,
-          currency,
-          status: payment.status === "SUCCESS" ? "COMPLETED" : "PENDING",
-          isSettled: payment.status === "SUCCESS",
-          externalRef: `LEDGER-${Date.now()}`,
-          description: "Government bus ticket — full revenue to admin",
           metadata: {
-            busId,
-            scheduleId: schedule.id,
+            ...payment.metadata,
+            bookingId: booking.id,
             seats,
-            boardingStop,
-            alightingStop,
-            ownershipType: "GOVERNMENT",
+            type: "BOOKING",
           },
         },
       })
+    }
+    if (paymentMethod === "WALLET") {
+      const tickets = await prisma.ticket.findMany({
+        where: { bookingId: booking.id },
+      })
 
-      if (payment.status === "SUCCESS") {
-        // c) Admin commission
-        const updatedAdmin = await tx.wallet.update({
-          where: { id: ADMIN_WALLET_ID },
-          data: { balance: { increment: finalAmount } },
-        })
+      // 6️⃣ Calculate commission & provider amount
+      const commission = totalAmount * COMMISSION_RATE
+      const providerAmount = totalAmount - commission
 
-        await tx.walletTransaction.create({
+      // 7️⃣ Ledger & payouts (atomic)
+      await prisma.$transaction(async (tx) => {
+        // a) TransactionLedger
+        await tx.transactionLedger.create({
           data: {
-            walletId: ADMIN_WALLET_ID,
-            amount: finalAmount,
-            type: "PAYMENT_IN",
-            status: "SUCCESS",
-            balanceAfter: updatedAdmin.balance,
-            reference: `TX-BUS-${booking.id}`,
+            userId,
+            providerId: null,
+            paymentId: payment.id,
+            totalAmount: finalAmount,
+            commission,
+            providerAmount,
             serviceType: "BUS_TICKET",
-            description: "Government bus ticket revenue",
+            referenceId: String(booking.id),
+            referenceType: "BOOKING",
+            paymentMethod,
+            currency,
+            status: payment.status === "SUCCESS" ? "COMPLETED" : "PENDING",
+            isSettled: payment.status === "SUCCESS",
+            externalRef: `LEDGER-${Date.now()}`,
+            description: "Government bus ticket — full revenue to admin",
+            metadata: {
+              busId,
+              scheduleId: schedule.id,
+              seats,
+              boardingStop,
+              alightingStop,
+              ownershipType: "GOVERNMENT",
+            },
           },
         })
 
-        await addPointsToUser({
-          tx,
-          userId,
-          amount: 100,
-          type: "EARN",
-          reason: "Bus ticket booking reward",
-          reference: `BOOKING_${booking.id}`,
-          metadata: {
-            bookingId: booking.id,
-            busId,
-            seats,
-          },
-        })
-      }
-    })
+        if (payment.status === "SUCCESS") {
+          // c) Admin commission
+          const updatedAdmin = await tx.wallet.update({
+            where: { id: ADMIN_WALLET_ID },
+            data: { balance: { increment: finalAmount } },
+          })
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: ADMIN_WALLET_ID,
+              amount: finalAmount,
+              type: "PAYMENT_IN",
+              status: "SUCCESS",
+              balanceAfter: updatedAdmin.balance,
+              reference: `TX-BUS-${booking.id}`,
+              serviceType: "BUS_TICKET",
+              description: "Government bus ticket revenue",
+            },
+          })
+
+          await addPointsToUser({
+            tx,
+            userId,
+            amount: 100,
+            type: "EARN",
+            reason: "Bus ticket booking reward",
+            reference: `BOOKING_${booking.id}`,
+            metadata: {
+              bookingId: booking.id,
+              busId,
+              seats,
+            },
+          })
+        }
+      })
+    }
+
+    // ADD this block after step 7️⃣, before the final return:
+    if (paymentMethod === "CHAPA") {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true, phone: true },
+      })
+
+      const chapaResult = await createChapaPayment(
+        {
+          ...payment,
+          metadata: { bookingId: booking.id, seats, type: "BOOKING" },
+        },
+        user,
+        {
+          callbackUrl: `${process.env.BACKEND_NEGROK_URL}/api/booking/callback`,
+          returnUrl: `${process.env.FRONTEND_URL}/payment/success?ref=${payment.reference}&amount=${payment.amount}&flow=${payment.flow}`,
+        },
+      )
+
+      return successResponse(
+        "Booking created, complete payment to confirm",
+        {
+          booking,
+          payment,
+          paymentUrl: chapaResult.paymentUrl,
+          expiresIn: "15 minutes",
+        },
+        201,
+      )
+    }
 
     return successResponse("Booking created successfully", {
       booking,
@@ -1113,5 +1177,76 @@ export const cancelSharedTicket = async (req, res) => {
   } catch (error) {
     console.error("Cancel shared ticket error:", error)
     return res.status(500).json(errorResponse("Failed to cancel shared ticket"))
+  }
+}
+
+export const paymentCallbackService = async (data) => {
+  try {
+    const reference = data.tx_ref || data.trx_ref
+    if (!reference) return errorResponse("Transaction reference missing", 400)
+
+    const payment = await prisma.payment.findUnique({
+      where: { reference },
+      include: { wallet: true, bookings: true },
+    })
+
+    if (!payment) return errorResponse("Payment not found", 404)
+    if (payment.status === "SUCCESS")
+      return successResponse("Payment already processed")
+
+    // ✅ Verify with Chapa — source of truth
+    const verification = await chapa.verify({ tx_ref: reference })
+    if (
+      verification.status !== "success" ||
+      verification.data.status !== "success"
+    ) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "FAILED",
+          metadata: {
+            ...payment.metadata,
+            failedAt: new Date(),
+            callbackData: data,
+            verificationResponse: verification,
+          },
+        },
+      })
+      return errorResponse("Payment verification failed", 400)
+    }
+
+    const actualMethod = "MOBILE_MONEY"
+    const { type, bookingId } = payment.metadata || {}
+
+    await prisma.$transaction(async (tx) => {
+      // 1️⃣ Mark payment SUCCESS
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "SUCCESS",
+          method: actualMethod.toUpperCase(),
+          gatewayRef: verification.data.reference,
+          metadata: {
+            ...payment.metadata,
+            actualMethod,
+            callbackData: data,
+            verificationResponse: verification,
+            completedAt: new Date(),
+          },
+        },
+      })
+
+      await handleSuccessfulPayment(tx, payment, type, bookingId)
+    })
+
+    return successResponse("Payment processed successfully", {
+      reference,
+      amount: payment.amount,
+      method: actualMethod,
+      flow: payment.flow,
+    })
+  } catch (error) {
+    console.error("Payment callback error:", error)
+    return errorResponse("Failed to process payment", 500)
   }
 }

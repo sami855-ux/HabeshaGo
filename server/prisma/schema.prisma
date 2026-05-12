@@ -1347,6 +1347,7 @@ enum PaymentMethod {
   BANK_TRANSFER
   CASH
   MOBILE_MONEY
+  CHAPA
 }
 
 enum PaymentGateway {
@@ -1360,6 +1361,7 @@ enum PaymentFlow {
   // Wallet related
   WALLET_TOPUP
   WALLET_PAYMENT
+  BOOKING
 
   // Direct external payment only
   DIRECT_PAYMENT

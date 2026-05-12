@@ -5,16 +5,20 @@ import {
   getPaymentHistory,
   topUpMpesa,
   mpesaCallback,
+  telebirrPaymentCallback,
 } from "../controllers/payment.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
 // Initiate a new payment (top-up wallet or direct) => this will work after deployment
-router.post("/initiate", initiatePayment)
+router.post("/initiate", authenticate, initiatePayment)
+
+//telebirr callback
+router.post("/telebirr/callback", telebirrPaymentCallback)
 
 // Callback from payment gateway (webhook) => this will work after deployment
-router.post("/callback", paymentCallback)
+router.get("/callback", paymentCallback)
 
 // Get user payment history
 router.get("/history", getPaymentHistory)

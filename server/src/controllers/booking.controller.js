@@ -143,3 +143,19 @@ export const adminBookingStats = (req, res) =>
     () => bookingService.adminBookingStatsService(),
     "Admin booking stats controller error",
   )
+
+export const paymentCallbackController = async (req, res) => {
+  try {
+    const data = { ...req.body, ...req.query }
+    const result = await bookingService.paymentCallbackService(data)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Payment callback controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while processing payment callback",
+      data: null,
+    })
+  }
+}

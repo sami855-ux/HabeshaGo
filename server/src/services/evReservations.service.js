@@ -1,6 +1,13 @@
+import { Decimal } from "@prisma/client/runtime/library"
 import prisma from "../prisma/client.js"
 import { successResponse, errorResponse } from "../utils/apiResponse.js"
-import { COMMISSION_RATE, POINTS_CONVERSION_RATE } from "../utils/constants.js"
+import {
+  ADMIN_WALLET_ID,
+  COMMISSION_RATE,
+  POINTS_CONVERSION_RATE,
+} from "../utils/constants.js"
+import { addPointsToUser } from "./wallet.service.js"
+import { createChapaPayment } from "./payment.service.js"
 
 /**
  * Create a new reservation
@@ -207,7 +214,10 @@ export const createReservationService = async (data) => {
           amount: calculatedAmount,
           method: isFullyPaid ? "WALLET" : paymentMethod,
           gateway: isFullyPaid ? "INTERNAL" : "CHAPA",
-          flow: paymentFlow,
+          flow:
+            paymentFlow === "EXTERNAL_ONLY"
+              ? "DIRECT_PAYMENT"
+              : "POINTS_WALLET",
           pointsUsed: pointsUsed || null,
           pointsValue: pointsValueUsed || null,
           status: isFullyPaid ? "SUCCESS" : "PENDING",
@@ -217,6 +227,7 @@ export const createReservationService = async (data) => {
             walletUsed,
             externalAmount: remainingAmount,
             paymentFlow,
+            type: "EV_RESERVATION",
           },
         },
       })
@@ -232,7 +243,7 @@ export const createReservationService = async (data) => {
           providerAmount,
           serviceType: "EV_CHARGING",
           referenceId: String(reservation.id),
-          referenceType: "EV_RESERVATION",
+          referenceType: "EV_CHARGING_SESSION",
           paymentMethod: isFullyPaid ? "WALLET" : paymentMethod,
           currency: "ETB",
           status: isFullyPaid ? "COMPLETED" : "PENDING",
@@ -321,6 +332,55 @@ export const createReservationService = async (data) => {
       }
     })
 
+    // AFTER the prisma.$transaction block, BEFORE the return:
+
+    if (result.needsExternalPayment) {
+      const user = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { name: true, email: true, phone: true },
+      })
+
+      // Update payment metadata with reservationId now that we have it
+      await prisma.payment.update({
+        where: { id: result.payment.id },
+        data: {
+          metadata: {
+            ...result.payment.metadata,
+            reservationId: result.reservation.id, // 🆕
+            type: "EV_RESERVATION", // 🆕
+          },
+        },
+      })
+
+      const chapaResult = await createChapaPayment(
+        {
+          ...result.payment,
+          amount: result.externalAmount, // only charge the remaining amount
+          metadata: {
+            ...result.payment.metadata,
+            reservationId: result.reservation.id,
+            type: "EV_RESERVATION",
+          },
+        },
+        user,
+        {
+          callbackUrl: `${process.env.BACKEND_NEGROK_URL}/api/ev/reservation/callback`,
+          returnUrl: `${process.env.FRONTEND_URL}/payment/success?ref=${result.payment.reference}&amount=${result.externalAmount}&flow=EV_CHARGING`,
+        },
+      )
+
+      return successResponse(
+        "Reservation created. Complete payment to confirm",
+        {
+          needsExternalPayment: true,
+          reservation: result.reservation,
+          payment: result.payment,
+          paymentUrl: chapaResult.paymentUrl,
+          expiresIn: "15 minutes",
+        },
+        201,
+      )
+    }
     // RESPONSE
     return successResponse(
       result.needsExternalPayment
@@ -334,72 +394,6 @@ export const createReservationService = async (data) => {
     return errorResponse(error?.message || "Failed to create reservation", 500)
   }
 }
-
-// const res = await createReservation()
-
-// if (res.data.needsExternalPayment) {
-//   const paymentId = res.data.payment.id
-
-//   const external = await initializeExternalPayment(paymentId)
-
-//   window.location.href = external.checkoutUrl
-// }
-//EXTERNAL Paymnet
-// export const initializeExternalPaymentService = async (paymentId) => {
-//   const payment = await prisma.payment.findUnique({
-//     where: { id: paymentId },
-//   })
-
-//   if (!payment) {
-//     return errorResponse("Payment not found", 404)
-//   }
-
-//   const amount = payment.metadata?.externalAmount
-
-//   if (!amount || amount <= 0) {
-//     return errorResponse("No external payment needed", 400)
-//   }
-
-//   // Call Chapa / Telebirr
-//   const gatewayResponse = await initializeChapaPayment({
-//     amount,
-//     tx_ref: payment.reference,
-//     callback_url: `${process.env.BASE_URL}/api/payments/webhook`,
-//   })
-
-//   return successResponse("Redirect user to payment gateway", {
-//     checkoutUrl: gatewayResponse.checkout_url,
-//   })
-// }
-
-// export const paymentWebhook = async (req) => {
-//   const { tx_ref, status } = req.body
-
-//   const payment = await prisma.payment.findUnique({
-//     where: { reference: tx_ref },
-//   })
-
-//   if (!payment) return errorResponse("Payment not found", 404)
-
-//   if (status === "success") {
-//     await prisma.payment.update({
-//       where: { id: payment.id },
-//       data: { status: "COMPLETED" },
-//     })
-
-//     await prisma.eVReservation.update({
-//       where: { id: payment.evReservationId },
-//       data: {
-//         paymentStatus: "COMPLETED",
-//         isConnectorLocked: false,
-//       },
-//     })
-
-//     return successResponse("Payment completed", null, 200)
-//   }
-
-//   return errorResponse("Payment failed", 400)
-// }
 
 /**
  * Get all reservations

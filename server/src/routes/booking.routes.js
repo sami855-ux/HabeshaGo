@@ -15,6 +15,7 @@ import {
   adminUpdateBooking,
   adminBookingStats,
   shareBookingResponse,
+  paymentCallbackController,
 } from "../controllers/booking.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import { authorizeAdmin } from "../middlewares/authorizeAdmin.js"
@@ -26,6 +27,9 @@ import {
 const router = express.Router()
 
 // USER ROUTES
+
+router.post("/callback", paymentCallbackController)
+router.get("/callback", paymentCallbackController)
 
 // Create a new booking (purchase ticket)
 router.post("/", authenticate, createBooking)

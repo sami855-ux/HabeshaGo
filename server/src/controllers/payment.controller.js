@@ -3,6 +3,7 @@ import {
   mpesaCallbackService,
   mpesaTopUpService,
   paymentCallbackService,
+  telebirrCallbackService,
   // getPaymentHistoryService,
   // verifyPaymentService,
   // getPaymentByReferenceService,
@@ -13,8 +14,8 @@ import {
  */
 export const initiatePayment = async (req, res) => {
   try {
-    // const userId = req.user?.id || req.body.userId // Get from auth middleware or request body
-    const userId = "cmknyr7sc00005zku6ti238bw"
+    const userId = req.user?.id
+    // const userId = "cmo0c8ahn0000ux3k5gaga7dm"
 
     if (!userId) {
       return res.status(401).json({
@@ -54,6 +55,20 @@ export const paymentCallback = async (req, res) => {
       statusCode: 500,
       message: "Internal server error during payment callback",
       data: null,
+    })
+  }
+}
+
+export const telebirrPaymentCallback = async (req, res) => {
+  try {
+    console.log("Received Telebirr callback:", req.body)
+    const result = await telebirrCallbackService(req.body)
+    return res.status(200).json({ code: "0", message: "success" })
+  } catch (error) {
+    console.error("Telebirr callback controller error:", error)
+    return res.status(500).json({
+      code: "1",
+      message: "error",
     })
   }
 }

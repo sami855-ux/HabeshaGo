@@ -1,29 +1,30 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { MapPin, Navigation, Search, Filter, Star } from "lucide-react";
-import { Button } from "../../../../components/ui/button";
-import { Input } from "../../../../components/ui/input";
-import { cn } from "../../../../lib/utils";
+import { useEffect, useState } from "react"
+import { MapPin, Navigation, Search, Filter, Star } from "lucide-react"
+import { Button } from "../../../../components/ui/button"
+import { Input } from "../../../../components/ui/input"
+import { cn } from "../../../../lib/utils"
 
-import { useDispatch, useSelector } from "react-redux";
-import { fetchParkingLots } from "@/store/slices/parkingSlice";
+import { useDispatch, useSelector } from "react-redux"
+import { fetchParkingLots } from "@/store/slices/parkingAdminSlice"
+// import { fetchParkingLots } from "@/store/slices/parkingSlice";
 
 interface FindParkingProps {
-  onSelectLot?: (lotId: string) => void;
+  onSelectLot?: (lotId: string) => void
 }
 
 export default function FindParking({ onSelectLot }: FindParkingProps) {
-  const dispatch = useDispatch<any>();
+  const dispatch = useDispatch<any>()
 
-  const { lots = [] } = useSelector((state: any) => state.parking || {});
+  const { lots = [] } = useSelector((state: any) => state.parking || {})
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState("")
 
   // FETCH FROM BACKEND
   useEffect(() => {
-    dispatch(fetchParkingLots());
-  }, [dispatch]);
+    dispatch(fetchParkingLots())
+  }, [dispatch])
 
   // SAFE DATA NORMALIZATION (prevents object crash)
   const safeLots = Array.isArray(lots)
@@ -43,27 +44,27 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
         rating: lot?.rating || 4.0,
         operatingHours: lot?.operatingHours || "24/7",
       }))
-    : [];
+    : []
 
   // FILTERING (UNCHANGED LOGIC)
   const filteredLots = safeLots.filter(
     (lot: any) =>
       lot.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lot.address?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  )
 
   const getOccupancyRate = (total: number, available: number) => {
-    if (!total) return 0;
-    return ((total - available) / total) * 100;
-  };
+    if (!total) return 0
+    return ((total - available) / total) * 100
+  }
 
   const getOccupancyColor = (rate: number) => {
     if (rate >= 80)
-      return "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400";
+      return "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400"
     if (rate >= 50)
-      return "text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400";
-    return "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400";
-  };
+      return "text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400"
+    return "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400"
+  }
 
   return (
     <div className="space-y-6">
@@ -104,7 +105,7 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
           const occupancyRate = getOccupancyRate(
             lot.totalSlots,
             lot.availableSlots,
-          );
+          )
 
           return (
             <div
@@ -200,7 +201,7 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
                 </span>
               </div>
             </div>
-          );
+          )
         })}
       </div>
 
@@ -211,5 +212,5 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
         </div>
       )}
     </div>
-  );
+  )
 }

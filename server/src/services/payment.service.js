@@ -655,9 +655,8 @@ const handleMinibusBookingPayment = async (tx, payment, bookingId) => {
 export const createChapaPayment = async (payment, user, options = {}) => {
   const nameParts = (user.name || "User").split(" ")
 
-  const defaultCallbackUrl =
-    "https://freight-lisp-poking.ngrok-free.dev/api/payment/callback"
-  const defaultReturnUrl = `http://localhost:3000/payment/success?ref=${payment.reference}&amount=${payment.amount}&flow=${payment.flow}`
+  const defaultCallbackUrl = `${process.env.BACKEND_NEGROK_URL}/api/payment/callback`
+  const defaultReturnUrl = `${process.env.FRONTEND_URL}/payment/success?ref=${payment.reference}&amount=${payment.amount}&flow=${payment.flow}`
 
   const payload = {
     amount: payment.amount.toString(),
@@ -667,8 +666,8 @@ export const createChapaPayment = async (payment, user, options = {}) => {
     last_name: nameParts.slice(1).join(" ") || "Customer",
     phone_number: user.phone,
     tx_ref: payment.reference,
-    callback_url: options.callbackUrl || defaultCallbackUrl, // 🆕
-    return_url: options.returnUrl || defaultReturnUrl, // 🆕
+    callback_url: options.callbackUrl || defaultCallbackUrl,
+    return_url: options.returnUrl || defaultReturnUrl,
     "customization[title]": "HabeshaGo Payment",
     "customization[description]": payment.metadata.type,
     "meta[payment_id]": payment.id.toString(),

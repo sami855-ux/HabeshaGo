@@ -9,6 +9,7 @@ import {
   getReservationsByPoint,
   getReservationsByUser,
   getManagerPayments,
+  verifyCharger,
 } from "../controllers/evReservations.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import { paymentCallbackController } from "../controllers/booking.controller.js"
@@ -17,6 +18,8 @@ const router = express.Router()
 
 router.post("/callback", paymentCallbackController)
 router.get("/callback", paymentCallbackController)
+
+router.post("/verify", authenticate, verifyCharger)
 
 // CRUD
 router.post("/", createReservation)

@@ -13,3 +13,23 @@ export const getReservationById = async (id: number | null) => {
     )
   }
 }
+export const verifyChargerCode = async (payload: {
+  code: string
+  stationId?: number
+}) => {
+  try {
+    console.log("🔍 Verifying charger with payload:", payload)
+
+    const response = await axiosInstance.post("/ev/reservation/verify", payload)
+
+    console.log("✅ Charger verification response:", response.data)
+
+    return response.data
+  } catch (error: any) {
+    console.error(
+      "❌ Charger verification error:",
+      error?.response?.data || error?.message,
+    )
+    throw new Error(error?.response?.data?.message || "Verification failed")
+  }
+}

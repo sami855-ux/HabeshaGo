@@ -58,3 +58,22 @@ export const getManagerPayments = async (req, res) => {
 
   return res.status(result.statusCode).json(result)
 }
+
+export const verifyCharger = async (req, res) => {
+  try {
+    const result = await reservationService.verifyChargerService(
+      req.user.id,
+      req.body.code,
+      req.body.stationId,
+    )
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Verify charger controller error:", error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Internal server error while verifying charger",
+      data: null,
+    })
+  }
+}

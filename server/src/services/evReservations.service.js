@@ -9,6 +9,27 @@ import {
 import { addPointsToUser } from "./wallet.service.js"
 import { createChapaPayment } from "./payment.service.js"
 
+//Helper function
+export async function generateUniqueReservationCode(tx) {
+  const MAX_ATTEMPTS = 5
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const timestamp = Date.now().toString(36).toUpperCase()
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase()
+    const code = `EVE-RES-${timestamp}${random}`
+
+    // Check if this code already exists in the DB
+    const existing = await tx.eVReservation.findUnique({
+      where: { reservationCode: code },
+    })
+
+    if (!existing) return code
+  }
+
+  throw new Error(
+    "Failed to generate a unique reservation code after multiple attempts",
+  )
+}
 /**
  * Create a new reservation
  */
@@ -45,7 +66,6 @@ export const createReservationService = async (data) => {
 
     if (end <= start) return errorResponse("Invalid time range", 400)
 
-    console.log(calculatedAmount)
     if (!calculatedAmount || Number(calculatedAmount) <= 0)
       return errorResponse("Invalid payment amount", 400)
 
@@ -187,6 +207,7 @@ export const createReservationService = async (data) => {
       }
 
       const isFullyPaid = remainingAmount === 0
+      const reservationCode = await generateUniqueReservationCode(tx)
 
       // 3. RESERVATION
       const reservation = await tx.eVReservation.create({
@@ -202,8 +223,9 @@ export const createReservationService = async (data) => {
           status: isFullyPaid ? "CONFIRMED" : "PENDING",
           paymentStatus: isFullyPaid ? "SUCCESS" : "PENDING",
           preAuthorizedAmount: calculatedAmount,
-          reservationCode: `RES-${Date.now()}`,
+          reservationCode,
           isConnectorLocked: !isFullyPaid,
+          expiresAt: new Date(new Date(start).getTime() + 15 * 60 * 1000),
         },
       })
 
@@ -696,5 +718,243 @@ export const getManagerPaymentsService = async (managerId) => {
   } catch (error) {
     console.error("Error fetching manager payments:", error)
     return errorResponse("Failed to fetch payments", 500)
+  }
+}
+
+export const verifyChargerService = async (userId, code, stationId) => {
+  try {
+    if (!code) {
+      return errorResponse("code is required", 400)
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        isSuspended: true,
+        isDeleted: true,
+      },
+    })
+
+    if (!user) return errorResponse("User not found", 404)
+    if (user.isSuspended) return errorResponse("Your account is suspended", 403)
+    if (user.isDeleted)
+      return errorResponse("Your account no longer exists", 403)
+
+    // ─── 3. Detect input type & find charging point ───────────────────
+    // QR scan  → code = "EVE-CP-00423" (contains dash or long)
+    // Manual   → code = "A3" or "12"   (short slot label)
+    const isQrScan = code.length > 6
+
+    let chargingPoint
+
+    if (isQrScan) {
+      // QR scan → find by stationCode
+      chargingPoint = await prisma.chargingPoint.findFirst({
+        where: {
+          slotnumber: code.trim().toUpperCase(),
+        },
+        include: {
+          station: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              status: true,
+              isVerified: true,
+            },
+          },
+        },
+      })
+    } else {
+      // Manual type → find by slotNumber + stationId
+      if (!stationId) {
+        return errorResponse(
+          "stationId is required when typing a slot number",
+          400,
+        )
+      }
+
+      chargingPoint = await prisma.chargingPoint.findFirst({
+        where: {
+          slotNumber: code.trim().toUpperCase(),
+          stationId: Number(stationId),
+        },
+        include: {
+          station: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              status: true,
+              isVerified: true,
+            },
+          },
+        },
+      })
+    }
+
+    console.log(chargingPoint)
+    // ─── 4. Charging point exists? ────────────────────────────────────
+    if (!chargingPoint) {
+      return errorResponse(
+        isQrScan
+          ? `No charging point found with code "${code}"`
+          : `No charging point found with slot "${code}" at this station`,
+        404,
+      )
+    }
+
+    // ─── 5. Station checks ────────────────────────────────────────────
+    if (chargingPoint.station.status !== "ACTIVE") {
+      return errorResponse(
+        `This station is currently ${chargingPoint.station.status}`,
+        400,
+      )
+    }
+
+    if (!chargingPoint.station.isVerified) {
+      return errorResponse("This station is not yet verified", 400)
+    }
+
+    // ─── 6. Charging point available? ────────────────────────────────
+    if (chargingPoint.status !== "AVAILABLE") {
+      return errorResponse(
+        `Charging point is currently ${chargingPoint.status}`,
+        400,
+      )
+    }
+
+    // ─── 7. Find active reservation for this user + charger ──────────
+    const now = new Date()
+
+    const reservation = await prisma.eVReservation.findFirst({
+      where: {
+        chargingPointId: chargingPoint.id,
+        userId,
+        status: { in: ["PENDING", "CONFIRMED"] },
+        // user can scan up to 10 mins before their startTime
+        // startTime: { lte: new Date(now.getTime() + 10 * 60 * 1000) },
+        // expiresAt: { gte: now },
+      },
+      include: {
+        vehicle: {
+          select: {
+            id: true,
+            plateNumber: true,
+            vin: true,
+            model: true,
+            manufacturer: true,
+            connectorType: true,
+          },
+        },
+      },
+    })
+
+    // ← ADD THIS to see what the actual values are
+    console.log("now        →", now)
+    console.log("startTime  →", reservation?.startTime)
+    console.log("expiresAt  →", reservation?.expiresAt)
+    console.log("status     →", reservation?.status)
+
+    if (!reservation) {
+      return errorResponse(
+        "No active reservation found for this charging point",
+        403,
+      )
+    }
+
+    // ─── 8. Already used? ─────────────────────────────────────────────
+    if (reservation.isUsed) {
+      return errorResponse("This reservation has already been used", 400)
+    }
+
+    // ─── 9. Payment cleared? ──────────────────────────────────────────
+    if (reservation.isConnectorLocked) {
+      return errorResponse("Connector is locked — payment not completed", 400)
+    }
+
+    // ─── 10. Connector type match? ────────────────────────────────────
+    if (reservation.vehicle.connectorType !== chargingPoint.connectorType) {
+      return errorResponse(
+        `Connector mismatch — vehicle uses ${reservation.vehicle.connectorType} but charger is ${chargingPoint.connectorType}`,
+        400,
+      )
+    }
+
+    // ─── 11. All checks passed → start session ────────────────────────
+    const result = await prisma.$transaction(async (tx) => {
+      const session = await tx.chargingSession.create({
+        data: {
+          userId,
+          vehicleId: reservation.vehicleId,
+          stationId: chargingPoint.stationId,
+          chargingPointId: chargingPoint.id,
+          startTime: now,
+          status: "ACTIVE",
+        },
+      })
+
+      const updatedReservation = await tx.eVReservation.update({
+        where: { id: reservation.id },
+        data: {
+          status: "CONFIRMED",
+          isUsed: true,
+          isConnectorLocked: false,
+          chargingSessionId: session.id,
+        },
+      })
+
+      await tx.chargingPoint.update({
+        where: { id: chargingPoint.id },
+        data: { status: "OCCUPIED" },
+      })
+
+      return { session, updatedReservation }
+    })
+
+    // ─── 12. Return success ───────────────────────────────────────────
+    return successResponse("Charging session started successfully", {
+      method: isQrScan ? "QR_SCAN" : "MANUAL_TYPE",
+      sessionId: result.session.id,
+      reservationCode: reservation.reservationCode,
+      startTime: result.session.startTime,
+
+      chargingPoint: {
+        id: chargingPoint.id,
+        slotNumber: chargingPoint.slotNumber,
+        connectorType: chargingPoint.connectorType,
+        powerKw: chargingPoint.powerKw,
+        chargingSpeed: chargingPoint.chargingSpeed,
+      },
+
+      station: {
+        id: chargingPoint.station.id,
+        name: chargingPoint.station.name,
+        address: chargingPoint.station.address,
+        city: chargingPoint.station.city,
+      },
+
+      vehicle: {
+        id: reservation.vehicle.id,
+        plateNumber: reservation.vehicle.plateNumber,
+        model: reservation.vehicle.model,
+        connectorType: reservation.vehicle.connectorType,
+      },
+
+      reservation: {
+        id: reservation.id,
+        targetBatteryPercentage: reservation.targetBatteryPercentage,
+        targetKwh: reservation.targetKwh,
+        calculatedAmount: reservation.calculatedAmount?.toString(),
+        endTime: reservation.endTime,
+      },
+    })
+  } catch (error) {
+    console.error("Verify charger service error:", error)
+    return errorResponse("Failed to verify charger", 500)
   }
 }

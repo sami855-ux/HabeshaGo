@@ -521,24 +521,6 @@ export default function TripsPage() {
             </Badge>
           </Button>
 
-          <Button
-            variant={bookingTypeFilter === "parking" ? "default" : "outline"}
-            onClick={() => setBookingTypeFilter("parking")}
-            className={cn(
-              "rounded-full px-4 gap-2",
-              bookingTypeFilter === "parking" && "bg-gradient-to-r from-green-500 to-emerald-500"
-            )}
-            disabled
-          >
-            <ParkingCircle className="h-4 w-4" />
-            Parking
-            <Badge variant="secondary" className="ml-1 bg-white/20">
-              {upcomingParkingCount + pastParkingCount}
-            </Badge>
-            <Badge variant="outline" className="ml-1 text-xs bg-yellow-100 text-yellow-700 border-yellow-200">
-              Soon
-            </Badge>
-          </Button>
         </div>
       </div>
 

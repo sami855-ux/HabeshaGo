@@ -41,6 +41,8 @@ const formatReservation = (reservation: any) => {
     powerKw: reservation.chargingPoint?.powerKw,
     targetKwh: reservation.targetKwh,
     paymentStatus: reservation.paymentStatus,
+    stationId: station?.id,
+    stationCode: reservation.chargingPoint?.slotNumber,
   }
 }
 
@@ -75,7 +77,6 @@ const StartCharging: React.FC = () => {
   const [connectionTimeout, setConnectionTimeout] =
     useState<NodeJS.Timeout | null>(null)
 
-  // ================= SOCKET =================
   useEffect(() => {
     if (!socket) return
 
@@ -210,7 +211,6 @@ const StartCharging: React.FC = () => {
     }
   }
 
-  // ================= UI =================
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -245,7 +245,7 @@ const StartCharging: React.FC = () => {
           ← Back
         </button>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-2 gap-8">
           <ReservationDetails reservation={reservation} />
 
           <VerificationPanel

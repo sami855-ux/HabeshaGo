@@ -327,15 +327,6 @@ export const startChargingService = async (reservationId) => {
     throw new Error("Reservation not found")
   }
 
-  // STEP 2: Validations
-  if (reservation.isUsed) {
-    throw new Error("Reservation already used")
-  }
-
-  if (reservation.paymentStatus !== "SUCCESS") {
-    throw new Error("Payment not completed")
-  }
-
   if (new Date() > reservation.endTime) {
     throw new Error("Reservation expired")
   }

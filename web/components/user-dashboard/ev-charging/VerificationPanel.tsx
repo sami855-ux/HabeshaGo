@@ -9,6 +9,8 @@ import {
   Smartphone,
   Plug,
 } from "lucide-react"
+import { verifyChargerCode } from "@/services/ev-reservation"
+import { toast } from "sonner"
 
 interface VerificationPanelProps {
   reservation: any
@@ -33,20 +35,47 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
   const [manualCode, setManualCode] = useState("")
   const [isVerifying, setIsVerifying] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
+  const [verifyError, setVerifyError] = useState<string | null>(null) // ← NEW
 
-  const handleVerifyQR = async () => {
+  // QR Scan
+  const handleVerifyQR = async (scannedCode: string) => {
+    // scannedCode comes from your QR scanner result
+    // e.g. "EVE-CP-00423"
     setIsVerifying(true)
-    await new Promise((resolve) => setTimeout(resolve, 1200))
-    setIsVerifying(false)
-    onVerificationSuccess("qr")
+    setVerifyError(null)
+
+    try {
+      await verifyChargerCode({ code: scannedCode })
+      onVerificationSuccess("qr")
+      toast.success("Charger verified successfully")
+    } catch (error: any) {
+      setVerifyError(error.message)
+      toast.error(error.message || "QR verification failed")
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
+  // Manual Type
   const handleVerifyManual = async () => {
     if (!manualCode.trim()) return
     setIsVerifying(true)
-    await new Promise((resolve) => setTimeout(resolve, 1200))
-    setIsVerifying(false)
-    onVerificationSuccess("manual")
+    setVerifyError(null)
+
+    try {
+      await verifyChargerCode({
+        code: manualCode.trim().toUpperCase(), // "A3"
+        stationId: reservation.stationId, // needed for manual type
+      })
+      onVerificationSuccess("manual")
+      toast.success("Code verified successfully")
+    } catch (error: any) {
+      setVerifyError(error.message)
+      console.log(error)
+      toast.error(error.message || "Code verification failed")
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   const handleStartChargingClick = () => {
@@ -79,7 +108,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
+      {/* Step indicator — unchanged */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div
@@ -124,7 +153,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
             <div className="space-y-6">
               <div className="grid sm:grid-cols-2 gap-4">
                 <button
-                  onClick={() => setVerificationMethod("qr")}
+                  onClick={() => {
+                    setVerificationMethod("qr")
+                    setVerifyError(null)
+                  }}
                   className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
                     verificationMethod === "qr"
                       ? "border-blue-500 bg-blue-50"
@@ -155,7 +187,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setVerificationMethod("manual")}
+                  onClick={() => {
+                    setVerificationMethod("manual")
+                    setVerifyError(null)
+                  }}
                   className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
                     verificationMethod === "manual"
                       ? "border-blue-500 bg-blue-50"
@@ -184,6 +219,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 </button>
               </div>
 
+              {/* ── QR Panel ── */}
               {verificationMethod === "qr" && (
                 <div className="bg-gray-50 rounded-xl p-6 text-center animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="w-20 h-20 mx-auto bg-white rounded-xl shadow-sm flex items-center justify-center mb-4">
@@ -192,8 +228,13 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                   <p className="text-gray-700 text-sm mb-4">
                     Scan the QR code displayed on the charger screen
                   </p>
+                  {/* 
+                    Replace this button with your actual QR scanner component.
+                    When the scanner reads a code, call handleVerifyQR(scannedCode)
+                    For now it simulates with the reservation's stationCode
+                  */}
                   <button
-                    onClick={handleVerifyQR}
+                    onClick={() => handleVerifyQR(reservation.stationCode)}
                     disabled={isVerifying}
                     className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition disabled:opacity-50"
                   >
@@ -209,19 +250,23 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 </div>
               )}
 
+              {/* ── Manual Panel ── */}
               {verificationMethod === "manual" && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <input
                     type="text"
                     value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value)}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg tracking-widest"
+                    onChange={(e) => {
+                      setManualCode(e.target.value)
+                      setVerifyError(null) // clear error on type
+                    }}
+                    placeholder="Enter slot code e.g. A3"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg tracking-widest uppercase"
                     maxLength={6}
                   />
                   <button
                     onClick={handleVerifyManual}
-                    disabled={isVerifying || manualCode.length !== 6}
+                    disabled={isVerifying || !manualCode.trim()}
                     className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isVerifying ? (
@@ -230,6 +275,14 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                       "Verify Code"
                     )}
                   </button>
+                </div>
+              )}
+
+              {/* ── Error Message ── */}
+              {verifyError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in duration-200">
+                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-600">{verifyError}</p>
                 </div>
               )}
 
@@ -261,7 +314,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         </div>
       </div>
 
-      {/* Start Charging Button */}
+      {/* Start Charging Button — unchanged */}
       <button
         onClick={handleStartChargingClick}
         disabled={!isVerified || isStarting}

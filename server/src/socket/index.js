@@ -1,8 +1,8 @@
-import { Server } from "socket.io"
-import { getLatestVehicleLocation } from "../services/redisService.service.js"
-import { chargingSocketHandler } from "./charging.socket.js"
+import { Server } from "socket.io";
+import { getLatestVehicleLocation } from "../services/redisService.service.js";
+import { chargingSocketHandler } from "./charging.socket.js";
 
-let io = null
+let io = null;
 
 // Initialize socket
 export const initSocket = (server) => {
@@ -12,217 +12,271 @@ export const initSocket = (server) => {
       methods: ["GET", "POST"],
       credentials: true,
     },
-  })
+  });
 
   io.on("connection", (socket) => {
-    console.log("Connected:", socket.id)
+    console.log("Connected:", socket.id);
 
-    // Join vehicle room
+    // =========================
+    // VEHICLE SOCKETS
+    // =========================
     socket.on("joinVehicle", async (vehicleId) => {
-      socket.join(`vehicle-${vehicleId}`)
+      socket.join(`vehicle-${vehicleId}`);
 
       try {
-        const latest = await getLatestVehicleLocation(vehicleId)
+        const latest = await getLatestVehicleLocation(vehicleId);
         if (latest) {
-          socket.emit("vehicle:location", latest)
+          socket.emit("vehicle:location", latest);
         }
       } catch (error) {
-        console.error("Vehicle location error", error)
+        console.error("Vehicle location error", error);
       }
-    })
+    });
 
     socket.on("leaveVehicle", (vehicleId) => {
-      socket.leave(`vehicle-${vehicleId}`)
-    })
+      socket.leave(`vehicle-${vehicleId}`);
+    });
 
-    chargingSocketHandler(socket)
+    // Charging module
+    chargingSocketHandler(socket);
 
-    // Join map room
+    // =========================
+    // PARKING SOCKETS (NEW CLEAN MODULE)
+    // =========================
+
+    socket.on("joinParkingLot", (lotId) => {
+      if (!lotId) return;
+      socket.join(`parking-lot-${lotId}`);
+    });
+
+    socket.on("leaveParkingLot", (lotId) => {
+      if (!lotId) return;
+      socket.leave(`parking-lot-${lotId}`);
+    });
+
+    socket.on("joinParkingSlot", (slotId) => {
+      if (!slotId) return;
+      socket.join(`parking-slot-${slotId}`);
+    });
+
+    socket.on("leaveParkingSlot", (slotId) => {
+      if (!slotId) return;
+      socket.leave(`parking-slot-${slotId}`);
+    });
+
+    socket.on("joinParkingSession", (sessionId) => {
+      if (!sessionId) return;
+      socket.join(`parking-session-${sessionId}`);
+    });
+
+    socket.on("leaveParkingSession", (sessionId) => {
+      if (!sessionId) return;
+      socket.leave(`parking-session-${sessionId}`);
+    });
+
+    // =========================
+    // MAP SOCKETS
+    // =========================
     socket.on("joinMap", async (vehicleIds) => {
-      // 1. Input validation with client feedback
       if (!Array.isArray(vehicleIds) || vehicleIds.length === 0) {
         socket.emit("map:error", {
           message: "vehicleIds must be a non-empty array",
-        })
-        return
+        });
+        return;
       }
 
-      // 2. Filter to valid positive integers only
       const validIds = vehicleIds
-        .slice(0, 100) // safety cap
-        .filter((id) => Number.isInteger(id) && id > 0)
+        .slice(0, 100)
+        .filter((id) => Number.isInteger(id) && id > 0);
 
       if (validIds.length === 0) {
-        socket.emit("map:error", { message: "No valid vehicle IDs provided" })
-        return
+        socket.emit("map:error", { message: "No valid vehicle IDs provided" });
+        return;
       }
 
-      socket.join("map")
+      socket.join("map");
 
       try {
-        // 3. Promise.allSettled so one Redis failure doesn't kill the whole init
         const results = await Promise.allSettled(
           validIds.map(getLatestVehicleLocation),
-        )
+        );
 
-        console.log("Promise results:", results)
-
-        const locations = []
-        results.forEach((result, index) => {
+        const locations = [];
+        results.forEach((result) => {
           if (result.status === "fulfilled" && result.value) {
-            locations.push(result.value)
-          } else if (result.status === "rejected") {
-            console.error(
-              `Failed to fetch location for vehicle ${validIds[index]}:`,
-              result.reason,
-            )
+            locations.push(result.value);
           }
-        })
+        });
 
-        socket.emit("map:init", locations)
+        socket.emit("map:init", locations);
 
-        // 4. Track which vehicles this socket is watching (for disconnect cleanup)
-        socket.data.trackedVehicleIds = validIds
+        socket.data.trackedVehicleIds = validIds;
       } catch (error) {
-        console.error("Map init error", error)
-        socket.emit("map:error", { message: "Failed to initialize map" })
+        console.error("Map init error", error);
+        socket.emit("map:error", { message: "Failed to initialize map" });
       }
-    })
+    });
 
-    // 5. Cleanup on leave / disconnect
     socket.on("leaveMap", () => {
-      socket.leave("map")
-      socket.data.trackedVehicleIds = []
-    })
+      socket.leave("map");
+      socket.data.trackedVehicleIds = [];
+    });
 
     socket.on("disconnect", () => {
-      socket.data.trackedVehicleIds = []
-    })
+      console.log("Disconnected:", socket.id);
+      socket.data.trackedVehicleIds = [];
+    });
 
-    // Join charging session
+    // =========================
+    // CHARGING / STATION
+    // =========================
     socket.on("joinSession", (sessionId) => {
-      socket.join(`session-${sessionId}`)
-    })
+      if (!sessionId) return;
+      socket.join(`session-${sessionId}`);
+    });
 
     socket.on("leaveSession", (sessionId) => {
-      socket.leave(`session-${sessionId}`)
-    })
+      if (!sessionId) return;
+      socket.leave(`session-${sessionId}`);
+    });
 
-    // Join station room
     socket.on("joinStation", (stationId) => {
-      socket.join(`station-${stationId}`)
-    })
+      if (!stationId) return;
+      socket.join(`station-${stationId}`);
+    });
 
     socket.on("leaveStation", (stationId) => {
-      socket.leave(`station-${stationId}`)
-    })
+      if (!stationId) return;
+      socket.leave(`station-${stationId}`);
+    });
 
-    // Join user notification room
+    // =========================
+    // USER / ADMIN ROOMS
+    // =========================
     socket.on("joinUserNotification", (userId) => {
-      if (!userId) return
-      socket.join(`user-${userId}`)
-    })
+      if (!userId) return;
+      socket.join(`user-${userId}`);
+    });
 
-    // Join admin notification room (fixed)
     socket.on("joinAdminRoom", (adminId) => {
-      if (!adminId) return
-      socket.join(`admin-${adminId}`)
-    })
+      if (!adminId) return;
+      socket.join(`admin-${adminId}`);
+    });
+  });
 
-    socket.on("disconnect", () => {
-      console.log("Disconnected:", socket.id)
-    })
-  })
+  return io;
+};
 
-  return io
-}
-
-// Get socket instance
+// =========================
+// SOCKET INSTANCE
+// =========================
 export const getIO = () => {
-  if (!io) {
-    throw new Error("Socket not initialized")
-  }
-  return io
-}
+  if (!io) throw new Error("Socket not initialized");
+  return io;
+};
 
-// Emit vehicle location
+// =========================
+// EMIT HELPERS
+// =========================
 export const emitToVehicle = (vehicleId, payload) => {
-  if (!io) return
-  io.to(`vehicle-${vehicleId}`).emit("vehicle:location", payload)
-}
+  if (!io) return;
+  io.to(`vehicle-${vehicleId}`).emit("vehicle:location", payload);
+};
 
-// Emit session update
 export const emitSessionUpdate = (sessionId, payload) => {
-  if (!io) return
-  io.to(`session-${sessionId}`).emit("session:update", payload)
-}
+  if (!io) return;
+  io.to(`session-${sessionId}`).emit("session:update", payload);
+};
 
-// Emit charging point status
+export const emitParkingReservation = (userId, reservation) => {
+  if (!io) return;
+
+  io.to(`user-${userId}`).emit("parking:reservation", {
+    reservation,
+  });
+};
+export const emitParkingSessionEnd = (userId, session) => {
+  if (!io) return;
+
+  io.to(`user-${userId}`).emit("parking:session:end", {
+    session,
+  });
+};
+export const emitParkingSessionStart = (userId, session) => {
+  if (!io) return;
+
+  io.to(`user-${userId}`).emit("parking:session:start", {
+    session,
+  });
+};
+
+export const emitParkingSlotUpdate = (lotId, slot) => {
+  if (!io) return;
+
+  io.to(`parking-lot-${lotId}`).emit("parking:slot:update", {
+    slot,
+  });
+};
+
 export const emitPointStatusUpdate = (stationId, pointData) => {
-  if (!io) return
+  if (!io) return;
 
-  io.to(`station-${stationId}`).emit("point:statusChanged", pointData)
+  io.to(`station-${stationId}`).emit("point:statusChanged", pointData);
 
   io.to("map").emit("station:availabilityUpdate", {
     stationId,
     point: pointData,
-  })
-}
+  });
+};
 
-// Emit wallet transaction
 export const emitWalletTransaction = (userId, transaction) => {
-  if (!io) return
-  io.to(`user-${userId}`).emit("wallet:transaction", transaction)
-}
+  if (!io) return;
+  io.to(`user-${userId}`).emit("wallet:transaction", transaction);
+};
 
-// Emit reservation events
 export const emitReservationExpiring = (userId, reservation) => {
-  if (!io) return
-  io.to(`user-${userId}`).emit("reservation:expiring", reservation)
-}
+  if (!io) return;
+  io.to(`user-${userId}`).emit("reservation:expiring", reservation);
+};
 
 export const emitReservationConfirmed = (userId, reservation) => {
-  if (!io) return
-  io.to(`user-${userId}`).emit("reservation:confirmed", reservation)
-}
+  if (!io) return;
+  io.to(`user-${userId}`).emit("reservation:confirmed", reservation);
+};
 
-// Emit admin telemetry
 export const emitAdminTelemetry = (payload) => {
-  if (!io) return
-  io.to("admin-dashboard").emit("telemetry:update", payload)
-}
+  if (!io) return;
+  io.to("admin-dashboard").emit("telemetry:update", payload);
+};
 
 export const emitToMap = (payload) => {
-  if (!io) return
-  io.to("map").emit("map:vehicleUpdate", payload)
-}
+  if (!io) return;
+  io.to("map").emit("map:vehicleUpdate", payload);
+};
 
-// Emit charger fault
 export const emitChargerFault = (stationId, faultData) => {
-  if (!io) return
+  if (!io) return;
   io.emit("charger:fault", {
     stationId,
     ...faultData,
-  })
-}
+  });
+};
 
-// Emit user notification (fixed structure)
 export const emitToUserNotification = (userId, notification) => {
-  if (!io) return
+  if (!io) return;
   io.to(`user-${userId}`).emit("notification:new", {
     notification,
-  })
-}
+  });
+};
 
-// Emit admin notification (fixed room)
 export const emitToAdminNotification = (adminId, notification) => {
-  if (!io) return
+  if (!io) return;
   io.to(`admin-${adminId}`).emit("notification:new", {
     notification,
-  })
-}
+  });
+};
 
 export const emitTripCompleted = (userId, payload) => {
-  if (!io) return
-  io.to(`user-${userId}`).emit("trip:completed", payload)
-}
+  if (!io) return;
+  io.to(`user-${userId}`).emit("trip:completed", payload);
+};

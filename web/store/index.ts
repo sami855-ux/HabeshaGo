@@ -8,6 +8,8 @@ import routeReducer from "./slices/routeslice"
 import { setupAxiosInterceptors } from "@/services/setupAxiosInterceptors"
 import supportAgentReducer from "./slices/supportAgentSlice";
 import supportCustomerReducer from "./slices/supportCustomerSlice"
+import userparkingReducer from "./slices/parkingUserSlice";
+import AdminparkingReducer from "./slices/parkingAdminSlice"
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +21,8 @@ export const store = configureStore({
     route: routeReducer,
     supportChat: supportAgentReducer,
     supportCustomer: supportCustomerReducer,
+    parkingUser: userparkingReducer,
+    parking: AdminparkingReducer,
   },
 });
 

@@ -75,6 +75,7 @@ model User {
 
   typingStatuses ChatTypingStatus[]
   agentStatus    SupportAgentStatus?
+  ParkingSession ParkingSession[]
 
   @@map("user")
 }
@@ -317,8 +318,8 @@ model PointTransaction {
 model WalletTransaction {
   id Int @id @default(autoincrement())
 
-  walletId          Int // sender or primary wallet
-  recipientWalletId Int? // receiver wallet (for transfers)
+  walletId          Int
+  recipientWalletId Int?
 
   amount       Decimal
   type         TransactionType
@@ -328,16 +329,19 @@ model WalletTransaction {
 
   reference   String  @unique
   description String?
-  metadata    Json? // store sessionId, reservationId, or extra info
+  metadata    Json?
+
+  // ✅ NEW CONNECTIONS
+  parkingSessionId     String?
+  parkingReservationId String?
+
+  parkingSession     ParkingSession?   @relation(fields: [parkingSessionId], references: [id])
+  parkingReservation ParkingReservation? @relation(fields: [parkingReservationId], references: [id])
 
   createdAt DateTime @default(now())
 
   wallet          Wallet  @relation("SenderWallet", fields: [walletId], references: [id])
   recipientWallet Wallet? @relation("RecipientWallet", fields: [recipientWalletId], references: [id])
-
-  // Back-relations
-  // chargingSession ChargingSession? @relation(name: "SessionTransaction")
-  // reservation     EVReservation?  @relation(name: "ReservationTransaction")
 
   @@index([walletId])
   @@index([recipientWalletId])
@@ -377,6 +381,14 @@ model Payment {
   evReservation   EVReservation? @relation(fields: [evReservationId], references: [id])
 
   // Relations
+
+  // PARKING
+  parkingReservationId String?
+  parkingSessionId     String?
+
+  parkingReservation ParkingReservation? @relation(fields: [parkingReservationId], references: [id])
+  parkingSession     ParkingSession?     @relation(fields: [parkingSessionId], references: [id])
+
   user               User                @relation(fields: [userId], references: [id])
   wallet             Wallet?             @relation(fields: [walletId], references: [id])
   bookings           Booking[] // One payment → many bookings
@@ -1066,8 +1078,7 @@ model ParkingLot {
   latitude  Float
   longitude Float
 
-  totalSlots     Int
-  availableSlots Int
+  totalSlots Int
 
   pricePerMinute Float
 
@@ -1092,15 +1103,13 @@ model ParkingLot {
 model ParkingSlot {
   id String @id @default(cuid())
 
-  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
   parkingLotId String
+  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
 
   slotNumber String
 
   slotType SlotType   @default(CAR)
   status   SlotStatus @default(AVAILABLE)
-
-  isOccupied Boolean @default(false)
 
   floor   Int?
   section String?
@@ -1118,50 +1127,50 @@ model ParkingSlot {
   updatedAt DateTime @updatedAt
 
   @@unique([parkingLotId, slotNumber])
-  @@index([parkingLotId])
   @@index([parkingLotId, status])
-  @@index([status, isOccupied])
 }
 
 model ParkingReservation {
   id String @id @default(cuid())
 
   userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
   parkingLotId String
+  parkingLot   ParkingLot @relation(fields: [parkingLotId], references: [id])
 
-  slot   ParkingSlot @relation(fields: [slotId], references: [id])
   slotId String
-
-  startTime DateTime
-  endTime   DateTime
-
-  checkInTime  DateTime?
-  checkOutTime DateTime?
+  slot   ParkingSlot @relation(fields: [slotId], references: [id])
 
   status ParkingStatus @default(PENDING)
 
-  qrCode   String?
+  reservedAt DateTime @default(now())
+  expiresAt  DateTime?
+
+  qrCode String?
+
   isNoShow Boolean @default(false)
 
   notes String?
 
   sessions ParkingSession[]
+  payments Payment[]
+
+  // ✅ NEW
+  walletTransactions WalletTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  User      User     @relation(fields: [userId], references: [id])
-
-  @@index([userId, status])
-  @@index([slotId, startTime, endTime])
 }
 
 model ParkingSession {
   id String @id @default(cuid())
 
-  slot   ParkingSlot @relation(fields: [slotId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
   slotId String
+  slot   ParkingSlot @relation(fields: [slotId], references: [id])
 
   parkingReservationId String?
   parkingReservation   ParkingReservation? @relation(fields: [parkingReservationId], references: [id])
@@ -1169,17 +1178,20 @@ model ParkingSession {
   entryTime DateTime  @default(now())
   exitTime  DateTime?
 
-  duration Int? // in minutes
+  durationMinutes Int?
 
   status SessionStatus @default(ACTIVE)
 
-  entryMethod EntryMethod  @default(MANUAL)
+  entryMethod EntryMethod  @default(QR)
   exitMethod  EntryMethod?
+
+  payments Payment[]
+
+  // ✅ NEW
+  walletTransactions WalletTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([slotId, status])
 }
 
 model AuditLog {
@@ -1426,6 +1438,7 @@ enum ServiceType {
   BUS_TICKET
   PARKING
   EV_CHARGING
+  WALLET_TOPUP
   NULL
 }
 

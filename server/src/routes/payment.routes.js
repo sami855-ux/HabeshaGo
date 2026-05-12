@@ -6,29 +6,45 @@ import {
   topUpMpesa,
   mpesaCallback,
   telebirrPaymentCallback,
+  payForParking,
 } from "../controllers/payment.controller.js"
+
 import { authenticate } from "../middlewares/authenticate.js"
 
 const router = express.Router()
 
-// Initiate a new payment (top-up wallet or direct) => this will work after deployment
+// =============================
+// GENERAL PAYMENT (CHAPA / WALLET)
+// =============================
 router.post("/initiate", authenticate, initiatePayment)
 
-//telebirr callback
 router.post("/telebirr/callback", telebirrPaymentCallback)
 
-// Callback from payment gateway (webhook) => this will work after deployment
-router.get("/callback", paymentCallback)
+// webhook (NO auth - external gateway)
+router.post("/callback", paymentCallback)
 
-// Get user payment history
-router.get("/history", getPaymentHistory)
+// =============================
+// PAYMENT HISTORY
+// =============================
+router.get("/history", authenticate, getPaymentHistory)
 
-// Mepesa
-router.post("/mpesa/topup", topUpMpesa)
+// =============================
+// PARKING PAYMENT (NEW ⭐)
+// =============================
+router.post("/parking/pay", authenticate, payForParking)
+
+// =============================
+// M-PESA
+// =============================
+router.post("/mpesa/topup", authenticate, topUpMpesa)
+
+// webhook (NO auth - M-Pesa server)
 router.post("/mpesa/callback", mpesaCallback)
 
-//Telebirr
-// router.post("/telebirr/topup", authenticate, topUpTelebirr);
-// router.post("/telebirr/callback", telebirrCallback);
+// =============================
+// TELEBIRR (future ready)
+// =============================
+// router.post("/telebirr/topup", authenticate, topUpTelebirr)
+// router.post("/telebirr/callback", telebirrCallback)
 
 export default router

@@ -26,7 +26,7 @@ export const generateReference = (prefix = "payment") =>
 
 export const initiatePaymentService = async (
   userId,
-  { amount, gateway, type, flow, bookingId, userInfo },
+  { amount, gateway, type, flow, bookingId, sessionId, userInfo },
 ) => {
   try {
     if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
@@ -59,6 +59,7 @@ export const initiatePaymentService = async (
         method: "MOBILE_MONEY",
         status: "PENDING",
         flow,
+        flow,
         reference,
         ...(flow === "WALLET_TOPUP" &&
           user.wallet && {
@@ -70,9 +71,6 @@ export const initiatePaymentService = async (
           preferredMethod: userInfo?.preferredMethod || null,
           userInfo: { name: user.name, email: user.email, phone: user.phone },
         },
-        ...(bookingId && {
-          bookings: { connect: { id: parseInt(bookingId) } },
-        }),
       },
     })
 
@@ -145,6 +143,7 @@ export const paymentCallbackService = async (data) => {
           },
         },
       })
+
       return errorResponse("Payment verification failed", 400)
     }
 
@@ -645,8 +644,12 @@ const handleMinibusBookingPayment = async (tx, payment, bookingId) => {
   await tx.minibusReservation.update({
     where: { id: parseInt(bookingId) },
     data: {
-      status: "CONFIRMED",
-      paymentId: payment.id,
+      status: "COMPLETED",
+      exitTime: new Date(),
+      durationMinutes: Math.round(duration),
+      payments: {
+        connect: { id: payment.id },
+      },
     },
   })
 }
@@ -684,15 +687,17 @@ export const createChapaPayment = async (payment, user, options = {}) => {
   }
 }
 
-// M-Pesa Top-up Service
+/* ==============================
+   M-PESA TOPUP (UNCHANGED)
+============================== */
 export const mpesaTopUpService = async ({ amount, phone, userId }) => {
   try {
     if (!amount || amount <= 0) return errorResponse("Invalid amount", 400)
+
     if (!phone) return errorResponse("Phone number required", 400)
 
     const reference = crypto.randomBytes(8).toString("hex")
 
-    // 1️⃣ Create pending payment
     await prisma.payment.create({
       data: {
         userId,
@@ -707,8 +712,11 @@ export const mpesaTopUpService = async ({ amount, phone, userId }) => {
       },
     })
 
-    // 2️⃣ Call shared STK Push service
-    const stkResponse = await stkPush({ phone, amount, reference })
+    const stkResponse = await stkPush({
+      phone,
+      amount,
+      reference,
+    })
 
     return successResponse("STK push initiated", {
       reference,

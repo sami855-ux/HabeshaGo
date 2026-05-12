@@ -6,135 +6,175 @@ import {
   enableWalletBiometricService,
   getMyWalletService,
   getWalletTransactionsService,
-} from "../services/wallet.service.js"
+  payParkingSessionFromWallet,
+  depositToWalletService, 
+} from "../services/wallet.service.js";
 
-/**
- * Get the logged-in user's wallet
- */
+// ===============================
+// GET MY WALLET
+// ===============================
 export const getMyWallet = async (req, res) => {
   try {
-    const result = await getMyWalletService(req.user.id)
-    return res.status(result.statusCode).json(result)
+    const result = await getMyWalletService(req.user.id);
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Get wallet controller error:", error)
+    console.error("Get wallet controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while fetching wallet",
-      data: null,
-    })
+    });
   }
-}
+};
 
-/**
- * Get wallet transactions for the logged-in user
- */
+// ===============================
+// WALLET TRANSACTIONS
+// ===============================
 export const getWalletTransactions = async (req, res) => {
   try {
     const result = await getWalletTransactionsService(req.user?.id)
     return res.status(result.statusCode).json(result)
   } catch (error) {
-    console.error("Get wallet transactions controller error:", error)
+    console.error("Get wallet transactions controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while fetching wallet transactions",
-      data: null,
-    })
+    });
   }
-}
+};
 
-/**
- * Create wallet for logged-in user (with PIN)
- */
+// ===============================
+// CREATE WALLET
+// ===============================
 export const createWallet = async (req, res) => {
   try {
-    const result = await createWalletService(req.user.id, req.body)
-    return res.status(result.statusCode).json(result)
+    const result = await createWalletService(req.user.id, req.body);
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Wallet creation controller error:", error)
+    console.error("Wallet creation controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while creating wallet",
-      data: null,
-    })
+    });
   }
-}
+};
 
-/**
- * Enable biometric authentication for wallet
- */
+// ===============================
+// ENABLE BIOMETRIC
+// ===============================
 export const enableWalletBiometric = async (req, res) => {
   try {
-    const result = await enableWalletBiometricService(req.user.id, req.body)
-    return res.status(result.statusCode).json(result)
+    const result = await enableWalletBiometricService(req.user.id, req.body);
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Wallet biometric controller error:", error)
+    console.error("Wallet biometric controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while enabling biometric",
-      data: null,
-    })
+    });
   }
-}
+};
 
+// ===============================
+// CHANGE PIN
+// ===============================
 export const changeWalletPin = async (req, res) => {
   try {
-    const userId = req.user.id
-    const { newPin } = req.body
+    const { newPin } = req.body;
 
     if (!newPin) {
       return res.status(400).json({
         success: false,
         message: "New PIN is required",
-      })
+      });
     }
 
-    const result = await changeWalletPinService(userId, newPin)
-
-    return res.status(result.statusCode).json(result)
+    const result = await changeWalletPinService(req.user.id, newPin);
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Change wallet PIN error:", error)
+    console.error("Change wallet PIN error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to change wallet PIN",
-    })
+    });
   }
-}
+};
 
+export const depositToWallet = async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    const result = await depositToWalletService(req.user.id, amount);
+
+    return res.status(result.statusCode).json(result);
+  } catch (error) {
+    console.error("Deposit controller error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Deposit failed",
+    });
+  }
+};
+// ===============================
+// DEDUCT POINTS
+// ===============================
 export const deductPoints = async (req, res) => {
   try {
-    const { points, reason } = req.body
+    const { points, reason } = req.body;
 
-    const result = await deductPointsService(req.user.id, points, reason)
-
-    return res.status(result.statusCode).json(result)
+    const result = await deductPointsService(req.user.id, points, reason);
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Deduct points controller error:", error)
+    console.error("Deduct points controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while deducting points",
-      data: null,
-    })
+    });
   }
-}
+};
 
+// ===============================
+// DEDUCT FROM WALLET (GENERAL)
+// ===============================
 export const deductFromWallet = async (req, res) => {
   try {
-    const result = await deductFromWalletService(req.user.id, req.body)
+    const result = await deductFromWalletService(req.user.id, req.body);
 
-    return res.status(result.statusCode).json(result)
+    return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error("Wallet deduct controller error:", error)
-
+    console.error("Wallet deduct controller error:", error);
     return res.status(500).json({
       success: false,
-      statusCode: 500,
       message: "Internal server error while deducting wallet",
-      data: null,
-    })
+    });
   }
-}
+};
+
+// ===============================
+// 🚀 NEW: PARKING PAYMENT CONTROLLER
+// ===============================
+export const payParkingSession = async (req, res) => {
+  try {
+    const { sessionId, amount } = req.body;
+
+    if (!sessionId || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: "sessionId and amount are required",
+      });
+    }
+
+    const result = await payParkingSessionFromWallet(
+      req.user.id,
+      sessionId,
+      amount,
+    );
+
+    return res.status(result.statusCode).json(result);
+  } catch (error) {
+    console.error("Parking payment controller error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process parking payment",
+    });
+  }
+};

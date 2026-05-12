@@ -1,4 +1,4 @@
-import express from "express"
+import express from "express";
 import {
   getMyWallet,
   getWalletTransactions,
@@ -7,17 +7,21 @@ import {
   changeWalletPin,
   deductPoints,
   deductFromWallet,
-} from "../controllers/wallet.controller.js"
-import { authenticate } from "../middlewares/authenticate.js"
-import { verifyWalletPin } from "../controllers/transaction.controller.js"
+  payParkingSession,
+  depositToWallet// 🚀 NEW
+} from "../controllers/wallet.controller.js";
 
-const router = express.Router()
+import { authenticate } from "../middlewares/authenticate.js";
+import { verifyWalletPin } from "../controllers/transaction.controller.js";
 
-// Wallet info
-router.get("/me", authenticate, getMyWallet)
+const router = express.Router();
 
-// Verify wallet
-router.post("/verify-pin", authenticate, verifyWalletPin)
+// ========================
+// WALLET CORE
+// ========================
+
+// Get wallet
+router.get("/me", authenticate, getMyWallet);
 
 //Deduct wallet balance
 router.post("/balance/deduct", authenticate, deductFromWallet)
@@ -27,14 +31,42 @@ router.post("/deduct", authenticate, deductPoints)
 
 // Wallet transactions
 router.get("/transactions", authenticate, getWalletTransactions)
+// Create wallet
+router.post("/create", authenticate, createWallet);
 
-// Create wallet + PIN
-router.post("/create", authenticate, createWallet)
+// Change PIN
+router.patch("/change-pin", authenticate, changeWalletPin);
 
 // Enable biometric
-router.post("/biometric", authenticate, enableWalletBiometric)
+router.post("/biometric", authenticate, enableWalletBiometric);
 
-//Change pin
-router.patch("/change-pin", authenticate, changeWalletPin)
+// ========================
+// SECURITY
+// ========================
 
-export default router
+// Verify PIN
+router.post("/verify-pin", authenticate, verifyWalletPin);
+
+// ========================
+// TRANSACTIONS
+// ========================
+
+router.post("/deposit", authenticate, depositToWallet);
+
+// Wallet transactions (FIXED: add auth)
+router.get("/transactions", authenticate, getWalletTransactions);
+
+// Deduct wallet balance (generic)
+router.post("/balance/deduct", authenticate, deductFromWallet);
+
+// Deduct points
+router.post("/deduct", authenticate, deductPoints);
+
+// ========================
+// 🚀 PARKING PAYMENT (NEW)
+// ========================
+
+// Pay parking session using wallet
+router.post("/parking/pay", authenticate, payParkingSession);
+
+export default router;

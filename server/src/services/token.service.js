@@ -143,24 +143,18 @@ export const issueTokensSocial = async (user, req, res) => {
     })
 
     // Decide role-based redirect URL
-    let redirectUrl = "http://localhost:3000"
-    switch (user.role) {
-      case "ADMIN":
-        redirectUrl = "http://localhost:3000/admin"
-        break
-      case "DRIVER":
-        redirectUrl = "http://localhost:3000/driver"
-        break
-      case "PASSENGER":
-        redirectUrl = "http://localhost:3000/user"
-        break
-      case "EV_CHARGER_MANAGER":
-        redirectUrl = "http://localhost:3000/ev-charge-manager"
-        break
-      case "PARKING_MANAGER":
-        redirectUrl = "http://localhost:3000/parking-manager"
-        break
+    const base = process.env.FRONTEND_URL
+
+    const roleRedirects = {
+      ADMIN: `${base}/admin`,
+      DRIVER: `${base}/driver`,
+      PASSENGER: `${base}/user`,
+      EV_CHARGER_MANAGER: `${base}/ev-charge-manager`,
+      PARKING_MANAGER: `${base}/parking-manager`,
     }
+
+    const redirectUrl = roleRedirects[user.role] || base
+
     return res.redirect(redirectUrl)
   } catch (err) {
     console.error("Token issuance failed:", err)

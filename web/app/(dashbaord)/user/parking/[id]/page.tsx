@@ -1,33 +1,34 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
+import { Suspense } from "react"
+import { useEffect, useState } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
 
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Zap } from "lucide-react";
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Zap } from "lucide-react"
 
-import { fetchAvailableSlots } from "@/store/slices/parkingUserSlice";
+import { fetchAvailableSlots } from "@/store/slices/parkingUserSlice"
 
-export default function ParkingLotPage() {
-  const router = useRouter();
-  const params = useParams();
-  const dispatch = useDispatch<any>();
+// ✅ Inner component with all the logic
+function ParkingLotContent() {
+  const router = useRouter()
+  const params = useParams()
+  const dispatch = useDispatch<any>()
 
-  const { slots, loading } = useSelector((s: any) => s.parkingUser);
+  const { slots, loading } = useSelector((s: any) => s.parkingUser)
+  const [selectedSlot, setSelectedSlot] = useState<any>(null)
 
-  const [selectedSlot, setSelectedSlot] = useState<any>(null);
-
-  const lotId = params?.id as string;
+  const lotId = params?.id as string
 
   /* ================= LOAD SLOTS ================= */
   useEffect(() => {
     if (lotId) {
-      dispatch(fetchAvailableSlots(lotId));
+      dispatch(fetchAvailableSlots(lotId))
     }
-  }, [lotId, dispatch]);
+  }, [lotId, dispatch])
 
   /* ================= STATUS UI ================= */
   const getStatusBadge = (status: string) => {
@@ -37,10 +38,9 @@ export default function ParkingLotPage() {
       OCCUPIED: "bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400",
       RESERVED:
         "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-400",
-    };
-
-    return <Badge className={map[status]}>{status}</Badge>;
-  };
+    }
+    return <Badge className={map[status]}>{status}</Badge>
+  }
 
   const getTypeBadge = (type: string) => {
     const map: any = {
@@ -48,19 +48,17 @@ export default function ParkingLotPage() {
       BIKE: "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400",
       TRUCK:
         "bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400",
-    };
-
-    return <Badge className={map[type]}>{type}</Badge>;
-  };
+    }
+    return <Badge className={map[type]}>{type}</Badge>
+  }
 
   /* ================= CONTINUE ================= */
   const handleContinue = () => {
-    if (!selectedSlot) return;
-
+    if (!selectedSlot) return
     router.push(
       `/user/parking/booking/confirm?lotId=${lotId}&slotId=${selectedSlot.id}`,
-    );
-  };
+    )
+  }
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 dark:bg-zinc-950 min-h-screen text-gray-900 dark:text-gray-100">
@@ -80,9 +78,9 @@ export default function ParkingLotPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {slots.map((slot: any) => {
-            const isSelected = selectedSlot?.id === slot.id;
+            const isSelected = selectedSlot?.id === slot.id
             const isDisabled =
-              slot.status === "OCCUPIED" || slot.status === "RESERVED";
+              slot.status === "OCCUPIED" || slot.status === "RESERVED"
 
             return (
               <Card
@@ -121,7 +119,7 @@ export default function ParkingLotPage() {
                   )}
                 </div>
               </Card>
-            );
+            )
           })}
         </div>
       )}
@@ -135,5 +133,20 @@ export default function ParkingLotPage() {
         </div>
       )}
     </div>
-  );
+  )
+}
+
+// ✅ Default export wraps inner component in Suspense
+export default function ParkingLotPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+          Loading parking lot...
+        </div>
+      }
+    >
+      <ParkingLotContent />
+    </Suspense>
+  )
 }

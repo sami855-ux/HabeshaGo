@@ -1,42 +1,41 @@
-"use client";
+"use client"
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { QRCodeView } from "@/components/user-parking/QRCodeView";
-import { useDispatch } from "react-redux";
-import { checkInReservation } from "@/store/slices/parkingUserSlice";
+import { Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { QRCodeView } from "@/components/user-parking/QRCodeView"
+import { useDispatch } from "react-redux"
+import { checkInReservation } from "@/store/slices/parkingUserSlice"
 
-export default function QRCodePage() {
-  const router = useRouter();
-  const dispatch = useDispatch<any>();
-  const searchParams = useSearchParams();
+// ✅ Inner component that uses useSearchParams
+function QRCodeContent() {
+  const router = useRouter()
+  const dispatch = useDispatch<any>()
+  const searchParams = useSearchParams()
 
-  const bookingId = searchParams.get("bookingId");
-  const lotId = searchParams.get("lotId");
-  const slotId = searchParams.get("slotId");
+  const bookingId = searchParams.get("bookingId")
+  const lotId = searchParams.get("lotId")
+  const slotId = searchParams.get("slotId")
 
   if (!bookingId || !lotId || !slotId) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-zinc-950">
         <p className="text-gray-700 dark:text-gray-300">Invalid QR data</p>
       </div>
-    );
+    )
   }
 
   const handleStartSession = async () => {
     try {
-      const res = await dispatch(checkInReservation(bookingId)).unwrap();
-
-      const sessionId = res?.id;
-
+      const res = await dispatch(checkInReservation(bookingId)).unwrap()
+      const sessionId = res?.id
       if (!sessionId) {
-        throw new Error("Session not created");
+        throw new Error("Session not created")
       }
-
-      router.push(`/user/parking/session/active?sessionId=${sessionId}`);
+      router.push(`/user/parking/session/active?sessionId=${sessionId}`)
     } catch (err) {
-      console.error("Failed to start session:", err);
+      console.error("Failed to start session:", err)
     }
-  };
+  }
 
   return (
     <div className="h-screen bg-gray-50 dark:bg-zinc-950">
@@ -52,5 +51,20 @@ export default function QRCodePage() {
         onStartSession={handleStartSession}
       />
     </div>
-  );
+  )
+}
+
+// ✅ Default export wraps inner component in Suspense
+export default function QRCodePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-zinc-950">
+          <p className="text-gray-700 dark:text-gray-300">Loading QR code...</p>
+        </div>
+      }
+    >
+      <QRCodeContent />
+    </Suspense>
+  )
 }

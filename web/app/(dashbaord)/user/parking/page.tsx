@@ -1,19 +1,19 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Map, List, Wallet, User, Menu } from "lucide-react";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Map, List, Wallet, User, Menu } from "lucide-react"
 
-import MapSection from "@/components/MapSection";
-import FindParking from "@/components/user-parking/ParkingLotCard";
+import MapSection from "@/components/MapSection"
+import FindParking from "@/components/user-parking/ParkingLotCard"
 
 export default function HomePage() {
-  const router = useRouter();
-  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const router = useRouter()
+  const [viewMode, setViewMode] = useState<"map" | "list">("map")
 
   const handleSelectLot = (lotId: string) => {
-    router.push(`/user/parking/${lotId}`);
-  };
+    router.push(`/user/parking/${lotId}`)
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-100">
@@ -79,5 +79,5 @@ export default function HomePage() {
         )}
       </div>
     </div>
-  );
+  )
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useEffect, useState, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
@@ -94,11 +95,13 @@ function Particles() {
   )
 }
 
-export default function PaymentSuccessPage() {
+// ✅ Inner component that uses useSearchParams
+function PaymentSuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+
   const ref = searchParams.get("ref") || "TXN-2025-001"
-  const flow = searchParams.get("flow") || "WALLET_TOPUP" // BUS_TICKET | WALLET_TOPUP | EV_CHARGING | PARKING
+  const flow = searchParams.get("flow") || "WALLET_TOPUP"
   const amountParam = searchParams.get("amount")
   const amount = amountParam ? parseFloat(amountParam) : 150
 
@@ -163,6 +166,16 @@ export default function PaymentSuccessPage() {
     { label: "Payment Initiated", done: true, time: "10:42 AM" },
     { label: "Chapa Verified", done: true, time: "10:42 AM" },
   ]
+
+  const getHomeRoute = () => {
+    if (flow === "BOOKING" || flow === "DIRECT_PAYMENT") return "/user/trips"
+    return "/user"
+  }
+
+  const getHomeLabel = () => {
+    if (flow === "BOOKING" || flow === "DIRECT_PAYMENT") return "My Tickets"
+    return "Home"
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans overflow-x-hidden">
@@ -232,28 +245,11 @@ export default function PaymentSuccessPage() {
             </span>
           </div>
           <button
-  onClick={() =>
-    router.push(
-      flow === "BOOKING" || flow === "DIRECT_PAYMENT"
-        ? "/user/trips"
-        : flow === "EV_CHARGING" || flow === "POINTS_EXTERNAL" || flow === "EXTERNAL_ONLY"
-          ? "/user"
-          : flow === "PARKING"
-            ? "/user"
-            : "/user",
-    )
-  }
-  className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors"
->
-  <Home size={14} />{" "}
-  {flow === "BOOKING" || flow === "DIRECT_PAYMENT"
-    ? "My Tickets"
-    : flow === "EV_CHARGING" || flow === "POINTS_EXTERNAL" || flow === "EXTERNAL_ONLY"
-      ? "Home"
-      : flow === "PARKING"
-        ? "Home"
-        : "Home"}
-</button>
+            onClick={() => router.push(getHomeRoute())}
+            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors"
+          >
+            <Home size={14} /> {getHomeLabel()}
+          </button>
         </div>
 
         {/* ── Hero check ── */}
@@ -373,7 +369,6 @@ export default function PaymentSuccessPage() {
 
         {/* ── Actions ── */}
         <div className="space-y-3 fade-up" style={{ animationDelay: "460ms" }}>
-          {/* Secondary row */}
           <div className="grid grid-cols-2 gap-3">
             <button className="h-12 glass rounded-xl text-white/70 hover:text-white text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.97] card-hover">
               <Download size={15} />
@@ -385,7 +380,6 @@ export default function PaymentSuccessPage() {
             </button>
           </div>
 
-          {/* Ghost */}
           <button
             onClick={() => router.back()}
             className="w-full h-11 text-white/30 hover:text-white/60 text-sm transition-colors flex items-center justify-center gap-1.5"
@@ -408,5 +402,20 @@ export default function PaymentSuccessPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+// ✅ Default export wraps inner component in Suspense
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+          <p className="text-white/40 text-sm">Loading...</p>
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }

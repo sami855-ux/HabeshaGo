@@ -61,9 +61,6 @@ const isProduction = process.env.NODE_ENV === "production"
 app.use(helmet())
 app.set("trust proxy", 1)
 
-// CORS
-const isProduction = process.env.NODE_ENV === 'production'
-
 const allowedOrigins = [
   // Web
   "https://habesha-go-v2.vercel.app",

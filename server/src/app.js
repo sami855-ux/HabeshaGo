@@ -62,9 +62,22 @@ app.use(helmet())
 app.set("trust proxy", 1)
 
 // CORS
+const isProduction = process.env.NODE_ENV === 'production'
+
 const allowedOrigins = [
+  // Web
   "https://habesha-go-v2.vercel.app",
-  ...(!isProduction ? ["http://localhost:3000", "http://localhost:3001"] : []),
+  // Mobile / Expo
+  "https://auth.expo.io",                   // Expo Go OAuth redirect
+  `https://auth.expo.io/@samiux855/mobile`, // Your specific app
+  ...(!isProduction ? [
+    // Web dev
+    "http://localhost:3000",
+    "http://localhost:3001",
+    // Mobile dev
+    "exp://localhost:8081",                 // Expo dev client
+    "exp://192.168.1.1:8081",              // Local network (optional)
+  ] : []),
 ]
 
 app.use(

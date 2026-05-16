@@ -15,6 +15,7 @@ import dotenv from "dotenv"
 import { errorResponse, successResponse } from "../utils/apiResponse.js"
 import admin from "../config/firebaseAdmin.js"
 import { generateReferralCode } from "../utils/qrcode.js"
+import axios from "axios"
 dotenv.config()
 
 // Registration
@@ -447,6 +448,132 @@ export const logout = async (req, res) => {
   } catch (err) {
     console.error("Logout error:", err)
     return res.status(500).json({ message: "Failed to logout", success: false })
+  }
+}
+
+export const googleMobileAuth = async (req, res) => {
+  try {
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({ error: "Token is required" })
+    }
+
+    // 1. Verify token with Google
+    const googleRes = await axios.get(
+      "https://www.googleapis.com/userinfo/v2/me",
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    const googleUser = googleRes.data
+
+    if (!googleUser.verified_email) {
+      return res.status(401).json({ error: "Google email not verified" })
+    }
+
+    // 2. Check if user exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: googleUser.id }, { email: googleUser.email }],
+      },
+    })
+
+    // 3. Check suspended or deleted
+    if (existingUser?.isSuspended) {
+      return res.status(403).json({
+        error: "Account suspended",
+        reason: existingUser.suspensionReason,
+        suspendedAt: existingUser.suspendedAt,
+      })
+    }
+
+    if (existingUser?.isDeleted) {
+      return res.status(403).json({ error: "Account has been deleted" })
+    }
+
+    // 4. Find or create user
+    let user
+
+    if (existingUser) {
+      // ✅ User exists — update their Google info
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          googleId: googleUser.id,
+          avaterUrl: existingUser.avaterUrl ?? googleUser.picture,
+          emailVerified: true,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          avaterUrl: true,
+          bio: true,
+          location: true,
+          emailVerified: true,
+          phoneVerified: true,
+          passengerCategory: true,
+          createdAt: true,
+          wallet: true,
+        },
+      })
+    } else {
+      // ✅ No user found — create new one
+      user = await prisma.user.create({
+        data: {
+          name: googleUser.name,
+          email: googleUser.email,
+          googleId: googleUser.id,
+          avaterUrl: googleUser.picture,
+          emailVerified: true,
+          role: "PASSENGER",
+          passengerCategory: "NORMAL",
+          emailVerified: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          avaterUrl: true,
+          bio: true,
+          location: true,
+          emailVerified: true,
+          phoneVerified: true,
+          passengerCategory: true,
+          createdAt: true,
+          wallet: true,
+        },
+      })
+    }
+
+    // 5. Generate tokens
+    const payload = { userId: user.id, email: user.email, role: user.role }
+    const accessToken = generateAccessToken(payload)
+    const refreshToken = generateRefreshToken(payload)
+
+    // 6. Save session
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        token: refreshToken,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    })
+
+    // 7. Return response
+    return res.status(200).json({
+      user,
+      accessToken,
+      refreshToken,
+      isNewUser: !existingUser,
+    })
+  } catch (error) {
+    console.error("Google auth error:", error.message)
+    return res.status(500).json({ error: "Authentication failed" })
   }
 }
 

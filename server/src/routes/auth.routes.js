@@ -14,6 +14,7 @@ import {
   refreshTokenApp,
   verifyOtpPhone,
   appleAuth,
+  googleMobileAuth,
 } from "../controllers/auth.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import passport from "passport"
@@ -36,6 +37,8 @@ router.post("/logout-all", authenticate, logoutAll)
 
 // Get authenticated user data
 router.get("/me", authenticate, getMe)
+
+router.post("/mobile/google", googleMobileAuth)
 
 // Social login
 router.get(

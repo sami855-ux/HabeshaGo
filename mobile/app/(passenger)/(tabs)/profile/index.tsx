@@ -5,6 +5,7 @@ import { showToast } from "@/lib/showToast"
 import { AppDispatch, useAppSelector } from "@/store"
 import { logout } from "@/store/slices/userSlice"
 import { useRouter } from "expo-router"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
   Bell,
   Check,
@@ -29,7 +30,7 @@ import {
   WifiOff,
   Zap,
 } from "lucide-react-native"
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import {
   Alert,
   Animated,
@@ -140,6 +141,7 @@ export default function SettingsScreen() {
   const isDark = actualTheme === "dark"
   const dispatch = useDispatch<AppDispatch>()
   const { user } = useAppSelector((state) => state.user)
+  const { wallet } = useAppSelector((state) => state.wallet)
 
   const router = useRouter()
   const [showThemeModal, setShowThemeModal] = useState(false)
@@ -180,8 +182,58 @@ export default function SettingsScreen() {
     gestureControls: true,
   })
 
-  const toggleSetting = (key: keyof typeof settings) => {
-    setSettings((prev) => ({ ...prev, [key]: !prev[key] }))
+  const toggleSetting = async (key: keyof typeof settings) => {
+    const newValue = !settings[key]
+
+    if (key === "pushNotifications" && !newValue) {
+      const updated = {
+        ...settings,
+        pushNotifications: false,
+        sound: false,
+        vibration: false,
+      }
+      setSettings(updated)
+      await AsyncStorage.setItem("notifSettings", JSON.stringify(updated))
+      showToast("Push notifications disabled", ToastAndroid.SHORT)
+      return
+    }
+
+    const updated = { ...settings, [key]: newValue }
+    setSettings(updated)
+    await AsyncStorage.setItem("notifSettings", JSON.stringify(updated))
+
+    // Toast per setting
+    const messages: Record<keyof typeof settings, [string, string]> = {
+      pushNotifications: [
+        "Push notifications enabled",
+        "Push notifications disabled",
+      ],
+      sound: ["Sound enabled", "Sound disabled"],
+      vibration: ["Vibration enabled", "Vibration disabled"],
+      biometricAuth: ["Biometric auth enabled", "Biometric auth disabled"],
+      appLock: ["App lock enabled", "App lock disabled"],
+      locationSharing: [
+        "Location sharing enabled",
+        "Location sharing disabled",
+      ],
+      dataSharing: ["Data sharing enabled", "Data sharing disabled"],
+      biometricPayments: [
+        "Biometric payments enabled",
+        "Biometric payments disabled",
+      ],
+      autoTopUp: ["Auto top-up enabled", "Auto top-up disabled"],
+      hapticFeedback: ["Haptic feedback enabled", "Haptic feedback disabled"],
+      voiceCommands: ["Voice commands enabled", "Voice commands disabled"],
+      smartRoutes: ["Smart routes enabled", "Smart routes disabled"],
+      offlineMode: ["Offline mode enabled", "Offline mode disabled"],
+      gestureControls: [
+        "Gesture controls enabled",
+        "Gesture controls disabled",
+      ],
+    }
+
+    const [onMsg, offMsg] = messages[key] ?? ["Enabled", "Disabled"]
+    showToast(newValue ? onMsg : offMsg, ToastAndroid.SHORT)
   }
 
   const themeOptions = [
@@ -207,6 +259,16 @@ export default function SettingsScreen() {
     })
   }
 
+  useEffect(() => {
+    const loadSettings = async () => {
+      const saved = await AsyncStorage.getItem("notifSettings")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setSettings((prev) => ({ ...prev, ...parsed }))
+      }
+    }
+    loadSettings()
+  }, [])
   const renderSection = (
     title: string,
     items: {
@@ -500,7 +562,7 @@ export default function SettingsScreen() {
                           className="text-sm font-groteskBold pl-2"
                           style={{ color: colors.primary }}
                         >
-                          {userData.walletBalance}
+                          {wallet?.balance}
                         </Text>
                       </View>
                     </View>

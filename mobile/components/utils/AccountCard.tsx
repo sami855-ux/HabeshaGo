@@ -26,6 +26,13 @@ import {
 
 const { width } = Dimensions.get("window")
 
+export const formatCurrencyAbbr = (amount) => {
+  if (!amount && amount !== 0) return "0 ETB"
+  if (amount >= 1e6) return (amount / 1e6).toFixed(1) + "M ETB"
+  if (amount >= 1e3) return (amount / 1e3).toFixed(1) + "K ETB"
+  return amount.toLocaleString() + " ETB"
+}
+
 // Skeleton Component
 const AccountCardSkeleton = () => {
   const pulseAnim = useState(new Animated.Value(1))[0]
@@ -380,12 +387,12 @@ const AccountCard = () => {
               </TouchableOpacity>
             </View>
             <Text
-              className="text-[40px] font-groteskBold text-white mb-1"
+              className="text-3xl font-groteskBold text-white"
               numberOfLines={1}
               adjustsFontSizeToFit
             >
               {isAmountVisible
-                ? formatCurrency(walletData.balance, walletData.currency)
+                ? formatCurrencyAbbr(walletData.balance)
                 : "••••••"}
             </Text>
             <View className="flex-row items-center">
@@ -419,7 +426,7 @@ const AccountCard = () => {
             </View>
             <View className="flex-row items-baseline gap-1 mb-1">
               <Text
-                className="text-2xl font-groteskBold text-white"
+                className="text-3xl font-groteskBold text-white"
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
@@ -433,39 +440,6 @@ const AccountCard = () => {
               <Award size={10} color="#d8b4fe" />
               <Text className="text-purple-200 text-[10px] font-geist ml-1">
                 +150 this week
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Stats Grid */}
-        <View className="flex-row justify-between bg-white/10 rounded-2xl p-3 mb-3">
-          <View className="items-center flex-1">
-            <Text className="text-white/60 text-[10px] font-geist mb-1">
-              Cashback
-            </Text>
-            <Text className="text-white text-xs font-groteskBold">
-              {walletData.cashback}%
-            </Text>
-          </View>
-          <View className="w-px bg-white/20" />
-          <View className="items-center flex-1">
-            <Text className="text-white/60 text-[10px] font-geist mb-1">
-              Reward Rate
-            </Text>
-            <Text className="text-white text-xs font-groteskBold">
-              {walletData.rewardRate}pt/10
-            </Text>
-          </View>
-          <View className="w-px bg-white/20" />
-          <View className="items-center flex-1">
-            <Text className="text-white/60 text-[10px] font-geist mb-1">
-              Status
-            </Text>
-            <View className="flex-row items-center">
-              <View className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1" />
-              <Text className="text-green-300 text-xs font-groteskBold">
-                Active
               </Text>
             </View>
           </View>

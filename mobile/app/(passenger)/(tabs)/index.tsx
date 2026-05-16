@@ -4,13 +4,15 @@ import SystemInfoCarousel from "@/components/passenger/SystemInfo"
 import ProfileCompletionModal from "@/components/profile-completion-modal"
 import AccountCard from "@/components/utils/AccountCard"
 import { useThemeContext } from "@/context/ThemeContext"
+import { fetchAllNotification } from "@/service/notification.api"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { fetchUserWallet } from "@/store/slices/walletSlice"
 import { Ionicons } from "@expo/vector-icons"
+import { useQuery } from "@tanstack/react-query"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { Search } from "lucide-react-native"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import {
   Image,
   ScrollView,
@@ -28,6 +30,19 @@ const PassengerHome = () => {
 
   const { colors, actualTheme } = useThemeContext()
 
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["notification"],
+    queryFn: fetchAllNotification,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+
+    // Refetch every 2 seconds
+    refetchInterval: 2000,
+
+    // Optional: also refetch in background
+    refetchIntervalInBackground: true,
+  })
+
   // Define gradient colors based on theme
   const gradientColors =
     actualTheme === "dark"
@@ -35,6 +50,10 @@ const PassengerHome = () => {
       : ["#ea580c", "#f97316", "#fb923c"]
 
   const dispatch = useAppDispatch()
+
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length
+  }, [notifications])
 
   useEffect(() => {
     // Fetch wallet once when user area loads
@@ -57,18 +76,20 @@ const PassengerHome = () => {
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          className="p-6 pb-10 mb-3 h-80 pt-10 pl-8"
+          className="p-6 pb-5 mb-3 h-72 pt-10 pl-8"
         >
           {/* Top Row: Profile + Search */}
           <View className="flex-row justify-between items-center mb-4">
             {/* Left: Profile + Greeting */}
             <View className="flex-row items-center">
-              <Image
-                source={
-                  user?.avaterUrl ? { uri: user.avaterUrl } : defaultAvatar
-                }
-                className="w-14 h-14 rounded-full  mr-3"
-              />
+              <TouchableOpacity onPress={() => router.push("/edit-profile")}>
+                <Image
+                  source={
+                    user?.avaterUrl ? { uri: user.avaterUrl } : defaultAvatar
+                  }
+                  className="w-14 h-14 rounded-full  mr-3"
+                />
+              </TouchableOpacity>
               <View>
                 <Text className="text-sm font-jakarta text-white">
                   {getGreeting()}
@@ -88,14 +109,24 @@ const PassengerHome = () => {
                 <Search size={20} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity
-                className="bg-white/20 p-3 rounded-full"
-                onPress={() => router.push("/(passenger)/qrScanner")}
+                className="bg-white/20 p-3 rounded-full relative"
+                onPress={() => router.push("/(passenger)/notifications")}
               >
                 <Ionicons
-                  name="qr-code-outline"
+                  name="notifications-outline"
                   size={20}
                   color={colors.text}
                 />
+
+                {unreadNotificationCount > 0 && (
+                  <View className="absolute -top-1.5 -right-1 bg-red-500 w-6 h-6 rounded-full items-center justify-center">
+                    <Text className="text-white text-[10px] font-bold">
+                      {unreadNotificationCount > 10
+                        ? "10+"
+                        : unreadNotificationCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>

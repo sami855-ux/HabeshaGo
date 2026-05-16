@@ -31,9 +31,9 @@ const ServiceDashboardGrid = () => {
       color: "#fb923c",
     },
     {
-      id: "employee",
-      title: "Employee Shuttle",
-      icon: "people-outline",
+      id: "my-vehicle",
+      title: "My Vehicle",
+      icon: "car-sport-outline",
       iconSet: Ionicons,
       color: "#ea580c",
     },
@@ -42,6 +42,8 @@ const ServiceDashboardGrid = () => {
   const handleServicePress = (serviceTitle: string) => {
     if (serviceTitle === "bus") {
       router.push("/(passenger)/busBook")
+    } else if (serviceTitle === "my-vehicle") {
+      router.push("/vehicle")
     }
   }
 

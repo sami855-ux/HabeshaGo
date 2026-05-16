@@ -4,7 +4,8 @@ export const fetchAllNotification = async () => {
   try {
     const response = await axiosInstance.get(`/notification/me`)
 
-    if (response.success) {
+    console.log(response.data.success, response.data.notifications)
+    if (response.data.success) {
       return response.data.notifications
     } else {
       return []

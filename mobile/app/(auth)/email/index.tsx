@@ -172,7 +172,6 @@ Please check for typos or missing characters and try again.`,
       console.log("Sending OTP to:", email)
       const res = await continueWithEmail(email)
 
-      console.log("OTP response:", res)
       if (res.success) {
         setCodeSent(true)
         setTimeLeft(60)
@@ -275,7 +274,7 @@ Please check for typos or missing characters and try again.`,
           primaryButtonText: "Continue",
         })
 
-        dispatch(setAccessToken(data?.accessToken))
+        dispatch(setAccessToken({ accessToken: data?.accessToken }))
 
         const userRes = await getMe()
 
@@ -283,7 +282,9 @@ Please check for typos or missing characters and try again.`,
           await new Promise((resolve) => {
             dispatch(saveUserToStorage({ user: userRes.user }))
 
-            dispatch(setUser(userRes.user))
+            dispatch(setUser({ user: userRes.user }))
+
+            saveRefreshToken(data.refreshToken)
             // small delay for state to propagate
             setTimeout(resolve, 0)
           })
@@ -294,8 +295,6 @@ Please check for typos or missing characters and try again.`,
             router.push("/(driver)/tabs")
           }
         }
-
-        await saveRefreshToken(data.refreshToken)
       } else {
         showAlert({
           type: "error",

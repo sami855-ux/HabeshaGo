@@ -1,56 +1,136 @@
-export type TripStatus = "CONFIRMED" | "COMPLETED" | "CANCELLED"
+import { User } from "./user"
+
+export interface Ticket {
+  id: number
+  seatNumber: number | null
+  boardingStop: string | null
+  alightingStop: string | null
+  qrCode: string | null
+  checkedIn: boolean
+  checkedInAt: string | null
+  validUntil: string | null
+  sharedTo: User | null
+  sharedTicketUsed: boolean
+  sharedAt: string
+  cancelledAt: string | null
+}
+
+export type TripStatus = "CONFIRMED" | "COMPLETED" | "CANCELLED" | "IN_PROGRESS"
+export type TripType = "BUS" | "EV" | "PARKING"
+export type TripCategory = "upcoming" | "past"
 
 export interface Trip {
   id: number
-  userId: string
-  busId: number
-  date: string // ISO date
+  type: TripType
+  category?: TripCategory // upcoming or past
+  userId?: string
+  busId?: number
   status: TripStatus
-  boardingStop: string
-  alightingStop: string
   bookingCode: string
-  cancelledAt: string | null
-  payNow: boolean
-  sharedToId: string | null
-  sharedAt: string | null
-  sharedTicketUsed: boolean
-  qrCode: string
-  checkedIn: boolean
-  checkedInAt: string | null
-  validUntil: string
-  discount: string
-  promoCode: string | null
+  cancelledAt?: string | null
+
+  // Pricing
+  discount?: string
+  promoCode?: string | null
   amountPaid: string
   totalAmount: string
   currency: string
-  pointsUsed: number
-  pointsValue: string
-  pointsConversionRate: string
-  paymentId: number
-  createdAt: string
-  updatedAt: string
-  bus: {
+
+  // Points
+  pointsUsed?: number
+  pointsValue?: string
+  pointsConversionRate?: string
+
+  // Dates
+  bookedAt: string
+  updatedAt?: string
+  date?: string // BUS departure date
+  startTime?: string // EV session start
+  endTime?: string // EV session end
+  createdAt?: string // EV reservation created at
+
+  // Locations
+  origin?: string // BUS origin
+  destination?: string // BUS destination
+
+  // EV specific
+  targetBatteryPercentage?: number
+  targetKwh?: number
+
+  // Relations
+  paymentId?: number
+  tickets?: Ticket[] // BUS tickets
+
+  // BUS specific
+  bus?: {
     id: number
     busNumber: string
     capacity: number
     status: string
-    driverId: string
-    routeId: number
     currentStop: string | null
     nextDestination: string | null
     isActive: boolean
     departureTime: string | null
     estimatedArrival: string | null
     delayMinutes: number
-    lastServiceDate: string
-    nextServiceDate: string
-    reservedSeats: number
-    availableSeats: number
-    vehicleId: number
-    createdAt: string
-    updatedAt: string
+    driver: {
+      id: string
+      name: string
+      phone: string
+      licenseNo: string
+      experience: number
+      rating: number
+      totalTrips: number
+      status: string
+      isOnDuty: boolean
+    }
+    vehicle: {
+      id: number
+      plateNumber: string
+      model: string
+      manufacturer: string
+      year: number
+      capacity: number
+      mileage: number
+      image: string
+      status: string
+      type: string
+    }
   }
-  payment: {
+
+  // EV specific
+  vehicle?: {
+    id: number
+    plateNumber: string
+    model: string
+    manufacturer: string
+    year?: number
+    image?: string
+    type?: string
+    capacity?: number
+  }
+
+  chargingPoint?: {
+    id: number
+    name: string
+    status: string
+    connectorType?: string
+    powerKw?: number
+    slotNumber?: string
+  }
+
+  payments?: Array<{
+    id: number
+    amount: number
+    status: string
+    method: string
+    gateway?: string
+    reference?: string
+    createdAt?: string
+  }>
+
+  // Payment (BUS uses this, EV uses payments array)
+  payment?: {
     id: number
     userId: string
     amount: string
@@ -69,7 +149,16 @@ export interface Trip {
     createdAt: string
     updatedAt: string
   }
-  sharedTo: null | any // You can define a more specific type if needed
 }
 
-export type TripCategory = "upcoming" | "past"
+export const isBusTrip = (trip: Trip): boolean => {
+  return trip.type === "BUS"
+}
+
+export const isEvTrip = (trip: Trip): boolean => {
+  return trip.type === "EV"
+}
+
+// export const isParkingTrip = (trip: Trip): boolean => {
+//   return trip.type === "PARKING"
+// }

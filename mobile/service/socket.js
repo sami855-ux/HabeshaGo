@@ -1,10 +1,13 @@
-import { io } from "socket.io-client"
+import { io, Socket } from "socket.io-client"
 
-// Replace with your actual backend URL
-const SOCKET_URL = "https://habeshago-v1.onrender.com"
+let socket = null
 
-export const socket = io(SOCKET_URL, {
-  autoConnect: false,
-  transports: ["websocket"],
-  withCredentials: true,
-})
+export const getSocket = () => {
+  if (!socket) {
+    socket = io("https://habeshago-pro-v1.onrender.com", {
+      transports: ["websocket"],
+      autoConnect: false,
+    })
+  }
+  return socket
+}

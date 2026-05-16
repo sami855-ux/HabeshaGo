@@ -1,371 +1,380 @@
-"use client"
-
-import { useUser } from "@/context/user-context"
-import { LinearGradient } from "expo-linear-gradient"
+import { useAppSelector } from "@/store"
+import { useThemeContext } from "@/context/ThemeContext"
 import { useRouter } from "expo-router"
-import { ArrowRight, Gift, Shield, Star, X, Zap } from "lucide-react-native"
-import React from "react"
-import { Dimensions, Modal, Text, TouchableOpacity, View } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
+import { LinearGradient } from "expo-linear-gradient"
+import { useState, useEffect } from "react"
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+} from "react-native"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window")
+const { height } = Dimensions.get("window")
 
-export default function ProfileCompletionModal() {
+type StepKey = "name" | "email" | "phone" | "emailVerified" | "phoneVerified"
+
+interface Step {
+  key: StepKey
+  label: string
+  description: string
+  icon: keyof typeof Ionicons.glyphMap
+  action: string
+  route: string
+}
+
+const STEPS: Step[] = [
+  {
+    key: "name",
+    label: "Add your name",
+    description: "Let others know who you are.",
+    icon: "person-outline",
+    action: "Add Name",
+    route: "/(passenger)/profile/edit",
+  },
+  {
+    key: "email",
+    label: "Add your email",
+    description: "Required for account security and receipts.",
+    icon: "mail-outline",
+    action: "Add Email",
+    route: "/(passenger)/profile",
+  },
+  {
+    key: "phone",
+    label: "Add your phone",
+    description: "Needed for booking confirmations.",
+    icon: "call-outline",
+    action: "Add Phone",
+    route: "/(passenger)/profile",
+  },
+  {
+    key: "emailVerified",
+    label: "Verify your email",
+    description: "Confirm ownership of your email address.",
+    icon: "checkmark-circle-outline",
+    action: "Verify Email",
+    route: "/(passenger)/profile",
+  },
+  {
+    key: "phoneVerified",
+    label: "Verify your phone",
+    description: "Confirm your phone number via OTP.",
+    icon: "shield-checkmark-outline",
+    action: "Verify Phone",
+    route: "/(passenger)/profile",
+  },
+]
+
+/**
+ * Returns incomplete steps for the user.
+ * emailVerified / phoneVerified steps only appear if the underlying
+ * email / phone value already exists (no point verifying nothing).
+ */
+function getIncompleteSteps(user: {
+  name: string | null
+  email: string | null
+  phone: string | null
+  emailVerified: boolean
+  phoneVerified: boolean
+}) {
+  return STEPS.filter((step) => {
+    if (step.key === "name") return !user.name
+    if (step.key === "email") return !user.email
+    if (step.key === "phone") return !user.phone
+    if (step.key === "emailVerified") return !!user.email && !user.emailVerified
+    if (step.key === "phoneVerified") return !!user.phone && !user.phoneVerified
+    return false
+  })
+}
+
+const ProfileCompletionModal = () => {
+  const { user } = useAppSelector((state) => state.user)
+  const { colors, actualTheme } = useThemeContext()
   const router = useRouter()
-  const { showProfileModal, setShowProfileModal } = useUser()
 
-  const handleCompleteNow = () => {
-    setShowProfileModal(false)
-    router.push("/(passenger)/set-update")
+  const [visible, setVisible] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const slideAnim = useState(new Animated.Value(height))[0]
+
+  const incompleteSteps = user ? getIncompleteSteps(user) : []
+  const totalSteps = STEPS.length
+  const completedCount = totalSteps - incompleteSteps.length
+  const completionPercent = Math.round((completedCount / totalSteps) * 100)
+  const isFullyComplete = incompleteSteps.length === 0
+
+  useEffect(() => {
+    // Show the modal only when profile is incomplete and user hasn't dismissed it
+    if (!isFullyComplete && !dismissed) {
+      setVisible(true)
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 10,
+      }).start()
+    }
+  }, [isFullyComplete, dismissed])
+
+  const handleDismiss = () => {
+    Animated.timing(slideAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setVisible(false)
+      setDismissed(true)
+    })
   }
 
-  const handleSkip = () => {
-    setShowProfileModal(false)
+  const handleAction = (route: string) => {
+    handleDismiss()
+    router.push(route as never)
   }
 
-  // Styles
-  const styles = {
-    modalBackground: {
-      flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.7)",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 16,
-    },
-    modalContainer: {
-      width: "100%",
-      maxWidth: 380,
-      maxHeight: "98%",
-      backgroundColor: "#ffffff",
-      borderRadius: 24,
-      overflow: "hidden",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 10,
-    },
-    headerGradient: {
-      paddingTop: 40,
-      paddingBottom: 24,
-      paddingHorizontal: 24,
-      alignItems: "center",
-    },
-    iconContainer: {
-      width: 96,
-      height: 96,
-      backgroundColor: "rgba(255,255,255,0.2)",
-      backdropFilter: "blur(10px)",
-      borderRadius: 48,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 4,
-      borderColor: "rgba(255,255,255,0.3)",
-      marginBottom: 16,
-    },
-    innerIcon: {
-      width: 80,
-      height: 80,
-      backgroundColor: "#ffffff",
-      borderRadius: 40,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: "bold",
-      color: "#ffffff",
-      textAlign: "center",
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 18,
-      color: "rgba(255,255,255,0.9)",
-      textAlign: "center",
-    },
-    contentContainer: {
-      paddingHorizontal: 24,
-      paddingVertical: 32,
-    },
-    statsCard: {
-      backgroundColor: "#fef3c7",
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: "#fde68a",
-    },
-    statsRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    statItem: {
-      alignItems: "center",
-    },
-    statValue: {
-      fontSize: 32,
-      fontWeight: "bold",
-      color: "#d97706",
-      marginBottom: 4,
-    },
-    statLabel: {
-      fontSize: 14,
-      color: "#92400e",
-    },
-    sectionTitle: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: "#1f2937",
-      textAlign: "center",
-      marginBottom: 20,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    featuresGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-      marginBottom: 32,
-    },
-    featureCard: {
-      width: "48%",
-      backgroundColor: "#fffbeb",
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: "#fef3c7",
-      alignItems: "center",
-    },
-    featureIcon: {
-      marginBottom: 12,
-    },
-    featureText: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: "#78350f",
-      textAlign: "center",
-    },
-    benefitItem: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      marginBottom: 16,
-    },
-    benefitIcon: {
-      marginRight: 12,
-      marginTop: 2,
-    },
-    benefitText: {
-      fontSize: 16,
-      color: "#374151",
-      flex: 1,
-    },
-    testimonialCard: {
-      backgroundColor: "#eff6ff",
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: "#dbeafe",
-    },
-    quoteMark: {
-      fontSize: 32,
-      color: "#9ca3af",
-      marginBottom: 8,
-    },
-    testimonialText: {
-      fontSize: 16,
-      color: "#374151",
-      fontStyle: "italic",
-      marginBottom: 16,
-    },
-    testimonialAuthor: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    authorAvatar: {
-      width: 40,
-      height: 40,
-      backgroundColor: "#f97316",
-      borderRadius: 20,
-      marginRight: 12,
-    },
-    authorName: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: "#111827",
-    },
-    authorRole: {
-      fontSize: 14,
-      color: "#6b7280",
-    },
-    buttonContainer: {
-      paddingHorizontal: 24,
-      paddingBottom: 24,
-      paddingTop: 16,
-    },
-    primaryButton: {
-      borderRadius: 16,
-      paddingVertical: 20,
-      paddingHorizontal: 24,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 16,
-      shadowColor: "#f97316",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 6,
-    },
-    primaryButtonText: {
-      fontSize: 17,
-      color: "#ffffff",
-      marginRight: 12,
-    },
-    secondaryButton: {
-      paddingVertical: 16,
-      borderRadius: 16,
-      borderWidth: 2,
-      borderColor: "#d1d5db",
-      alignItems: "center",
-      marginBottom: 16,
-    },
-    secondaryButtonText: {
-      fontSize: 16,
-      color: "#6b7280",
-    },
-    helpText: {
-      fontSize: 14,
-      color: "#9ca3af",
-      textAlign: "center",
-    },
-    closeButton: {
-      position: "absolute",
-      top: 16,
-      right: 16,
-      width: 40,
-      height: 40,
-      backgroundColor: "rgba(255,255,255,0.2)",
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    floatingBadge: {
-      position: "absolute",
-      bottom: -12,
-      left: "50%",
-      transform: [{ translateX: -50 }],
-      backgroundColor: "#f97316",
-      borderRadius: 20,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 4,
-    },
-    badgeText: {
-      color: "#ffffff",
-      fontWeight: "bold",
-      fontSize: 12,
-    },
-  }
+  if (isFullyComplete || !visible) return null
 
-  const features = [
-    { icon: <Shield size={24} color="#d97706" />, text: "Enhanced Security" },
-    { icon: <Gift size={24} color="#d97706" />, text: "Personalized Offers" },
-    { icon: <Zap size={24} color="#d97706" />, text: "Faster Access" },
-    { icon: <Star size={24} color="#d97706" />, text: "Premium Features" },
-  ]
-
-  const benefits = [
-    "Get personalized recommendations",
-    "Unlock premium features",
-    "Earn rewards and badges",
-    "Join exclusive events",
-    "Priority customer support",
-  ]
+  const gradientColors: [string, string] =
+    actualTheme === "dark" ? ["#FFB300", "#FF6F00"] : ["#ea580c", "#f97316"]
 
   return (
     <Modal
-      visible={showProfileModal}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={handleSkip}
+      transparent
+      visible={visible}
+      animationType="none"
+      onRequestClose={handleDismiss}
     >
-      <View style={styles.modalBackground}>
-        <View style={styles.modalContainer}>
-          {/* Header with Gradient */}
-          <LinearGradient
-            colors={["#f97316", "#fb923c", "#fdba74"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerGradient}
-          >
-            {/* Floating Badge */}
-            <View style={styles.floatingBadge}>
-              <Text style={styles.badgeText}>2 MIN SETUP</Text>
-            </View>
-
-            {/* Main Icon */}
-            <View style={styles.iconContainer}>
-              <View style={styles.innerIcon}>
-                <Zap size={48} color="#f97316" />
-              </View>
-            </View>
-
-            {/* Titles */}
-            <Text style={styles.title}>Complete Your Profile</Text>
-            <Text style={styles.subtitle}>Unlock the full experience</Text>
-          </LinearGradient>
-
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            {/* Primary Button */}
-            <TouchableOpacity onPress={handleCompleteNow} className="mt-4">
-              <LinearGradient
-                colors={["#f97316", "#ea580c"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText} className="font-geist">
-                  Complete Profile Now
-                </Text>
-                <ArrowRight size={24} color="#ffffff" />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Secondary Button */}
-            <TouchableOpacity
-              onPress={handleSkip}
-              style={styles.secondaryButton}
+      {/* Backdrop */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleDismiss}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          justifyContent: "flex-end",
+        }}
+      >
+        <Animated.View
+          style={{ transform: [{ translateY: slideAnim }] }}
+          // Prevent backdrop tap from closing when tapping the sheet
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: colors.card,
+                borderTopLeftRadius: 28,
+                borderTopRightRadius: 28,
+                paddingBottom: 40,
+                maxHeight: height * 0.82,
+              }}
             >
-              <Text style={styles.secondaryButtonText} className="font-geist">
-                I'll do it later
-              </Text>
-            </TouchableOpacity>
+              {/* Handle bar */}
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: colors.border ?? "#ccc",
+                  alignSelf: "center",
+                  marginTop: 12,
+                  marginBottom: 20,
+                }}
+              />
 
-            {/* Help Text */}
-            <Text style={styles.helpText}>
-              Takes only 2 minutes • Your data is secure
-            </Text>
-          </View>
+              {/* Header */}
+              <View style={{ paddingHorizontal: 24, marginBottom: 20 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 22,
+                        fontWeight: "800",
+                        color: colors.text,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Complete your profile
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: colors.icon ?? "#888",
+                        lineHeight: 20,
+                      }}
+                    >
+                      {incompleteSteps.length} step
+                      {incompleteSteps.length !== 1 ? "s" : ""} remaining to
+                      unlock the full experience.
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={handleDismiss}>
+                    <Ionicons
+                      name="close-circle"
+                      size={28}
+                      color={colors.icon ?? "#888"}
+                    />
+                  </TouchableOpacity>
+                </View>
 
-          {/* Close Button */}
-          <TouchableOpacity onPress={handleSkip} style={styles.closeButton}>
-            <X size={20} color="#ffffff" />
+                {/* Progress bar */}
+                <View style={{ marginTop: 16 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: colors.icon ?? "#888",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {completedCount}/{totalSteps} complete
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: gradientColors[0],
+                        fontWeight: "700",
+                      }}
+                    >
+                      {completionPercent}%
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      height: 8,
+                      backgroundColor: actualTheme === "dark" ? "#333" : "#eee",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <LinearGradient
+                      colors={gradientColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{
+                        height: "100%",
+                        width: `${completionPercent}%`,
+                        borderRadius: 4,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Steps list */}
+              <View style={{ paddingHorizontal: 24, gap: 12 }}>
+                {incompleteSteps.map((step, index) => (
+                  <View
+                    key={step.key}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor:
+                        actualTheme === "dark" ? "#1a1a1a" : "#f9f9f9",
+                      borderRadius: 16,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor:
+                        actualTheme === "dark" ? "#2a2a2a" : "#efefef",
+                    }}
+                  >
+                    {/* Icon bubble */}
+                    <LinearGradient
+                      colors={gradientColors}
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 12,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginRight: 12,
+                      }}
+                    >
+                      <Ionicons name={step.icon} size={20} color="#fff" />
+                    </LinearGradient>
+
+                    {/* Text */}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: "700",
+                          color: colors.text,
+                          marginBottom: 2,
+                        }}
+                      >
+                        {step.label}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: colors.icon ?? "#888",
+                        }}
+                      >
+                        {step.description}
+                      </Text>
+                    </View>
+
+                    {/* CTA */}
+                    <TouchableOpacity
+                      onPress={() => handleAction(step.route)}
+                      style={{
+                        backgroundColor: gradientColors[0],
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        marginLeft: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {step.action}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+
+              {/* Dismiss link */}
+              <TouchableOpacity
+                onPress={handleDismiss}
+                style={{ alignItems: "center", marginTop: 20 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.icon ?? "#999",
+                    textDecorationLine: "underline",
+                  }}
+                >
+                  Remind me later
+                </Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
-        </View>
-      </View>
+        </Animated.View>
+      </TouchableOpacity>
     </Modal>
   )
 }
+
+export default ProfileCompletionModal

@@ -3,31 +3,44 @@ import { MaterialIcons } from "@expo/vector-icons"
 import React from "react"
 import { ScrollView, Text, TouchableOpacity, View } from "react-native"
 import { actualThemeBackground } from "./ServiceDashbaord"
+import { Href, useRouter } from "expo-router"
+
+type PassengerRoute =
+  | "my-booking"
+  | "search"
+  | "qrScanner"
+  | "wallet/topup"
+  | "profile/edit"
 
 const SmartSuggestions = () => {
   const { colors } = useThemeContext() // Get theme colors
+  const router = useRouter()
 
   const suggestions = [
-    {
-      id: 1,
-      title: "Quick Booking",
-      icon: "flash-on",
-      iconSet: MaterialIcons,
-      color: "#ea580c",
-    },
-    {
-      id: 2,
-      title: "Nearby Stations",
-      icon: "location-on",
-      iconSet: MaterialIcons,
-      color: "#f97316",
-    },
     {
       id: 3,
       title: "My Bookings",
       icon: "receipt",
       iconSet: MaterialIcons,
       color: "#fb923c",
+      route: "my-booking",
+    },
+    {
+      id: 1,
+      title: "Quick Booking",
+      icon: "flash-on",
+      iconSet: MaterialIcons,
+      color: "#ea580c",
+      route: "",
+    },
+
+    {
+      id: 5,
+      title: "Notifications",
+      icon: "notifications",
+      iconSet: MaterialIcons,
+      color: "#f97316",
+      route: "notifications",
     },
     {
       id: 4,
@@ -35,19 +48,12 @@ const SmartSuggestions = () => {
       icon: "payment",
       iconSet: MaterialIcons,
       color: "#ea580c",
-    },
-    {
-      id: 5,
-      title: "Notifications",
-      icon: "notifications",
-      iconSet: MaterialIcons,
-      color: "#f97316",
+      route: "",
     },
   ]
 
-  const handleSuggestionPress = (title: string) => {
-    console.log(`Pressed: ${title}`)
-    alert(`Action: ${title}`)
+  const handleSuggestionPress = (route: PassengerRoute) => {
+    router.push(`/(passenger)/${route}` as Href)
   }
 
   const SuggestionCard = ({
@@ -64,7 +70,7 @@ const SmartSuggestions = () => {
           borderColor: colors.border,
         }}
         className="rounded-xl px-4 py-2 mr-3 w-28 flex items-center justify-center flex-col"
-        onPress={() => handleSuggestionPress(suggestion.title)}
+        onPress={() => handleSuggestionPress(suggestion.route)}
         activeOpacity={0.7}
       >
         <View

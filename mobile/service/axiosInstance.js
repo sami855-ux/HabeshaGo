@@ -4,10 +4,8 @@ import { clearUser, setAccessToken } from "@/store/slices/userSlice"
 import axios from "axios"
 import * as SecureStore from "expo-secure-store"
 
-const API_URL = "https://habeshago-v1.onrender.com/api"
-
 export const axiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: "https://habeshago-pro-v1.onrender.com/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -22,7 +20,7 @@ axiosInstance.interceptors.request.use(
     }
     return config
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 )
 
 // Refresh token handling
@@ -47,9 +45,12 @@ axiosInstance.interceptors.response.use(
         }
 
         // 🔄 Request new access token
-        const res = await axios.post(`${API_URL}/app/auth/refresh`, {
-          refreshToken,
-        })
+        const res = await axios.post(
+          `https://habeshago-pro-v1.onrender.com/api/app/auth/refresh`,
+          {
+            refreshToken,
+          },
+        )
 
         const newAccessToken = res.data.accessToken
 
@@ -69,5 +70,5 @@ axiosInstance.interceptors.response.use(
     }
 
     return Promise.reject(error)
-  }
+  },
 )

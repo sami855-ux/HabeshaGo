@@ -26,9 +26,6 @@ export const logout = createAsyncThunk(
     // Remove refresh token from secure storage
     await SecureStore.deleteItemAsync("refreshToken")
 
-    // Optional: tell backend to invalidate session
-    // await axios.post("/app/auth/logout")
-
     dispatch(clearUser())
   },
 )
@@ -115,8 +112,8 @@ const userSlice = createSlice({
       }
     },
 
-    setAccessToken: (state, action: PayloadAction<string>) => {
-      state.accessToken = action.payload
+    setAccessToken: (state, action: PayloadAction<{ accessToken: string }>) => {
+      state.accessToken = action.payload.accessToken
       state.isAuthenticated = true
     },
 
@@ -143,6 +140,9 @@ const userSlice = createSlice({
         state.user = null
         state.accessToken = null
         state.isAuthenticated = false
+      })
+      .addCase(restoreSession.pending, (state) => {
+        state.isBootstrapping = true
       })
       .addCase(restoreSession.fulfilled, (state) => {
         state.isAuthenticated = true

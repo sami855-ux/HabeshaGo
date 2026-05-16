@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "@react-navigation/native"
 import { Image } from "expo-image"
 import { LinearGradient } from "expo-linear-gradient"
+import * as SecureStore from "expo-secure-store"
 import { useRouter } from "expo-router"
 import {
   ArrowRight,
@@ -26,8 +27,15 @@ import {
   useColorScheme,
   View,
 } from "react-native"
+import * as WebBrowser from "expo-web-browser"
+import * as Google from "expo-auth-session/providers/google"
+import { useAppDispatch } from "@/store"
+import { axiosInstance } from "@/service/axiosInstance"
+import { setAccessToken, setUser } from "@/store/slices/userSlice"
 
 const { width, height } = Dimensions.get("window")
+
+WebBrowser.maybeCompleteAuthSession()
 
 // Slide 4: Trusted Community
 const Slide4 = ({ isActive }) => {
@@ -191,7 +199,7 @@ const Slide3 = ({ isActive }) => {
             duration: 1500,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       )
       pulseLoop.start()
 
@@ -524,7 +532,7 @@ const Slide2 = ({ isActive }) => {
             duration: 1000,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       )
       pulseLoop.start()
 
@@ -885,12 +893,67 @@ const Slide1 = ({ isActive }) => {
 const AuthSlide = ({ isActive }) => {
   const colorScheme = useColorScheme()
   const router = useRouter()
+  const dispatch = useAppDispatch()
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  })
+
+  // Add this
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { authentication } = response
+      fetchUserInfo(authentication.accessToken)
+    }
+  }, [response])
 
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideUpAnim = useRef(new Animated.Value(50)).current
   const buttonScale = useRef(new Animated.Value(0.95)).current
   const logoScale = useRef(new Animated.Value(0.8)).current
   const shimmerAnim = useRef(new Animated.Value(0)).current
+
+  // Add this
+  const fetchUserInfo = async (token) => {
+    try {
+      // 1. Send Google token to YOUR backend
+      const res = await axiosInstance.post("/mobile/google", { token })
+
+      const { user, accessToken, refreshToken, isNewUser } = res.data
+
+      // 2. Save tokens to SecureStore
+      await SecureStore.setItemAsync("refreshToken", refreshToken)
+      await SecureStore.setItemAsync("user", JSON.stringify(user))
+
+      // 3. Save to Redux
+      dispatch(setUser({ user }))
+      dispatch(setAccessToken(accessToken))
+
+      // 4. Navigate based on role and new/existing user
+      if (isNewUser) {
+        router.push("/(auth)")
+      } else {
+        switch (user.role) {
+          case "PASSENGER":
+            router.push("/(passenger)/(tabs)")
+            break
+          case "DRIVER":
+            router.push("/(driver)/(tabs)")
+            break
+          default:
+            router.push("/(passenger)/(tabs)")
+        }
+      }
+    } catch (error) {
+      console.error("Google login error:", error.message)
+    }
+  }
+
+  // Update this
+  const handleGoogleLogin = () => {
+    promptAsync()
+  }
 
   useEffect(() => {
     if (isActive) {
@@ -926,7 +989,7 @@ const AuthSlide = ({ isActive }) => {
           toValue: 1,
           duration: 2000,
           useNativeDriver: false, // Can't use native driver for transform with non-layout properties
-        })
+        }),
       ).start()
     } else {
       // Reset animations
@@ -942,11 +1005,6 @@ const AuthSlide = ({ isActive }) => {
     inputRange: [0, 1],
     outputRange: [-100, 100],
   })
-
-  const handleGoogleLogin = () => {
-    console.log("Google login pressed")
-    // Implement Google OAuth logic here
-  }
 
   const handleAppleLogin = () => {
     console.log("Apple login pressed")
@@ -1075,6 +1133,7 @@ const AuthSlide = ({ isActive }) => {
               {/* Google Login */}
               <TouchableOpacity
                 onPress={handleGoogleLogin}
+                disabled={!request}
                 activeOpacity={0.8}
                 className="flex-1"
               >
@@ -1145,7 +1204,7 @@ const AuthSlide = ({ isActive }) => {
 // FIXED Progress Dots - Simplified without conflicting animations
 const ProgressDots = ({ currentIndex, total }) => {
   const [dots, setDots] = useState(
-    Array(total).fill({ width: 8, opacity: 0.4 })
+    Array(total).fill({ width: 8, opacity: 0.4 }),
   )
 
   useEffect(() => {
@@ -1193,7 +1252,7 @@ const JoinButton = ({ onPress }) => {
           duration: 1000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start()
 
     return () => {

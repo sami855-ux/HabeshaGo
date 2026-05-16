@@ -9,6 +9,7 @@ export const continueWithEmail = async (email) => {
     if (response.data.success) {
       return response.data
     } else {
+      console.log(response)
       return {
         success: false,
         message: "Error when logining in with email",
@@ -36,7 +37,7 @@ export const verifyOtp = async (email, code) => {
   } catch (error) {
     console.error(
       "OTP verification failed:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     )
     throw error
   }

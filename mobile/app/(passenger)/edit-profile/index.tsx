@@ -1,6 +1,7 @@
 // EditProfileScreen.tsx
 import { useThemeContext } from "@/context/ThemeContext"
-import AsyncStorage from "@react-native-async-storage/async-storage"
+import { setUser, updateUser } from "@/store/slices/userSlice"
+import { updateMyProfileAPI } from "@/service/user.api"
 import * as ImagePicker from "expo-image-picker"
 import {
   Camera,
@@ -32,13 +33,13 @@ import {
   View,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { useAppDispatch, useAppSelector } from "@/store"
 
 interface ProfileData {
   name: string
   email: string
   phone: string
   location: string
-  website: string
   bio: string
   avatarUri: string | null
 }
@@ -54,58 +55,80 @@ const showToast = (message: string, duration: number = ToastAndroid.SHORT) => {
 
 const EditProfileScreen: React.FC = () => {
   const { colors, actualTheme } = useThemeContext()
+  const dispatch = useAppDispatch()
+  const { user, loading: isUserLoading } = useAppSelector((state) => state.user)
 
   // Profile state
   const [profile, setProfile] = useState<ProfileData>({
-    name: "Alex Johnson",
-    email: "alex.johnson@example.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    website: "alexjohnson.design",
-    bio: "Product designer passionate about creating beautiful, functional interfaces. Coffee enthusiast ☕️",
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    bio: "",
     avatarUri: null,
   })
 
   // UI state
-  const [isLoading, setIsLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
   const [tempAvatar, setTempAvatar] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<any>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-  // Load profile on mount
+  // Load profile from Redux on mount
   useEffect(() => {
-    loadProfile()
-  }, [])
+    if (user) {
+      setProfile({
+        name: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        location: user.location || "",
+        bio: user.bio || "",
+        avatarUri: user.avaterUrl || null,
+      })
+    }
+  }, [user])
 
   // Check for unsaved changes
   useEffect(() => {
+    if (!user) return
+
     const initialProfile = {
-      name: "Alex Johnson",
-      email: "alex.johnson@example.com",
-      phone: "+1 (555) 123-4567",
-      location: "San Francisco, CA",
-      website: "alexjohnson.design",
-      bio: "Product designer passionate about creating beautiful, functional interfaces. Coffee enthusiast ☕️",
-      avatarUri: null,
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      location: user.location || "",
+      bio: user.bio || "",
+      avatarUri: user.avaterUrl || null,
     }
 
     const hasChanges =
-      JSON.stringify(profile) !== JSON.stringify(initialProfile)
+      JSON.stringify(profile) !== JSON.stringify(initialProfile) ||
+      avatarFile !== null
     setHasUnsavedChanges(hasChanges)
-  }, [profile])
+  }, [profile, user, avatarFile])
 
-  const loadProfile = async () => {
-    setIsLoading(true)
+  // Convert image URI to FormData compatible file
+  const uriToBlob = async (uri: string): Promise<Blob> => {
+    const response = await fetch(uri)
+    const blob = await response.blob()
+    return blob
+  }
+
+  // Prepare avatar file for upload
+  const prepareAvatarFile = async (uri: string) => {
     try {
-      const savedProfile = await AsyncStorage.getItem("userProfile")
-      if (savedProfile) {
-        setProfile(JSON.parse(savedProfile))
-      }
+      const blob = await uriToBlob(uri)
+      const filename = uri.split("/").pop() || "avatar.jpg"
+      const fileType = blob.type || "image/jpeg"
+
+      // Create File object for FormData
+      const file = new File([blob], filename, { type: fileType })
+      setAvatarFile(file)
     } catch (error) {
-      console.error("Error loading profile:", error)
-    } finally {
-      setIsLoading(false)
+      console.error("Error preparing avatar file:", error)
+      showToast("Failed to prepare image file")
     }
   }
 
@@ -119,7 +142,7 @@ const EditProfileScreen: React.FC = () => {
         Alert.alert(
           "Permission Required",
           "Sorry, we need camera roll permissions to upload photos.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         )
         return
       }
@@ -133,6 +156,7 @@ const EditProfileScreen: React.FC = () => {
 
       if (!result.canceled && result.assets[0]) {
         setTempAvatar(result.assets[0].uri)
+        await prepareAvatarFile(result.assets[0].uri)
       }
     } catch (error) {
       console.error("Error picking image:", error)
@@ -149,7 +173,7 @@ const EditProfileScreen: React.FC = () => {
         Alert.alert(
           "Permission Required",
           "Sorry, we need camera permissions to take photos.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         )
         return
       }
@@ -162,6 +186,7 @@ const EditProfileScreen: React.FC = () => {
 
       if (!result.canceled && result.assets[0]) {
         setTempAvatar(result.assets[0].uri)
+        await prepareAvatarFile(result.assets[0].uri)
       }
     } catch (error) {
       console.error("Error taking photo:", error)
@@ -176,63 +201,104 @@ const EditProfileScreen: React.FC = () => {
       showToast("Profile photo updated")
     }
     setShowImageModal(false)
-    setTempAvatar(null)
   }
 
-  // Save profile
-  const saveProfile = async () => {
+  // Save profile to backend using API
+  const saveProfileData = async () => {
     setIsSaving(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
     try {
-      await AsyncStorage.setItem("userProfile", JSON.stringify(profile))
+      const formData = new FormData()
+      formData.append("email", profile.email)
+      formData.append("phone", profile.phone)
+      formData.append("name", profile.name)
+      formData.append("bio", profile.bio || "")
+      formData.append("location", profile.location || "")
+
+      if (avatarFile) {
+        formData.append("avatar", avatarFile)
+      }
+
+      console.log("Saving profile with data:", {
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        location: profile.location,
+        bio: profile.bio,
+        hasAvatar: !!avatarFile,
+      })
+
+      const response = await updateMyProfileAPI(formData)
+
+      dispatch(
+        updateUser({
+          ...user,
+          name: response.user.name,
+          email: response.user.email,
+          phone: response.user.phone,
+          avaterUrl: response.user.avaterUrl,
+          emailVerified: response.user.emailVerified,
+          phoneVerified: response.user.phoneVerified,
+          bio: response.user.bio,
+          location: response.user.location,
+        }),
+      )
+
       setIsSaving(false)
+      setIsEditing(false)
+      setAvatarFile(null)
+      setTempAvatar(null)
       showToast("Profile updated successfully!")
       setHasUnsavedChanges(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving profile:", error)
       setIsSaving(false)
-      showToast("Failed to save profile. Please try again.")
+      showToast(error?.message || "Failed to save profile. Please try again.")
     }
   }
 
-  // Reset changes
-  const resetChanges = () => {
-    if (!hasUnsavedChanges) return
+  // Cancel editing
+  const cancelEditing = () => {
+    if (!hasUnsavedChanges) {
+      setIsEditing(false)
+      return
+    }
 
     Alert.alert(
-      "Reset Changes",
+      "Discard Changes",
       "Are you sure you want to discard all changes?",
       [
         {
-          text: "Cancel",
+          text: "Continue Editing",
           style: "cancel",
         },
         {
-          text: "Reset",
+          text: "Discard",
           style: "destructive",
           onPress: () => {
-            // Reset to initial state
-            setProfile({
-              name: "Alex Johnson",
-              email: "alex.johnson@example.com",
-              phone: "+1 (555) 123-4567",
-              location: "San Francisco, CA",
-              website: "alexjohnson.design",
-              bio: "Product designer passionate about creating beautiful, functional interfaces. Coffee enthusiast ☕️",
-              avatarUri: null,
-            })
-            showToast("Changes reset")
+            // Reset to original user data
+            if (user) {
+              setProfile({
+                name: user.name || "",
+                email: user.email || "",
+                phone: user.phone || "",
+                location: user.location || "",
+                bio: user.bio || "",
+                avatarUri: user.avaterUrl || null,
+              })
+              setAvatarFile(null)
+              setTempAvatar(null)
+            }
+            setIsEditing(false)
+            showToast("Changes discarded")
           },
         },
-      ]
+      ],
     )
   }
 
   // Loading state
-  if (isLoading) {
+  if (isUserLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View className="flex-1 justify-center items-center">
@@ -254,7 +320,7 @@ const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Header with Large Title - Consistent with Biometric Page */}
+        {/* Header with Profile Title and Edit Button */}
         <View className="px-5 pt-6 pb-4">
           <View className="flex-row items-center justify-between mb-6">
             <View className="flex-1">
@@ -262,19 +328,65 @@ const EditProfileScreen: React.FC = () => {
                 className="text-2xl font-groteskBold"
                 style={{ color: colors.text }}
               >
-                Edit Profile
+                Profile
               </Text>
               <Text
                 className="text-base mt-2 font-geist"
                 style={{ color: colors.mutedText }}
               >
-                Update your personal information and profile picture
+                {isEditing
+                  ? "Edit your personal information"
+                  : "View your profile details"}
               </Text>
             </View>
+
+            {/* Edit/Save Button */}
+            {!isEditing ? (
+              <TouchableOpacity
+                onPress={() => setIsEditing(true)}
+                className="flex-row items-center gap-2 px-4 py-2 rounded-xl"
+                style={{ backgroundColor: `${colors.primary}15` }}
+              >
+                <Edit2 size={18} color={colors.primary} />
+                <Text style={{ color: colors.primary }} className="font-medium">
+                  Edit
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={cancelEditing}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl"
+                  style={{ backgroundColor: `${colors.error}15` }}
+                >
+                  <Text style={{ color: colors.error }} className="font-medium">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={saveProfileData}
+                  disabled={isSaving || !hasUnsavedChanges}
+                  className="px-4 py-2 rounded-xl"
+                  style={{
+                    backgroundColor: hasUnsavedChanges
+                      ? colors.primary
+                      : `${colors.mutedText}30`,
+                    opacity: isSaving || !hasUnsavedChanges ? 0.7 : 1,
+                  }}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text className="text-white font-medium">Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Profile Image Card - Consistent Styling */}
+        {/* Profile Image Card */}
         <View className="px-5 mb-6">
           <View
             className="rounded-2xl p-5 border"
@@ -285,9 +397,10 @@ const EditProfileScreen: React.FC = () => {
           >
             <View className="items-center">
               <TouchableOpacity
-                onPress={() => setShowImageModal(true)}
+                onPress={() => isEditing && setShowImageModal(true)}
                 className="relative"
-                activeOpacity={0.8}
+                activeOpacity={isEditing ? 0.8 : 1}
+                disabled={!isEditing}
               >
                 <View
                   className="w-28 h-28 rounded-full border-4 overflow-hidden"
@@ -296,9 +409,11 @@ const EditProfileScreen: React.FC = () => {
                     borderColor: colors.card,
                   }}
                 >
-                  {profile.avatarUri ? (
+                  {tempAvatar || profile.avatarUri ? (
                     <Image
-                      source={{ uri: profile.avatarUri }}
+                      source={{
+                        uri: tempAvatar || profile.avatarUri || undefined,
+                      }}
                       className="w-full h-full"
                       resizeMode="cover"
                     />
@@ -308,49 +423,54 @@ const EditProfileScreen: React.FC = () => {
                     </View>
                   )}
 
-                  {/* Edit overlay */}
+                  {/* Edit overlay - only show when editing */}
+                  {isEditing && (
+                    <View
+                      className="absolute inset-0 items-center justify-center"
+                      style={{ backgroundColor: "#00000040" }}
+                    >
+                      <Edit2 size={24} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+
+                {/* Camera badge - only show when editing */}
+                {isEditing && (
                   <View
-                    className="absolute inset-0 items-center justify-center"
-                    style={{ backgroundColor: "#00000040" }}
+                    className="absolute bottom-2 right-2 w-10 h-10 rounded-full items-center justify-center border-2"
+                    style={{
+                      backgroundColor: colors.card,
+                      borderColor: colors.background,
+                    }}
                   >
-                    <Edit2 size={24} color="#FFFFFF" />
+                    <Camera size={16} color={colors.primary} />
                   </View>
-                </View>
+                )}
+              </TouchableOpacity>
 
-                {/* Camera badge */}
-                <View
-                  className="absolute bottom-2 right-2 w-10 h-10 rounded-full items-center justify-center border-2"
-                  style={{
-                    backgroundColor: colors.card,
-                    borderColor: colors.background,
-                  }}
+              {isEditing && (
+                <TouchableOpacity
+                  onPress={() => setShowImageModal(true)}
+                  className="mt-4 p-3.5 rounded-xl active:opacity-80"
+                  style={{ backgroundColor: `${colors.border}20` }}
                 >
-                  <Camera size={16} color={colors.primary} />
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setShowImageModal(true)}
-                className="mt-4 p-3.5 rounded-xl active:opacity-80"
-                style={{ backgroundColor: `${colors.border}20` }}
-              >
-                <View className="flex-row items-center">
-                  <Upload size={16} color={colors.primary} className="mr-2" />
-                  <Text
-                    className="font-medium text-sm font-geist ml-2"
-                    style={{ color: colors.primary }}
-                  >
-                    Change Profile Photo
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                  <View className="flex-row items-center">
+                    <Upload size={16} color={colors.primary} />
+                    <Text
+                      className="font-medium text-sm font-geist ml-2"
+                      style={{ color: colors.primary }}
+                    >
+                      Change Profile Photo
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
 
-        {/* Form Section - Consistent with Biometric Page */}
+        {/* Form Section */}
         <View className="mb-8">
-          {/* Section Header */}
           <View className="px-5 mb-3">
             <Text
               className="text-xs font-semibold font-groteskBold uppercase tracking-wider"
@@ -360,7 +480,6 @@ const EditProfileScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Form Container */}
           <View
             className="rounded-2xl mx-5 border overflow-hidden"
             style={{
@@ -390,16 +509,25 @@ const EditProfileScreen: React.FC = () => {
                   >
                     Full Name
                   </Text>
-                  <TextInput
-                    value={profile.name}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, name: text }))
-                    }
-                    className="text-base font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Enter your full name"
-                    placeholderTextColor={colors.mutedText}
-                  />
+                  {isEditing ? (
+                    <TextInput
+                      value={profile.name}
+                      onChangeText={(text) =>
+                        setProfile((prev) => ({ ...prev, name: text }))
+                      }
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                      placeholder="Enter your full name"
+                      placeholderTextColor={colors.mutedText}
+                    />
+                  ) : (
+                    <Text
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                    >
+                      {profile.name || "Not provided"}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -426,18 +554,27 @@ const EditProfileScreen: React.FC = () => {
                   >
                     Email Address
                   </Text>
-                  <TextInput
-                    value={profile.email}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, email: text }))
-                    }
-                    className="text-base font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Enter your email"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
+                  {isEditing ? (
+                    <TextInput
+                      value={profile.email}
+                      onChangeText={(text) =>
+                        setProfile((prev) => ({ ...prev, email: text }))
+                      }
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                      placeholder="Enter your email"
+                      placeholderTextColor={colors.mutedText}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  ) : (
+                    <Text
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                    >
+                      {profile.email || "Not provided"}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -464,17 +601,26 @@ const EditProfileScreen: React.FC = () => {
                   >
                     Phone Number
                   </Text>
-                  <TextInput
-                    value={profile.phone}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, phone: text }))
-                    }
-                    className="text-base font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Enter your phone number"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="phone-pad"
-                  />
+                  {isEditing ? (
+                    <TextInput
+                      value={profile.phone}
+                      onChangeText={(text) =>
+                        setProfile((prev) => ({ ...prev, phone: text }))
+                      }
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                      placeholder="Enter your phone number"
+                      placeholderTextColor={colors.mutedText}
+                      keyboardType="phone-pad"
+                    />
+                  ) : (
+                    <Text
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                    >
+                      {profile.phone || "Not provided"}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -501,53 +647,25 @@ const EditProfileScreen: React.FC = () => {
                   >
                     Location
                   </Text>
-                  <TextInput
-                    value={profile.location}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, location: text }))
-                    }
-                    className="text-base font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Enter your location"
-                    placeholderTextColor={colors.mutedText}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Website Field */}
-            <View
-              className="px-4 py-3.5"
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: `${colors.border}80`,
-              }}
-            >
-              <View className="flex-row items-center">
-                <View
-                  className="w-10 h-10 rounded-lg items-center justify-center mr-3"
-                  style={{ backgroundColor: `#f59e0b20` }}
-                >
-                  <Globe size={18} color="#f59e0b" />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className="text-sm font-medium mb-1 font-geist"
-                    style={{ color: colors.mutedText }}
-                  >
-                    Website
-                  </Text>
-                  <TextInput
-                    value={profile.website}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, website: text }))
-                    }
-                    className="text-base font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Enter your website"
-                    placeholderTextColor={colors.mutedText}
-                    autoCapitalize="none"
-                  />
+                  {isEditing ? (
+                    <TextInput
+                      value={profile.location}
+                      onChangeText={(text) =>
+                        setProfile((prev) => ({ ...prev, location: text }))
+                      }
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                      placeholder="Enter your location"
+                      placeholderTextColor={colors.mutedText}
+                    />
+                  ) : (
+                    <Text
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
+                    >
+                      {profile.location || "Not provided"}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -568,95 +686,56 @@ const EditProfileScreen: React.FC = () => {
                   >
                     Bio
                   </Text>
-                  <TextInput
-                    value={profile.bio}
-                    onChangeText={(text) =>
-                      setProfile((prev) => ({ ...prev, bio: text }))
-                    }
-                    className="text-base min-h-[80px] font-geist"
-                    style={{ color: colors.text }}
-                    placeholder="Tell us about yourself..."
-                    placeholderTextColor={colors.mutedText}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                  <View className="flex-row justify-between items-center mt-2">
+                  {isEditing ? (
+                    <>
+                      <TextInput
+                        value={profile.bio}
+                        onChangeText={(text) =>
+                          setProfile((prev) => ({ ...prev, bio: text }))
+                        }
+                        className="text-base min-h-[80px] font-geist"
+                        style={{ color: colors.text }}
+                        placeholder="Tell us about yourself..."
+                        placeholderTextColor={colors.mutedText}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                      <View className="flex-row justify-end mt-2">
+                        <Text
+                          className="text-xs font-geist"
+                          style={{
+                            color:
+                              profile.bio.length > 200
+                                ? colors.error
+                                : colors.mutedText,
+                          }}
+                        >
+                          {profile.bio.length}/200
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
                     <Text
-                      className="text-xs font-geist"
-                      style={{ color: colors.mutedText }}
+                      className="text-base font-geist"
+                      style={{ color: colors.text }}
                     >
-                      Brief introduction
+                      {profile.bio || "No bio provided"}
                     </Text>
-                    <Text
-                      className="text-xs font-geist"
-                      style={{
-                        color:
-                          profile.bio.length > 200
-                            ? colors.error
-                            : colors.mutedText,
-                      }}
-                    >
-                      {profile.bio.length}/200
-                    </Text>
-                  </View>
+                  )}
                 </View>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View className="px-5 mb-8">
-          <View className="flex-row gap-3">
-            {/* Reset Button */}
-            <TouchableOpacity
-              onPress={resetChanges}
-              disabled={!hasUnsavedChanges}
-              className="flex-1 rounded-xl py-3.5 border items-center justify-center"
-              style={{
-                borderColor: colors.border,
-                opacity: hasUnsavedChanges ? 1 : 0.5,
-              }}
-            >
-              <Text
-                className="font-medium font-geist"
-                style={{ color: colors.text }}
-              >
-                Reset
-              </Text>
-            </TouchableOpacity>
-
-            {/* Save Button */}
-            <TouchableOpacity
-              onPress={saveProfile}
-              disabled={isSaving || !hasUnsavedChanges}
-              className="flex-1 rounded-xl font-geist py-3.5 items-center justify-center"
-              style={{
-                backgroundColor: hasUnsavedChanges
-                  ? colors.primary
-                  : `${colors.mutedText}30`,
-                opacity: isSaving || !hasUnsavedChanges ? 0.7 : 1,
-              }}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text className="text-white font-semibold font-geist">
-                  Save Changes
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Information Section */}
+        {/* Account Information Section */}
         <View className="mb-8">
           <View className="px-5 mb-3">
             <Text
               className="text-xs font-semibold uppercase tracking-wider"
               style={{ color: colors.mutedText }}
             >
-              Privacy & Security
+              Account Information
             </Text>
           </View>
 
@@ -668,8 +747,70 @@ const EditProfileScreen: React.FC = () => {
             }}
           >
             <View className="px-4 py-3.5">
+              <View className="flex-row items-center mb-3">
+                <ShieldCheck size={16} color={colors.primary} />
+                <Text
+                  className="text-sm ml-3 font-medium"
+                  style={{ color: colors.text }}
+                >
+                  Account Status
+                </Text>
+              </View>
+              <View className="ml-6">
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-sm" style={{ color: colors.mutedText }}>
+                    Role
+                  </Text>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: colors.text }}
+                  >
+                    {user?.role || "PASSENGER"}
+                  </Text>
+                </View>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-sm" style={{ color: colors.mutedText }}>
+                    Email Verified
+                  </Text>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{
+                      color: user?.emailVerified ? "#10b981" : colors.error,
+                    }}
+                  >
+                    {user?.emailVerified ? "Yes" : "No"}
+                  </Text>
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm" style={{ color: colors.mutedText }}>
+                    Phone Verified
+                  </Text>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{
+                      color: user?.phoneVerified ? "#10b981" : colors.error,
+                    }}
+                  >
+                    {user?.phoneVerified ? "Yes" : "No"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Privacy Note */}
+        <View className="mb-8">
+          <View
+            className="rounded-2xl mx-5 border overflow-hidden"
+            style={{
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            }}
+          >
+            <View className="px-4 py-3.5">
               <View className="flex-row items-center">
-                <Info size={16} color={colors.primary} className="mr-3" />
+                <Info size={16} color={colors.primary} />
                 <View className="flex-1 ml-3">
                   <Text className="text-sm" style={{ color: colors.mutedText }}>
                     Your information is securely stored and never shared with
@@ -682,7 +823,7 @@ const EditProfileScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Image Upload Modal - Enhanced */}
+      {/* Image Upload Modal */}
       <Modal
         visible={showImageModal}
         animationType="slide"
@@ -695,7 +836,6 @@ const EditProfileScreen: React.FC = () => {
             style={{ backgroundColor: "#00000080" }}
             onTouchEnd={() => {
               setShowImageModal(false)
-              setTempAvatar(null)
             }}
           />
 
@@ -705,7 +845,6 @@ const EditProfileScreen: React.FC = () => {
               backgroundColor: colors.card,
             }}
           >
-            {/* Modal Header */}
             <View className="flex-row items-center justify-between mb-6">
               <Text
                 className="text-xl font-groteskBold"
@@ -716,7 +855,6 @@ const EditProfileScreen: React.FC = () => {
               <TouchableOpacity
                 onPress={() => {
                   setShowImageModal(false)
-                  setTempAvatar(null)
                 }}
                 className="w-10 h-10 rounded-full items-center justify-center"
                 style={{ backgroundColor: `${colors.border}30` }}
@@ -725,7 +863,6 @@ const EditProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Preview */}
             {tempAvatar && (
               <View className="items-center mb-6">
                 <View
@@ -754,9 +891,7 @@ const EditProfileScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Options */}
             <View className="gap-3 mb-8">
-              {/* Take Photo */}
               <TouchableOpacity
                 onPress={takePhoto}
                 className="flex-row items-center p-4 rounded-xl active:opacity-80"
@@ -789,7 +924,6 @@ const EditProfileScreen: React.FC = () => {
                 <ChevronRight size={20} color={colors.mutedText} />
               </TouchableOpacity>
 
-              {/* Choose from Gallery */}
               <TouchableOpacity
                 onPress={pickImage}
                 className="flex-row items-center p-4 rounded-xl active:opacity-80"
@@ -823,13 +957,10 @@ const EditProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Action Buttons */}
             <View className="flex-row gap-3">
-              {/* Cancel Button */}
               <TouchableOpacity
                 onPress={() => {
                   setShowImageModal(false)
-                  setTempAvatar(null)
                 }}
                 className="flex-1 rounded-xl py-3.5 border items-center justify-center active:opacity-80"
                 style={{
@@ -845,7 +976,6 @@ const EditProfileScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
 
-              {/* Save Button */}
               <TouchableOpacity
                 onPress={saveProfileImage}
                 disabled={!tempAvatar}
@@ -858,8 +988,8 @@ const EditProfileScreen: React.FC = () => {
                 }}
               >
                 <View className="flex-row items-center">
-                  <Check size={20} color="#FFFFFF" className="mr-2" />
-                  <Text className="text-white font-semibold font-geist">
+                  <Check size={20} color="#FFFFFF" />
+                  <Text className="text-white font-semibold font-geist ml-2">
                     Use This Photo
                   </Text>
                 </View>

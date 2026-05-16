@@ -228,8 +228,6 @@ export function useProfileForm() {
         formData.append("avatar", avatarFile)
       }
 
-      console.log(profile.phone)
-
       const res = await updateMyProfileAPI(formData)
 
       dispatch(

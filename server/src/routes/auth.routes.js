@@ -24,6 +24,7 @@ const router = express.Router()
 // Registration & verification
 router.post("/register", register)
 router.post("/register/phone/verify", verifyOtpPhone)
+router.post("/app/register/phone/verify", verifyOtpPhone)
 router.post("/verify-otp", verifyOTP)
 router.post("/resend-otp", resendOTP)
 

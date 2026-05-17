@@ -74,6 +74,41 @@ export const verifyOtpPhone = async (req, res) => {
   }
 }
 
+export const verifyAppOtpPhone = async (req, res) => {
+  try {
+    const { idToken } = req.body
+
+    if (!idToken) return errorResponse(res, "ID token is required", 400)
+
+    // 1. Verify the Firebase OTP token
+    const decoded = await admin.auth().verifyIdToken(idToken)
+    const phone = decoded.phone_number
+
+    if (!phone) return errorResponse(res, "Invalid phone number", 400)
+
+    // 2. Find the user in your Neon DB
+    let user = await prisma.user.findUnique({ where: { phone } })
+
+    const referralCode = generateReferralCode(user?.name || "USR")
+    // 3. If the user doesn't exist, create them
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          phone,
+          role: "PASSENGER",
+          referralCode,
+          phoneVerified: true,
+        },
+      })
+    }
+
+    // 4. Issue JWT and respond using your helper
+    return issueMobileTokens(user, req, res)
+  } catch (err) {
+    console.error("verifyOtp error:", err)
+    return errorResponse(res, "OTP verification failed", 401)
+  }
+}
 // Verify OTP
 export const verifyOTP = async (req, res) => {
   try {

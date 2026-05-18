@@ -37,8 +37,8 @@ export const createBookingService = async ({
 }) => {
   try {
     // 0️⃣ Pre-generate QR code
-    const qrPayload = JSON.stringify({ userId, temp: true })
-    const qrCode = await generateQRCode(qrPayload)
+    // const qrPayload = JSON.stringify({ userId, temp: true })
+    // const qrCode = await generateQRCode(qrPayload)
 
     // 1️⃣ Fetch bus & schedule in a short transaction
     const bus = await prisma.bus.findUnique({
@@ -167,15 +167,15 @@ export const createBookingService = async ({
 
       return tx.payment.create({
         data: {
-          userId,
+          user: { connect: { id: userId } },
           amount: finalAmount,
           method: paymentMethod,
-          gateway: paymentMethod === "CHAPA" ? "CHAPA" : null,
+          gateway: paymentMethod === "CHAPA" ? "CHAPA" : "INTERNAL",
           flow:
             paymentMethod === "WALLET" ? "WALLET_PAYMENT" : "DIRECT_PAYMENT",
           status: paymentMethod === "WALLET" ? "SUCCESS" : "PENDING",
           reference: generateReference(),
-          walletId,
+          ...(walletId && { wallet: { connect: { id: walletId } } }),
           currency,
           pointsUsed: isPointUsed ? pointsUsed : 0,
           pointsValue: isPointUsed ? pointsValue : 0,
@@ -208,16 +208,31 @@ export const createBookingService = async ({
       })
 
       if (paymentMethod === "WALLET") {
-        const ticketsData = Array.from({ length: seats }).map((index) => ({
-          bookingId: newBooking.id,
-          userId,
-          seatNumber: index + 1,
-          boardingStop,
-          alightingStop,
-          qrCode,
-          validUntil,
-        }))
-        await tx.ticket.createMany({ data: ticketsData })
+        for (let i = 0; i < seats; i++) {
+          const newTicket = await tx.ticket.create({
+            data: {
+              bookingId: newBooking.id,
+              userId,
+              seatNumber: i + 1,
+              boardingStop,
+              alightingStop,
+              validUntil,
+            },
+          })
+
+          const qrPayload = JSON.stringify({
+            ticketId: newTicket.id,
+            bookingId: newBooking.id,
+            userId,
+            busId,
+          })
+          const qrCode = await generateQRCode(qrPayload)
+
+          await tx.ticket.update({
+            where: { id: newTicket.id },
+            data: { qrCode },
+          })
+        }
       }
       return newBooking
     })
@@ -235,8 +250,10 @@ export const createBookingService = async ({
         },
       })
     }
+    let tickets = []
+
     if (paymentMethod === "WALLET") {
-      const tickets = await prisma.ticket.findMany({
+      tickets = await prisma.ticket.findMany({
         where: { bookingId: booking.id },
       })
 

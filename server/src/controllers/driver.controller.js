@@ -8,6 +8,13 @@ import {
   toggleDriverDutyService,
   blockDriverService,
   getFormattedDriversService,
+  getCurrentTripService,
+  updateLocationService,
+  endTripService,
+  startTripService,
+  checkInPassengerService,
+  getDriverTripHistoryService,
+  getDriverBusWithSchedulesService,
 } from "../services/driver.service.js"
 
 import { uploadToCloudinary } from "../services/cloudinary.service.js"
@@ -223,6 +230,180 @@ export const toggleDutyStatus = async (req, res) => {
       statusCode: 500,
       message: "Internal server error while toggling duty status",
       data: null,
+    })
+  }
+}
+
+// START TRIP
+export const startTrip = async (req, res) => {
+  try {
+    const { busId, scheduleId } = req.body
+
+    if (!busId || typeof busId !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "busId (number) is required",
+      })
+    }
+
+    const result = await startTripService("cmobrm47f0004py85qscobcww", {
+      busId,
+      scheduleId,
+    })
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Start trip controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while starting trip",
+    })
+  }
+}
+
+// END TRIP
+export const endTrip = async (req, res) => {
+  try {
+    const { busId } = req.body
+
+    if (!busId || typeof busId !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "busId (number) is required",
+      })
+    }
+
+    const result = await endTripService("cmobrm47f0004py85qscobcww", busId)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("End trip controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while ending trip",
+    })
+  }
+}
+
+// UPDATE LOCATION
+export const updateLocation = async (req, res) => {
+  try {
+    const busId = parseInt(req.params.busId, 10)
+
+    if (isNaN(busId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid busId in URL",
+      })
+    }
+
+    const { latitude, longitude, speed, heading, accuracy } = req.body
+
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Valid latitude (-90 to 90) and longitude (-180 to 180) are required",
+      })
+    }
+
+    const result = await updateLocationService(
+      "cmobrm47f0004py85qscobcww",
+      busId,
+      {
+        latitude,
+        longitude,
+        speed,
+        heading,
+        accuracy,
+      },
+    )
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Update location controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating location",
+    })
+  }
+}
+
+// GET CURRENT TRIP
+export const getCurrentTrip = async (req, res) => {
+  try {
+    const result = await getCurrentTripService("cmobrm47f0004py85qscobcww")
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get current trip controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching current trip",
+    })
+  }
+}
+
+export const checkInPassenger = async (req, res) => {
+  try {
+    const { qrCode } = req.body
+
+    if (!qrCode || typeof qrCode !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "qrCode is required",
+      })
+    }
+
+    const result = await checkInPassengerService("cmobrm47f0004py85qscobcww", {
+      qrCode,
+    })
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Check-in controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while checking in passenger",
+    })
+  }
+}
+
+export const getDriverTripHistory = async (req, res) => {
+  try {
+    const result = await getDriverTripHistoryService(
+      "cmobrm47f0004py85qscobcww",
+    )
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get driver trip history controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching trip history",
+    })
+  }
+}
+
+export const getDriverBusWithSchedules = async (req, res) => {
+  try {
+    const { driverUserId } = req.body
+
+    if (!driverUserId || typeof driverUserId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "driverUserId (string) is required",
+      })
+    }
+
+    const result = await getDriverBusWithSchedulesService(driverUserId)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get driver bus with schedules controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching driver bus and schedules",
     })
   }
 }

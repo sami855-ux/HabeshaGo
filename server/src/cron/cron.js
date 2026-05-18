@@ -12,6 +12,7 @@ import {
   completeParkingSessions,
   completeTripsJob,
 } from "./completeTrips.job.js"
+import { startBusEtaNotificationJob } from "./busEtaNotification.job.js"
 
 // Passenger reminders (24h & 2h before departure)
 // Run every 15 mins
@@ -137,3 +138,5 @@ cron.schedule("*/1 * * * *", async () => {
   // await completeEVChargingSessions()
   // await completeParkingSessions()
 })
+
+startBusEtaNotificationJob()

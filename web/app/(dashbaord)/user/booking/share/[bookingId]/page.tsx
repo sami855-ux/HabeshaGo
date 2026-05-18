@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
+
 import { ShareHeader } from "@/components/user-dashboard/trip/ShareHeader"
 import { TicketPreview } from "@/components/user-dashboard/trip/TicketPreview"
 import { ShareFlow } from "@/components/user-dashboard/trip/ShareFlow"
 import { ShareConfirmationDialog } from "@/components/user-dashboard/trip/ShareConfirmationDialog"
 import { StepProgress } from "@/components/user-dashboard/trip/StepProgress"
+
 import { getUserByPhoneNumber } from "@/services/user.api"
 import { getBooking, shareBookingRequest } from "@/services/booking.api"
 import { toast } from "sonner"

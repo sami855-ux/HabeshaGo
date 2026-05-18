@@ -11,7 +11,6 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { useDebounce } from "@/hooks/useDebounce"
 
 import { MapSection } from "./MapSection"
 import { StationList } from "./StationList"
@@ -21,7 +20,6 @@ import { StationDetailsSheet } from "./StationDetailsSheet"
 import { ChargingStation, ChargingPoint } from "@/types/ev"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Menu, X, Search, MapPin, Navigation } from "lucide-react"
-import { mockStations } from "@/lib/mock-data(1)"
 import { axiosInstance } from "@/services/axiosInstance"
 
 export type TabType = "ALL" | "NEARBY" | "EXPLORE"
@@ -79,83 +77,6 @@ export function EVChargingDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<TabType>("ALL")
   const [isMobileListOpen, setIsMobileListOpen] = useState(false)
-
-  // Optimized search with debounce
-  const debouncedSearchQuery = useDebounce(searchQuery, 300)
-  const deferredFilters = useDeferredValue(filters)
-
-  // User location (replace with actual GPS)
-  const userLocation = useMemo(() => ({ lat: 9.0192, lng: 38.7468 }), [])
-
-  // Distance calculation helper
-  const calculateDistance = useCallback(
-    (station: ChargingStation) => {
-      const dx = station.lat - userLocation.lat
-      const dy = station.lng - userLocation.lng
-      return Math.sqrt(dx * dx + dy * dy)
-    },
-    [userLocation],
-  )
-
-  // 🔥 Optimized filtering pipeline
-  const filteredStations = useMemo(() => {
-    let data = [...mockStations]
-
-    // Search filter
-    if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase()
-      data = data.filter(
-        (station) =>
-          station.name.toLowerCase().includes(query) ||
-          station.address?.toLowerCase().includes(query) ||
-          station.city?.toLowerCase().includes(query),
-      )
-    }
-
-    // Tab-specific filtering
-    if (activeTab === "NEARBY") {
-      data = data
-        .map((station) => ({
-          ...station,
-          distance: calculateDistance(station),
-        }))
-        .sort((a, b) => (a.distance || 0) - (b.distance || 0))
-    }
-
-    // Apply filters
-    const {
-      connectorTypes = [],
-      minPower = 0,
-      verifiedOnly = false,
-      availableOnly = false,
-    } = deferredFilters
-
-    if (connectorTypes.length) {
-      data = data.filter((station) =>
-        station.chargingPoints.some((point) =>
-          connectorTypes.includes(point.connectorType),
-        ),
-      )
-    }
-
-    if (minPower > 0) {
-      data = data.filter((station) =>
-        station.chargingPoints.some((point) => point.powerKw >= minPower),
-      )
-    }
-
-    if (verifiedOnly) {
-      data = data.filter((station) => station.isVerified)
-    }
-
-    if (availableOnly) {
-      data = data.filter((station) =>
-        station.chargingPoints.some((point) => point.status === "AVAILABLE"),
-      )
-    }
-
-    return data
-  }, [debouncedSearchQuery, activeTab, deferredFilters, calculateDistance])
 
   // React Query setup (ready for real API)
   const {

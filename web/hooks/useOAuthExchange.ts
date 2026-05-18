@@ -1,5 +1,4 @@
 "use client"
-
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { setAccessToken, fetchCurrentUser } from "@/store/slices/userSlice"
@@ -14,31 +13,27 @@ export const useOAuthExchange = () => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
 
-    if (!code) {
-      // No OAuth redirect — still need to resolve auth via cookie
-      dispatch(fetchCurrentUser())
-      return
-    }
+    if (code) {
+      // OAuth redirect — exchange code for token then fetch user
+      const exchange = async () => {
+        try {
+          const { data } = await axiosInstance.get("/auth/exchange", {
+            params: { code },
+            withCredentials: true,
+          })
 
-    const exchange = async () => {
-      try {
-        const { data } = await axiosInstance.get("/auth/exchange", {
-          params: { code },
-          withCredentials: true,
-        })
-
-        dispatch(setAccessToken(data.accessToken))
-
-        // await this so isReady flips before anything else renders
-        await dispatch(fetchCurrentUser())
-
-        router.replace(window.location.pathname)
-      } catch (err) {
-        console.error("OAuth exchange error:", err)
-        router.replace("/login?error=auth_failed")
+          dispatch(setAccessToken(data.accessToken))
+          await dispatch(fetchCurrentUser())
+          router.replace(window.location.pathname)
+        } catch (err) {
+          console.error("OAuth exchange error:", err)
+          router.replace("/login?error=auth_failed")
+        }
       }
+      exchange()
+    } else {
+      // Normal page load — try to restore session via refresh token cookie
+      dispatch(fetchCurrentUser())
     }
-
-    exchange()
-  }, [])
+  }, []) // ✅ runs exactly once on mount
 }

@@ -3,7 +3,6 @@ import { setAccessToken, clearUser } from "@/store/slices/userSlice"
 import type { AppStore } from "@/store/store"
 
 export const setupAxiosInterceptors = (store: AppStore) => {
-  // Request interceptor
   axiosInstance.interceptors.request.use(
     (config) => {
       const token = store.getState().user.accessToken
@@ -12,10 +11,9 @@ export const setupAxiosInterceptors = (store: AppStore) => {
       }
       return config
     },
-    (error) => Promise.reject(error)
+    (error) => Promise.reject(error),
   )
 
-  // Response interceptor
   axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -27,21 +25,26 @@ export const setupAxiosInterceptors = (store: AppStore) => {
         !originalRequest.url?.includes("/auth/refresh")
       ) {
         originalRequest._retry = true
-
         try {
-          const res = await axiosInstance.post("/auth/refresh")
-
-          store.dispatch(setAccessToken(res.data.accessToken))
-
-          originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`
-
+          const res = await axiosInstance.post(
+            "/auth/refresh",
+            {},
+            {
+              withCredentials: true, // ✅ send refresh token cookie
+            },
+          )
+          const newToken = res.data.accessToken
+          store.dispatch(setAccessToken(newToken))
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
           return axiosInstance(originalRequest)
         } catch {
           store.dispatch(clearUser())
+          // ✅ reset isReady so useRequireRole can redirect cleanly
+          window.location.replace("/login")
         }
       }
 
       return Promise.reject(error)
-    }
+    },
   )
 }

@@ -8,6 +8,7 @@ const JWT_ALGORITHM = "HS256"
 import prisma from "../prisma/client.js"
 import "dotenv"
 import { hashPassword } from "./password.service.js"
+import { redis } from "../config/redis.js"
 
 // console.log(first)
 /**
@@ -107,7 +108,6 @@ export const issueMobileTokens = async (user, req, res) => {
   }
 }
 
-//Socal IssueToken
 export const issueTokensSocial = async (user, req, res) => {
   try {
     if (user.isSuspended) {
@@ -122,7 +122,7 @@ export const issueTokensSocial = async (user, req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: await hashPassword(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -138,13 +138,16 @@ export const issueTokensSocial = async (user, req, res) => {
     // Set refresh token cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: true,
+      sameSite: "None",
     })
 
-    // Decide role-based redirect URL
-    const base = process.env.FRONTEND_URL
+    // Generate one-time code and store access token (30s TTL)
+    const code = crypto.randomUUID()
+    await redis.set(`oauth_code:${code}`, accessToken, { ex: 30 })
 
+    // Role-based redirect with code
+    const base = process.env.FRONTEND_URL
     const roleRedirects = {
       ADMIN: `${base}/admin`,
       DRIVER: `${base}/driver`,
@@ -154,14 +157,12 @@ export const issueTokensSocial = async (user, req, res) => {
     }
 
     const redirectUrl = roleRedirects[user.role] || base
-
-    return res.redirect(redirectUrl)
+    return res.redirect(`${redirectUrl}?code=${code}`)
   } catch (err) {
     console.error("Token issuance failed:", err)
     return res.status(500).json({ message: "Failed to issue tokens" })
   }
 }
-
 // ACCESS TOKEN
 export const generateAccessToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")

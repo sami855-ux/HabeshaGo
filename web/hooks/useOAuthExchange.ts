@@ -14,7 +14,11 @@ export const useOAuthExchange = () => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
 
-    if (!code) return
+    if (!code) {
+      // No OAuth redirect — still need to resolve auth via cookie
+      dispatch(fetchCurrentUser())
+      return
+    }
 
     const exchange = async () => {
       try {
@@ -23,13 +27,11 @@ export const useOAuthExchange = () => {
           withCredentials: true,
         })
 
-        // Store access token in Redux (memory only)
         dispatch(setAccessToken(data.accessToken))
 
-        // Fetch full user profile now that we're authenticated
-        dispatch(fetchCurrentUser())
+        // await this so isReady flips before anything else renders
+        await dispatch(fetchCurrentUser())
 
-        // Clean the code from the URL
         router.replace(window.location.pathname)
       } catch (err) {
         console.error("OAuth exchange error:", err)

@@ -8,6 +8,7 @@ interface UserState {
   isAuthenticated: boolean
   loading: boolean
   error?: string
+  isReady: boolean
 }
 
 const initialState: UserState = {
@@ -16,6 +17,7 @@ const initialState: UserState = {
   isAuthenticated: false,
   loading: true,
   error: undefined,
+  isReady: false,
 }
 
 export const fetchCurrentUser = createAsyncThunk(
@@ -91,12 +93,14 @@ const userSlice = createSlice({
           state.user = action.payload
           state.isAuthenticated = true
           state.loading = false
+          state.isReady = true
         },
       )
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.user = null
         state.isAuthenticated = false
         state.loading = false
+        state.isReady = true
       })
   },
 })

@@ -58,23 +58,24 @@ const app = express()
 const isProduction = process.env.NODE_ENV === "production"
 
 //  Security
-app.use(helmet())
 app.set("trust proxy", 1)
 
 const allowedOrigins = [
   // Web
   "https://habesha-go-v2.vercel.app",
   // Mobile / Expo
-  "https://auth.expo.io",                   // Expo Go OAuth redirect
+  "https://auth.expo.io", // Expo Go OAuth redirect
   `https://auth.expo.io/@samiux855/mobile`, // Your specific app
-  ...(!isProduction ? [
-    // Web dev
-    "http://localhost:3000",
-    "http://localhost:3001",
-    // Mobile dev
-    "exp://localhost:8081",                 // Expo dev client
-    "exp://192.168.1.1:8081",              // Local network (optional)
-  ] : []),
+  ...(!isProduction
+    ? [
+        // Web dev
+        "http://localhost:3000",
+        "http://localhost:3001",
+        // Mobile dev
+        "exp://localhost:8081", // Expo dev client
+        "exp://192.168.1.1:8081", // Local network (optional)
+      ]
+    : []),
 ]
 
 app.use(
@@ -86,6 +87,8 @@ app.use(
       callback(new Error(`CORS blocked: ${origin}`))
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 )
 
@@ -116,6 +119,8 @@ const locationLimiter = rateLimit({
 //   message: { message: "Too many auth attempts, please try again later." },
 // })
 
+app.use(helmet())
+app.set("trust proxy", 1)
 app.use(globalLimiter)
 
 //  General middleware
@@ -133,7 +138,7 @@ app.use(
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000,
     },
   }),

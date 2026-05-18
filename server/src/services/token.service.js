@@ -6,16 +6,13 @@ const REFRESH_TOKEN_EXPIRES = "15d"
 const JWT_ALGORITHM = "HS256"
 
 import prisma from "../prisma/client.js"
-import "dotenv"
 import { hashPassword } from "./password.service.js"
 import { redis } from "../config/redis.js"
 
-// console.log(first)
+const isProduction = process.env.NODE_ENV === "production"
+
 /**
- * Issue access and refresh tokens for a user
- * @param {Object} user - Prisma User object
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Issue access and refresh tokens for a user (email/OTP login)
  */
 export const issueTokens = async (user, req, res) => {
   try {
@@ -23,39 +20,34 @@ export const issueTokens = async (user, req, res) => {
       return res.status(403).json({ message: "Account suspended" })
     }
 
-    // Generate refresh token JWT
     const refreshToken = generateRefreshToken({ sub: user.id })
 
-    // Store hashed refresh token in DB for session tracking
     const session = await prisma.session.create({
       data: {
         userId: user.id,
         refreshTokenHash: await hashPassword(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
     })
 
-    // Generate access token JWT
     const accessToken = generateAccessToken({
       id: user.id,
       role: user.role,
       sessionId: session.id,
     })
 
-    // Send refresh token as HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
     })
 
-    // Return access token in response body
     return res.json({
       userId: user.id,
       accessToken,
-      message: "Email Verfied Successfuly",
+      message: "Email Verified Successfully",
       success: true,
     })
   } catch (err) {
@@ -63,34 +55,34 @@ export const issueTokens = async (user, req, res) => {
     return res.status(500).json({ message: "Failed to issue tokens" })
   }
 }
+
+/**
+ * Issue tokens for mobile (no cookies — tokens in response body)
+ */
 export const issueMobileTokens = async (user, req, res) => {
   try {
     if (user.isSuspended) {
       return res.status(403).json({ message: "Account suspended" })
     }
 
-    // Generate refresh token
     const refreshToken = generateRefreshToken({ sub: user.id })
 
-    // Store hashed refresh token for session tracking
     const session = await prisma.session.create({
       data: {
         userId: user.id,
         refreshTokenHash: await hashPassword(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
     })
 
-    // Generate access token
     const accessToken = generateAccessToken({
       id: user.id,
       role: user.role,
       sessionId: session.id,
     })
 
-    // ✅ MOBILE-FRIENDLY RESPONSE (NO COOKIES)
     return res.status(200).json({
       success: true,
       message: "Authentication successful",
@@ -108,16 +100,17 @@ export const issueMobileTokens = async (user, req, res) => {
   }
 }
 
+/**
+ * Issue tokens for social OAuth (Google, etc.) — one-time code pattern
+ */
 export const issueTokensSocial = async (user, req, res) => {
   try {
     if (user.isSuspended) {
       return res.status(403).json({ message: "Account suspended" })
     }
 
-    // Generate refresh token
     const refreshToken = generateRefreshToken({ sub: user.id })
 
-    // Store hashed refresh token in DB
     const session = await prisma.session.create({
       data: {
         userId: user.id,
@@ -128,25 +121,22 @@ export const issueTokensSocial = async (user, req, res) => {
       },
     })
 
-    // Generate access token
     const accessToken = generateAccessToken({
       id: user.id,
       role: user.role,
       sessionId: session.id,
     })
 
-    // Set refresh token cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: "None",
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
     })
 
-    // Generate one-time code and store access token (30s TTL)
+    // Generate one-time code and store access token in Redis (30s TTL)
     const code = crypto.randomUUID()
     await redis.set(`oauth_code:${code}`, accessToken, { ex: 30 })
 
-    // Role-based redirect with code
     const base = process.env.FRONTEND_URL
     const roleRedirects = {
       ADMIN: `${base}/admin`,
@@ -163,7 +153,7 @@ export const issueTokensSocial = async (user, req, res) => {
     return res.status(500).json({ message: "Failed to issue tokens" })
   }
 }
-// ACCESS TOKEN
+
 export const generateAccessToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -182,7 +172,6 @@ export const verifyAccessToken = (token) => {
   }
 }
 
-// REFRESH TOKEN
 export const generateRefreshToken = (payload) => {
   if (!process.env.JWT_REFRESH_SECRET)
     throw new Error("JWT_REFRESH_SECRET is not set")

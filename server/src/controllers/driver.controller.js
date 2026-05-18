@@ -388,7 +388,7 @@ export const getDriverTripHistory = async (req, res) => {
 
 export const getDriverBusWithSchedules = async (req, res) => {
   try {
-    const { driverUserId } = req.body
+    const { driverUserId } = req.query
 
     if (!driverUserId || typeof driverUserId !== "string") {
       return res.status(400).json({

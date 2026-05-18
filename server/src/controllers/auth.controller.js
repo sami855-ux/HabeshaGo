@@ -16,6 +16,7 @@ import { errorResponse, successResponse } from "../utils/apiResponse.js"
 import admin from "../config/firebaseAdmin.js"
 import { generateReferralCode } from "../utils/qrcode.js"
 import axios from "axios"
+import { redis } from "../config/redis.js"
 dotenv.config()
 
 // Registration
@@ -696,5 +697,27 @@ export const revokeSession = async (req, res) => {
   } catch (error) {
     console.error("revokeSession error:", error)
     return res.status(500).json(errorResponse("Failed to revoke session", 500))
+  }
+}
+
+export const exchangeOAuthCode = async (req, res) => {
+  try {
+    const { code } = req.query
+
+    if (!code) {
+      return res.status(400).json({ message: "Code is required" })
+    }
+
+    // Atomically get and delete — one-time use guaranteed
+    const accessToken = await redis.getdel(`oauth_code:${code}`)
+
+    if (!accessToken) {
+      return res.status(400).json({ message: "Invalid or expired code" })
+    }
+
+    return res.json({ accessToken })
+  } catch (err) {
+    console.error("Code exchange failed:", err)
+    return res.status(500).json({ message: "Exchange failed" })
   }
 }

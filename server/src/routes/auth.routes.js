@@ -15,6 +15,7 @@ import {
   verifyOtpPhone,
   appleAuth,
   googleMobileAuth,
+  exchangeOAuthCode,
 } from "../controllers/auth.controller.js"
 import { authenticate } from "../middlewares/authenticate.js"
 import passport from "passport"
@@ -57,6 +58,8 @@ router.get(
 
 // Contniue with Apple
 router.post("/apple", appleAuth)
+
+router.get("/exchange", exchangeOAuthCode)
 
 // Sessions
 router.get("/sessions", getSessions)

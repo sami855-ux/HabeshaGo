@@ -2,7 +2,7 @@ import * as SecureStore from "expo-secure-store"
 
 export const saveRefreshToken = async (token) => {
   try {
-    console.log("Saving refresh token...")
+    console.log("Saving refresh token...", token)
 
     await SecureStore.setItemAsync("refreshToken", token, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED,

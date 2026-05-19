@@ -43,3 +43,26 @@ export const getUserBookings = async () => {
     return []
   }
 }
+
+export const shareBookingRequest = async (
+  bookingId,
+  targetUserId,
+  ticketIds,
+) => {
+  try {
+    const res = await axiosInstance.patch(
+      `/booking/${bookingId}/share/request`,
+      {
+        targetUserId,
+        ticketIds,
+      },
+    )
+    return res.data
+  } catch (error) {
+    console.error("Error sharing a ticket:", error)
+    return {
+      success: false,
+      message: error.response?.data.message || "Failed",
+    }
+  }
+}

@@ -2,8 +2,9 @@ import { useThemeContext } from "@/context/ThemeContext"
 import { MaterialIcons } from "@expo/vector-icons"
 import React from "react"
 import { ScrollView, Text, TouchableOpacity, View } from "react-native"
-import { actualThemeBackground } from "./ServiceDashbaord"
+// import { getContainerBackground } from "./ServiceDashbaord"
 import { Href, useRouter } from "expo-router"
+import { getContainerBackground } from "./ServiceDashbaord"
 
 type PassengerRoute =
   | "my-booking"
@@ -97,7 +98,7 @@ const SmartSuggestions = () => {
   return (
     <View
       style={{
-        backgroundColor: actualThemeBackground(colors),
+        backgroundColor: getContainerBackground(colors),
         paddingVertical: 8,
         paddingHorizontal: 4,
         borderRadius: 16,

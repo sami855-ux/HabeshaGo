@@ -1,10 +1,7 @@
-import "../tamagui-web.css"
-
 import { useFonts } from "expo-font"
 import { Redirect, Stack } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
 import { useEffect } from "react"
-import { TamaguiProvider } from "tamagui"
 import QueryProvider from "@/components/utils/queryProvider"
 import { ThemeProviderCustom, useThemeContext } from "@/context/ThemeContext"
 import { UserProvider } from "@/context/user-context"
@@ -12,7 +9,6 @@ import { store, useAppDispatch, useAppSelector } from "@/store"
 import { fetchCurrentUser, restoreSession } from "@/store/slices/userSlice"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { Provider } from "react-redux"
-import tamaguiConfig from "../tamagui.config"
 // import notifee from "@notifee/react-native"
 
 export default function RootLayout() {
@@ -64,48 +60,45 @@ function AppWithTheme() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <TamaguiProvider config={tamaguiConfig} defaultTheme={actualTheme}>
-        <UserProvider>
-          <QueryProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor:
-                    actualTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
-                },
-              }}
-            >
-              {/* All screens declared always — Redirect handles navigation */}
-              <Stack.Screen
-                name="index"
-                options={{ headerShown: false, animation: "fade" }}
-              />
-              <Stack.Screen
-                name="(auth)/email"
-                options={{ headerShown: false, animation: "slide_from_right" }}
-              />
-              <Stack.Screen
-                name="(auth)/phone"
-                options={{ headerShown: false, animation: "slide_from_right" }}
-              />
-              <Stack.Screen
-                name="(passenger)"
-                options={{ headerShown: false, animation: "fade" }}
-              />
-              <Stack.Screen name="(driver)" options={{ headerShown: false }} />
-            </Stack>
+      <UserProvider>
+        <QueryProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: actualTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
+              },
+            }}
+          >
+            {/* All screens declared always — Redirect handles navigation */}
+            <Stack.Screen
+              name="index"
+              options={{ headerShown: false, animation: "fade" }}
+            />
+            <Stack.Screen
+              name="(auth)/email"
+              options={{ headerShown: false, animation: "slide_from_right" }}
+            />
+            <Stack.Screen
+              name="(auth)/phone"
+              options={{ headerShown: false, animation: "slide_from_right" }}
+            />
+            <Stack.Screen
+              name="(passenger)"
+              options={{ headerShown: false, animation: "fade" }}
+            />
+            <Stack.Screen name="(driver)" options={{ headerShown: false }} />
+          </Stack>
 
-            {isAuthenticated && user?.role === "PASSENGER" && (
-              <Redirect href="/(passenger)/(tabs)" />
-            )}
-            {isAuthenticated && user?.role === "DRIVER" && (
-              <Redirect href="/(driver)/tabs" />
-            )}
-            {!isAuthenticated && <Redirect href="/" />}
-          </QueryProvider>
-        </UserProvider>
-      </TamaguiProvider>
+          {isAuthenticated && user?.role === "PASSENGER" && (
+            <Redirect href="/(passenger)/(tabs)" />
+          )}
+          {isAuthenticated && user?.role === "DRIVER" && (
+            <Redirect href="/(driver)/tabs" />
+          )}
+          {!isAuthenticated && <Redirect href="/" />}
+        </QueryProvider>
+      </UserProvider>
     </GestureHandlerRootView>
   )
 }

@@ -82,7 +82,7 @@ const PassengerHome = () => {
           <View className="flex-row justify-between items-center mb-4">
             {/* Left: Profile + Greeting */}
             <View className="flex-row items-center">
-              <TouchableOpacity onPress={() => router.push("/edit-profile")}>
+              <TouchableOpacity onPress={() => router.push("/evService")}>
                 <Image
                   source={
                     user?.avaterUrl ? { uri: user.avaterUrl } : defaultAvatar

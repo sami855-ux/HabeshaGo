@@ -1,4 +1,3 @@
-// components/TicketDetailModal.tsx
 import { Trip, isBusTrip, isEvTrip } from "@/types/trips"
 import { useThemeContext } from "@/context/ThemeContext"
 import {
@@ -40,6 +39,7 @@ import {
   Users,
 } from "lucide-react-native"
 import { format } from "date-fns"
+import { useRouter } from "expo-router"
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window")
 
@@ -71,6 +71,8 @@ export default function TicketDetailModal({
   onClose,
   trip,
 }: TicketDetailModalProps) {
+  const router = useRouter()
+
   const { colors, actualTheme } = useThemeContext()
   const isDark = actualTheme === "dark"
   const [copied, setCopied] = useState(false)
@@ -80,6 +82,7 @@ export default function TicketDetailModal({
   const [isSharing, setIsSharing] = useState(false)
 
   const isEv = isEvTrip(trip)
+  const isBus = isBusTrip(trip)
 
   const config = TYPE_CONFIG[trip.type] || TYPE_CONFIG.BUS
   const TypeIcon = config.icon
@@ -283,14 +286,29 @@ Thank you for choosing HabeshaGo!`
 
                 <View className="flex-row items-center gap-2">
                   <TouchableOpacity
-                    onPress={handleShare}
-                    className="w-9 h-9 rounded-full bg-white/20 items-center justify-center"
+                    onPress={() => {
+                      router.push(`/ticketShare/${trip.id}`)
+                    }}
                     disabled={isSharing}
+                    className={`flex-row items-center justify-center px-4 py-2 rounded-full ${
+                      isSharing ? "bg-white/20" : "bg-white/30"
+                    }`}
+                    style={{ gap: 8 }}
                   >
                     {isSharing ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text className="text-white text-sm font-medium">
+                          Sharing...
+                        </Text>
+                      </>
                     ) : (
-                      <Share2 size={16} color="#fff" />
+                      <>
+                        <Share2 size={16} color="#fff" />
+                        <Text className="text-white text-sm font-medium">
+                          Share Ticket
+                        </Text>
+                      </>
                     )}
                   </TouchableOpacity>
 

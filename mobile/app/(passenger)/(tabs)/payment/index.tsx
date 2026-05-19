@@ -163,10 +163,14 @@ const PaymentPage = () => {
   }, [hasWallet, hasPinSet])
 
   const quickActions = [
-    { icon: Send, label: "Send", color: colors.primary },
-    { icon: Wallet, label: "Top-up", color: colors.primary },
-    { icon: Download, label: "Request", color: colors.primary },
-    { icon: QrCode, label: "Scan QR", color: colors.primary },
+    { icon: Send, label: "Send", color: colors.primary, route: "send-money" },
+    {
+      icon: Wallet,
+      label: "Top-up",
+      color: colors.primary,
+      route: "deposite-money",
+    },
+    { icon: QrCode, label: "Scan QR", color: colors.primary, route: "" },
   ]
 
   const promotions = [
@@ -265,15 +269,15 @@ const PaymentPage = () => {
         className="items-center"
         activeOpacity={0.7}
         onPress={() => {
-          if (!hasWallet || !hasPinSet) {
-            setShowPinModal(true)
-            return
-          }
-          if (!isPasswordSet) {
-            setShowPasswordModal(true)
-            return
-          }
-          // Handle action
+          // if (!hasWallet || !hasPinSet) {
+          //   setShowPinModal(true)
+          //   return
+          // }
+          // if (!isPasswordSet) {
+          //   setShowPasswordModal(true)
+          //   return
+          // }
+          router.push(`/${action.route}`)
         }}
       >
         <View

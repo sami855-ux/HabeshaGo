@@ -15,6 +15,7 @@ export default function RootLayout() {
         name="loggedDevice"
         options={{ headerShown: false, animation: "slide_from_left" }}
       />
+      <Stack.Screen name="evService" options={{ title: "EV Charging" }} />
     </Stack>
   )
 }

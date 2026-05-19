@@ -1,7 +1,5 @@
 "use client"
-
 import { ReactNode, useEffect } from "react"
-import { useDispatch } from "react-redux"
 import {
   setUser,
   setAccessToken,
@@ -9,40 +7,41 @@ import {
   setLoading,
 } from "@/store/slices/userSlice"
 import { axiosInstance } from "@/services/axiosInstance"
+import { fetchCurrentUser } from "@/store/slices/userSlice"
+import { useAppDispatch } from "@/store/store"
 
 export default function SessionProvider({ children }: { children: ReactNode }) {
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     const restoreSession = async () => {
       dispatch(setLoading(true))
-
       try {
-        // 1. Load cached user from localStorage
+        // 1. Load cached user for instant UI
         const cachedUser = localStorage.getItem("habeshagoUser")
         if (cachedUser) {
           dispatch(setUser({ user: JSON.parse(cachedUser) }))
         }
 
-        // 2. Refresh session from backend
-        const res = await axiosInstance.post("/auth/refresh", {
-          withCredentials: true,
-        })
+        // 2. Get fresh access token via refresh cookie
+        const res = await axiosInstance.post(
+          "/auth/refresh",
+          {},
+          {
+            withCredentials: true,
+          },
+        )
 
-        const backendUser = res.data.user
+        // 3. Store access token in Redux FIRST
+        dispatch(setAccessToken(res.data.accessToken))
 
-        // 3. Compare with cached user
-        if (!cachedUser || JSON.stringify(backendUser) !== cachedUser) {
-          dispatch(setUser({ user: backendUser }))
-          localStorage.setItem("habeshagoUser", JSON.stringify(backendUser))
-        }
-
-        dispatch(setAccessToken({ accessToken: res.data.accessToken }))
+        // 4. NOW fetch full user profile (interceptor will attach the token)
+        await dispatch(fetchCurrentUser(res.data.accessToken))
       } catch (error) {
+        // Refresh failed — no valid session
         dispatch(clearUser())
         localStorage.removeItem("habeshagoUser")
-      } finally {
-        setLoading(false)
+        dispatch(setLoading(false))
       }
     }
 

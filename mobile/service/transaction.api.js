@@ -1,7 +1,6 @@
 import { axiosInstance } from "./axiosInstance"
 
 export const transferFunds = async (recipientId, amount, pin, description) => {
-  console.log(recipientId, amount, pin, description)
   try {
     const response = await axiosInstance.post("/transactions/transfer", {
       recipientId,

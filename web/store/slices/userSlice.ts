@@ -22,29 +22,35 @@ const initialState: UserState = {
 
 export const fetchCurrentUser = createAsyncThunk(
   "user/fetchCurrentUser",
-  async (_, { dispatch, rejectWithValue }) => {
+  async (
+    accessToken: string | undefined = undefined,
+    { dispatch, rejectWithValue },
+  ) => {
     try {
-      // 1️. Load cached user
-      const cachedUser = localStorage.getItem("habeshagoUser")
-      if (cachedUser) {
-        // dispatch immediately for instant UI
-        dispatch(setUser({ user: JSON.parse(cachedUser) }))
+      // Load cached user for instant UI
+      if (typeof window !== "undefined") {
+        const cachedUser = localStorage.getItem("habeshagoUser")
+        if (cachedUser) {
+          dispatch(setUser({ user: JSON.parse(cachedUser) }))
+        }
       }
 
-      // 2. Fetch from backend
-      const response = await getMe()
+      // Fetch from backend — pass token explicitly if provided
+      const response = await getMe(accessToken)
       const backendUser = response.user
 
-      // 3. Compare and update if different
-      if (!cachedUser || JSON.stringify(backendUser) !== cachedUser) {
-        dispatch(setUser({ user: backendUser }))
-        localStorage.setItem("habeshagoUser", JSON.stringify(backendUser))
+      if (typeof window !== "undefined") {
+        const cachedUser = localStorage.getItem("habeshagoUser")
+        if (!cachedUser || JSON.stringify(backendUser) !== cachedUser) {
+          localStorage.setItem("habeshagoUser", JSON.stringify(backendUser))
+        }
       }
 
       return backendUser
     } catch (err: any) {
-      // Clear localStorage if fetch fails
-      localStorage.removeItem("habeshagoUser")
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("habeshagoUser")
+      }
       return rejectWithValue(
         err.response?.data || { message: "Failed to fetch user" },
       )

@@ -1,33 +1,42 @@
 "use client"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useDispatch, useSelector } from "react-redux"
-import { RootState } from "@/store"
-// import { AppDispatch, RootState } from "@/store/store"
 
-// ✅ NO fetchCurrentUser here — useOAuthExchange owns that
+import { useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { RootState } from "@/store"
+import { useAppSelector } from "@/store/store"
+
 export const useRequireRole = (allowedRoles: string[]) => {
   const router = useRouter()
-  const { user, isAuthenticated, isReady } = useSelector(
+  const { user, isAuthenticated, isReady } = useAppSelector(
     (state: RootState) => state.user,
   )
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // ✅ Wait until auth is fully resolved before making any decisions
     if (!isReady) return
 
-    // Not authenticated — send to login
+    // Clear any pending redirect if state updates before timer fires
+    if (redirectTimer.current) clearTimeout(redirectTimer.current)
+
     if (!isAuthenticated || !user) {
-      router.replace("/login")
+      // Small delay to allow state to fully settle before redirecting
+      redirectTimer.current = setTimeout(() => {
+        router.replace("/login")
+      }, 100)
       return
     }
 
-    // Authenticated but wrong role
     if (!allowedRoles.includes(user.role)) {
-      if (user.role === "PASSENGER") router.replace("/user")
-      else if (user.role === "DRIVER") router.replace("/driver")
-      else if (user.role === "ADMIN") router.replace("/admin")
-      else router.replace("/login")
+      redirectTimer.current = setTimeout(() => {
+        if (user.role === "PASSENGER") router.replace("/user")
+        else if (user.role === "DRIVER") router.replace("/driver")
+        else if (user.role === "ADMIN") router.replace("/admin")
+        else router.replace("/login")
+      }, 100)
+    }
+
+    return () => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current)
     }
   }, [isReady, isAuthenticated, user, allowedRoles, router])
 }

@@ -75,3 +75,24 @@ export const verifyCodeAPI = async (code, type) => {
     }
   }
 }
+
+export const getUserByPhoneNumber = async (phoneNumber) => {
+  try {
+    const res = await axiosInstance.get("/users/by-phone", {
+      params: { phone: phoneNumber },
+    })
+
+    return {
+      success: true,
+      data: res.data.users[0],
+    }
+  } catch (error) {
+    console.error("Failed to fetch user by phone number:", error)
+
+    return {
+      success: false,
+      message:
+        error?.response?.data?.message || error.message || "Unknown error",
+    }
+  }
+}

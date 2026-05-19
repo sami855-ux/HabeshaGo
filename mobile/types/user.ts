@@ -77,3 +77,10 @@ export interface ParkingReservation {
   startTime: string
   endTime: string
 }
+
+export type UserByPhoneResponse = {
+  id: string
+  name: string
+  phone: string | null
+  isVerified: boolean
+}

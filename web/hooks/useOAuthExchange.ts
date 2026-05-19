@@ -23,7 +23,7 @@ export const useOAuthExchange = () => {
           })
 
           dispatch(setAccessToken(data.accessToken))
-          await dispatch(fetchCurrentUser())
+          await dispatch(fetchCurrentUser(data.accessToken))
           router.replace(window.location.pathname)
         } catch (err) {
           console.error("OAuth exchange error:", err)

@@ -109,9 +109,14 @@ export const getUserById = async (id: string): Promise<ApiResponse<User>> => {
   }
 }
 
-export const getMe = async () => {
+export const getMe = async (accessToken?: string) => {
   try {
-    const res = await axiosInstance.get("/auth/me/", { withCredentials: true })
+    const res = await axiosInstance.get("/auth/me/", {
+      withCredentials: true,
+      ...(accessToken && {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }),
+    })
 
     if (res.data.success) {
       return res.data

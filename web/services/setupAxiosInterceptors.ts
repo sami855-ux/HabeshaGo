@@ -40,7 +40,7 @@ export const setupAxiosInterceptors = (store: AppStore) => {
         } catch {
           store.dispatch(clearUser())
           // ✅ reset isReady so useRequireRole can redirect cleanly
-          window.location.replace("/login")
+          window.location.replace("/login?error=axios")
         }
       }
 

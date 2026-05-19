@@ -31,7 +31,7 @@ export const useRequireRole = (allowedRoles: string[]) => {
         if (user.role === "PASSENGER") router.replace("/user")
         else if (user.role === "DRIVER") router.replace("/driver")
         else if (user.role === "ADMIN") router.replace("/admin")
-        else router.replace("/login")
+        else router.replace("/login?error=login")
       }, 100)
     }
 

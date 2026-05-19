@@ -76,6 +76,7 @@ const userSlice = createSlice({
       state.user = null
       state.accessToken = null
       state.isAuthenticated = false
+      state.isReady = true
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload

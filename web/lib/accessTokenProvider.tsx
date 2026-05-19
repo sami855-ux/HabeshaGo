@@ -1,13 +1,14 @@
 "use client"
 import { ReactNode, useEffect } from "react"
+import { useDispatch } from "react-redux"
 import {
   setUser,
   setAccessToken,
   clearUser,
   setLoading,
 } from "@/store/slices/userSlice"
-import { axiosInstance } from "@/services/axiosInstance"
 import { fetchCurrentUser } from "@/store/slices/userSlice"
+import { axiosInstance } from "@/services/axiosInstance"
 import { useAppDispatch } from "@/store/store"
 
 export default function SessionProvider({ children }: { children: ReactNode }) {
@@ -16,14 +17,23 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const restoreSession = async () => {
       dispatch(setLoading(true))
+
+      // ✅ If this is an OAuth redirect (?code=), skip restore
+      // useOAuthExchange will handle it
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("code")) {
+        dispatch(setLoading(false))
+        return
+      }
+
       try {
-        // 1. Load cached user for instant UI
+        // Load cached user for instant UI
         const cachedUser = localStorage.getItem("habeshagoUser")
         if (cachedUser) {
           dispatch(setUser({ user: JSON.parse(cachedUser) }))
         }
 
-        // 2. Get fresh access token via refresh cookie
+        // Get fresh access token via refresh cookie
         const res = await axiosInstance.post(
           "/auth/refresh",
           {},
@@ -32,16 +42,15 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
           },
         )
 
-        // 3. Store access token in Redux FIRST
+        // Set token first
         dispatch(setAccessToken(res.data.accessToken))
 
-        // 4. NOW fetch full user profile (interceptor will attach the token)
+        // Then fetch full user with token passed directly
         await dispatch(fetchCurrentUser(res.data.accessToken))
-      } catch (error) {
-        // Refresh failed — no valid session
+      } catch (error: any) {
+        // ✅ clearUser now sets isReady=true so useRequireRole unblocks
         dispatch(clearUser())
         localStorage.removeItem("habeshagoUser")
-        dispatch(setLoading(false))
       }
     }
 

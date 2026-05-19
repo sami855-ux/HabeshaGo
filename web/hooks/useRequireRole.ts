@@ -21,7 +21,7 @@ export const useRequireRole = (allowedRoles: string[]) => {
     if (!isAuthenticated || !user) {
       // Small delay to allow state to fully settle before redirecting
       redirectTimer.current = setTimeout(() => {
-        router.replace("/login")
+        router.replace("/login?error=require")
       }, 100)
       return
     }

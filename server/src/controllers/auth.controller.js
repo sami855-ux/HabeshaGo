@@ -704,6 +704,7 @@ export const exchangeOAuthCode = async (req, res) => {
   try {
     const { code } = req.query
 
+    console.log(code)
     if (!code) {
       return res.status(400).json({ message: "Code is required" })
     }
@@ -711,6 +712,7 @@ export const exchangeOAuthCode = async (req, res) => {
     // Atomically get and delete — one-time use guaranteed
     const accessToken = await redis.getdel(`oauth_code:${code}`)
 
+    console.log(accessToken)
     if (!accessToken) {
       return res.status(400).json({ message: "Invalid or expired code" })
     }

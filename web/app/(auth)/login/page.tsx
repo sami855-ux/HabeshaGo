@@ -71,7 +71,25 @@ export default function LoginPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+  const validateEmail = (value: string) => {
+    const email = value.trim().toLowerCase()
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/
+
+    if (!email) {
+      return "Email is required"
+    }
+
+    if (email.includes(" ")) {
+      return "Email cannot contain spaces"
+    }
+
+    if (!emailRegex.test(email)) {
+      return "Please enter a valid email address"
+    }
+
+    return null
+  }
 
   // Generate email suggestions based on input
   const generateSuggestions = useCallback((value: string) => {
@@ -100,14 +118,18 @@ export default function LoginPage() {
       const newSuggestions = generateSuggestions(email)
       setSuggestions(newSuggestions)
       setShowSuggestions(newSuggestions.length > 0 && !isValidEmail)
-      setIsValidEmail(validateEmail(email))
+      const validationError = validateEmail(email)
+
+      setIsValidEmail(!validationError)
 
       // Clear error when user starts typing
       if (touched) setEmailError("")
     } else {
       setSuggestions([])
       setShowSuggestions(false)
-      setIsValidEmail(validateEmail(email))
+      const validationError = validateEmail(email)
+
+      setIsValidEmail(!validationError)
     }
 
     // Reset selected suggestion index

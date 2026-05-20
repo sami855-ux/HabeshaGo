@@ -86,7 +86,7 @@ const STEPS = [
 
 type StepState = "idle" | "active" | "done"
 
-function AccountSetupLoader() {
+export function AccountSetupLoader() {
   const [stepStates, setStepStates] = useState<StepState[]>([
     "active",
     "idle",

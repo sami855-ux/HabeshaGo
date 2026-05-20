@@ -7,7 +7,15 @@ import {
 } from "expo-camera"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
-import { CheckCircle, QrCode, User, X, Bus, MapPin, Clock } from "lucide-react-native"
+import {
+  CheckCircle,
+  QrCode,
+  User,
+  X,
+  Bus,
+  MapPin,
+  Clock,
+} from "lucide-react-native"
 import { useState, useRef } from "react"
 import {
   Alert,
@@ -30,9 +38,12 @@ export default function DriverQRScanner() {
   const [torchOn, setTorchOn] = useState(false)
   const [cameraFacing, setCameraFacing] = useState<"front" | "back">("back")
   const [isVerifying, setIsVerifying] = useState(false)
-  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toastMessage, setToastMessage] = useState<{
+    message: string
+    type: "success" | "error"
+  } | null>(null)
   const [checkInResult, setCheckInResult] = useState<any>(null)
-  
+
   const toastAnim = useRef(new Animated.Value(0)).current
   const scanLineAnim = useRef(new Animated.Value(0)).current
 
@@ -44,7 +55,10 @@ export default function DriverQRScanner() {
 
   if (!permission.granted) {
     return (
-      <LinearGradient colors={["#1E3A8A", "#3B82F6"]} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <LinearGradient
+        colors={["#1E3A8A", "#3B82F6"]}
+        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+      >
         <View className="items-center p-8">
           <View className="w-24 h-24 rounded-full items-center justify-center mb-6 bg-white/20">
             <QrCode size={48} color="#FFFFFF" />
@@ -53,7 +67,8 @@ export default function DriverQRScanner() {
             Camera Access Required
           </Text>
           <Text className="text-white/80 text-center mb-8">
-            To scan passenger tickets and verify bookings, we need access to your camera.
+            To scan passenger tickets and verify bookings, we need access to
+            your camera.
           </Text>
           <TouchableOpacity
             onPress={requestPermission}
@@ -68,7 +83,7 @@ export default function DriverQRScanner() {
     )
   }
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = (message: string, type: "success" | "error") => {
     setToastMessage({ message, type })
     Animated.sequence([
       Animated.timing(toastAnim, {
@@ -99,52 +114,58 @@ export default function DriverQRScanner() {
           duration: 0,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start()
   }
 
   const handleBarCodeScanned = async ({ data }: BarcodeScanningResult) => {
-    if (scanned || isVerifying) return
+    if (isVerifying) return
 
     setScanned(true)
     setIsVerifying(true)
-    
-    // Haptic feedback
-    Vibration.vibrate(100)
+    Vibration.vibrate(50)
 
     try {
-      // Parse QR code data (assuming it contains ticket info)
       let qrData
       try {
         qrData = JSON.parse(data)
       } catch {
-        qrData = { ticketId: data }
+        Vibration.vibrate([0, 100, 50, 100]) // error vibration pattern
+        showToast("Invalid QR code", "error")
+        setScanned(false)
+        setIsVerifying(false)
+        return
+      }
+
+      // ✅ Validate required fields
+      const { ticketId, bookingId, userId, busId } = qrData
+      if (!ticketId || !bookingId || !userId || !busId) {
+        showToast("Invalid ticket QR code", "error")
+        setScanned(false)
+        setIsVerifying(false)
+        return
       }
 
       const result = await checkInPassenger(qrData)
-      
       setCheckInResult(result)
       setScannedData(data)
       setShowResultModal(true)
-      showToast(`✓ ${result.passenger.name} checked in successfully`, 'success')
-      
+      showToast(`✓ ${result.passenger.name} checked in successfully`, "success")
     } catch (error: any) {
-      console.error("Check-in error:", error)
       const errorMessage = error.message || "Failed to verify ticket"
-      showToast(errorMessage, 'error')
-      
-      // Show error alert
-      Alert.alert(
-        "Check-in Failed",
-        errorMessage,
-        [{ text: "OK", onPress: () => setScanned(false) }]
-      )
+      showToast(errorMessage, "error")
+      Alert.alert("Check-in Failed", errorMessage, [
+        { text: "OK", onPress: () => setScanned(false) },
+      ])
     } finally {
       setIsVerifying(false)
-      setTimeout(() => {
-        setScanned(false)
-      }, 2000)
     }
+  }
+  const closeModal = () => {
+    setShowResultModal(false)
+    setScannedData(null)
+    setCheckInResult(null)
+    setScanned(false)
   }
 
   const toggleTorch = () => {
@@ -155,18 +176,12 @@ export default function DriverQRScanner() {
     setCameraFacing((current) => (current === "back" ? "front" : "back"))
   }
 
-  const closeModal = () => {
-    setShowResultModal(false)
-    setScannedData(null)
-    setCheckInResult(null)
-  }
-
   return (
     <View className="flex-1 bg-black">
       <CameraView
-        className="flex-1"
+        style={{ flex: 1 }}
         barcodeScannerSettings={{
-          barcodeTypes: ["qr", "pdf417", "ean13", "upc_e"],
+          barcodeTypes: ["qr"],
         }}
         onBarcodeScanned={handleBarCodeScanned}
         facing={cameraFacing}
@@ -178,15 +193,17 @@ export default function DriverQRScanner() {
       {toastMessage && (
         <Animated.View
           className={`absolute bottom-24 left-4 right-4 z-50 rounded-xl px-4 py-3 ${
-            toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            toastMessage.type === "success" ? "bg-green-500" : "bg-red-500"
           }`}
           style={{
-            transform: [{
-              translateY: toastAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [100, 0],
-              })
-            }],
+            transform: [
+              {
+                translateY: toastAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [100, 0],
+                }),
+              },
+            ],
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.25,
@@ -214,9 +231,7 @@ export default function DriverQRScanner() {
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <Text className="text-white text-xl font-bold">
-            Scan Ticket
-          </Text>
+          <Text className="text-white text-xl font-bold">Scan Ticket</Text>
 
           <TouchableOpacity
             onPress={toggleTorch}
@@ -256,12 +271,14 @@ export default function DriverQRScanner() {
               shadowOpacity: 0.8,
               shadowRadius: 10,
               elevation: 5,
-              transform: [{
-                translateY: scanLineAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-150, 150],
-                })
-              }]
+              transform: [
+                {
+                  translateY: scanLineAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-150, 150],
+                  }),
+                },
+              ],
             }}
           />
         </View>
@@ -279,8 +296,12 @@ export default function DriverQRScanner() {
           </TouchableOpacity>
 
           <View className="items-center">
-            <Text className="text-white text-sm">Scan Count: {checkInResult?.bus?.passengersAboard || 0}</Text>
-            <Text className="text-white/70 text-xs mt-1">Passengers aboard</Text>
+            <Text className="text-white text-sm">
+              Scan Count: {checkInResult?.bus?.passengersAboard || 0}
+            </Text>
+            <Text className="text-white/70 text-xs mt-1">
+              Passengers aboard
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -337,23 +358,34 @@ export default function DriverQRScanner() {
                 <View className="w-full bg-green-500/10 rounded-xl p-3 mb-4 flex-row items-center justify-center space-x-2">
                   <Clock size={16} color={colors.primary} />
                   <Text className="text-green-600 font-semibold">
-                    Checked in at {new Date(checkInResult.checkedInAt).toLocaleTimeString()}
+                    Checked in at{" "}
+                    {new Date(checkInResult.checkedInAt).toLocaleTimeString()}
                   </Text>
                 </View>
 
                 {/* Passenger Info Card */}
-                <View className="w-full rounded-xl p-4 mb-4 border"
-                  style={{ borderColor: colors.border, backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5' }}
+                <View
+                  className="w-full rounded-xl p-4 mb-4 border"
+                  style={{
+                    borderColor: colors.border,
+                    backgroundColor: isDarkMode ? "#1a1a1a" : "#f5f5f5",
+                  }}
                 >
                   <View className="flex-row items-center mb-4">
                     <View className="w-12 h-12 rounded-full bg-blue-500/20 items-center justify-center">
                       <User size={24} color={colors.primary} />
                     </View>
                     <View className="ml-3">
-                      <Text className="font-semibold text-lg" style={{ color: colors.text }}>
+                      <Text
+                        className="font-semibold text-lg"
+                        style={{ color: colors.text }}
+                      >
                         {checkInResult.passenger.name}
                       </Text>
-                      <Text className="text-sm" style={{ color: colors.mutedText }}>
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.mutedText }}
+                      >
                         {checkInResult.passenger.phone}
                       </Text>
                     </View>
@@ -361,45 +393,93 @@ export default function DriverQRScanner() {
 
                   <View className="space-y-3">
                     <View className="flex-row justify-between">
-                      <Text className="text-sm" style={{ color: colors.mutedText }}>Ticket ID:</Text>
-                      <Text className="font-medium" style={{ color: colors.text }}>
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.mutedText }}
+                      >
+                        Ticket ID:
+                      </Text>
+                      <Text
+                        className="font-medium"
+                        style={{ color: colors.text }}
+                      >
                         #{checkInResult.ticketId}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
-                      <Text className="text-sm" style={{ color: colors.mutedText }}>Seat Number:</Text>
-                      <Text className="font-bold text-lg" style={{ color: colors.primary }}>
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.mutedText }}
+                      >
+                        Seat Number:
+                      </Text>
+                      <Text
+                        className="font-bold text-lg"
+                        style={{ color: colors.primary }}
+                      >
                         {checkInResult.seatNumber}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
-                      <Text className="text-sm" style={{ color: colors.mutedText }}>Route:</Text>
-                      <Text className="font-medium" style={{ color: colors.text }}>
-                        {checkInResult.boardingStop} → {checkInResult.alightingStop}
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.mutedText }}
+                      >
+                        Route:
+                      </Text>
+                      <Text
+                        className="font-medium"
+                        style={{ color: colors.text }}
+                      >
+                        {checkInResult.boardingStop} →{" "}
+                        {checkInResult.alightingStop}
                       </Text>
                     </View>
                   </View>
                 </View>
 
                 {/* Bus Info Card */}
-                <View className="w-full rounded-xl p-4 border"
-                  style={{ borderColor: colors.border, backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5' }}
+                <View
+                  className="w-full rounded-xl p-4 border"
+                  style={{
+                    borderColor: colors.border,
+                    backgroundColor: isDarkMode ? "#1a1a1a" : "#f5f5f5",
+                  }}
                 >
                   <View className="flex-row items-center mb-3">
                     <Bus size={20} color={colors.primary} />
-                    <Text className="font-semibold ml-2" style={{ color: colors.text }}>
+                    <Text
+                      className="font-semibold ml-2"
+                      style={{ color: colors.text }}
+                    >
                       Bus Information
                     </Text>
                   </View>
                   <View className="flex-row justify-between">
-                    <Text className="text-sm" style={{ color: colors.mutedText }}>Bus Number:</Text>
-                    <Text className="font-medium" style={{ color: colors.text }}>
+                    <Text
+                      className="text-sm"
+                      style={{ color: colors.mutedText }}
+                    >
+                      Bus Number:
+                    </Text>
+                    <Text
+                      className="font-medium"
+                      style={{ color: colors.text }}
+                    >
                       {checkInResult.bus.busNumber}
                     </Text>
                   </View>
                   <View className="flex-row justify-between mt-2">
-                    <Text className="text-sm" style={{ color: colors.mutedText }}>Passengers Aboard:</Text>
-                    <Text className="font-bold" style={{ color: colors.primary }}>
+                    <Text
+                      className="text-sm"
+                      style={{ color: colors.mutedText }}
+                    >
+                      Passengers Aboard:
+                    </Text>
+                    <Text
+                      className="font-bold"
+                      style={{ color: colors.primary }}
+                    >
                       {checkInResult.bus.passengersAboard}
                     </Text>
                   </View>
@@ -414,10 +494,7 @@ export default function DriverQRScanner() {
                 className="flex-1 py-4 rounded-xl items-center border"
                 style={{ borderColor: colors.border }}
               >
-                <Text
-                  className="font-semibold"
-                  style={{ color: colors.text }}
-                >
+                <Text className="font-semibold" style={{ color: colors.text }}>
                   Close
                 </Text>
               </TouchableOpacity>

@@ -166,15 +166,15 @@ export default function DriverHome() {
   const handleStartTrip = async () => {
     if (!selectedSchedule) return
 
-    if (!canStartSchedule(selectedSchedule)) {
-      Alert.alert(
-        "Cannot Start Trip",
-        `You can only start a trip within 30 minutes of the scheduled time (${selectedSchedule.startTime}).`,
-        [{ text: "OK" }],
-      )
-      setShowScheduleModal(false)
-      return
-    }
+    // if (!canStartSchedule(selectedSchedule)) {
+    //   Alert.alert(
+    //     "Cannot Start Trip",
+    //     `You can only start a trip within 30 minutes of the scheduled time (${selectedSchedule.startTime}).`,
+    //     [{ text: "OK" }],
+    //   )
+    //   setShowScheduleModal(false)
+    //   return
+    // }
 
     setStartingTrip(true)
     try {

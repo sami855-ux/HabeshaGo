@@ -371,9 +371,9 @@ export const startTripService = async (driverUserId, { busId, scheduleId }) => {
     const confirmedBooking = await prisma.booking.findFirst({
       where: {
         busId,
-        scheduleId, // Use schedule ID to filter bookings
+        scheduleId,
         status: "CONFIRMED",
-        date: { gte: todayStart, lte: todayEnd },
+        // date: { gte: todayStart, lte: todayEnd },
       },
     })
 
@@ -1237,7 +1237,11 @@ export const getDriverBusWithSchedulesService = async (driverUserId) => {
       currentTrip,
     }
 
-    return successResponse("Driver bus and schedules retrieved successfully", data, 200)
+    return successResponse(
+      "Driver bus and schedules retrieved successfully",
+      data,
+      200,
+    )
   } catch (error) {
     console.error("Get driver bus with schedules service error:", error)
     return errorResponse("Failed to retrieve driver bus and schedules", 500)

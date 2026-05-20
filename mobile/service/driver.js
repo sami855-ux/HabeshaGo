@@ -14,7 +14,7 @@ export const checkInPassenger = async (qrCode) => {
 export const getDriverTripHistory = async () => {
   try {
     const response = await axiosInstance.get("/drivers/trips/history")
-    return response.data.data
+    return response.data
   } catch (error) {
     throw error.response?.data || error.message
   }
@@ -27,6 +27,8 @@ export const startTrip = async (driverUserId, { busId, scheduleId }) => {
       scheduleId,
     })
 
+    console.log("start trip", response.data)
+
     // Return standardized response
     return {
       success: true,
@@ -36,11 +38,11 @@ export const startTrip = async (driverUserId, { busId, scheduleId }) => {
   } catch (error) {
     // Handle different error types
     const errorMessage = error.response?.data?.message || error.message
-
+    console.log("start trip", error.response.data)
     // Return standardized error
     return {
       success: false,
-      error: errorMessage,
+      message: errorMessage,
       statusCode: error.response?.status || 500,
       data: null,
     }

@@ -156,7 +156,6 @@ export const createBookingService = async ({
               amount: -pointsUsed,
               type: "SPEND",
               reason: "Used points for ticket discount",
-              reference: `BOOKING_${Date.now()}`,
               metadata: {
                 pointsUsed,
               },

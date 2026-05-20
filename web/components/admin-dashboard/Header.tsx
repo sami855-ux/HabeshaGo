@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Search,
   Bell,
@@ -49,11 +49,26 @@ import { clearUser } from "@/store/slices/userSlice"
 import { logoutUser } from "@/services/auth.user.api"
 import NotificationSheet from "@/components/user-dashboard/NotificationSheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useQuery } from "@tanstack/react-query"
+import { fetchAllNotification } from "@/services/notification.api"
+import { motion } from "framer-motion"
+
+const notificationKeys = {
+  all: ["notifications"] as const,
+  lists: () => [...notificationKeys.all, "list"] as const,
+}
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
   const dispatch = useDispatch()
   const { user, loading } = useSelector((state: RootState) => state.user)
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: notificationKeys.lists(),
+    queryFn: fetchAllNotification,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -66,7 +81,11 @@ function Header({ className }: { className?: string }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Mock unread count - you can update this based on your notification state
-  const [unreadNotificationCount] = useState(3)
+
+  // / Mock unread count - you can update this based on your notification state
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length
+  }, [notifications])
 
   // Close all modals and dropdowns on theme change
   useEffect(() => {
@@ -86,7 +105,12 @@ function Header({ className }: { className?: string }) {
     try {
       router.push("/")
       await logoutUser()
-      dispatch(clearUser())
+
+      setTimeout(() => {
+        dispatch(clearUser())
+      }, 2000)
+
+      localStorage.removeItem("habeshagoUser")
     } catch (error) {
       console.error("Logout failed:", error)
     } finally {
@@ -156,14 +180,20 @@ function Header({ className }: { className?: string }) {
                       >
                         <Bell className="w-5 h-5" />
                         {unreadNotificationCount > 0 && (
-                          <Badge
-                            variant="destructive"
-                            className="absolute -top-1 -right-1 px-1 min-w-0 w-5 h-5 flex items-center justify-center text-xs p-0"
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 500 }}
                           >
-                            {unreadNotificationCount > 9
-                              ? "9+"
-                              : unreadNotificationCount}
-                          </Badge>
+                            <Badge
+                              variant="destructive"
+                              className="absolute -top-1.5 -right-1 px-1 min-w-0 w-6 h-6 flex items-center justify-center text-xs p-0"
+                            >
+                              {unreadNotificationCount > 10
+                                ? "10+"
+                                : unreadNotificationCount}
+                            </Badge>
+                          </motion.div>
                         )}
                       </Button>
                     </TooltipTrigger>

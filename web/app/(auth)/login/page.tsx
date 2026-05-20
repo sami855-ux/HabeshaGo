@@ -112,29 +112,33 @@ export default function LoginPage() {
     return []
   }, [])
 
-  // Update suggestions when email changes
   useEffect(() => {
-    if (email && !validateEmail(email) && !email.includes(" ")) {
+    const validationError = validateEmail(email)
+
+    const isValid = validationError === null
+
+    setIsValidEmail(isValid)
+
+    if (email && !isValid && !email.includes(" ")) {
       const newSuggestions = generateSuggestions(email)
+
       setSuggestions(newSuggestions)
-      setShowSuggestions(newSuggestions.length > 0 && !isValidEmail)
-      const validationError = validateEmail(email)
 
-      setIsValidEmail(!validationError)
-
-      // Clear error when user starts typing
-      if (touched) setEmailError("")
+      setShowSuggestions(newSuggestions.length > 0)
     } else {
       setSuggestions([])
-      setShowSuggestions(false)
-      const validationError = validateEmail(email)
 
-      setIsValidEmail(!validationError)
+      setShowSuggestions(false)
+    }
+
+    // Clear error while typing
+    if (touched) {
+      setEmailError("")
     }
 
     // Reset selected suggestion index
     setSelectedSuggestionIndex(-1)
-  }, [email, generateSuggestions, isValidEmail, touched])
+  }, [email, generateSuggestions, touched])
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -234,19 +238,20 @@ export default function LoginPage() {
     submitEmailWithValue(email)
   }
 
-  const signInWithGoogle = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`
-  }
+  const signInWithGoogle = async () => {
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
 
-  const signInWithApple = async () => {
-    const result = await signInWithRedirect(auth, appleProvider)
+      if (!backendUrl) {
+        throw new Error("Backend URL is missing")
+      }
 
-    const user = result.user
+      window.location.href = `${backendUrl}/auth/google`
+    } catch (error: any) {
+      console.error(error)
 
-    const idToken = await user.getIdToken()
-
-    // send token to backend
-    continueWithApple(idToken)
+      toast.error(error?.message || "Google sign in failed")
+    }
   }
 
   // Get provider icon/color based on domain

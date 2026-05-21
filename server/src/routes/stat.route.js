@@ -62,6 +62,6 @@ router.get(
 )
 router.get("/withdrawals", authenticate, getWithdrawals)
 
-router.get("/kpis", authenticate, getKpis)
+router.get("/kpis", getKpis)
 
 export default router

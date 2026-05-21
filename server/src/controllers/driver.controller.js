@@ -15,6 +15,7 @@ import {
   checkInPassengerService,
   getDriverTripHistoryService,
   getDriverBusWithSchedulesService,
+  getTripDetailsService,
 } from "../services/driver.service.js"
 
 import { uploadToCloudinary } from "../services/cloudinary.service.js"
@@ -404,6 +405,28 @@ export const getDriverBusWithSchedules = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error while fetching driver bus and schedules",
+    })
+  }
+}
+
+export const getTripDetails = async (req, res) => {
+  try {
+    const { busId, scheduleId } = req.body
+    const driverId = "cmocj1iy50003d6k3v1mfq0y8"
+
+    const result = await getTripDetailsService({
+      driverId,
+      busId: parseInt(busId),
+      scheduleId: parseInt(scheduleId),
+    })
+
+    console.log(busId, scheduleId)
+    return res.status(result.statusCode).json(result)
+  } catch (error) {
+    console.error("Get trip details controller error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching trip details",
     })
   }
 }

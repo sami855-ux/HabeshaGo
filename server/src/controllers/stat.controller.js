@@ -663,13 +663,10 @@ export const getKpis = async (req, res) => {
     const [totalParkingSlots, occupiedParkingSlots, yesterdayOccupied] =
       await Promise.all([
         prisma.parkingSlot.count(),
-        prisma.parkingSlot.count({
-          where: { isOccupied: true },
-        }),
+        prisma.parkingSlot.count(),
         // yesterday snapshot — active reservations that started before today
         prisma.parkingSlot.count({
           where: {
-            isOccupied: true,
             updatedAt: { lt: todayStart },
           },
         }),
@@ -820,7 +817,9 @@ export const getKpis = async (req, res) => {
 
     const response = successResponse("KPIs fetched successfully", data)
     return res.status(response.statusCode).json(response)
+    
   } catch (error) {
+    console.log(error)
     const response = errorResponse(error.message, 500)
     return res.status(response.statusCode).json(response)
   }

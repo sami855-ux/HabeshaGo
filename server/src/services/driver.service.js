@@ -1247,3 +1247,231 @@ export const getDriverBusWithSchedulesService = async (driverUserId) => {
     return errorResponse("Failed to retrieve driver bus and schedules", 500)
   }
 }
+
+export const getTripDetailsService = async ({
+  driverId,
+  busId,
+  scheduleId,
+}) => {
+  try {
+    // Verify driver owns this bus
+    const bus = await prisma.bus.findFirst({
+      where: {
+        id: busId,
+        driverId: driverId,
+      },
+      include: {
+        route: true,
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                avaterUrl: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!bus) {
+      return errorResponse("Bus not found or not assigned to this driver", 404)
+    }
+
+    // Get schedule details
+    const schedule = await prisma.busSchedule.findFirst({
+      where: {
+        id: scheduleId,
+        busId: busId,
+        isActive: true,
+      },
+    })
+
+    if (!schedule) {
+      return errorResponse("Schedule not found", 404)
+    }
+
+    // Get current bus location
+    const currentLocation = await prisma.busPosition.findFirst({
+      where: {
+        busId: busId,
+      },
+      orderBy: {
+        timestamp: "desc",
+      },
+    })
+
+    // Get bookings for this bus and schedule
+    const bookings = await prisma.booking.findMany({
+      where: {
+        busId: busId,
+        scheduleId: scheduleId,
+        date: {
+          gte: new Date(),
+          lt: new Date(new Date().setDate(new Date().getDate() + 1)),
+        },
+        status: "CONFIRMED",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            avaterUrl: true,
+          },
+        },
+        tickets: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        payment: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    })
+
+    // Calculate passenger statistics
+    const totalPassengers = bookings.reduce(
+      (sum, booking) => sum + booking.tickets.length,
+      0,
+    )
+    const checkedInPassengers = bookings.filter((booking) =>
+      booking.tickets.some((ticket) => ticket.checkedIn === true),
+    ).length
+
+    const totalRevenue = bookings.reduce(
+      (sum, booking) => sum + (booking.totalAmount || 0),
+      0,
+    )
+    const occupiedSeats = bookings
+      .flatMap((booking) => booking.tickets.map((ticket) => ticket.seatNumber))
+      .filter((seat) => seat !== null)
+
+    // Get all passengers list
+    const passengers = bookings.flatMap((booking) =>
+      booking.tickets.map((ticket) => ({
+        id: booking.user.id,
+        name: booking.user.name,
+        phone: booking.user.phone,
+        email: booking.user.email,
+        avatar: booking.user.avaterUrl,
+        seatNumber: ticket.seatNumber,
+        bookingCode: booking.bookingCode,
+        checkedIn: ticket.checkedIn || false,
+        checkedInAt: ticket.checkedInAt,
+        boardingStop: ticket.boardingStop,
+        alightingStop: ticket.alightingStop,
+      })),
+    )
+
+    // Generate seat map
+    const seatMap = []
+    for (let i = 1; i <= bus.capacity; i++) {
+      const occupiedSeat = passengers.find((p) => p.seatNumber === i)
+      seatMap.push({
+        seatNumber: i,
+        isOccupied: !!occupiedSeat,
+        passenger: occupiedSeat
+          ? {
+              name: occupiedSeat.name,
+              bookingCode: occupiedSeat.bookingCode,
+              checkedIn: occupiedSeat.checkedIn,
+            }
+          : null,
+        status: occupiedSeat
+          ? occupiedSeat.checkedIn
+            ? "CHECKED_IN"
+            : "BOOKED"
+          : "AVAILABLE",
+      })
+    }
+
+    // Prepare response
+    const tripDetails = {
+      bus: {
+        id: bus.id,
+        busNumber: bus.busNumber,
+        capacity: bus.capacity,
+        status: bus.status,
+        averageRating: bus.averageRating,
+        currentLocation: {
+          latitude: currentLocation?.latitude || null,
+          longitude: currentLocation?.longitude || null,
+          timestamp: currentLocation?.timestamp || null,
+          speed: currentLocation?.speed || null,
+        },
+        route: bus.route
+          ? {
+              id: bus.route.id,
+              name: bus.route.name,
+              origin: bus.route.origin,
+              destination: bus.route.destination,
+              distanceKm: bus.route.distanceKm,
+              estimatedTimeMin: bus.route.estimatedTimeMin,
+              price: bus.route.price,
+            }
+          : null,
+      },
+      driver: {
+        id: bus.driver?.id,
+        name: bus.driver?.user?.name,
+        phone: bus.driver?.user?.phone,
+        email: bus.driver?.user?.email,
+        avatar: bus.driver?.user?.avaterUrl,
+        licenseNo: bus.driver?.licenseNo,
+        experience: bus.driver?.experience,
+        rating: bus.driver?.rating,
+        isOnDuty: bus.driver?.isOnDuty,
+      },
+      schedule: {
+        id: schedule.id,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        direction: schedule.direction,
+        isActive: schedule.isActive,
+      },
+      passengers: {
+        total: totalPassengers,
+        checkedIn: checkedInPassengers,
+        pending: totalPassengers - checkedInPassengers,
+        list: passengers,
+        occupancyRate: ((occupiedSeats.length / bus.capacity) * 100).toFixed(1),
+      },
+      seats: {
+        total: bus.capacity,
+        occupied: occupiedSeats.length,
+        available: bus.capacity - occupiedSeats.length,
+        seatMap: seatMap,
+        occupiedSeatsList: occupiedSeats.sort((a, b) => a - b),
+      },
+      revenue: {
+        total: totalRevenue,
+        averagePerPassenger:
+          totalPassengers > 0 ? totalRevenue / totalPassengers : 0,
+        currency: "ETB",
+      },
+    }
+
+    return successResponse(
+      "Trip details retrieved successfully",
+      tripDetails,
+      200,
+    )
+  } catch (error) {
+    console.error("Error fetching trip details:", error)
+    return errorResponse("Failed to fetch trip details", 500)
+  }
+}

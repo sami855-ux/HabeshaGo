@@ -189,7 +189,7 @@ export default function DriverHome() {
           `You have started the ${selectedSchedule.startTime} - ${selectedSchedule.endTime} trip.`,
           [
             {
-              text: "Go to Tracking",
+              text: "Okay",
               onPress: () => {
                 router.push({
                   pathname: "/(driver)/activeTrip",

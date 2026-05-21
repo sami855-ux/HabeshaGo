@@ -76,6 +76,9 @@ const userSlice = createSlice({
       state.user = null
       state.accessToken = null
       state.isAuthenticated = false
+      state.isReady = false
+    },
+    markReady: (state) => {
       state.isReady = true
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -119,6 +122,7 @@ export const {
   setLoading,
   setAccessToken,
   setError,
+  markReady,
 } = userSlice.actions
 
 export default userSlice.reducer

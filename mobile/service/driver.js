@@ -76,3 +76,27 @@ export const getDriverBusWithSchedules = async (driverUserId) => {
 //   console.error("Error:", result.error)
 //   Alert.alert("Error", result.error)
 // }
+
+export const getTripDetails = async (busId, scheduleId) => {
+  try {
+    const response = await axiosInstance.get("/drivers/trips/details", {
+      params: {
+        busId: busId,
+        scheduleId: scheduleId,
+      },
+    })
+
+    return response.data
+  } catch (error) {
+    console.error(
+      "Error fetching trip details:",
+      error.response?.data || error.message,
+    )
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch trip details",
+      statusCode: error.response?.status || 500,
+      data: null,
+    }
+  }
+}

@@ -1,7 +1,7 @@
 "use client"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { setAccessToken } from "@/store/slices/userSlice"
+import { markReady, setAccessToken } from "@/store/slices/userSlice"
 import { fetchCurrentUser } from "@/store/slices/userSlice"
 import { clearUser } from "@/store/slices/userSlice"
 import { useAppDispatch } from "@/store/store"
@@ -34,7 +34,8 @@ export const useOAuthExchange = () => {
         router.replace(window.location.pathname)
       } catch (err) {
         console.error("OAuth exchange error:", err)
-        dispatch(clearUser()) // ✅ sets isReady=true so hook unblocks
+        dispatch(clearUser())
+        dispatch(markReady())
         router.replace("/login?error=auth_failed")
       }
     }

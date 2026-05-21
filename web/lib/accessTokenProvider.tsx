@@ -6,6 +6,7 @@ import {
   setAccessToken,
   clearUser,
   setLoading,
+  markReady,
 } from "@/store/slices/userSlice"
 import { fetchCurrentUser } from "@/store/slices/userSlice"
 import { axiosInstance } from "@/services/axiosInstance"
@@ -51,6 +52,7 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
         // ✅ clearUser now sets isReady=true so useRequireRole unblocks
         dispatch(clearUser())
         localStorage.removeItem("habeshagoUser")
+        dispatch(markReady())
       }
     }
 

@@ -411,7 +411,7 @@ export const getDriverBusWithSchedules = async (req, res) => {
 
 export const getTripDetails = async (req, res) => {
   try {
-    const { busId, scheduleId } = req.body
+    const { busId, scheduleId } = req.query
     const driverId = "cmocj1iy50003d6k3v1mfq0y8"
 
     const result = await getTripDetailsService({

@@ -29,6 +29,8 @@ const ActiveTripScreen = () => {
   } = useLocalSearchParams()
   const queryClient = useQueryClient()
 
+  console.log(busId, scheduleId, "bus")
+
   const [selectedTab, setSelectedTab] = useState("overview")
   const [showEndTripModal, setShowEndTripModal] = useState(false)
 

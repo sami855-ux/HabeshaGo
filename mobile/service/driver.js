@@ -80,10 +80,7 @@ export const getDriverBusWithSchedules = async (driverUserId) => {
 export const getTripDetails = async (busId, scheduleId) => {
   try {
     const response = await axiosInstance.get("/drivers/trips/details", {
-      params: {
-        busId: busId,
-        scheduleId: scheduleId,
-      },
+      params: { busId, scheduleId },
     })
 
     return response.data

@@ -117,6 +117,7 @@ export default function DriverHome() {
 
       if (result.success) {
         setBusData(result.data)
+        // console.log(result.data)
       } else {
         setError(result.message)
       }
@@ -159,6 +160,7 @@ export default function DriverHome() {
   }
 
   const handleScheduleSelect = (schedule: Schedule) => {
+    console.log("first", schedule)
     setSelectedSchedule(schedule)
     setShowScheduleModal(true)
   }
@@ -182,6 +184,8 @@ export default function DriverHome() {
         busId: busData?.bus.id,
         scheduleId: selectedSchedule.id,
       })
+
+      console.log(busData?.bus.id, selectedSchedule.id, "bus")
 
       if (result.success) {
         Alert.alert(

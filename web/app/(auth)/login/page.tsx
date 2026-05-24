@@ -186,11 +186,9 @@ export default function LoginPage() {
 
   const handleBlur = () => {
     setTouched(true)
-    if (email && !validateEmail(email)) {
-      setEmailError("Please enter a valid email address")
-    }
+    const error = validateEmail(email)
+    if (error) setEmailError(error)
 
-    // Delay hiding suggestions to allow click on suggestion
     setTimeout(() => {
       if (!suggestionsRef.current?.contains(document.activeElement)) {
         setShowSuggestions(false)

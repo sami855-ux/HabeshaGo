@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 import {
   MapPin,
   Navigation,
@@ -10,29 +10,29 @@ import {
   Clock,
   Users,
   Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
-import { useDispatch, useSelector } from "react-redux";
-import { fetchParkingLots } from "@/store/slices/parkingUserSlice";
+import { useDispatch, useSelector } from "react-redux"
+import { fetchParkingLots } from "@/store/slices/parkingUserSlice"
 
 interface FindParkingProps {
-  onSelectLot?: (lotId: string) => void;
+  onSelectLot?: (lotId: string) => void
 }
 
 export default function FindParking({ onSelectLot }: FindParkingProps) {
-  const dispatch = useDispatch<any>();
+  const dispatch = useDispatch<any>()
 
-  const { lots = [] } = useSelector((state: any) => state.parkingUser || {});
+  const { lots = [] } = useSelector((state: any) => state.parkingUser || {})
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState("")
 
   // FETCH FROM BACKEND
   useEffect(() => {
-    dispatch(fetchParkingLots());
-  }, [dispatch]);
+    dispatch(fetchParkingLots())
+  }, [dispatch])
 
   // SAFE DATA NORMALIZATION (prevents object crash)
   const safeLots = Array.isArray(lots)
@@ -47,66 +47,65 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
         rating: lot?.rating || 4.0,
         operatingHours: lot?.operatingHours || "24/7",
       }))
-    : [];
+    : []
 
   // FILTERING (UNCHANGED LOGIC)
   const filteredLots = safeLots.filter(
     (lot: any) =>
       lot.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lot.address?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  )
 
   const getOccupancyRate = (total: number, available: number) => {
-    if (!total) return 0;
-    return ((total - available) / total) * 100;
-  };
+    if (!total) return 0
+    return ((total - available) / total) * 100
+  }
 
   // Helper to get badge style without "Full" wording
- const getStatusBadge = (available, total) => {
-  if (!total) {
-    return {
-      text: "Loading...",
-      color: "text-gray-400 bg-gray-100 dark:bg-gray-800",
-    };
-  }
+  const getStatusBadge = (available, total) => {
+    if (!total) {
+      return {
+        text: "Loading...",
+        color: "text-gray-400 bg-gray-100 dark:bg-gray-800",
+      }
+    }
 
-  if (available === 0) {
+    if (available === 0) {
+      return {
+        text: "No spots",
+        color: "text-red-600 bg-red-100 dark:bg-red-950/30 dark:text-red-400",
+      }
+    }
+
+    if (available < total * 0.2) {
+      return {
+        text: "Very limited",
+        color:
+          "text-orange-600 bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400",
+      }
+    }
+
+    if (available < total * 0.5) {
+      return {
+        text: "Limited",
+        color:
+          "text-amber-600 bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400",
+      }
+    }
+
     return {
-      text: "No spots",
+      text: "Available",
       color:
-        "text-red-600 bg-red-100 dark:bg-red-950/30 dark:text-red-400",
-    };
+        "text-green-600 bg-green-100 dark:bg-green-950/30 dark:text-green-400",
+    }
   }
-
-  if (available < total * 0.2) {
-    return {
-      text: "Very limited",
-      color:
-        "text-orange-600 bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400",
-    };
-  }
-
-  if (available < total * 0.5) {
-    return {
-      text: "Limited",
-      color:
-        "text-amber-600 bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400",
-    };
-  }
-
-  return {
-    text: "Available",
-    color:
-      "text-green-600 bg-green-100 dark:bg-green-950/30 dark:text-green-400",
-  };
-};
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(price);
-  };
+    }).format(price)
+  }
 
   return (
     <div className="space-y-8">
@@ -180,8 +179,8 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
           const occupancyRate = getOccupancyRate(
             lot.totalSlots,
             lot.availableSlots,
-          );
-          const badge = getStatusBadge(lot.availableSlots, lot.totalSlots);
+          )
+          const badge = getStatusBadge(lot.availableSlots, lot.totalSlots)
 
           return (
             <div
@@ -307,7 +306,7 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
                 </div>
               </div>
             </div>
-          );
+          )
         })}
       </div>
 
@@ -336,5 +335,5 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
         </div>
       )}
     </div>
-  );
+  )
 }

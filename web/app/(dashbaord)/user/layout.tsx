@@ -33,9 +33,9 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
   }, [isReady, isAuthenticated, accessToken])
 
   // ✅ block render until auth is resolved
-  if (!isReady || loading) {
-    return <AccountSetupLoader />
-  }
+  // if (!isReady || loading) {
+  //   return <AccountSetupLoader />
+  // }
 
   return (
     <div className="flex min-h-screen bg-background">

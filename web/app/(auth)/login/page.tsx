@@ -71,60 +71,39 @@ export default function LoginPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  const validateEmail = (value: string) => {
-    const email = value.trim().toLowerCase()
-    if (!email) return "Email is required"
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
-      return "Please enter a valid email address"
-    return null
-  }
+  const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
   // Generate email suggestions based on input
   const generateSuggestions = useCallback((value: string) => {
-    if (!value || value.includes("@")) {
-      const [localPart, domain] = value.split("@")
-
-      // If user started typing domain, filter domains
-      if (domain) {
-        const filtered = COMMON_EMAIL_DOMAINS.filter((d) =>
-          d.toLowerCase().startsWith(domain.toLowerCase()),
-        ).map((d) => `${localPart}@${d}`)
-        return filtered.slice(0, 5) // Limit to 5 suggestions
-      }
-
-      // If no @ yet, suggest common domains with the local part
-      if (localPart && localPart.length > 1) {
-        return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5)
-      }
+    if (!value) return []
+    const [localPart, domain] = value.split("@")
+    if (domain !== undefined) {
+      return COMMON_EMAIL_DOMAINS.filter((d) =>
+        d.toLowerCase().startsWith(domain.toLowerCase()),
+      )
+        .map((d) => `${localPart}@${d}`)
+        .slice(0, 5)
+    }
+    if (localPart.length > 1) {
+      return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5)
     }
     return []
   }, [])
 
   useEffect(() => {
-    const validationError = validateEmail(email)
-
-    const isValid = validationError === null
-
+    const isValid = validateEmail(email)
     setIsValidEmail(isValid)
 
-    if (email && !isValid && !email.includes(" ")) {
+    if (email && !isValid) {
       const newSuggestions = generateSuggestions(email)
-
       setSuggestions(newSuggestions)
-
       setShowSuggestions(newSuggestions.length > 0)
     } else {
       setSuggestions([])
-
       setShowSuggestions(false)
     }
 
-    // Clear error while typing
-    if (touched) {
-      setEmailError("")
-    }
-
-    // Reset selected suggestion index
+    if (touched) setEmailError("")
     setSelectedSuggestionIndex(-1)
   }, [email, generateSuggestions, touched])
 
@@ -186,9 +165,11 @@ export default function LoginPage() {
 
   const handleBlur = () => {
     setTouched(true)
-    const error = validateEmail(email)
-    if (error) setEmailError(error)
+    if (email && !validateEmail(email)) {
+      setEmailError("Please enter a valid email address")
+    }
 
+    // Delay hiding suggestions to allow click on suggestion
     setTimeout(() => {
       if (!suggestionsRef.current?.contains(document.activeElement)) {
         setShowSuggestions(false)
@@ -409,7 +390,11 @@ export default function LoginPage() {
                         <button
                           key={domain}
                           type="button"
-                          onClick={() => setEmail(`yourname@${domain}`)}
+                          onClick={() => {
+                            const localPart = email.split("@")[0] || ""
+                            setEmail(`${localPart}@${domain}`)
+                            inputRef.current?.focus()
+                          }}
                           className={cn(
                             "text-xs px-2 py-1 rounded-full border hover:bg-muted transition-colors",
                             color,

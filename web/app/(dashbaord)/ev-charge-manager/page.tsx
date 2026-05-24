@@ -23,7 +23,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAppSelector } from "@/store/store"
 
 export default function EVChargingDashboard() {
-  const { isReady, loading } = useAppSelector((state) => state.user)
   const {
     sessions,
     trendData,

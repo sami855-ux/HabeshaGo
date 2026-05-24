@@ -20,8 +20,13 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAppSelector } from "@/store/store"
 
 export default function EVChargingDashboard() {
+  const { isReady, loading } = useAppSelector((state) => state.user)
+
+  const authLoading = !isReady || loading
+
   const {
     sessions,
     trendData,
@@ -34,7 +39,9 @@ export default function EVChargingDashboard() {
     refreshData,
     isRefreshing,
     refetch,
-  } = useDashboardData()
+  } = useDashboardData({
+    enabled: !authLoading,
+  })
 
   const dashboardLoading = isLoading || isFetching
 

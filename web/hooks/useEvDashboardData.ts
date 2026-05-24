@@ -33,7 +33,11 @@ interface UseDashboardDataReturn {
   refetch: () => void
 }
 
-export function useDashboardData(): UseDashboardDataReturn {
+export function useDashboardData({
+  enabled = true,
+}: {
+  enabled?: boolean
+}): UseDashboardDataReturn {
   const queryClient = useQueryClient()
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
@@ -49,6 +53,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     queryFn: chargingAPI.getDashboardSummary,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Auto refetch every 5 minutes
+    enabled,
   })
 
   // Fetch Sessions
@@ -62,6 +67,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     queryKey: dashboardKeys.sessions(20),
     queryFn: () => chargingAPI.getRecentSessions(20),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled,
   })
 
   // Fetch Trend Data
@@ -75,6 +81,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     queryKey: dashboardKeys.trends(30),
     queryFn: () => chargingAPI.getTrendData(30),
     staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled,
   })
 
   // Fetch Station Performance
@@ -88,6 +95,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     queryKey: dashboardKeys.stations(),
     queryFn: chargingAPI.getStationPerformance,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled,
   })
 
   // Refresh mutation

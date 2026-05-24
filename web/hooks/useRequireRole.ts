@@ -10,38 +10,34 @@ export const useRequireRole = (allowedRoles: string[]) => {
   const { user, isAuthenticated, isReady } = useAppSelector(
     (state: RootState) => state.user,
   )
+
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
 
-    // ✅ skip guard during OAuth callback
+    // skip OAuth callback
     if (code) return
     if (!isReady) return
 
-    // Clear any pending redirect if state updates before timer fires
-    if (redirectTimer.current) clearTimeout(redirectTimer.current)
+    // ✅ global small delay BEFORE running any auth logic
+    const timer = setTimeout(() => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current)
 
-    if (!isAuthenticated || !user) {
-      // Small delay to allow state to fully settle before redirecting
-      redirectTimer.current = setTimeout(() => {
+      if (!isAuthenticated || !user) {
         router.replace("/login?error=require")
-      }, 100)
-      return
-    }
+        return
+      }
 
-    if (!allowedRoles.includes(user.role)) {
-      redirectTimer.current = setTimeout(() => {
+      if (!allowedRoles.includes(user.role)) {
         if (user.role === "PASSENGER") router.replace("/user")
         else if (user.role === "DRIVER") router.replace("/driver")
         else if (user.role === "ADMIN") router.replace("/admin")
         else router.replace("/login?error=login")
-      }, 100)
-    }
+      }
+    }, 400) // 👈 adjust delay here (300–600ms is ideal)
 
-    return () => {
-      if (redirectTimer.current) clearTimeout(redirectTimer.current)
-    }
+    return () => clearTimeout(timer)
   }, [isReady, isAuthenticated, user, allowedRoles, router])
 }

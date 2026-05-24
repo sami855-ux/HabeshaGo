@@ -20,7 +20,7 @@ import { authenticate } from "../middlewares/authenticate.js"
 const router = express.Router()
 
 // Static routes first (before any /:id)
-// router.post("/", upload.single("image"), createVehicle)
+router.post("/", upload.single("image"), createVehicle)
 router.post("/location", updateVehicleLocation)
 router.get("/user-vehicles", authenticate, getUserVehicles)
 router.get("/ids", getVehicleIds) // ← before /:id

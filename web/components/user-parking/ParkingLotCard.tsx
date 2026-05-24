@@ -262,41 +262,6 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
 
                 {/* Footer Actions - changed "Full" to new badge texts */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-all",
-                        badge.color,
-                      )}
-                    >
-                      <span className="relative flex h-2 w-2">
-                        <span
-                          className={cn(
-                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
-                            badge.text === "Good space"
-                              ? "bg-green-400"
-                              : badge.text === "Limited" ||
-                                  badge.text === "Very limited"
-                                ? "bg-orange-400"
-                                : "bg-red-400",
-                          )}
-                        />
-                        <span
-                          className={cn(
-                            "relative inline-flex rounded-full h-2 w-2",
-                            badge.text === "Good space"
-                              ? "bg-green-500"
-                              : badge.text === "Limited" ||
-                                  badge.text === "Very limited"
-                                ? "bg-orange-500"
-                                : "bg-red-500",
-                          )}
-                        />
-                      </span>
-                      {badge.text}
-                    </div>
-                  </div>
-
                   <Button
                     size="default"
                     className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg transition-all duration-300 rounded-xl px-6"

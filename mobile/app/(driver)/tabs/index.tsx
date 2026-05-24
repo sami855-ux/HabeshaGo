@@ -413,7 +413,7 @@ export default function DriverHome() {
                       </Text>
                     </View>
                     <TouchableOpacity
-                      // onPress={() => router.push("/(driver)/activeTrip")}
+                      onPress={() => router.push("/(driver)/activeTrip")}
                       className="bg-green-600 px-4 py-2 rounded-lg"
                     >
                       <Text className="text-white text-sm">View Trip</Text>

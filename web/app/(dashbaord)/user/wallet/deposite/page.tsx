@@ -322,7 +322,6 @@ function SummarySkeleton() {
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TopUpPage() {
   const router = useRouter()
 
@@ -398,7 +397,7 @@ export default function TopUpPage() {
       })
 
       if (res.success) {
-        window.location.href = res.paymentUrl
+        window.open(res.paymentUrl, "_blank")
         toast.success("Redirecting to payment...", {
           description: `Processing ETB ${values.amount.toLocaleString()} top-up`,
         })

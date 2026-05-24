@@ -58,6 +58,7 @@ export default function UserDashboard() {
   const {
     user,
     loading: userLoading,
+    isReady,
     error: userError,
   } = useAppSelector((state) => state.user)
 
@@ -179,7 +180,7 @@ export default function UserDashboard() {
     !!user
 
   // Loading skeleton for the entire dashboard
-  if (userLoading || isInitialLoad) {
+  if (userLoading || isInitialLoad || !isReady) {
     return (
       <div className="min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">

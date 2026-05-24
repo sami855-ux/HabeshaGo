@@ -27,8 +27,10 @@ export const useOAuthExchange = () => {
         // Set token first
         dispatch(setAccessToken(data.accessToken))
 
-        // Fetch user with token passed directly — bypasses interceptor timing
-        await dispatch(fetchCurrentUser(data.accessToken))
+        const result = await dispatch(
+          fetchCurrentUser(data.accessToken),
+        ).unwrap()
+        if (!result) throw new Error("No user returned")
 
         // Clean URL after everything is ready
         router.replace(window.location.pathname)

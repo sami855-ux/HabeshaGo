@@ -64,6 +64,9 @@ export default function UserDashboard() {
 
   const router = useRouter()
 
+  const authLoading = !isReady || userLoading
+  const isBooting = authLoading || isInitialLoad
+
   const [showCompletionBadge, setShowCompletionBadge] = useState(true)
   const [badgeDismissed, setBadgeDismissed] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
@@ -139,6 +142,12 @@ export default function UserDashboard() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login?state=no")
+    }
+  }, [authLoading, user, router])
+
   // Check if profile is complete
   const isProfileComplete = user?.emailVerified && user?.phoneVerified
 
@@ -180,7 +189,7 @@ export default function UserDashboard() {
     !!user
 
   // Loading skeleton for the entire dashboard
-  if (userLoading || isInitialLoad || !isReady) {
+  if (isBooting) {
     return (
       <div className="min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
@@ -212,7 +221,7 @@ export default function UserDashboard() {
   }
 
   // Error state for user loading
-  if (userError) {
+  if (isReady && userError) {
     return (
       <div className="min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
@@ -227,28 +236,6 @@ export default function UserDashboard() {
                   {userError || "Please try refreshing the page"}
                 </p>
               </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  // No user state
-  if (isReady && !user && !userLoading) {
-    return (
-      <div className="min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          <Card className="p-6 sm:p-8">
-            <div className="text-center">
-              <UserCircle className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-3" />
-              <h3 className="font-semibold text-lg sm:text-xl mb-1">
-                No user data available
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Please log in to view your dashboard
-              </p>
-              <Button onClick={() => router.push("/login")}>Go to Login</Button>
             </div>
           </Card>
         </div>

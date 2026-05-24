@@ -21,7 +21,7 @@ router.post("/initiate", authenticate, initiatePayment)
 router.post("/telebirr/callback", telebirrPaymentCallback)
 
 // webhook (NO auth - external gateway)
-router.post("/callback", paymentCallback)
+router.get("/callback", paymentCallback)
 
 // =============================
 // PAYMENT HISTORY

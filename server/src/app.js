@@ -170,7 +170,7 @@ app.use("/api/route", routeRoutes)
 app.use("/api/midpoint", midPointRoute)
 app.use("/api/payment", paymentRoutes)
 app.use("/api/booking", bookingRoutes)
-app.use("/api/vehicles/location", locationLimiter, vehicleRoute) // GPS ping route gets its own limiter
+app.use("/api/vehicles/location", locationLimiter, vehicleRoute)
 app.use("/api/vehicles", vehicleRoute)
 app.use("/api/minibus-reservation", minibusReservationRoutes)
 app.use("/api/minibus", minibusRoute)

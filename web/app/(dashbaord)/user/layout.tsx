@@ -54,7 +54,7 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserLayout({ children }: { children: React.ReactNode }) {
-  useRequireRole(["PASSENGER"])
+  // useRequireRole(["PASSENGER"])
   useOAuthExchange()
 
   return (

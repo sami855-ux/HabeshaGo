@@ -12,8 +12,8 @@ import e from "express"
  */
 export const authenticate = async (req, res, next) => {
   try {
-    // Extract token from Authorization header
     const authHeader = req.headers.authorization
+
     const token = authHeader?.startsWith("Bearer ")
       ? authHeader.split(" ")[1]
       : null
@@ -22,8 +22,8 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json(errorResponse("Access token missing", 401))
     }
 
-    // Verify JWT
     let decoded
+
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET)
     } catch (err) {
@@ -32,34 +32,22 @@ export const authenticate = async (req, res, next) => {
         .json(errorResponse("Invalid or expired access token", 401))
     }
 
-    // Fetch session and user
-    const session = await prisma.session.findUnique({
-      where: { id: decoded.sessionId },
-      include: { user: true },
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
     })
 
-    if (!session || session.revoked) {
-      return res
-        .status(401)
-        .json(errorResponse("Session invalid or expired", 401))
+    if (!user) {
+      return res.status(401).json(errorResponse("User not found", 401))
     }
 
-    if (session.user.isSuspended) {
+    if (user.isSuspended) {
       return res.status(403).json(errorResponse("Account suspended", 403))
     }
 
-    // Update lastActiveAt for session (heartbeat)
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { lastActiveAt: new Date() },
-    })
-
-    // Attach user info to request
     req.user = {
-      id: session.user.id,
-      role: session.user.role,
-      sessionId: session.id,
-      email: session.user.email,
+      id: user.id,
+      role: user.role,
+      email: user.email,
     }
 
     next()

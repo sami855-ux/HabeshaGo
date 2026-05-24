@@ -73,21 +73,9 @@ export default function LoginPage() {
 
   const validateEmail = (value: string) => {
     const email = value.trim().toLowerCase()
-
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/
-
-    if (!email) {
-      return "Email is required"
-    }
-
-    if (email.includes(" ")) {
-      return "Email cannot contain spaces"
-    }
-
-    if (!emailRegex.test(email)) {
+    if (!email) return "Email is required"
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
       return "Please enter a valid email address"
-    }
-
     return null
   }
 

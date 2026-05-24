@@ -91,7 +91,7 @@ import { cn } from "@/lib/utils"
 import { axiosInstance } from "@/services/axiosInstance"
 
 // Types based on your Prisma model
-type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT"
+type DiscountType = "PERCENT" | "FIXED"
 
 interface PromoCode {
   id: number
@@ -135,7 +135,7 @@ export default function PromoCodesPage() {
   // Form state
   const [formData, setFormData] = useState({
     code: "",
-    type: "PERCENTAGE" as DiscountType,
+    type: "PERCENT" as DiscountType,
     value: 0,
     maxUsage: "",
     minAmount: "",
@@ -888,8 +888,8 @@ export default function PromoCodesPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
-                      <SelectItem value="FIXED_AMOUNT">
+                      <SelectItem value="PERCENT">Percentage (%)</SelectItem>
+                      <SelectItem value="FIXED">
                         Fixed Amount ({CURRENCY})
                       </SelectItem>
                     </SelectContent>

@@ -132,7 +132,7 @@ export const issueTokensSocial = async (user, req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? "None" : "Lax",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/",
     })

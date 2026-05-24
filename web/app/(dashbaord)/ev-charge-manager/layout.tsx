@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import Sidebar from "@/components/ev-owner/Sidebar"
 import EvOwnerHeader from "@/components/ev-owner/Header"
 import { useOAuthExchange } from "@/hooks/useOAuthExchange"
+import { useRequireRole } from "@/hooks/useRequireRole"
 
 function UserLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
@@ -33,6 +34,7 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
 
 function UserLayout({ children }: { children: React.ReactNode }) {
   useOAuthExchange()
+  useRequireRole(["EV_CHARGER_MANAGER"])
 
   return (
     <SidebarProvider>

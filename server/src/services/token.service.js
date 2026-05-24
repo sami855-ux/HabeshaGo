@@ -139,7 +139,7 @@ export const issueTokensSocial = async (user, req, res) => {
     const code = crypto.randomUUID()
     await redis.set(`oauth_code:${code}`, accessToken, { ex: 30 })
 
-    const base = process.env.FRONTEND_URL
+    const base = "https://habeshago.vercel.app"
     const roleRedirects = {
       ADMIN: `${base}/admin`,
       DRIVER: `${base}/driver`,

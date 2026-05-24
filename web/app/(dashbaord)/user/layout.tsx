@@ -22,16 +22,18 @@ import {
 function UserLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
   const dispatch = useAppDispatch()
-  const { isReady, isAuthenticated } = useAppSelector((state) => state.user)
+  const { accessToken, isReady, isAuthenticated, loading } = useAppSelector(
+    (state) => state.user,
+  )
 
   useEffect(() => {
-    // ✅ only fetch wallet once auth is fully resolved and user is authenticated
-    if (!isReady || !isAuthenticated) return
+    if (!isReady || !isAuthenticated || !accessToken) return
+
     dispatch(fetchUserWallet())
-  }, [isReady, isAuthenticated, dispatch])
+  }, [isReady, isAuthenticated, accessToken])
 
   // ✅ block render until auth is resolved
-  if (!isReady) {
+  if (!isReady || loading) {
     return <AccountSetupLoader />
   }
 

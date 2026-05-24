@@ -1,6 +1,5 @@
 "use client"
 import { ReactNode, useEffect } from "react"
-import { useDispatch } from "react-redux"
 import {
   setUser,
   setAccessToken,
@@ -47,6 +46,9 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
 
         // IMPORTANT: persist again after refresh
         localStorage.setItem("habeshagoUser", JSON.stringify(user))
+
+        // ✅ ADD THIS SMALL BUFFER (critical fix)
+        await new Promise((resolve) => setTimeout(resolve, 0))
 
         dispatch(markReady())
       } catch (error) {

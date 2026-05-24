@@ -121,6 +121,12 @@ export default function WalletPage() {
     hasPinSet,
   ])
 
+  useEffect(() => {
+    if (!user) return
+
+    dispatch(fetchUserWallet())
+  }, [user, dispatch])
+
   const handlePinComplete = async (pin: string) => {
     try {
       setPinLoading(true)

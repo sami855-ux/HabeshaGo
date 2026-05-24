@@ -13,6 +13,11 @@ export const useRequireRole = (allowedRoles: string[]) => {
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get("code")
+
+    // ✅ skip guard during OAuth callback
+    if (code) return
     if (!isReady) return
 
     // Clear any pending redirect if state updates before timer fires

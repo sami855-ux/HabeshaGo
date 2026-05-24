@@ -157,7 +157,7 @@ export const verifyOTP = async (req, res) => {
       data: { emailVerified: true },
     })
 
-    return issueTokens(user, req, res) // ✅ issue web tokens
+    return issueTokens(user, req, res)
   } catch (err) {
     console.error("Verify OTP error:", err)
     return res
@@ -362,8 +362,6 @@ export const refreshToken = async (req, res) => {
     if (!user || user.isSuspended) {
       return res.status(403).json({ message: "Invalid user" })
     }
-
-    console.log(user.email)
 
     // 🔁 generate new refresh token
     const newRefreshToken = generateRefreshToken({

@@ -81,17 +81,19 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin || allowedOrigins.includes(origin))
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true)
-      callback(new Error(`CORS blocked: ${origin}`))
+      }
+
+      return callback(null, false)
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 )
-
 // Rate limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

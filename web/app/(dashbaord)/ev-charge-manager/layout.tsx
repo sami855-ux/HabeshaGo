@@ -3,10 +3,10 @@
 import React from "react"
 
 import { SidebarProvider, useSidebar } from "@/context/sidebar-context"
-import { useRequireRole } from "@/hooks/useRequireRole"
 import { cn } from "@/lib/utils"
 import Sidebar from "@/components/ev-owner/Sidebar"
 import EvOwnerHeader from "@/components/ev-owner/Header"
+import { useOAuthExchange } from "@/hooks/useOAuthExchange"
 
 function UserLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
@@ -15,7 +15,6 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
 
-      {/* Dynamic margin based on sidebar state */}
       <div
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-all duration-300",
@@ -33,7 +32,7 @@ function UserLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserLayout({ children }: { children: React.ReactNode }) {
-  //   useRequireRole(["PASSENGER"])
+  useOAuthExchange()
 
   return (
     <SidebarProvider>

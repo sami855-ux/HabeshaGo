@@ -331,39 +331,25 @@ export const appleCallback = async (req, res) => {
 export const refreshToken = async (req, res) => {
   try {
     const incomingToken = req.cookies?.refreshToken
+
     console.log("Incoming token:", incomingToken)
 
     if (!incomingToken) {
       return res.status(401).json({ message: "No refresh token" })
     }
 
-    const hashedToken = hashPassword(incomingToken)
+    // ✅ verify JWT only
+    const decoded = verifyRefreshToken(incomingToken)
 
-    console.log("Hashed incoming:", hashedToken)
+    console.log("Decoded:", decoded)
 
-    const session = await prisma.session.findFirst({
-      where: {
-        refreshTokenHash: hashedToken,
-        revoked: false,
-        expiresAt: { gt: new Date() },
-      },
-      include: { user: true },
-    })
+    const userId = decoded.sub
 
-    console.log("Session:", session)
-
-    if (!session || session.user.isSuspended) {
-      return res.status(403).json({ message: "Invalid session" })
-    }
-
+    // ✅ get user only
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       include: {
-        wallet: {
-          include: {
-            payments: true,
-          },
-        },
+        wallet: { include: { payments: true } },
         bookings: true,
         minibusReservations: true,
         parkingReservations: true,
@@ -372,30 +358,40 @@ export const refreshToken = async (req, res) => {
       },
     })
 
+    if (!user || user.isSuspended) {
+      return res.status(403).json({ message: "Invalid user" })
+    }
+
     console.log(user.email)
 
-    // 🔁 Rotate refresh token
-    const newRefreshToken = generateRefreshToken({ sub: session.user.id })
-    const newHashedToken = await hashPassword(newRefreshToken)
+    // 🔁 generate new refresh token
+    const newRefreshToken = generateRefreshToken({
+      sub: user.id,
+    })
 
-    await prisma.session.update({
-      where: { id: session.id },
+    const newHashedToken = hashPassword(newRefreshToken)
+
+    // ✅ SAVE session (NO lookup, only insert tracking)
+    await prisma.session.create({
       data: {
+        userId: user.id,
         refreshTokenHash: newHashedToken,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+        lastActiveAt: new Date(),
       },
     })
 
-    // New access token
+    // 🔐 access token
     const accessToken = generateAccessToken({
-      id: session.user.id,
-      role: session.user.role,
-      sessionId: session.id,
+      id: user.id,
+      role: user.role,
     })
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: "none",
       sameSite: "Strict",
     })
 
@@ -405,9 +401,10 @@ export const refreshToken = async (req, res) => {
     })
   } catch (err) {
     console.error("Refresh token error:", err)
-    res.status(500).json({ message: "Failed to refresh token" })
+    return res.status(403).json({ message: "Invalid or expired refresh token" })
   }
 }
+
 export const refreshTokenApp = async (req, res) => {
   try {
     // 🔐 Get refresh token from request body (mobile-safe)

@@ -38,11 +38,10 @@ export default function EVChargingDashboard() {
     refetch,
   } = useDashboardData()
 
-  const authLoading = !isReady || loading
   const dashboardLoading = isLoading || isFetching
 
   // Show loading state
-  if (authLoading) {
+  if (dashboardLoading) {
     return <DashboardSkeleton />
   }
 
@@ -70,13 +69,6 @@ export default function EVChargingDashboard() {
 
   return (
     <>
-      {dashboardLoading && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <RefreshCw className="h-3 w-3 animate-spin" />
-          <span>Updating data...</span>
-        </div>
-      )}
-
       <div className="min-h-screen">
         {/* Header */}
         <header className="sticky top-0 backdrop-blur-md pt-3 bg-background/95 z-10">

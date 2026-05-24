@@ -20,7 +20,6 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAppSelector } from "@/store/store"
 
 export default function EVChargingDashboard() {
   const {

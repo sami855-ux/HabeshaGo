@@ -26,18 +26,16 @@ export const setupAxiosInterceptors = (store: AppStore) => {
       ) {
         originalRequest._retry = true
         try {
-          const res = await axiosInstance.post(
-            "/auth/refresh",
-            {},
-            {
-              withCredentials: true, // ✅ send refresh token cookie
-            },
-          )
+          const res = await axiosInstance.post("/auth/refresh")
           const newToken = res.data.accessToken
+
           store.dispatch(setAccessToken(newToken))
+
           originalRequest.headers.Authorization = `Bearer ${newToken}`
+
           return axiosInstance(originalRequest)
-        } catch {
+        } catch (err) {
+          console.log("Axios", err)
           store.dispatch(clearUser())
           // ✅ reset isReady so useRequireRole can redirect cleanly
           window.location.replace("/login?error=axios")

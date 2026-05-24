@@ -66,6 +66,7 @@ const userSlice = createSlice({
       state.user = action.payload.user
       state.isAuthenticated = true
       state.loading = false
+      state.isReady = true
     },
     updateUser: (state, action: PayloadAction<Partial<UserState["user"]>>) => {
       if (state.user) {

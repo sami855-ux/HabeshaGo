@@ -169,8 +169,6 @@ export const paymentCallbackService = async (data) => {
         },
       })
 
-      console.log(payment.flow)
-
       // 2. Only update wallet for WALLET_TOPUP flow
       if (payment.flow === "WALLET_TOPUP" && payment.walletId) {
         // Get current balance for balanceAfter calculation

@@ -97,13 +97,17 @@ function Particles() {
 
 // ✅ Inner component that uses useSearchParams
 function PaymentSuccessContent() {
-  const searchParams = useSearchParams()
   const router = useRouter()
 
-  const ref = searchParams.get("ref") || "TXN-2025-001"
-  const flow = searchParams.get("flow") || "WALLET_TOPUP"
-  const amountParam = searchParams.get("amount")
-  const amount = amountParam ? parseFloat(amountParam) : 150
+  const params = new URLSearchParams(
+    typeof window !== "undefined"
+      ? window.location.search.replaceAll("&amp;", "&")
+      : "",
+  )
+
+  const ref = params.get("ref") || "TXN-2025-001"
+  const flow = params.get("flow") || "WALLET_TOPUP"
+  const amount = Number(params.get("amount") || 150)
 
   const [visible, setVisible] = useState(false)
   const [showParticles, setShowParticles] = useState(false)

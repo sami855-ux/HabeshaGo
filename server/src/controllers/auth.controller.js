@@ -331,11 +331,15 @@ export const appleCallback = async (req, res) => {
 export const refreshToken = async (req, res) => {
   try {
     const incomingToken = req.cookies?.refreshToken
+    console.log("Incoming token:", incomingToken)
+
     if (!incomingToken) {
       return res.status(401).json({ message: "No refresh token" })
     }
 
     const hashedToken = hashPassword(incomingToken)
+
+    console.log("Hashed incoming:", hashedToken)
 
     const session = await prisma.session.findFirst({
       where: {
@@ -345,6 +349,8 @@ export const refreshToken = async (req, res) => {
       },
       include: { user: true },
     })
+
+    console.log("Session:", session)
 
     if (!session || session.user.isSuspended) {
       return res.status(403).json({ message: "Invalid session" })

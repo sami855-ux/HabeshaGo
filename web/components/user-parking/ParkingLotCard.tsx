@@ -247,19 +247,6 @@ export default function FindParking({ onSelectLot }: FindParkingProps) {
                   </div>
                 </div>
 
-                {/* Simple slot info instead of progress bar */}
-                <div className="mb-5 flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800/30 rounded-xl px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-600 dark:text-gray-300 font-medium">
-                      Available spots
-                    </span>
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {lot.availableSlots} / {lot.totalSlots}
-                  </span>
-                </div>
-
                 {/* Footer Actions - changed "Full" to new badge texts */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
                   <Button

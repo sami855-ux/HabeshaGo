@@ -390,6 +390,8 @@ export default function BookingPage() {
       if (data.data.needsExternalPayment) {
         if (data.data.paymentUrl) {
           window.location.href = data.data.paymentUrl
+
+          window.open(data.data.paymentUrl, "_blank")
         }
       }
       if (data?.success) {

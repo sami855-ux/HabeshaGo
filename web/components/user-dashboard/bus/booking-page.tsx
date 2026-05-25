@@ -447,7 +447,7 @@ export default function BookingPage({
         return
       }
 
-      window.location.href = paymentUrl
+      window.open(paymentUrl, "_blank")
     } catch (error) {
       console.error("Chapa payment failed:", error)
       toast.error("Payment processing failed. Please try again.")

@@ -10,7 +10,6 @@ import { motion } from "framer-motion"
 import { searchBusesAPI } from "@/services/bus.api"
 import { toast } from "sonner"
 
-// Define the correct types based on the data structure
 interface BusSchedule {
   scheduleId: number
   startTime: string

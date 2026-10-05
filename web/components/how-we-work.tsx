@@ -1,331 +1,267 @@
-"use client";
+"use client"
 
+import { useState } from "react"
+import Link from "next/link"
+import { motion, AnimatePresence } from "framer-motion"
 import {
-  Bus,
-  CarTaxiFront,
-  Zap,
-  ParkingCircle,
+  Search,
+  Ticket,
+  Smartphone,
+  QrCode,
   ArrowRight,
-  Sparkles,
-  CheckCircle,
-  Users,
-  Target,
-  Clock,
-} from "lucide-react";
-import { motion } from "framer-motion";
-import { useState, useRef, useEffect } from "react";
+  CheckCircle2,
+  Bus,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface HowWeWorksProps {
-  id?: string;
+  id?: string
 }
 
 export default function HowWeWorks({ id }: HowWeWorksProps) {
-  const [activeStep, setActiveStep] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeStep, setActiveStep] = useState(0)
 
   const steps = [
     {
       number: "01",
-      title: "Analysis & Planning",
+      title: "Search & Compare",
+      subtitle: "Find the best coach & schedule",
       description:
-        "We analyze city transport patterns and plan optimal solutions.",
-      icon: <Target className="w-6 h-6" />,
-      color: "from-blue-500 to-cyan-500",
+        "Enter your departure and destination cities across Ethiopia. Instantly compare verified bus companies, departure times, VIP coach amenities, and live fares.",
+      icon: <Search className="w-5 h-5" />,
+      details: [
+        "50+ Intercity & Express routes",
+        "Compare coach amenities (WiFi, AC, USB)",
+        "Direct schedules from 05:00 AM to 08:00 PM",
+      ],
     },
     {
       number: "02",
-      title: "Technology Integration",
+      title: "Pick Your Seat",
+      subtitle: "Real-time cabin layout map",
       description:
-        "Implementing IoT, AI, and smart sensors for mobility solutions.",
-      icon: <Zap className="w-6 h-6" />,
-      color: "from-purple-500 to-pink-500",
+        "View the actual seat layout of your assigned coach. Choose your preferred window, aisle, or VIP front seat with 100% reservation certainty.",
+      icon: <Ticket className="w-5 h-5" />,
+      details: [
+        "Live reserved vs available seat indicators",
+        "Executive VIP vs Standard seating",
+        "Select single or group seats together",
+      ],
     },
     {
       number: "03",
-      title: "Deployment & Launch",
+      title: "1-Click Mobile Pay",
+      subtitle: "Instant Telebirr & CBE Birr",
       description:
-        "Rolling out services across the city with real-time monitoring.",
-      icon: <Clock className="w-6 h-6" />,
-      color: "from-orange-500 to-yellow-500",
+        "Pay securely in Ethiopian Birr via Telebirr, CBE Birr, Chapa, Amole, or your HabeshaGo Wallet. No terminal cash lines or change hassles.",
+      icon: <Smartphone className="w-5 h-5" />,
+      details: [
+        "Automated SMS booking confirmation",
+        "Instant transaction receipt with VAT",
+        "Earn HabeshaGo reward miles per kilometer",
+      ],
     },
     {
       number: "04",
-      title: "Optimization & Growth",
+      title: "Board & Track Live",
+      subtitle: "Paperless QR & GPS tracker",
       description:
-        "Continuous improvement based on user feedback and analytics.",
-      icon: <Users className="w-6 h-6" />,
+        "Simply present your digital QR boarding pass on your phone to the driver. Track your bus journey, current speed, and stop ETAs in real-time.",
+      icon: <QrCode className="w-5 h-5" />,
+      details: [
+        "Contactless QR code scan at bus door",
+        "Live satellite GPS location tracking",
+        "1-click ticket sharing to family members",
+      ],
     },
-  ];
-
-  const services = [
-    {
-      title: "Smart Transport System",
-      description:
-        "Unified digital platform connecting public and private transport modes.",
-      icon: <CarTaxiFront size={32} strokeWidth={1.5} />,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-      gradient: "from-blue-500 to-cyan-500",
-      stats: ["99.9% Uptime", "Real-time Tracking"],
-    },
-    {
-      title: "Minibus Contract Service",
-      description: "Digitalized minibus transportation with smart scheduling.",
-      icon: <Bus size={32} strokeWidth={1.5} />,
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
-      gradient: "from-green-500 to-emerald-500",
-      stats: ["50% Faster", "24/7 Support"],
-    },
-    {
-      title: "EV Charging Network",
-      description:
-        "Connected EV charging ecosystem for seamless station access.",
-      icon: <Zap size={32} strokeWidth={1.5} />,
-      color: "text-yellow-500",
-      bgColor: "bg-yellow-500/10",
-      gradient: "from-yellow-500 to-orange-500",
-      stats: ["Fast Charging", "100+ Stations"],
-    },
-    {
-      title: "Smart Parking Solutions",
-      description: "IoT-powered parking management reducing congestion.",
-      icon: <ParkingCircle size={32} strokeWidth={1.5} />,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-      gradient: "from-purple-500 to-pink-500",
-      stats: ["90% Time Saved", "Smart Detection"],
-    },
-  ];
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: "easeOut" },
-    },
-  };
+  ]
 
   return (
-    <section
-      id={id}
-      className="relative py-16 md:py-24 px-4 overflow-hidden bg-gradient-to-b from-background via-white to-gray-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/90"
-    >
-      {/* Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-gradient-to-tr from-orange-500/5 to-yellow-500/5 rounded-full blur-3xl" />
-      </div>
+    <section id={id} className="relative py-20 sm:py-28 px-4 bg-background">
+      <div className="max-w-5xl mx-auto">
+        {/* Header Without Sparkles */}
+        <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
+          <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-orange-500 mb-2">
+            How It Works
+          </p>
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        {/* Header */}
-        <div className="text-center mb-12 md:mb-20">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20"
-          >
-            <Sparkles className="w-4 h-4 text-orange-500" />
-            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
-              Our Methodology
-            </span>
-          </motion.div>
+          <h2 className="text-3xl sm:text-5xl font-extrabold text-foreground tracking-tight">
+            How HabeshaGo Works
+          </h2>
 
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3"
-          >
-            <span className="text-gradient bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">
-              How We
-            </span>
-            <span className="text-foreground ml-2">Work</span>
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-muted-foreground max-w-2xl mx-auto"
-          >
-            A step-by-step approach to transforming urban mobility through
-            technology
-          </motion.p>
+          <p className="text-sm sm:text-base text-muted-foreground mt-3 leading-relaxed">
+            Booking your intercity bus in Ethiopia used to take hours of terminal queuing. With HabeshaGo, it takes less than 60 seconds from your phone.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
-          {/* LEFT: Images with Animation */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="relative"
-          >
-            {/* Main Image Container */}
-            <motion.div
-              variants={itemVariants}
-              className="relative rounded-2xl overflow-hidden shadow-lg"
-            >
-              {/* Main Image */}
-              <div className="relative h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden">
-                <img
-                  src="/big-im.png"
-                  alt="Smart city transportation system"
-                  className="w-full h-full object-cover"
-                />
+        {/* Step Navigation Tabs - Clean, Borderless */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          {steps.map((step, index) => {
+            const isActive = activeStep === index
+            return (
+              <button
+                key={step.number}
+                type="button"
+                onClick={() => setActiveStep(index)}
+                className={`p-4 sm:p-5 rounded-2xl text-left transition-all duration-300 relative ${
+                  isActive
+                    ? "bg-muted/70 text-foreground"
+                    : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span
+                    className={`text-xl font-grotesk font-black ${
+                      isActive ? "text-orange-500" : "text-muted-foreground/40"
+                    }`}
+                  >
+                    {step.number}
+                  </span>
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                      isActive ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {step.icon}
+                  </div>
+                </div>
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-              </div>
-            </motion.div>
+                <div className="text-sm sm:text-base font-bold text-foreground">
+                  {step.title}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                  {step.subtitle}
+                </div>
 
-            {/* Process Steps Timeline */}
+                {isActive && (
+                  <span className="absolute bottom-0 left-6 right-6 h-0.5 bg-orange-500 rounded-full" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Active Step Detailed Showcase - Clean, Borderless */}
+        <div className="rounded-3xl bg-muted/30 p-6 sm:p-10 mb-16">
+          <AnimatePresence mode="wait">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="mt-8"
+              key={activeStep}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+              className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
             >
-              <div className="glass-effect rounded-2xl p-6">
-                <h3 className="text-lg font-semibold mb-6 text-center">
-                  Our Process
+              {/* Left Column: Text & Features (7 cols) */}
+              <div className="lg:col-span-7 space-y-4">
+                <span className="text-xs font-bold text-orange-500 uppercase tracking-wider block">
+                  STEP {steps[activeStep].number} OF 04
+                </span>
+
+                <h3 className="text-xl sm:text-2xl font-extrabold text-foreground">
+                  {steps[activeStep].title} —{" "}
+                  <span className="text-muted-foreground font-normal">
+                    {steps[activeStep].subtitle}
+                  </span>
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {steps.map((step, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setActiveStep(index)}
-                      className={`relative p-4 rounded-xl transition-colors duration-300 ${
-                        activeStep === index
-                          ? "bg-gradient-to-br from-orange-500/10 to-yellow-500/10 border border-orange-500/30"
-                          : "bg-white/50 dark:bg-gray-800/50 border border-transparent"
-                      }`}
-                    >
-                      <div className="flex flex-col items-center text-center">
-                        <div
-                          className={`text-2xl font-bold mb-2 ${
-                            activeStep === index
-                              ? "text-gradient bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {step.number}
-                        </div>
-                        <div className="text-sm font-medium line-clamp-2">
-                          {step.title}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {step.description}
-                        </div>
-                      </div>
-                    </button>
+
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {steps[activeStep].description}
+                </p>
+
+                <div className="space-y-2 pt-2">
+                  {steps[activeStep].details.map((detail, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm text-foreground">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                      <span>{detail}</span>
+                    </div>
                   ))}
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
 
-          {/* RIGHT: Service list */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="space-y-6"
-          >
-            {services.map((item, idx) => (
-              <motion.div
-                key={idx}
-                variants={itemVariants}
-                className="relative"
-              >
-                <div className="flex gap-4 items-start p-5 rounded-xl bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
-                  {/* Icon Container */}
-                  <div
-                    className={`flex-shrink-0 w-12 h-12 rounded-xl ${item.bgColor} flex items-center justify-center`}
+                <div className="pt-4 flex items-center gap-3">
+                  <Button
+                    asChild
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl text-xs sm:text-sm shadow-md shadow-orange-500/20"
                   >
-                    <div className={item.color}>{item.icon}</div>
+                    <Link href="/user/bus">
+                      <span>Book a Seat Now</span>
+                      <ArrowRight className="w-4 h-4 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right Column: Visual Preview */}
+              <div className="lg:col-span-5">
+                <div className="rounded-2xl bg-muted/60 p-6 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-orange-500 flex items-center justify-center text-white mx-auto shadow-md shadow-orange-500/20 mb-3">
+                    {steps[activeStep].icon}
                   </div>
 
-                  <div className="flex-1">
-                    {/* Title with Count */}
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">
-                        {item.title}
-                      </h3>
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                        0{idx + 1}
-                      </span>
+                  <h4 className="text-base font-bold text-foreground mb-1">
+                    {steps[activeStep].title}
+                  </h4>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4">
+                    Designed for travelers and operators across Ethiopia.
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-background text-xs text-left space-y-2">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Service Status:</span>
+                      <span className="text-emerald-500 font-semibold">Online 24/7</span>
                     </div>
-
-                    {/* Description */}
-                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-                      {item.description}
-                    </p>
-
-                    {/* Stats Tags */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.stats.map((stat, statIdx) => (
-                        <span
-                          key={statIdx}
-                          className={`px-2 py-1 rounded-md text-xs font-medium ${item.bgColor} ${item.color}`}
-                        >
-                          {stat}
-                        </span>
-                      ))}
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Currency:</span>
+                      <span className="font-bold text-foreground">ETB (Ethiopian Birr)</span>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </motion.div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </div>
 
-      {/* FULL WIDTH Orange CTA Section */}
-      <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] mt-12 md:mt-16">
-        <div className="bg-gradient-to-r from-orange-500 to-yellow-500 py-12 md:py-16">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm">
-              <CheckCircle className="w-5 h-5 text-white" />
-              <span className="text-sm font-medium text-white">
-                Ready to Transform?
-              </span>
-            </div>
+        {/* Bus Fleet Operator Partnership Banner - Clean, Borderless */}
+        <div className="rounded-3xl bg-orange-500 p-8 sm:p-12 text-white shadow-xl">
+          <div className="max-w-2xl">
+            <span className="text-xs font-semibold uppercase tracking-wider block mb-2 text-white/80">
+              For Bus Companies &amp; Fleet Owners
+            </span>
 
-            <h3 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4">
-              Join the Smart City Revolution
+            <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-3">
+              Own a Bus Fleet or Minibus in Ethiopia?
             </h3>
-            <p className="text-white/90 mb-8 max-w-2xl mx-auto text-lg">
-              Be part of the future of urban mobility. Get started today with
-              our comprehensive solutions.
+
+            <p className="text-white/90 text-sm leading-relaxed mb-6">
+              Digitize ticket sales, eliminate manual paper fraud, track your vehicles live on GPS, and receive direct automated payouts to your CBE or Telebirr merchant account.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-3 rounded-xl bg-white text-orange-600 font-semibold transition-all duration-300 shadow-lg hover:shadow-xl">
-                Request Demo
-              </button>
-              <button className="px-8 py-3 rounded-xl bg-white/10 backdrop-blur-sm text-white font-semibold border-2 border-white/30 transition-all duration-300 hover:bg-white/20">
-                Contact Sales
-              </button>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                asChild
+                size="lg"
+                className="bg-white text-orange-600 hover:bg-orange-50 font-bold px-6 py-5 rounded-xl shadow-md transition-all"
+              >
+                <Link href="/login">
+                  <span>Register Your Fleet</span>
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-semibold px-6 py-5 rounded-xl"
+              >
+                <Link href="/login">
+                  <span>Operator Login</span>
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
       </div>
     </section>
-  );
+  )
 }

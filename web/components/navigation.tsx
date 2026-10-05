@@ -4,8 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, ChevronDown, Sparkles } from "lucide-react"
-import { ThemeToggle } from "@/components/themeToggle"
+import { Menu, X, Ticket, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function Navigation() {
@@ -15,107 +14,114 @@ export function Navigation() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
+      setIsScrolled(window.scrollY > 20)
 
-      const sections = ["services", "how-we-work", "testimonial", "footer"]
+      const sections = ["features", "digital-pass", "how-we-work", "testimonials", "faq"]
       const currentSection = sections.find((section) => {
         const element = document.getElementById(section)
         if (element) {
           const rect = element.getBoundingClientRect()
-          return rect.top <= 100 && rect.bottom >= 100
+          return rect.top <= 120 && rect.bottom >= 120
         }
         return false
       })
 
-      if (currentSection) setActiveLink(currentSection)
+      if (currentSection) {
+        setActiveLink(currentSection)
+      } else if (window.scrollY < 150) {
+        setActiveLink("")
+      }
     }
 
-    window.addEventListener("scroll", handleScroll)
+    window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
   const navLinks = [
-    { href: "#services", label: "Services" },
-    { href: "#how-we-work", label: "How We Work" },
-    { href: "#testimonial", label: "Testimonials" },
-    { href: "#footer", label: "Contact" },
+    { href: "#features", label: "Features" },
+    { href: "#digital-pass", label: "Digital Pass" },
+    { href: "#how-we-work", label: "How It Works" },
+    { href: "#testimonials", label: "Reviews" },
+    { href: "#faq", label: "FAQ" },
   ]
 
   return (
-    <motion.header
+    <header
       className={cn(
         "fixed top-0 w-full z-50 transition-all duration-300",
         isScrolled
-          ? "bg-background/80 backdrop-blur-xl border-b border-border"
-          : "backdrop-blur-sm",
+          ? "bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm"
+          : "bg-transparent border-transparent"
       )}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <span className="text-xl font-grotesk font-bold bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">
-              HabeshaGo
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Sleek compact height: h-14 sm:h-16 */}
+        <div className="flex items-center justify-between h-14 sm:h-16">
+          {/* Brand Logo */}
+          <Link href="/" className="flex items-center group">
+            <span className="text-xl sm:text-2xl font-grotesk font-extrabold tracking-tight text-gray-900 drop-shadow-xs">
+              Habesha<span className="text-orange-500">Go</span>
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setActiveLink(link.href.slice(1))}
-                className={cn(
-                  "relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200",
-                  activeLink === link.href.slice(1)
-                    ? "text-orange-500 bg-orange-50 dark:bg-orange-950/20"
-                    : isScrolled
-                      ? "text-gray-900 dark:text-gray-300 hover:text-orange-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      : "text-gray-800 dark:text-gray-800 hover:text-orange-500 hover:bg-white/10",
-                )}
-              >
-                {link.label}
-                {activeLink === link.href.slice(1) && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-500"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-              </Link>
-            ))}
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-7">
+            {navLinks.map((link) => {
+              const isActive = activeLink === link.href.slice(1)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setActiveLink(link.href.slice(1))}
+                  className={cn(
+                    "text-sm font-semibold transition-colors duration-200 relative py-1 drop-shadow-xs",
+                    isActive
+                      ? "text-orange-600 font-bold"
+                      : "text-gray-800 hover:text-orange-600"
+                  )}
+                >
+                  {link.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-full" />
+                  )}
+                </Link>
+              )
+            })}
           </nav>
 
-          {/* Right Section */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
+          {/* Right Section: Sign In & Book Ticket */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              href="/login"
+              className="hidden sm:inline-flex text-sm font-semibold text-gray-800 hover:text-orange-600 transition-colors drop-shadow-xs"
+            >
+              Sign In
+            </Link>
 
             <Button
               asChild
               size="sm"
-              className="hidden md:inline-flex bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white shadow-lg shadow-orange-500/25"
+              className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-md shadow-sm transition-all"
             >
-              <Link href="/login">Sign In</Link>
+              <Link href="/user/bus" className="flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5" />
+                <span>Book Ticket</span>
+              </Link>
             </Button>
 
             {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
+            <button
+              type="button"
+              className="md:hidden p-1.5 text-gray-900"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
             >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
+              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu Dropdown */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.div
@@ -123,42 +129,45 @@ export function Navigation() {
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="md:hidden overflow-hidden"
+              className="md:hidden overflow-hidden py-3 border-t border-gray-100 bg-white shadow-xl rounded-b-md"
             >
-              <div className="py-4 space-y-1 border-t border-border mt-2">
-                {navLinks.map((link, index) => (
-                  <motion.div
+              <div className="space-y-1">
+                {navLinks.map((link) => (
+                  <Link
                     key={link.href}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
+                    href={link.href}
+                    onClick={() => {
+                      setActiveLink(link.href.slice(1))
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      activeLink === link.href.slice(1)
+                        ? "text-orange-600 bg-orange-50 font-semibold"
+                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                    )}
                   >
-                    <Link
-                      href={link.href}
-                      className={cn(
-                        "flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200",
-                        activeLink === link.href.slice(1)
-                          ? "bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                      )}
-                      onClick={() => {
-                        setActiveLink(link.href.slice(1))
-                        setIsMobileMenuOpen(false)
-                      }}
-                    >
-                      <span>{link.label}</span>
-                      <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
-                    </Link>
-                  </motion.div>
+                    <span>{link.label}</span>
+                    <ArrowRight className="w-3.5 h-3.5 opacity-40" />
+                  </Link>
                 ))}
 
-                {/* Mobile Sign In Button */}
-                <div className="pt-4">
+                <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                  <Link
+                    href="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full text-center py-2 text-sm text-gray-700 hover:text-gray-900"
+                  >
+                    Sign In
+                  </Link>
                   <Button
                     asChild
-                    className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white"
+                    size="sm"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-md"
                   >
-                    <Link href="/login">Sign In</Link>
+                    <Link href="/user/bus" onClick={() => setIsMobileMenuOpen(false)}>
+                      Book Bus Ticket
+                    </Link>
                   </Button>
                 </div>
               </div>
@@ -166,6 +175,6 @@ export function Navigation() {
           )}
         </AnimatePresence>
       </div>
-    </motion.header>
+    </header>
   )
 }

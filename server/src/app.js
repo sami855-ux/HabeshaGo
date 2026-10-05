@@ -44,6 +44,7 @@ import ratingRoutes from "./routes/ratings.route.js"
 import parkingRoute from "./routes/parking.routes.js"
 import analyticsRoute from "./routes/analaytics.route.js"
 import adminFinanceRoutes from "./routes/adminFinance.routes.js"
+import supportChatRoutes from "./routes/supportChat.routes.js"
 
 // Validate required env vars on startup
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key])
@@ -197,6 +198,7 @@ app.use("/api/ev/tariff", tariffRoutes)
 app.use("/api/rating", ratingRoutes)
 app.use("/api/parking", parkingRoute)
 app.use("/api/analytics", analyticsRoute)
+app.use("/api/support-chat", supportChatRoutes)
 
 // Server
 const server = http.createServer(app)

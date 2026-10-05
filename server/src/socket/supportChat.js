@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -22,7 +22,7 @@ export const initSupportChatSocket = (io) => {
 
         const savedMessage = await prisma.supportChatMessage.create({
           data: {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             sessionId,
             senderType,
             senderId,

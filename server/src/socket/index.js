@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import { getLatestVehicleLocation } from "../services/redisService.service.js";
 import { chargingSocketHandler } from "./charging.socket.js";
+import { initSupportChatSocket } from "./supportChat.js";
 
 let io = null;
 
@@ -13,6 +14,8 @@ export const initSocket = (server) => {
       credentials: true,
     },
   });
+
+  initSupportChatSocket(io);
 
   io.on("connection", (socket) => {
     console.log("Connected:", socket.id);

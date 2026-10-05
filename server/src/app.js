@@ -1,5 +1,4 @@
-import dotenv from "dotenv"
-dotenv.config()
+import "dotenv/config"
 
 import http from "http"
 import express from "express"
@@ -44,6 +43,7 @@ import tariffRoutes from "./routes/evTariffs.route.js"
 import ratingRoutes from "./routes/ratings.route.js"
 import parkingRoute from "./routes/parking.routes.js"
 import analyticsRoute from "./routes/analaytics.route.js"
+import adminFinanceRoutes from "./routes/adminFinance.routes.js"
 
 // Validate required env vars on startup
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key])
@@ -112,21 +112,18 @@ const locationLimiter = rateLimit({
   message: { message: "Location update rate limit exceeded." },
 })
 
-// tighter limit for auth endpoints
-// const authLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 20,
-//   standardHeaders: true,
-//   legacyHeaders: false,
-//   message: { message: "Too many auth attempts, please try again later." },
-// })
-
 app.use(helmet())
 app.set("trust proxy", 1)
 app.use(globalLimiter)
 
 //  General middleware
-app.use(cookieParser("some-key-for-the-secrete"))
+app.use(
+  cookieParser(
+    process.env.COOKIE_SECRET ||
+      process.env.SESSION_SECRET ||
+      process.env.JWT_SECRET,
+  ),
+)
 app.use(express.json({ limit: "10kb" })) // reject oversized payloads
 app.use(express.urlencoded({ extended: true, limit: "10kb" }))
 app.use(compression()) // gzip responses
@@ -134,7 +131,10 @@ app.use(morgan(isProduction ? "combined" : "dev"))
 
 app.use(
   session({
-    secret: "some-key-for-the-secrete",
+    secret:
+      process.env.SESSION_SECRET ||
+      process.env.JWT_SECRET ||
+      "habeshago-session-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -162,6 +162,7 @@ app.get("/health", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
+app.use("/api/admin/finance/revenue-overview", adminFinanceRoutes)
 app.use("/api/wallet", walletRoutes)
 app.use("/api/notification", notificationRoute)
 app.use("/api/transactions", transactionRoutes)

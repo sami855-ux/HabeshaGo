@@ -455,6 +455,17 @@ export default function LoginPage() {
                 </button>
               </p>
             </div>
+
+            <div className="pt-2 border-t text-center">
+              <button
+                type="button"
+                onClick={() => router.push("/staff-login")}
+                className="text-xs text-muted-foreground hover:text-emerald-500 inline-flex items-center gap-1.5 font-medium transition-colors"
+              >
+                <span>Staff or Fleet Operator Portal</span>
+                <span aria-hidden="true">&rarr;</span>
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>

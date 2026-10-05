@@ -112,7 +112,16 @@ const locationLimiter = rateLimit({
   message: { message: "Location update rate limit exceeded." },
 })
 
-app.use(helmet())
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    hsts: isProduction
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+    noSniff: true,
+  }),
+)
 app.set("trust proxy", 1)
 app.use(globalLimiter)
 

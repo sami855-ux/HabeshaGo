@@ -1,12 +1,9 @@
 import {
   initiatePaymentService,
-  // mpesaCallbackService,
+  mpesaCallbackService,
   mpesaTopUpService,
   paymentCallbackService,
   telebirrCallbackService,
-  // getPaymentHistoryService,
-  // verifyPaymentService,
-  // getPaymentByReferenceService,
 } from "../services/payment.service.js"
 
 /**
@@ -74,64 +71,6 @@ export const telebirrPaymentCallback = async (req, res) => {
     return res.status(500).json({
       code: "1",
       message: "error",
-    })
-  }
-}
-
-/**
- * Verify payment status
- */
-export const verifyPayment = async (req, res) => {
-  try {
-    const { reference } = req.params
-
-    if (!reference) {
-      return res.status(400).json({
-        success: false,
-        statusCode: 400,
-        message: "Payment reference is required",
-        data: null,
-      })
-    }
-
-    // const result = await verifyPaymentService(reference)
-    return res.status(result.statusCode).json(result)
-  } catch (error) {
-    console.error("Verify payment controller error:", error)
-    return res.status(500).json({
-      success: false,
-      statusCode: 500,
-      message: "Internal server error while verifying payment",
-      data: null,
-    })
-  }
-}
-
-/**
- * Get payment by reference
- */
-export const getPaymentByReference = async (req, res) => {
-  try {
-    const { reference } = req.params
-
-    if (!reference) {
-      return res.status(400).json({
-        success: false,
-        statusCode: 400,
-        message: "Payment reference is required",
-        data: null,
-      })
-    }
-
-    // const result = await getPaymentByReferenceService(reference)
-    return res.status(result.statusCode).json(result)
-  } catch (error) {
-    console.error("Get payment by reference controller error:", error)
-    return res.status(500).json({
-      success: false,
-      statusCode: 500,
-      message: "Internal server error while fetching payment",
-      data: null,
     })
   }
 }

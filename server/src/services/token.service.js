@@ -6,7 +6,7 @@ const REFRESH_TOKEN_EXPIRES = "15d"
 const JWT_ALGORITHM = "HS256"
 
 import prisma from "../prisma/client.js"
-import { hashPassword } from "./password.service.js"
+// hashToken is defined locally in this file for refresh token hashing
 import { redis } from "../config/redis.js"
 
 const isProduction = process.env.NODE_ENV === "production"
@@ -25,7 +25,7 @@ export const issueTokens = async (user, req, res) => {
     const session = await prisma.session.create({
       data: {
         userId: user.id,
-        refreshTokenHash: await hashPassword(refreshToken),
+        refreshTokenHash: hashToken(refreshToken),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
@@ -41,7 +41,7 @@ export const issueTokens = async (user, req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "none",
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/",
     })
@@ -72,7 +72,7 @@ export const issueMobileTokens = async (user, req, res) => {
     const session = await prisma.session.create({
       data: {
         userId: user.id,
-        refreshTokenHash: await hashPassword(refreshToken),
+        refreshTokenHash: hashToken(refreshToken),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
@@ -116,7 +116,7 @@ export const issueTokensSocial = async (user, req, res) => {
     const session = await prisma.session.create({
       data: {
         userId: user.id,
-        refreshTokenHash: await hashPassword(refreshToken),
+        refreshTokenHash: hashToken(refreshToken),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
@@ -132,7 +132,7 @@ export const issueTokensSocial = async (user, req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "none",
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/",
     })
@@ -198,3 +198,32 @@ export const verifyRefreshToken = (token) => {
 export const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex")
 }
+
+// Precomputed dummy bcrypt hash for constant-time comparison against timing attacks
+export const DUMMY_BCRYPT_HASH =
+  "$2b$10$e8wF3QvXv0U5P2cWvW6G9eI5nQpYvjL1F6rGvH3bY5qE8wF3QvXv0"
+
+export const generateMFAToken = (payload) => {
+  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
+  const jti = crypto.randomUUID()
+  return jwt.sign(
+    { ...payload, type: "mfa_pending", jti },
+    process.env.JWT_SECRET,
+    { algorithm: JWT_ALGORITHM, expiresIn: "5m" },
+  )
+}
+
+export const verifyMFAToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+    })
+    if (decoded.type !== "mfa_pending") {
+      throw new Error("Invalid token type")
+    }
+    return decoded
+  } catch (err) {
+    throw new Error("Invalid or expired MFA session")
+  }
+}
+

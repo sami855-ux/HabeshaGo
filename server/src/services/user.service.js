@@ -60,6 +60,10 @@ export const verifyOtpService = async (user, code, channel) => {
     throw new Error("Too many attempts")
   }
 
+  if (!otp.codeHash) {
+    throw new Error("Invalid OTP")
+  }
+
   const isValid = await verifyPassword(code, otp.codeHash)
 
   await prisma.otpCode.update({
@@ -166,7 +170,7 @@ export const getFormattedPassengersService = async () => {
  * GET /api/admin/finance/revenue-overview
  * Returns overall revenue, total commission, provider payouts, admin wallet balance, etc.
  */
-export const getRevenueOverview = async (req, res) => {
+export const getRevenueOverview = async () => {
   try {
     // 1️⃣ Total revenue from all bookings
     const totalRevenueResult = await prisma.transactionLedger.aggregate({
@@ -207,83 +211,17 @@ export const getRevenueOverview = async (req, res) => {
       where: { role: "PASSENGER" }, // Or any active users criteria
     })
 
-    return res.json(
-      successResponse("Revenue overview fetched successfully", {
-        totalRevenue,
-        totalCommission,
-        totalProviderPayout,
-        adminWalletBalance,
-        totalBookings,
-        activeUsers,
-      }),
-    )
+    return successResponse("Revenue overview fetched successfully", {
+      totalRevenue,
+      totalCommission,
+      totalProviderPayout,
+      adminWalletBalance,
+      totalBookings,
+      activeUsers,
+    })
   } catch (err) {
     console.error("Revenue overview error:", err)
-    return res
-      .status(500)
-      .json(errorResponse("Failed to fetch revenue overview", 500))
-  }
-}
-
-export const getDailyRevenue = async (req, res) => {
-  try {
-    const days = Number(req.query.days) || 30
-    const today = new Date()
-    const startDate = new Date()
-    startDate.setDate(today.getDate() - days + 1)
-
-    const dailyRevenueRaw = await prisma.transactionLedger.groupBy({
-      by: ["createdAt"],
-      where: { status: "COMPLETED", createdAt: { gte: startDate } },
-      _sum: { totalAmount: true },
-    })
-
-    const dailyRevenue = dailyRevenueRaw.map((item) => ({
-      date: item.createdAt.toISOString().split("T")[0],
-      revenue: item._sum.totalAmount || 0,
-    }))
-
-    return res.json(
-      successResponse("Daily revenue fetched successfully", dailyRevenue),
-    )
-  } catch (err) {
-    console.error("Daily revenue error:", err)
-    return res
-      .status(500)
-      .json(errorResponse("Failed to fetch daily revenue", 500))
-  }
-}
-
-export const getProviderRevenue = async (req, res) => {
-  try {
-    const revenueByProvider = await prisma.transactionLedger.groupBy({
-      by: ["providerId"],
-      where: { status: "COMPLETED" },
-      _sum: { providerAmount: true, commission: true },
-    })
-
-    const result = await Promise.all(
-      revenueByProvider.map(async (item) => {
-        const provider = await prisma.user.findUnique({
-          where: { id: item.providerId },
-        })
-        return {
-          providerId: item.providerId,
-          name: provider?.name || "Unknown",
-          revenue: item._sum.providerAmount || 0,
-          commission: item._sum.commission || 0,
-        }
-      }),
-    )
-
-    return res.json(
-      successResponse("Provider revenue fetched successfully", result),
-    )
-  } catch (err) {
-    console.error("Provider revenue error:", err)
-    return res
-      .status(500)
-      .json(errorResponse("Failed to fetch provider revenue", 500))
+    return errorResponse("Failed to fetch revenue overview", 500)
   }
 }
 
@@ -327,12 +265,16 @@ export const getProviderRevenueService = async () => {
 
     const result = await Promise.all(
       revenueByProvider.map(async (item) => {
-        const provider = await prisma.user.findUnique({
-          where: { id: item.providerId },
-        })
+        const provider = item.providerId
+          ? await prisma.user.findUnique({
+              where: { id: item.providerId },
+            })
+          : null
         return {
           providerId: item.providerId,
-          name: provider?.name || "Unknown",
+          name:
+            provider?.name ||
+            (item.providerId ? "Unknown" : "Platform / Government"),
           revenue: item._sum.providerAmount || 0,
           commission: item._sum.commission || 0,
         }

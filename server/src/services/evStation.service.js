@@ -450,17 +450,6 @@ export const getStationRatingsService = async (stationId) => {
   }
 }
 
-export const getStationTariffsService = async (stationId) => {
-  try {
-    const tariffs = await prisma.tariff.findMany({
-      where: { stationId: Number(stationId) },
-    })
-    return successResponse("Tariffs retrieved successfully", tariffs, 200)
-  } catch (error) {
-    console.error("Error fetching tariffs:", error)
-    return errorResponse("Failed to fetch tariffs", 500)
-  }
-}
 
 export const bulkCreateChargingPointsService = async (data) => {
   try {

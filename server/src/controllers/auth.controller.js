@@ -376,16 +376,6 @@ export const googleCallback = async (req, res) => {
   }
 }
 
-export const appleCallback = async (req, res) => {
-  try {
-    const user = req.user
-
-    return issueTokens(user, req, res)
-  } catch (err) {
-    console.error("Apple login failed:", err)
-    return res.status(500).json({ message: "Apple login failed" })
-  }
-}
 
 export const refreshToken = async (req, res) => {
   try {
@@ -814,22 +804,6 @@ export const logoutAll = async (req, res) => {
   }
 }
 
-export const suspendUser = async (req, res) => {
-  const { userId, reason } = req.body
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      isSuspended: true,
-      suspendedAt: new Date(),
-      suspensionReason: reason,
-    },
-  })
-  await prisma.session.updateMany({
-    where: { userId },
-    data: { revoked: true },
-  })
-  res.json({ message: "User suspended successfully" })
-}
 
 // Get all active sessions for the logged-in user
 export const getSessions = async (req, res) => {

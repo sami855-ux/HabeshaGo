@@ -41,10 +41,4 @@ router.post("/mpesa/topup", authenticate, topUpMpesa)
 // webhook (NO auth - M-Pesa server)
 router.post("/mpesa/callback", mpesaCallback)
 
-// =============================
-// TELEBIRR (future ready)
-// =============================
-// router.post("/telebirr/topup", authenticate, topUpTelebirr)
-// router.post("/telebirr/callback", telebirrCallback)
-
 export default router

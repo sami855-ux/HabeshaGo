@@ -13,17 +13,15 @@ import {
   getDailyRevenueController,
   getProviderRevenueController,
 } from "../controllers/user.controller.js"
-import { authenticate } from "../middlewares/authenticate.js"
+import { authenticate, requireAdmin } from "../middlewares/authenticate.js"
 import { upload } from "../config/multer.js"
 
 const router = express.Router()
 
-// Define user-related routes here
-
 // Get all users for the administrator
-router.get("/", getAllUsers)
+router.get("/", authenticate, requireAdmin, getAllUsers)
 
-//update user
+// Update user profile
 router.patch(
   "/me/profile",
   authenticate,
@@ -31,34 +29,65 @@ router.patch(
   updateMyProfile,
 )
 
-//Get formatted user for the drivers page
-router.get("/formatted-users", getformattedUsers)
+// Get formatted users for the drivers page
+router.get("/formatted-users", authenticate, getformattedUsers)
 
 // GET /api/users/by-phone?phone=+2519
-router.get("/by-phone", getUsersByPhone)
+router.get("/by-phone", authenticate, getUsersByPhone)
 
-//Send OTP for email or phone verification
+// Send OTP for email or phone verification
 router.post("/me/send-otp", authenticate, sendOtp)
 
-//Verify OTP for email
+// Verify OTP for email
 router.post("/me/verify-otp", authenticate, verifyOtp)
 
-// Verify Phone otp
+// Verify Phone OTP
 router.post("/me/phone/verify", authenticate, verifyOtpPhone)
 
-//Delete user (soft delete)
-router.delete("/:id", deleteUser)
+// Delete user (soft delete) - Admin only
+router.delete("/:id", authenticate, requireAdmin, deleteUser)
 
-//Stats
+// Stats
 router.get("/transport-stats", authenticate, getTransportStats)
 
-//ADMIN
-router.get("/admin/finance/revenue-overview", getRevenueOverviewController)
+// Revenue overview (admin)
+router.get(
+  "/admin/finance/revenue-overview",
+  authenticate,
+  requireAdmin,
+  getRevenueOverviewController,
+)
+router.get(
+  "/admin/finance/revenue-overview/daily",
+  authenticate,
+  requireAdmin,
+  getDailyRevenueController,
+)
+router.get(
+  "/admin/finance/revenue-overview/providers",
+  authenticate,
+  requireAdmin,
+  getProviderRevenueController,
+)
 
-// GET /api/admin/finance/revenue-overview/daily?days=30
-router.get("/revenue-overview/daily", getDailyRevenueController)
-
-// GET /api/admin/finance/revenue-overview/providers
-router.get("/revenue-overview/providers", getProviderRevenueController)
+// Aliases
+router.get(
+  "/revenue-overview",
+  authenticate,
+  requireAdmin,
+  getRevenueOverviewController,
+)
+router.get(
+  "/revenue-overview/daily",
+  authenticate,
+  requireAdmin,
+  getDailyRevenueController,
+)
+router.get(
+  "/revenue-overview/providers",
+  authenticate,
+  requireAdmin,
+  getProviderRevenueController,
+)
 
 export default router

@@ -187,21 +187,6 @@ export const assignVehicleToDriver = async (req, res) => {
   }
 }
 
-// TOGGLE DUTY STATUS (DRIVER)
-export const toggleDriverDuty = async (req, res) => {
-  try {
-    const result = await toggleDriverDutyService(req.user.id)
-    return res.status(result.statusCode).json(result)
-  } catch (error) {
-    console.error("Toggle driver duty controller error:", error)
-    return res.status(500).json({
-      success: false,
-      statusCode: 500,
-      message: "Internal server error while updating duty status",
-      data: null,
-    })
-  }
-}
 
 // BLOCK / UNBLOCK DRIVER (ADMIN)
 export const blockDriver = async (req, res) => {

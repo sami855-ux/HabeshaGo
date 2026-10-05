@@ -107,5 +107,7 @@ export const sendOTP = async (user, otpType = "login") => {
 
   console.log("Resend OTP email result:", result.data)
 
-  return code // dev-only (remove in production)
+  // Only return raw code in development (for testing)
+  if (process.env.NODE_ENV !== "production") return code
+  return null
 }

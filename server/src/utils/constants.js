@@ -1,14 +1,20 @@
 export const POINTS_CONVERSION_RATE = 0.5
 export const ADMIN_WALLET_ID = 2
 export const COMMISSION_RATE = 0.1
-export const DEFAULT_DRIVER_ID = "cmmhx2xt70000bpqgk6bb1kbq"
-export const MAX_TICKETS_PER_USER = 5
+
+export const STAFF_ROLES = [
+  "DRIVER",
+  "ADMIN",
+  "EV_CHARGER_MANAGER",
+  "PARKING_MANAGER",
+]
 
 export const REQUIRED_ENV = [
   "DATABASE_URL",
   "PORT",
   "JWT_SECRET",
   "JWT_REFRESH_SECRET",
+  "SESSION_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "CHAPA_SECRET_KEY",

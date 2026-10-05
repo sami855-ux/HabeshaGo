@@ -1,15 +1,17 @@
+import "dotenv/config"
 import passport from "passport"
 import { Strategy as GoogleStrategy } from "passport-google-oauth20"
 import prisma from "../prisma/client.js"
 
 //  GOOGLE STRATEGY
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
-    },
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "/api/auth/google/callback",
+      },
     async (accessToken, refreshToken, profile, done) => {
       try {
         let user = await prisma.user.findUnique({
@@ -51,8 +53,8 @@ passport.use(
         done(err, null)
       }
     },
-  ),
-)
+  ))
+}
 
 //  SESSION HANDLING
 passport.serializeUser((user, done) => done(null, user.id))

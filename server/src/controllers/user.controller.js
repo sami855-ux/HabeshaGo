@@ -10,7 +10,7 @@ import {
   verifyOtpService,
 } from "../services/user.service.js"
 import admin from "../config/firebaseAdmin.js"
-import { errorResponse } from "../utils/apiResponse.js"
+import { errorResponse, successResponse } from "../utils/apiResponse.js"
 
 /**
  * Controller: Get all users
@@ -239,7 +239,7 @@ export const verifyOtpPhone = async (req, res) => {
     const { idToken } = req.body
 
     if (!idToken) {
-      return errorResponse(res, "ID token is required", 400)
+      return res.status(400).json(errorResponse("ID token is required", 400))
     }
 
     // Verify Firebase OTP token
@@ -248,7 +248,7 @@ export const verifyOtpPhone = async (req, res) => {
     const phone = decoded.phone_number
 
     if (!phone) {
-      return errorResponse(res, "Invalid phone number", 400)
+      return res.status(400).json(errorResponse("Invalid phone number", 400))
     }
 
     // Find user by phone
@@ -256,9 +256,8 @@ export const verifyOtpPhone = async (req, res) => {
       where: { phone },
     })
 
-    console.log(user, phone)
     if (!user) {
-      return errorResponse(res, "User not found", 404)
+      return res.status(404).json(errorResponse("User not found", 404))
     }
 
     // Update phone verification
@@ -276,7 +275,7 @@ export const verifyOtpPhone = async (req, res) => {
     })
   } catch (err) {
     console.error("verifyOtpPhone error:", err)
-    return errorResponse(res, "OTP verification failed", 401)
+    return res.status(401).json(errorResponse("OTP verification failed", 401))
   }
 }
 
@@ -298,6 +297,7 @@ export const getTransportStats = async (req, res) => {
       lastMonthTrips,
       activeBusReservations,
       activeEVReservations,
+      activeParkingReservations,
       wallet,
     ] = await Promise.all([
       prisma.booking.count({
@@ -337,6 +337,14 @@ export const getTransportStats = async (req, res) => {
         },
       }),
 
+      prisma.parkingReservation.count({
+        where: {
+          userId,
+          status: "CONFIRMED",
+          expiresAt: { gte: now },
+        },
+      }),
+
       prisma.wallet.findUnique({
         where: { userId },
         select: { balance: true, currency: true },
@@ -344,8 +352,6 @@ export const getTransportStats = async (req, res) => {
     ])
 
     const trend = thisMonthTrips - lastMonthTrips
-
-    const activeParkingReservations = 0
 
     const totalActiveReservations =
       activeBusReservations + activeEVReservations + activeParkingReservations
@@ -364,7 +370,7 @@ export const getTransportStats = async (req, res) => {
 
     res.json(stats)
   } catch (error) {
-    console.error(error)
+    console.error("Error fetching transport stats:", error)
     res.status(500).json({ message: "Failed to fetch transport stats" })
   }
 }
@@ -374,11 +380,11 @@ export const getformattedUsers = async (req, res) => {
     const result = await getFormattedPassengersService()
     return res.status(result.statusCode).json(result)
   } catch (error) {
-    console.error("Get wallet controller error:", error)
+    console.error("Get formatted users controller error:", error)
     return res.status(500).json({
       success: false,
       statusCode: 500,
-      message: "Internal server error while fetching wallet",
+      message: "Internal server error while fetching formatted users",
       data: null,
     })
   }
@@ -389,11 +395,11 @@ export const getRevenueOverviewController = async (req, res) => {
     const result = await getRevenueOverview()
     return res.status(result.statusCode).json(result)
   } catch (error) {
-    console.error("Get wallet controller error:", error)
+    console.error("Get revenue overview controller error:", error)
     return res.status(500).json({
       success: false,
       statusCode: 500,
-      message: "Internal server error while fetching wallet",
+      message: "Internal server error while fetching revenue overview",
       data: null,
     })
   }

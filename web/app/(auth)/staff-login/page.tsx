@@ -1,13 +1,11 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useTransition } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useDispatch } from "react-redux"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import {
-  Shield,
-  ShieldCheck,
   Lock,
   Mail,
   KeyRound,
@@ -24,12 +22,8 @@ import {
   Smartphone,
   CheckCircle2,
   Sparkles,
-  Zap,
-  Car,
-  SquareParking,
-  FileText,
+  ShieldCheck,
   X,
-  ExternalLink,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -53,39 +47,11 @@ import {
   staffEnableTOTPApi,
 } from "@/services/staff.auth.api"
 
-// Role visual configurations
-const ROLE_CONFIGS = [
-  {
-    role: "ADMIN",
-    label: "Administrator",
-    icon: ShieldCheck,
-    color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10",
-  },
-  {
-    role: "DRIVER",
-    label: "Fleet Driver",
-    icon: Car,
-    color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
-  },
-  {
-    role: "EV_CHARGER_MANAGER",
-    label: "EV Charging Manager",
-    icon: Zap,
-    color: "text-amber-400 border-amber-500/30 bg-amber-500/10",
-  },
-  {
-    role: "PARKING_MANAGER",
-    label: "Parking Manager",
-    icon: SquareParking,
-    color: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10",
-  },
-]
-
 export default function StaffLoginPage() {
   const router = useRouter()
   const dispatch = useDispatch()
 
-  // State Step: 1 = Credentials, 2 = MFA Verification
+  // State Step: 1 = Credentials, 2 = MFA Verification / 2FA Setup
   const [step, setStep] = useState<1 | 2>(1)
 
   // Step 1: Form state
@@ -109,8 +75,10 @@ export default function StaffLoginPage() {
   } | null>(null)
   const [devOtp, setDevOtp] = useState<string | null>(null)
 
-  // Verification tab: "totp" | "phrase" | "email"
-  const [mfaTab, setMfaTab] = useState<"totp" | "phrase" | "email">("totp")
+  // Verification tab: "totp" | "phrase" | "email" | "setup"
+  const [mfaTab, setMfaTab] = useState<"totp" | "phrase" | "email" | "setup">(
+    "totp",
+  )
   const [totpCode, setTotpCode] = useState("")
   const [recoveryPhrase, setRecoveryPhrase] = useState("")
   const [emailOtpCode, setEmailOtpCode] = useState("")
@@ -201,7 +169,7 @@ export default function StaffLoginPage() {
     setFormError("")
 
     if (!email || !password) {
-      setFormError("Please enter both email and password")
+      setFormError("Please enter both work email and password")
       return
     }
 
@@ -224,7 +192,7 @@ export default function StaffLoginPage() {
       setDevOtp(res.data.devOtp || null)
       setSessionSeconds(res.data.expiresIn || 300)
 
-      // Set initial verification tab
+      // If user already has TOTP configured, tab to 'totp'; otherwise tab to 'email'
       if (res.data.mfaMethod === "TOTP_OR_EMAIL") {
         setMfaTab("totp")
       } else {
@@ -234,7 +202,7 @@ export default function StaffLoginPage() {
       setStep(2)
       setResendCooldown(60)
       setCanResend(false)
-      toast.success("Credentials verified! Please complete MFA.")
+      toast.success("Credentials verified! Please complete verification.")
     } catch (err: any) {
       setFormError("An unexpected error occurred. Please try again.")
     } finally {
@@ -328,7 +296,7 @@ export default function StaffLoginPage() {
   }
 
   // -------------------------------------------------------------
-  // Load TOTP Setup Details (Modal)
+  // Load TOTP Setup Details (Modal, after email & password)
   // -------------------------------------------------------------
   const openSetupModal = async () => {
     setShowSetupModal(true)
@@ -337,7 +305,7 @@ export default function StaffLoginPage() {
     setSetupLoading(true)
 
     try {
-      const res = await staffSetupTOTPApi()
+      const res = await staffSetupTOTPApi(mfaToken)
       if (res.success && res.data) {
         setSetupData(res.data)
       } else {
@@ -350,7 +318,7 @@ export default function StaffLoginPage() {
     }
   }
 
-  // Confirm TOTP in Modal
+  // Confirm TOTP in Modal & Auto-complete login
   const handleEnableTOTP = async () => {
     if (!setupTestCode || setupTestCode.length !== 6) {
       toast.error("Please enter the 6-digit code from Google Authenticator")
@@ -359,10 +327,18 @@ export default function StaffLoginPage() {
 
     setSetupActivating(true)
     try {
-      const res = await staffEnableTOTPApi(setupTestCode)
+      const res = await staffEnableTOTPApi(setupTestCode, mfaToken)
       if (res.success) {
         setSetupSuccess(true)
         toast.success("Google Authenticator successfully activated!")
+        setMfaMethod("TOTP_OR_EMAIL")
+        setMfaTab("totp")
+
+        // Automatically log in with the verified 6-digit code
+        setTimeout(() => {
+          setShowSetupModal(false)
+          handleVerifyMFA(setupTestCode)
+        }, 1000)
       } else {
         toast.error(res.message || "Invalid 6-digit code")
       }
@@ -419,322 +395,336 @@ export default function StaffLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden select-none">
-      {/* Background Ambient Glow Effects */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-600/15 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] bg-cyan-600/15 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-indigo-600/10 rounded-full blur-[160px] pointer-events-none" />
-
-      {/* Top Navigation Bar */}
-      <header className="relative z-10 w-full px-6 py-5 max-w-7xl mx-auto flex items-center justify-between border-b border-slate-800/60 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Shield className="h-5 w-5 text-slate-950 font-bold" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-white">
-                Habesha<span className="text-emerald-400">Go</span>
-              </span>
-              <Badge
-                variant="outline"
-                className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5"
-              >
-                Staff Portal
-              </Badge>
-            </div>
-            <p className="text-[11px] text-slate-400 font-medium">
-              Enterprise Operations & Security Gateway
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/login")}
-            className="text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
-          >
-            Passenger Login
-          </Button>
-          <div className="h-4 w-px bg-slate-800" />
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>256-bit Encrypted</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          {/* Staff Roles Preview Chips */}
-          <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
-            {ROLE_CONFIGS.map((rc) => {
-              const Icon = rc.icon
-              return (
-                <div
-                  key={rc.role}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all backdrop-blur-sm",
-                    rc.color,
-                  )}
+    <div className="min-h-screen bg-slate-50/60 text-slate-900 flex items-center justify-center p-4 selection:bg-orange-500/15 selection:text-orange-900 relative">
+      {/* Centered Flat Card with NO Shadow */}
+      <div className="w-full max-w-md mx-auto">
+        <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+          <CardContent className="p-7 sm:p-8">
+            <AnimatePresence mode="wait">
+              {/* -------------------------------------------------------- */}
+              {/* STEP 1: EMAIL & PASSWORD CREDENTIALS                     */}
+              {/* -------------------------------------------------------- */}
+              {step === 1 && (
+                <motion.div
+                  key="step-credentials"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
                 >
-                  <Icon className="h-3 w-3" />
-                  <span>{rc.label}</span>
-                </div>
-              )
-            })}
-          </div>
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex items-center gap-2 mb-1">
+                      <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                        Habesha<span className="text-orange-500">Go</span>
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-200">
+                        Staff
+                      </span>
+                    </div>
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight font-jakarta">
+                      Staff Sign In
+                    </h1>
+                    <p className="text-xs text-slate-500">
+                      Enter your work email and password to continue.
+                    </p>
+                  </div>
 
-          {/* Central Glass Card */}
-          <Card className="bg-slate-900/80 border-slate-800/80 shadow-2xl backdrop-blur-2xl rounded-2xl overflow-hidden">
-            <CardContent className="p-7 sm:p-8">
-              <AnimatePresence mode="wait">
-                {/* -------------------------------------------------------- */}
-                {/* STEP 1: EMAIL & PASSWORD CREDENTIALS                     */}
-                {/* -------------------------------------------------------- */}
-                {step === 1 && (
-                  <motion.div
-                    key="step-credentials"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.25 }}
-                    className="space-y-6"
-                  >
-                    <div className="text-center space-y-1.5">
-                      <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-2">
-                        <Lock className="h-6 w-6" />
+                  {formError && (
+                    <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-red-700 text-xs animate-in fade-in">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleLoginSubmit} className="space-y-4">
+                    {/* Email Field */}
+                    <div className="space-y-1.5 text-left">
+                      <Label
+                        htmlFor="staff-email"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        Work Email
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                          id="staff-email"
+                          type="email"
+                          autoComplete="username"
+                          placeholder="name@habeshago.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pl-10 h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 text-sm rounded-xl transition-colors"
+                          required
+                        />
                       </div>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">
-                        Staff Sign In
-                      </h2>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                        Enter your official staff credentials to begin two-factor
-                        authentication.
-                      </p>
                     </div>
 
-                    {formError && (
-                      <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-rose-300 text-xs animate-in fade-in">
-                        <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
-                        <span>{formError}</span>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleLoginSubmit} className="space-y-4">
-                      {/* Email Field */}
-                      <div className="space-y-1.5 text-left">
+                    {/* Password Field */}
+                    <div className="space-y-1.5 text-left">
+                      <div className="flex items-center justify-between">
                         <Label
-                          htmlFor="staff-email"
-                          className="text-xs font-semibold text-slate-300"
+                          htmlFor="staff-password"
+                          className="text-xs font-semibold text-slate-700"
                         >
-                          Work Email
+                          Password
                         </Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                          <Input
-                            id="staff-email"
-                            type="email"
-                            autoComplete="username"
-                            placeholder="admin@habeshago.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="pl-10 h-12 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500 text-sm rounded-xl"
-                            required
-                          />
-                        </div>
+                        {capsLockActive && (
+                          <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                            Caps Lock is ON
+                          </span>
+                        )}
                       </div>
-
-                      {/* Password Field */}
-                      <div className="space-y-1.5 text-left">
-                        <div className="flex items-center justify-between">
-                          <Label
-                            htmlFor="staff-password"
-                            className="text-xs font-semibold text-slate-300"
-                          >
-                            Password
-                          </Label>
-                          {capsLockActive && (
-                            <span className="text-[11px] text-amber-400 font-medium flex items-center gap-1">
-                              Caps Lock is ON
-                            </span>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                          id="staff-password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          placeholder="••••••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          className="pl-10 pr-10 h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 text-sm rounded-xl transition-colors"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
                           )}
-                        </div>
-                        <div className="relative">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                          <Input
-                            id="staff-password"
-                            type={showPassword ? "text" : "password"}
-                            autoComplete="current-password"
-                            placeholder="••••••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            className="pl-10 pr-10 h-12 bg-slate-950/60 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500 text-sm rounded-xl"
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <Button
+                      type="submit"
+                      disabled={loginPending}
+                      className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer shadow-none mt-2"
+                    >
+                      {loginPending ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                          <span>Verifying Credentials...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Continue</span>
+                          <ArrowRight className="h-4 w-4 text-white" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* -------------------------------------------------------- */}
+              {/* STEP 2: MFA VERIFICATION & 2FA SETUP (AFTER CREDENTIALS) */}
+              {/* -------------------------------------------------------- */}
+              {step === 2 && (
+                <motion.div
+                  key="step-mfa"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
+                  {/* Header with Back button and Session Timer */}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setStep(1)
+                        setTotpCode("")
+                        setRecoveryPhrase("")
+                        setEmailOtpCode("")
+                      }}
+                      className="text-xs text-slate-600 hover:text-slate-900 -ml-2 h-8 px-2 flex items-center gap-1 hover:bg-slate-100 rounded-lg cursor-pointer"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      <span>Change Account</span>
+                    </Button>
+
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span>
+                        {Math.floor(sessionSeconds / 60)}:
+                        {(sessionSeconds % 60).toString().padStart(2, "0")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Staff User Banner */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-left">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-slate-900">
+                        {mfaUser?.name || "Staff Member"}
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-mono">
+                        {mfaUser?.email}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="bg-orange-50 text-orange-700 border-orange-200 text-[10px] font-mono uppercase font-semibold"
+                    >
+                      {mfaUser?.role}
+                    </Badge>
+                  </div>
+
+                  {/* Dev Mode Code Helper (if provided by dev server) */}
+                  {devOtp && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between text-amber-800 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-amber-600" />
+                        <span>Dev Code:</span>
+                        <span className="font-mono font-bold tracking-widest text-amber-900">
+                          {devOtp}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEmailOtpCode(devOtp)
+                          setTotpCode(devOtp)
+                          toast.success("Dev code auto-filled!")
+                        }}
+                        className="h-6 text-[10px] border-amber-300 text-amber-800 hover:bg-amber-100 px-2"
+                      >
+                        Auto Fill
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* If user does NOT have 2FA setup yet */}
+                  {mfaMethod === "EMAIL_OTP" ? (
+                    <div className="space-y-5">
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Verify Your Identity
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Enter the 6-digit code sent to{" "}
+                          <strong>{mfaUser?.email}</strong>
+                        </p>
                       </div>
 
-                      {/* Submit Button */}
+                      {/* 6-Digit Email OTP Input */}
+                      <div className="flex justify-center py-1">
+                        <InputOTP
+                          maxLength={6}
+                          value={emailOtpCode}
+                          onChange={(val) => setEmailOtpCode(val)}
+                          disabled={verifyPending}
+                        >
+                          <InputOTPGroup className="gap-2">
+                            <InputOTPSlot
+                              index={0}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                            <InputOTPSlot
+                              index={1}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                            <InputOTPSlot
+                              index={2}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                            <InputOTPSlot
+                              index={3}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                            <InputOTPSlot
+                              index={4}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                            <InputOTPSlot
+                              index={5}
+                              className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
+                            />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+
                       <Button
-                        type="submit"
-                        disabled={loginPending}
-                        className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer mt-2"
+                        onClick={() => handleVerifyMFA(emailOtpCode)}
+                        disabled={verifyPending || emailOtpCode.length !== 6}
+                        className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm cursor-pointer shadow-none transition-colors"
                       >
-                        {loginPending ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
-                            <span>Verifying Credentials...</span>
-                          </>
+                        {verifyPending ? (
+                          <RefreshCw className="h-4 w-4 animate-spin text-white" />
                         ) : (
-                          <>
-                            <span>Continue to MFA</span>
-                            <ArrowRight className="h-4 w-4 text-slate-950 font-bold" />
-                          </>
+                          "Verify Code"
                         )}
                       </Button>
-                    </form>
 
-                    {/* Bottom Links */}
-                    <div className="pt-2 text-center border-t border-slate-800/60 space-y-2">
-                      <p className="text-xs text-slate-400">
-                        First time setting up your Authenticator app?{" "}
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                        {canResend ? (
+                          <button
+                            type="button"
+                            onClick={handleResendEmailMFA}
+                            disabled={resending}
+                            className="text-orange-600 hover:text-orange-700 font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <RefreshCw
+                              className={cn(
+                                "h-3 w-3",
+                                resending && "animate-spin",
+                              )}
+                            />
+                            <span>Resend Code</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">
+                            Resend code in {resendCooldown}s
+                          </span>
+                        )}
+
                         <button
                           type="button"
                           onClick={openSetupModal}
-                          className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+                          className="text-orange-600 hover:text-orange-700 font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          Setup 2FA QR Code
+                          <QrCode className="h-3.5 w-3.5" />
+                          <span>Set Up 2FA App</span>
                         </button>
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Authorized staff roles only. Violators are subject to
-                        monitoring and legal reporting.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* -------------------------------------------------------- */}
-                {/* STEP 2: MULTI-FACTOR AUTHENTICATION (MFA)                */}
-                {/* -------------------------------------------------------- */}
-                {step === 2 && (
-                  <motion.div
-                    key="step-mfa"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.25 }}
-                    className="space-y-6"
-                  >
-                    {/* Header with Back button and Session Timer */}
-                    <div className="flex items-center justify-between">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setStep(1)
-                          setTotpCode("")
-                          setRecoveryPhrase("")
-                          setEmailOtpCode("")
-                        }}
-                        className="text-xs text-slate-400 hover:text-white -ml-2 h-8 px-2 flex items-center gap-1"
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        <span>Change Account</span>
-                      </Button>
-
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] font-mono text-slate-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        <span>
-                          {Math.floor(sessionSeconds / 60)}:
-                          {(sessionSeconds % 60).toString().padStart(2, "0")}
-                        </span>
                       </div>
                     </div>
-
-                    {/* Staff User Banner */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-left">
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-semibold text-white">
-                          {mfaUser?.name || "Staff Member"}
-                        </p>
-                        <p className="text-[11px] text-slate-400 font-mono">
-                          {mfaUser?.email}
-                        </p>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] font-mono uppercase"
-                      >
-                        {mfaUser?.role}
-                      </Badge>
-                    </div>
-
-                    {/* Dev Mode Code Helper (if provided by dev server) */}
-                    {devOtp && (
-                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-300 text-xs">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-amber-400" />
-                          <span>Dev Code:</span>
-                          <span className="font-mono font-bold tracking-widest text-amber-200">
-                            {devOtp}
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEmailOtpCode(devOtp)
-                            setTotpCode(devOtp)
-                            toast.success("Dev code auto-filled!")
-                          }}
-                          className="h-6 text-[10px] border-amber-500/40 text-amber-300 hover:bg-amber-500/20 px-2"
-                        >
-                          Auto Fill
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* MFA Method Selection Tabs */}
+                  ) : (
+                    /* User HAS TOTP 2FA configured */
                     <Tabs
                       value={mfaTab}
                       onValueChange={(val: any) => setMfaTab(val)}
                       className="w-full"
                     >
-                      <TabsList className="grid grid-cols-3 w-full bg-slate-950/80 border border-slate-800 rounded-xl p-1 h-auto">
+                      <TabsList className="grid grid-cols-3 w-full bg-slate-100 border border-slate-200 rounded-xl p-1 h-auto">
                         <TabsTrigger
                           value="totp"
-                          className="text-[11px] py-2 data-[state=active]:bg-emerald-500 data-[state=active]:text-slate-950 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                          className="text-[11px] py-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-slate-200 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
                         >
                           <Smartphone className="h-3.5 w-3.5" />
                           <span>App Code</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="phrase"
-                          className="text-[11px] py-2 data-[state=active]:bg-emerald-500 data-[state=active]:text-slate-950 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                          className="text-[11px] py-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-slate-200 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
                         >
                           <KeyRound className="h-3.5 w-3.5" />
                           <span>Recovery</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="email"
-                          className="text-[11px] py-2 data-[state=active]:bg-emerald-500 data-[state=active]:text-slate-950 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                          className="text-[11px] py-2 data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-slate-200 font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
                         >
                           <Mail className="h-3.5 w-3.5" />
                           <span>Email OTP</span>
@@ -744,15 +734,15 @@ export default function StaffLoginPage() {
                       {/* TAB 1: Authenticator App TOTP */}
                       <TabsContent value="totp" className="mt-5 space-y-4">
                         <div className="text-center space-y-1">
-                          <p className="text-sm font-semibold text-white">
+                          <p className="text-sm font-semibold text-slate-900">
                             Google Authenticator
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-500">
                             Enter the 6-digit code showing on your phone app.
                           </p>
                         </div>
 
-                        <div className="flex justify-center py-2">
+                        <div className="flex justify-center py-1">
                           <InputOTP
                             maxLength={6}
                             value={totpCode}
@@ -762,27 +752,27 @@ export default function StaffLoginPage() {
                             <InputOTPGroup className="gap-2">
                               <InputOTPSlot
                                 index={0}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={1}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={2}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={3}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={4}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={5}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                             </InputOTPGroup>
                           </InputOTP>
@@ -791,10 +781,10 @@ export default function StaffLoginPage() {
                         <Button
                           onClick={() => handleVerifyMFA(totpCode)}
                           disabled={verifyPending || totpCode.length !== 6}
-                          className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 text-sm cursor-pointer"
+                          className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm cursor-pointer shadow-none transition-colors"
                         >
                           {verifyPending ? (
-                            <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
+                            <RefreshCw className="h-4 w-4 animate-spin text-white" />
                           ) : (
                             "Verify & Enter Portal"
                           )}
@@ -804,10 +794,10 @@ export default function StaffLoginPage() {
                           <button
                             type="button"
                             onClick={openSetupModal}
-                            className="text-xs text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+                            className="text-xs text-slate-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1 cursor-pointer"
                           >
-                            <QrCode className="h-3 w-3" />
-                            <span>Scan QR Code to setup on this device</span>
+                            <QrCode className="h-3.5 w-3.5" />
+                            <span>Re-scan QR Code to setup on new device</span>
                           </button>
                         </div>
                       </TabsContent>
@@ -815,12 +805,12 @@ export default function StaffLoginPage() {
                       {/* TAB 2: Recovery Phrase */}
                       <TabsContent value="phrase" className="mt-5 space-y-4">
                         <div className="text-center space-y-1">
-                          <p className="text-sm font-semibold text-white">
+                          <p className="text-sm font-semibold text-slate-900">
                             Single-Use Recovery Phrase
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-500">
                             Lost phone? Enter any one of your 8 saved backup
-                            phrases (e.g. <code>falcon-ember-482</code>).
+                            phrases.
                           </p>
                         </div>
 
@@ -834,7 +824,7 @@ export default function StaffLoginPage() {
                               onChange={(e) =>
                                 setRecoveryPhrase(e.target.value.toLowerCase())
                               }
-                              className="pl-10 h-12 bg-slate-950/80 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-emerald-500/50 font-mono text-sm rounded-xl"
+                              className="pl-10 h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 font-mono text-sm rounded-xl transition-colors"
                             />
                           </div>
                         </div>
@@ -842,33 +832,28 @@ export default function StaffLoginPage() {
                         <Button
                           onClick={() => handleVerifyMFA(recoveryPhrase)}
                           disabled={verifyPending || !recoveryPhrase.trim()}
-                          className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 text-sm cursor-pointer"
+                          className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm cursor-pointer shadow-none transition-colors"
                         >
                           {verifyPending ? (
-                            <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
+                            <RefreshCw className="h-4 w-4 animate-spin text-white" />
                           ) : (
                             "Authenticate with Recovery Phrase"
                           )}
                         </Button>
-
-                        <p className="text-[11px] text-slate-500 text-center">
-                          Note: A recovery phrase is immediately burned upon
-                          login and cannot be reused.
-                        </p>
                       </TabsContent>
 
                       {/* TAB 3: Email OTP Fallback */}
                       <TabsContent value="email" className="mt-5 space-y-4">
                         <div className="text-center space-y-1">
-                          <p className="text-sm font-semibold text-white">
+                          <p className="text-sm font-semibold text-slate-900">
                             Email Verification Code
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-500">
                             Sent to <strong>{mfaUser?.email}</strong>
                           </p>
                         </div>
 
-                        <div className="flex justify-center py-2">
+                        <div className="flex justify-center py-1">
                           <InputOTP
                             maxLength={6}
                             value={emailOtpCode}
@@ -878,27 +863,27 @@ export default function StaffLoginPage() {
                             <InputOTPGroup className="gap-2">
                               <InputOTPSlot
                                 index={0}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={1}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={2}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={3}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={4}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                               <InputOTPSlot
                                 index={5}
-                                className="h-13 w-11 text-lg font-mono font-bold bg-slate-950/80 border-slate-800 rounded-lg text-emerald-400"
+                                className="h-12 w-10 sm:w-11 text-lg font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900 data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20 shadow-none"
                               />
                             </InputOTPGroup>
                           </InputOTP>
@@ -907,10 +892,10 @@ export default function StaffLoginPage() {
                         <Button
                           onClick={() => handleVerifyMFA(emailOtpCode)}
                           disabled={verifyPending || emailOtpCode.length !== 6}
-                          className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 text-sm cursor-pointer"
+                          className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm cursor-pointer shadow-none transition-colors"
                         >
                           {verifyPending ? (
-                            <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
+                            <RefreshCw className="h-4 w-4 animate-spin text-white" />
                           ) : (
                             "Verify Email Code"
                           )}
@@ -922,7 +907,7 @@ export default function StaffLoginPage() {
                               type="button"
                               onClick={handleResendEmailMFA}
                               disabled={resending}
-                              className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                              className="text-orange-600 hover:text-orange-700 font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                               <RefreshCw
                                 className={cn(
@@ -933,53 +918,53 @@ export default function StaffLoginPage() {
                               <span>Resend Email Code</span>
                             </button>
                           ) : (
-                            <span className="text-slate-500">
+                            <span className="text-slate-400">
                               Resend code in {resendCooldown}s
                             </span>
                           )}
                         </div>
                       </TabsContent>
                     </Tabs>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 2FA SETUP MODAL (SCAN QR CODE & SAVE RECOVERY PHRASES)        */}
+      {/* 2FA SETUP MODAL (AFTER EMAIL & PASSWORD VERIFICATION)         */}
       {/* ------------------------------------------------------------- */}
       <AnimatePresence>
         {showSetupModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-y-auto max-h-[90vh]"
+              className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-none relative overflow-y-auto max-h-[90vh]"
             >
               {/* Close Button */}
               <button
                 type="button"
                 onClick={() => setShowSetupModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
 
               {/* Modal Header */}
               <div className="text-left space-y-1 mb-6">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-semibold">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>Two-Factor Authentication Setup</span>
+                  <span>Set Up Two-Factor Authentication</span>
                 </div>
-                <h3 className="text-2xl font-bold text-white tracking-tight">
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight font-jakarta">
                   Google Authenticator & Backup Phrases
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Scan the QR code with Google Authenticator or Authy, and save
                   your emergency recovery phrases offline.
                 </p>
@@ -987,24 +972,24 @@ export default function StaffLoginPage() {
 
               {setupLoading ? (
                 <div className="py-16 text-center space-y-3">
-                  <RefreshCw className="h-8 w-8 animate-spin text-emerald-400 mx-auto" />
-                  <p className="text-xs text-slate-400">
+                  <RefreshCw className="h-8 w-8 animate-spin text-orange-500 mx-auto" />
+                  <p className="text-xs text-slate-500">
                     Generating cryptographic secret and recovery phrases...
                   </p>
                 </div>
               ) : setupData ? (
                 <div className="space-y-6">
                   {/* Step A: QR Code & Manual Secret */}
-                  <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col sm:flex-row items-center gap-6">
-                    <div className="bg-white p-3 rounded-2xl shadow-xl shrink-0">
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-6">
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 shrink-0">
                       {setupData.qrCode ? (
                         <img
                           src={setupData.qrCode}
                           alt="HabeshaGo Google Authenticator QR Code"
-                          className="w-40 h-40 object-contain rounded-lg"
+                          className="w-36 h-36 object-contain rounded-lg"
                         />
                       ) : (
-                        <div className="w-40 h-40 bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
+                        <div className="w-36 h-36 bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
                           No QR Available
                         </div>
                       )}
@@ -1012,21 +997,21 @@ export default function StaffLoginPage() {
 
                     <div className="space-y-3 text-left">
                       <div className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-300">
+                        <span className="text-xs font-semibold text-slate-800">
                           1. Scan with Phone Camera
                         </span>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-500">
                           Open Google Authenticator, tap <strong>"+"</strong>,
                           and select <strong>"Scan a QR code"</strong>.
                         </p>
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-slate-500">
                           Can't scan? Use manual setup key:
                         </span>
                         <div className="flex items-center gap-2">
-                          <code className="text-xs font-mono font-bold text-cyan-300 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 select-all">
+                          <code className="text-xs font-mono font-bold text-orange-700 bg-orange-50/80 px-3 py-1.5 rounded-lg border border-orange-200/80 select-all">
                             {setupData.secret}
                           </code>
                           <Button
@@ -1035,10 +1020,10 @@ export default function StaffLoginPage() {
                             onClick={() =>
                               copyToClipboard(setupData.secret, "secret")
                             }
-                            className="h-8 px-2.5 border-slate-700 text-slate-300 hover:text-white"
+                            className="h-8 px-2.5 border-slate-200 text-slate-700 hover:bg-slate-100"
                           >
                             {copiedSecret ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
                             ) : (
                               <Copy className="h-3.5 w-3.5" />
                             )}
@@ -1052,13 +1037,13 @@ export default function StaffLoginPage() {
                   <div className="space-y-3 text-left">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <KeyRound className="h-4 w-4 text-emerald-400" />
+                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                          <KeyRound className="h-4 w-4 text-orange-500" />
                           <span>2. Save 8 Emergency Recovery Phrases</span>
                         </h4>
-                        <p className="text-[11px] text-slate-400">
-                          Each phrase is single-use. Store them safely in a
-                          password manager or offline note.
+                        <p className="text-[11px] text-slate-500">
+                          Each phrase is single-use. Store them safely offline
+                          or in a password manager.
                         </p>
                       </div>
 
@@ -1069,7 +1054,7 @@ export default function StaffLoginPage() {
                           onClick={() =>
                             downloadRecoveryCard(setupData.recoveryPhrases)
                           }
-                          className="h-8 text-xs border-slate-700 hover:bg-slate-800 text-slate-300 gap-1.5"
+                          className="h-8 text-xs border-slate-200 hover:bg-slate-100 text-slate-700 gap-1.5"
                         >
                           <Download className="h-3.5 w-3.5" />
                           <span>Download .txt</span>
@@ -1083,10 +1068,10 @@ export default function StaffLoginPage() {
                               "phrases",
                             )
                           }
-                          className="h-8 text-xs border-slate-700 hover:bg-slate-800 text-slate-300 gap-1.5"
+                          className="h-8 text-xs border-slate-200 hover:bg-slate-100 text-slate-700 gap-1.5"
                         >
                           {copiedPhrases ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
                           ) : (
                             <Copy className="h-3.5 w-3.5" />
                           )}
@@ -1099,9 +1084,9 @@ export default function StaffLoginPage() {
                       {setupData.recoveryPhrases.map((phrase, idx) => (
                         <div
                           key={idx}
-                          className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center font-mono text-xs text-emerald-300/90 shadow-sm"
+                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xs text-slate-800 shadow-none"
                         >
-                          <span className="text-[10px] text-slate-600 block">
+                          <span className="text-[10px] text-slate-400 block">
                             #{idx + 1}
                           </span>
                           <span className="font-semibold">{phrase}</span>
@@ -1111,17 +1096,16 @@ export default function StaffLoginPage() {
                   </div>
 
                   {/* Step C: Test 6-Digit Code Activation */}
-                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3 text-left">
-                    <span className="text-xs font-semibold text-slate-300 block">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-left">
+                    <span className="text-xs font-semibold text-slate-800 block">
                       3. Confirm Setup with 6-Digit Code from App
                     </span>
 
                     {setupSuccess ? (
-                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                         <span>
-                          Google Authenticator 2FA is now permanently enabled
-                          for your staff account!
+                          2FA activated successfully! Completing your login...
                         </span>
                       </div>
                     ) : (
@@ -1136,19 +1120,19 @@ export default function StaffLoginPage() {
                               e.target.value.replace(/\D/g, "").slice(0, 6),
                             )
                           }
-                          className="h-11 bg-slate-900 border-slate-800 text-center font-mono text-base font-bold tracking-widest text-emerald-400 rounded-xl"
+                          className="h-11 bg-white border-slate-200 text-center font-mono text-base font-bold tracking-widest text-slate-900 rounded-xl focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500"
                         />
                         <Button
                           onClick={handleEnableTOTP}
                           disabled={
                             setupActivating || setupTestCode.length !== 6
                           }
-                          className="w-full sm:w-auto h-11 px-5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shrink-0 cursor-pointer text-xs"
+                          className="w-full sm:w-auto h-11 px-5 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl shrink-0 cursor-pointer text-xs shadow-none transition-colors"
                         >
                           {setupActivating ? (
-                            <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
+                            <RefreshCw className="h-4 w-4 animate-spin text-white" />
                           ) : (
-                            "Activate 2FA"
+                            "Activate & Sign In"
                           )}
                         </Button>
                       </div>
@@ -1160,26 +1144,6 @@ export default function StaffLoginPage() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Footer */}
-      <footer className="relative z-10 w-full py-5 px-6 border-t border-slate-800/60 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
-        <p>© {new Date().getFullYear()} HabeshaGo Inc. All rights reserved.</p>
-        <div className="flex items-center gap-4 text-slate-400">
-          <button
-            onClick={() => router.push("/login")}
-            className="hover:text-white transition-colors"
-          >
-            Passenger App
-          </button>
-          <span>•</span>
-          <a
-            href="mailto:support@habeshago.com"
-            className="hover:text-white transition-colors"
-          >
-            Staff Operations Support
-          </a>
-        </div>
-      </footer>
     </div>
   )
 }

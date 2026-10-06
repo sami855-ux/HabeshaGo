@@ -63,7 +63,7 @@ app.set("trust proxy", 1)
 
 const allowedOrigins = [
   // Web
-  "https://habesha-go-v2.vercel.app",
+  "https://habeshago.vercel.app",
   // Mobile / Expo
   "https://auth.expo.io", // Expo Go OAuth redirect
   `https://auth.expo.io/@samiux855/mobile`, // Your specific app

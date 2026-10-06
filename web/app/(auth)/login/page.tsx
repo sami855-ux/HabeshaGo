@@ -4,32 +4,27 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Loader,
   Send,
-  Sparkles,
   CheckCircle,
   AlertCircle,
   Mail,
   X,
   Phone,
+  ArrowRight,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useEffect, useRef, useState, useTransition, useCallback } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
-import { FaApple } from "react-icons/fa"
-import { continueWithApple, register } from "@/services/auth.user.api"
+import { register } from "@/services/auth.user.api"
 import { AuthSlider } from "@/components/AuthSlider"
 import { cn } from "@/lib/utils"
-import { OAuthProvider, signInWithRedirect } from "firebase/auth"
-import { auth } from "@/lib/firebase"
 
 const COMMON_EMAIL_DOMAINS = [
   "gmail.com",
@@ -39,9 +34,6 @@ const COMMON_EMAIL_DOMAINS = [
   "mail.com",
   "icloud.com",
   "protonmail.com",
-  "aol.com",
-  "yandex.com",
-  "gmx.com",
 ]
 
 const EMAIL_PROVIDERS = {
@@ -51,8 +43,6 @@ const EMAIL_PROVIDERS = {
   hotmail: { domain: "hotmail.com", color: "text-blue-400" },
   icloud: { domain: "icloud.com", color: "text-gray-500" },
 }
-
-const appleProvider = new OAuthProvider("apple.com")
 
 export default function LoginPage() {
   const router = useRouter()
@@ -82,10 +72,10 @@ export default function LoginPage() {
         d.toLowerCase().startsWith(domain.toLowerCase()),
       )
         .map((d) => `${localPart}@${d}`)
-        .slice(0, 5)
+        .slice(0, 4)
     }
-    if (localPart.length > 1) {
-      return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 5)
+    if (localPart.length > 2) {
+      return COMMON_EMAIL_DOMAINS.map((d) => `${localPart}@${d}`).slice(0, 4)
     }
     return []
   }, [])
@@ -124,7 +114,7 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation in suggestions
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showSuggestions) return
 
@@ -155,12 +145,6 @@ export default function LoginPage() {
     setEmail(suggestion)
     setShowSuggestions(false)
     setTouched(true)
-
-    // Auto-validate and submit? (optional)
-    if (validateEmail(suggestion)) {
-      // You could auto-submit here if desired
-      // submitEmailWithValue(suggestion)
-    }
   }
 
   const handleBlur = () => {
@@ -169,7 +153,6 @@ export default function LoginPage() {
       setEmailError("Please enter a valid email address")
     }
 
-    // Delay hiding suggestions to allow click on suggestion
     setTimeout(() => {
       if (!suggestionsRef.current?.contains(document.activeElement)) {
         setShowSuggestions(false)
@@ -189,9 +172,13 @@ export default function LoginPage() {
   const submitEmailWithValue = (emailValue: string) => {
     startEmail(async () => {
       const res = await register({ email: emailValue })
-      if (!res.success) return
-      toast.success("OTP sent to your email")
-      router.push(`/verify-request?email=${emailValue}`)
+      if (!res.success) {
+        setEmailError(res.message || "Failed to send verification code")
+        toast.error(res.message || "Failed to send verification code")
+        return
+      }
+      toast.success("Verification code sent to your email")
+      router.push(`/verify-request?email=${encodeURIComponent(emailValue)}`)
     })
   }
 
@@ -208,84 +195,98 @@ export default function LoginPage() {
   const signInWithGoogle = async () => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
-
       if (!backendUrl) {
         throw new Error("Backend URL is missing")
       }
-
       window.location.href = `${backendUrl}/auth/google`
     } catch (error: any) {
       console.error(error)
-
       toast.error(error?.message || "Google sign in failed")
     }
   }
 
-  // Get provider icon/color based on domain
   const getProviderInfo = (suggestion: string) => {
     const domain = suggestion.split("@")[1]
-    const provider = Object.values(EMAIL_PROVIDERS).find(
-      (p) => p.domain === domain,
-    )
-    return provider
+    return Object.values(EMAIL_PROVIDERS).find((p) => p.domain === domain)
   }
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
+    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
+      {/* Left Side: Visual Showcase Slider */}
       <AuthSlider />
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6">
-        <Card className="w-full max-w-md shadow-none border-none bg-background">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-mozilla">
-              Welcome to HabeshaGo
-            </CardTitle>
-            <CardDescription>
-              Book buses, manage trips, and travel smarter
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <Button
-              onClick={signInWithGoogle}
-              variant="outline"
-              className="w-full h-12 cursor-pointer hover:bg-muted transition-all"
-              disabled={googlePending}
-            >
-              <FcGoogle className="mr-3 h-5 w-5" />
-              Continue with Google
-            </Button>
-
-            {/* Continue with Phone Button */}
-            <Button
-              onClick={() => router.push("/phone")}
-              variant="outline"
-              className="w-full h-12 bg-black text-white hover:bg-black/80 cursor-pointer transition-all"
-            >
-              <Phone className="mr-3 h-5 w-5" />
-              Continue with Phone
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t" />
+      {/* Right Side: Clean Centered Login Card */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-md mx-auto">
+          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+            <CardContent className="p-7 sm:p-9 space-y-6">
+              {/* Header */}
+              <div className="text-center space-y-1.5">
+                <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
+                  <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                    Habesha<span className="text-orange-500">Go</span>
+                  </span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-jakarta">
+                  Welcome back
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Sign in to manage your trips and bookings
+                </p>
               </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-3 text-muted-foreground">OR</span>
-              </div>
-            </div>
 
-            <form onSubmit={submitEmail} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email address
-                </Label>
-                <div className="relative">
+              {/* Quick Auth Actions: Google & Phone */}
+              <div className="space-y-2.5">
+                <Button
+                  onClick={signInWithGoogle}
+                  variant="outline"
+                  type="button"
+                  disabled={googlePending}
+                  className="w-full h-11 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer shadow-none flex items-center justify-center gap-2.5"
+                >
+                  <FcGoogle className="h-5 w-5 shrink-0" />
+                  <span>Continue with Google</span>
+                </Button>
+
+                <Button
+                  onClick={() => router.push("/phone")}
+                  variant="outline"
+                  type="button"
+                  className="w-full h-11 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer shadow-none flex items-center justify-center gap-2.5"
+                >
+                  <Phone className="h-4 w-4 text-slate-500 shrink-0" />
+                  <span>Continue with Phone</span>
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-[11px] text-slate-400 uppercase tracking-wider">
+                  <span className="bg-white px-3 font-medium">
+                    Or continue with email
+                  </span>
+                </div>
+              </div>
+
+              {/* Email Form */}
+              <form onSubmit={submitEmail} className="space-y-4">
+                <div className="space-y-1.5 text-left">
+                  <Label
+                    htmlFor="email"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Email address
+                  </Label>
                   <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                       id="email"
                       ref={inputRef}
                       type="email"
+                      autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       onKeyDown={handleKeyDown}
@@ -295,179 +296,143 @@ export default function LoginPage() {
                       onBlur={handleBlur}
                       placeholder="name@example.com"
                       className={cn(
-                        "h-12 pr-20 transition-all",
-                        isValidEmail &&
-                          "border-green-200 focus-visible:ring-green-200",
-                        emailError &&
-                          "border-destructive focus-visible:ring-destructive",
+                        "pl-10 h-11 pr-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 text-sm rounded-xl transition-colors",
+                        isValidEmail && "border-emerald-300 focus-visible:border-emerald-500",
+                        emailError && "border-red-300 focus-visible:border-red-500",
                       )}
                       aria-invalid={!!emailError}
-                      aria-describedby={emailError ? "email-error" : undefined}
                     />
 
-                    {/* Status icons */}
+                    {/* Status icon / Clear button */}
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                       {isValidEmail && (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        <CheckCircle className="h-4 w-4 text-emerald-500" />
                       )}
                       {email && (
                         <button
                           type="button"
                           onClick={clearEmail}
-                          className="p-1 hover:bg-muted rounded-full transition-colors"
+                          className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                           aria-label="Clear email"
                         >
-                          <X className="h-4 w-4 text-muted-foreground" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
+
+                    {/* Suggestions dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute z-50 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in-0 zoom-in-95 text-left"
+                      >
+                        <div className="px-3 py-1.5 border-b border-slate-100 bg-slate-50 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Suggested emails
+                        </div>
+                        {suggestions.map((suggestion, index) => {
+                          const provider = getProviderInfo(suggestion)
+                          return (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => handleSuggestionClick(suggestion)}
+                              onMouseEnter={() =>
+                                setSelectedSuggestionIndex(index)
+                              }
+                              className={cn(
+                                "w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 hover:bg-slate-50 transition-colors text-xs text-slate-700 cursor-pointer",
+                                selectedSuggestionIndex === index && "bg-slate-50 text-orange-600",
+                              )}
+                            >
+                              <Mail
+                                className={cn(
+                                  "h-3.5 w-3.5 shrink-0",
+                                  provider?.color || "text-slate-400",
+                                )}
+                              />
+                              <span className="flex-1 font-medium truncate">
+                                {suggestion}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Email suggestions dropdown */}
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div
-                      ref={suggestionsRef}
-                      className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden animate-in fade-in-0 zoom-in-95"
-                    >
-                      <div className="p-2 border-b bg-muted/50">
-                        <p className="text-xs text-muted-foreground">
-                          Suggested email addresses
-                        </p>
-                      </div>
-                      {suggestions.map((suggestion, index) => {
-                        const provider = getProviderInfo(suggestion)
-                        return (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => handleSuggestionClick(suggestion)}
-                            onMouseEnter={() =>
-                              setSelectedSuggestionIndex(index)
-                            }
-                            className={cn(
-                              "w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-muted transition-colors",
-                              selectedSuggestionIndex === index && "bg-muted",
-                            )}
-                          >
-                            <Mail
-                              className={cn(
-                                "h-3 w-3",
-                                provider?.color || "text-muted-foreground",
-                              )}
-                            />
-                            <span className="flex-1 font-medium text-sm">
-                              {suggestion}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {suggestion.split("@")[1]}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
+                  {emailError && (
+                    <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{emailError}</span>
+                    </p>
                   )}
                 </div>
 
-                {/* Error message */}
-                {emailError && (
-                  <p
-                    id="email-error"
-                    className="text-sm text-destructive flex items-center gap-1 mt-1"
-                  >
-                    <AlertCircle className="h-4 w-4" />
-                    {emailError}
-                  </p>
-                )}
+                <Button
+                  type="submit"
+                  disabled={emailPending || !isValidEmail}
+                  className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm transition-colors cursor-pointer shadow-none flex items-center justify-center gap-2"
+                >
+                  {emailPending ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin text-white" />
+                      <span>Sending verification code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue with Email</span>
+                      <ArrowRight className="h-4 w-4 text-white" />
+                    </>
+                  )}
+                </Button>
+              </form>
 
-                {/* Quick domain selectors (optional) */}
-                {!email && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <p className="text-xs text-muted-foreground w-full">
-                      Quick select:
-                    </p>
-                    {Object.entries(EMAIL_PROVIDERS).map(
-                      ([name, { domain, color }]) => (
-                        <button
-                          key={domain}
-                          type="button"
-                          onClick={() => {
-                            const localPart = email.split("@")[0] || ""
-                            setEmail(`${localPart}@${domain}`)
-                            inputRef.current?.focus()
-                          }}
-                          className={cn(
-                            "text-xs px-2 py-1 rounded-full border hover:bg-muted transition-colors",
-                            color,
-                          )}
-                        >
-                          {name}
-                        </button>
-                      ),
-                    )}
-                  </div>
-                )}
+              {/* Toggle to Register */}
+              <div className="pt-2 text-center text-xs text-slate-500">
+                <span>Don't have an account? </span>
+                <Link
+                  href="/register"
+                  className="text-orange-600 hover:text-orange-700 font-semibold transition-colors"
+                >
+                  Create an account
+                </Link>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 transition-all"
-                disabled={emailPending || !isValidEmail}
-              >
-                {emailPending ? (
-                  <>
-                    <Loader className="animate-spin mr-2" />
-                    Sending OTP
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2" />
-                    Continue with Email
-                  </>
-                )}
-              </Button>
-            </form>
+              {/* Bottom Staff Link & Terms */}
+              <div className="pt-3 border-t border-slate-100 text-center space-y-2">
+                <p className="text-[11px] text-slate-400">
+                  By continuing, you agree to HabeshaGo's{" "}
+                  <button
+                    type="button"
+                    onClick={() => toast.info("Terms of Service")}
+                    className="text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                  >
+                    Terms
+                  </button>{" "}
+                  &{" "}
+                  <button
+                    type="button"
+                    onClick={() => toast.info("Privacy Policy")}
+                    className="text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                  >
+                    Privacy Policy
+                  </button>
+                </p>
 
-            <div className="text-center space-y-2">
-              <p className="text-xs text-muted-foreground">
-                By continuing, you agree to HabeshaGo's{" "}
-                <button
-                  onClick={() => toast.info("Terms of Service")}
-                  className="text-primary hover:underline"
-                >
-                  Terms
-                </button>{" "}
-                &{" "}
-                <button
-                  onClick={() => toast.info("Privacy Policy")}
-                  className="text-primary hover:underline"
-                >
-                  Privacy Policy
-                </button>
-              </p>
-
-              <p className="text-xs text-muted-foreground">
-                Need help?{" "}
-                <button
-                  onClick={() => toast.info("Contact support")}
-                  className="text-primary hover:underline"
-                >
-                  Contact Support
-                </button>
-              </p>
-            </div>
-
-            <div className="pt-2 border-t text-center">
-              <button
-                type="button"
-                onClick={() => router.push("/staff-login")}
-                className="text-xs text-muted-foreground hover:text-emerald-500 inline-flex items-center gap-1.5 font-medium transition-colors"
-              >
-                <span>Staff or Fleet Operator Portal</span>
-                <span aria-hidden="true">&rarr;</span>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/staff-login")}
+                    className="text-xs text-slate-500 hover:text-orange-600 inline-flex items-center gap-1 transition-colors cursor-pointer font-medium"
+                  >
+                    <span>Staff & Operator Portal</span>
+                    <span aria-hidden="true">&rarr;</span>
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

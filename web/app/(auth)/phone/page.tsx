@@ -256,7 +256,7 @@ export default function PhoneLoginPage() {
 
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md mx-auto">
-          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+          <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
             <CardHeader className="text-center p-6 pb-2 sm:p-8 sm:pb-2">
               <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
                 <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
@@ -497,25 +497,7 @@ export default function PhoneLoginPage() {
               </div>
             )}
 
-            {/* Footer text */}
-            <div className="text-center space-y-2 pt-4">
-              <p className="text-xs text-muted-foreground">
-                By continuing, you agree to HabeshaGo's{" "}
-                <button
-                  onClick={() => toast.info("Terms of Service")}
-                  className="text-primary hover:underline"
-                >
-                  Terms
-                </button>{" "}
-                &{" "}
-                <button
-                  onClick={() => toast.info("Privacy Policy")}
-                  className="text-primary hover:underline"
-                >
-                  Privacy Policy
-                </button>
-              </p>
-            </div>
+
           </CardContent>
         </Card>
         </div>

@@ -12,6 +12,7 @@ import {
   verifyMFAToken,
   verifyRefreshToken,
   DUMMY_BCRYPT_HASH,
+  REFRESH_TOKEN_MS,
 } from "../services/token.service.js"
 
 /**
@@ -29,9 +30,14 @@ export const isStrongPassword = (pwd) => {
 import { hashPassword, verifyPassword } from "../services/password.service.js"
 import {
   verifyTOTP,
+  verifyTOTPWithStep,
   generate2FASecret,
   generateRecoveryPhrases,
+  hashRecoveryPhrase,
+  hashRecoveryPhrases,
   verifyRecoveryPhrase,
+  encryptTOTPSecret,
+  decryptTOTPSecret,
 } from "../services/2fa.service.js"
 import { STAFF_ROLES } from "../utils/constants.js"
 
@@ -54,6 +60,10 @@ export const register = async (req, res) => {
 
     let user = await prisma.user.findUnique({ where: { email } })
     if (!user) user = await prisma.user.create({ data: { email, name } })
+    if (STAFF_ROLES.includes(user.role)) {
+      // Do not expose whether the address belongs to privileged staff.
+      return res.json({ message: "OTP sent to email", success: true })
+    }
 
     await sendOTP(user, "login")
     res.json({ message: "OTP sent to email", success: true })
@@ -91,6 +101,10 @@ export const verifyOtpPhone = async (req, res) => {
           phoneVerified: true,
         },
       })
+    }
+
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json(errorResponse("Use staff sign-in", 403))
     }
 
     // 4. Issue JWT and respond using your helper
@@ -131,6 +145,10 @@ export const verifyAppOtpPhone = async (req, res) => {
       })
     }
 
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json(errorResponse("Use staff sign-in", 403))
+    }
+
     // 4. Issue JWT and respond using your helper
     return issueMobileTokens(user, req, res)
   } catch (err) {
@@ -151,6 +169,9 @@ export const verifyOTP = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user)
       return res.status(404).json({ message: "User not found", success: false })
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json({ message: "Use staff sign-in", success: false })
+    }
 
     const otp = await prisma.otpCode.findFirst({
       where: { userId: user.id, used: false, expiresAt: { gt: new Date() } },
@@ -205,6 +226,9 @@ export const verifyOTPApp = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user)
       return res.status(404).json({ message: "User not found", success: false })
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json({ message: "Use staff sign-in", success: false })
+    }
 
     const otp = await prisma.otpCode.findFirst({
       where: { userId: user.id, used: false, expiresAt: { gt: new Date() } },
@@ -254,6 +278,9 @@ export const resendOTP = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) return res.status(404).json({ message: "User not found" })
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json({ message: "Use staff sign-in" })
+    }
 
     await sendOTP(user, "resend")
     res.json({ message: "OTP resent successfully", success: true })
@@ -282,6 +309,9 @@ export const appleAuth = async (req, res) => {
       })
 
       if (existingUser) {
+        if (STAFF_ROLES.includes(existingUser.role)) {
+          return res.status(403).json(errorResponse("Use staff sign-in", 403))
+        }
         user = await prisma.user.update({
           where: { email },
           data: {
@@ -306,6 +336,10 @@ export const appleAuth = async (req, res) => {
           role: "PASSENGER",
         },
       })
+    }
+
+    if (STAFF_ROLES.includes(user.role)) {
+      return res.status(403).json(errorResponse("Use staff sign-in", 403))
     }
 
     // Issue tokens + get JSON response
@@ -379,7 +413,7 @@ export const googleCallback = async (req, res) => {
 
 export const refreshToken = async (req, res) => {
   try {
-    const incomingToken = req.cookies?.refreshToken
+    const incomingToken = req.cookies?.refreshToken || req.body?.refreshToken
 
     if (!incomingToken) {
       return res.status(401).json({ message: "No refresh token" })
@@ -450,7 +484,7 @@ export const refreshToken = async (req, res) => {
       where: { id: session.id },
       data: {
         refreshTokenHash: newHashedToken,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         lastActiveAt: new Date(),
       },
     })
@@ -467,12 +501,13 @@ export const refreshToken = async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_MS,
       path: "/",
     })
 
     return res.json({
       accessToken,
+      refreshToken: newRefreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -556,7 +591,7 @@ export const refreshTokenApp = async (req, res) => {
       where: { id: session.id },
       data: {
         refreshTokenHash: newHashedToken,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         lastActiveAt: new Date(),
       },
     })
@@ -605,8 +640,8 @@ export const logout = async (req, res) => {
       })
     }
 
-    // 3. Also revoke by incoming cookie refresh token hash if present
-    const incomingToken = req.cookies?.refreshToken
+    // 3. Also revoke by incoming cookie or body refresh token hash if present
+    const incomingToken = req.cookies?.refreshToken || req.body?.refreshToken
     if (incomingToken) {
       await prisma.session.updateMany({
         where: { refreshTokenHash: hashToken(incomingToken) },
@@ -666,6 +701,9 @@ export const googleMobileAuth = async (req, res) => {
 
     if (existingUser?.isDeleted) {
       return res.status(403).json({ error: "Account has been deleted" })
+    }
+    if (existingUser && STAFF_ROLES.includes(existingUser.role)) {
+      return res.status(403).json({ error: "Use staff sign-in" })
     }
 
     // 4. Find or create user
@@ -735,7 +773,7 @@ export const googleMobileAuth = async (req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -1007,14 +1045,12 @@ export const staffLogin = async (req, res) => {
       await redis.del(lockoutKey)
     } catch (e) {}
 
-    // Check if staff has TOTP 2FA enabled
-    let hasTotp = false
-    try {
-      const totpSecret = await redis.get(`totp:${user.id}`)
-      if (totpSecret) hasTotp = true
-    } catch (e) {
-      // Redis fallback
-    }
+    const hasTotp = Boolean(
+      await prisma.staffMfa.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      }),
+    )
 
     // Send MFA OTP code to staff email
     const rawOtp = await sendOTP(user, "login")
@@ -1080,25 +1116,21 @@ export const staffVerifyMFA = async (req, res) => {
         )
     }
 
-    // 1. MFA Replay Attack Prevention (single-use jti check)
-    if (decoded.jti) {
-      try {
-        const isReplayed = await redis.get(`mfa_used:${decoded.jti}`)
-        if (isReplayed) {
-          return res
-            .status(401)
-            .json(
-              errorResponse(
-                "MFA session has already been used. Please log in again.",
-                401,
-              ),
-            )
-        }
-      } catch (e) {}
+    // Replay and brute-force state is security-critical. Fail closed if the
+    // shared store is unavailable instead of silently disabling protection.
+    try {
+      const isReplayed = await redis.get(`mfa_used:${decoded.jti}`)
+      if (isReplayed) {
+        return res.status(401).json(
+          errorResponse("MFA session has already been used. Please log in again.", 401),
+        )
+      }
+    } catch (e) {
+      return res.status(503).json(errorResponse("MFA verification is temporarily unavailable", 503))
     }
 
     // 2. MFA Brute-Force Rate Limiting (max 5 attempts per user per session)
-    const mfaFailsKey = `mfa_fails:${decoded.sub}`
+    const mfaFailsKey = `mfa_fails:${decoded.jti}`
     try {
       const fails = await redis.get(mfaFailsKey)
       if (fails && Number(fails) >= 5) {
@@ -1111,7 +1143,9 @@ export const staffVerifyMFA = async (req, res) => {
             ),
           )
       }
-    } catch (e) {}
+    } catch (e) {
+      return res.status(503).json(errorResponse("MFA verification is temporarily unavailable", 503))
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
@@ -1126,40 +1160,46 @@ export const staffVerifyMFA = async (req, res) => {
     const cleanCode = code.toString().trim()
     let isValidMFA = false
 
-    // 1. Try TOTP Authenticator verification if user configured it
-    try {
-      const totpSecret = await redis.get(`totp:${user.id}`)
-      if (totpSecret && verifyTOTP(cleanCode, totpSecret)) {
-        isValidMFA = true
+    const staffMfa = await prisma.staffMfa.findUnique({
+      where: { userId: user.id },
+    })
+
+    // 1. Verify and atomically consume a TOTP time step. This prevents the
+    // same authenticator code from creating multiple concurrent sessions.
+    if (staffMfa && /^\d{6}$/.test(cleanCode)) {
+      const secret = decryptTOTPSecret(staffMfa.totpSecretCiphertext)
+      const matchedStep = verifyTOTPWithStep(cleanCode, secret)
+      if (matchedStep !== null) {
+        const consumed = await prisma.staffMfa.updateMany({
+          where: {
+            id: staffMfa.id,
+            OR: [
+              { lastUsedTotpStep: null },
+              { lastUsedTotpStep: { lt: matchedStep } },
+            ],
+          },
+          data: { lastUsedTotpStep: matchedStep },
+        })
+        isValidMFA = consumed.count === 1
       }
-    } catch (e) {
-      // Continue
     }
 
     // 2. Try single-use recovery phrase verification if user saved phrases
-    if (!isValidMFA) {
-      try {
-        const backupPhrasesJson = await redis.get(`totp_backup:${user.id}`)
-        if (backupPhrasesJson) {
-          const savedPhrases =
-            typeof backupPhrasesJson === "string"
-              ? JSON.parse(backupPhrasesJson)
-              : backupPhrasesJson
-          const { valid, remaining } = verifyRecoveryPhrase(
-            cleanCode,
-            savedPhrases,
-          )
-          if (valid) {
-            isValidMFA = true
-            // Save remaining single-use recovery phrases (burning the used phrase)
-            await redis.set(
-              `totp_backup:${user.id}`,
-              JSON.stringify(remaining),
-            )
-          }
-        }
-      } catch (e) {
-        // Continue to email OTP
+    if (!isValidMFA && staffMfa) {
+      const phraseHash = hashRecoveryPhrase(cleanCode)
+      const { valid, remaining } = verifyRecoveryPhrase(
+        cleanCode,
+        staffMfa.recoveryCodeHashes,
+      )
+      if (valid) {
+        const consumed = await prisma.staffMfa.updateMany({
+          where: {
+            id: staffMfa.id,
+            recoveryCodeHashes: { has: phraseHash },
+          },
+          data: { recoveryCodeHashes: { set: remaining } },
+        })
+        isValidMFA = consumed.count === 1
       }
     }
 
@@ -1216,19 +1256,28 @@ export const staffVerifyMFA = async (req, res) => {
         return res.status(400).json(errorResponse("Invalid MFA code", 400))
       }
 
-      // Mark OTP as used
-      await prisma.otpCode.update({
-        where: { id: otpRecord.id },
+      const consumed = await prisma.otpCode.updateMany({
+        where: { id: otpRecord.id, used: false },
         data: { used: true },
       })
+      if (consumed.count !== 1) {
+        return res.status(401).json(errorResponse("MFA code has already been used", 401))
+      }
     }
 
-    // Mark MFA token as consumed (prevents replay) and clear failed attempts
-    if (decoded.jti) {
-      try {
-        await redis.set(`mfa_used:${decoded.jti}`, "1", { ex: 300 })
-        await redis.del(mfaFailsKey)
-      } catch (e) {}
+    // Atomically consume the pending login itself. NX closes the concurrent
+    // request race that a separate GET/SET pair would leave open.
+    try {
+      const claimed = await redis.set(`mfa_used:${decoded.jti}`, "1", {
+        nx: true,
+        ex: 300,
+      })
+      if (claimed !== "OK") {
+        return res.status(401).json(errorResponse("MFA session has already been used", 401))
+      }
+      await redis.del(mfaFailsKey)
+    } catch (e) {
+      return res.status(503).json(errorResponse("MFA verification is temporarily unavailable", 503))
     }
 
     // 3. Issue full session and tokens
@@ -1237,7 +1286,7 @@ export const staffVerifyMFA = async (req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -1254,7 +1303,7 @@ export const staffVerifyMFA = async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_MS,
       path: "/",
     })
 
@@ -1378,6 +1427,16 @@ export const staffChangePassword = async (req, res) => {
       data: { password: hashedPassword },
     })
 
+    // Invalidate other active sessions for user upon password update
+    await prisma.session.updateMany({
+      where: {
+        userId,
+        ...(req.user?.sessionId ? { id: { not: req.user.sessionId } } : {}),
+        revoked: false,
+      },
+      data: { revoked: true },
+    })
+
     return res
       .status(200)
       .json(successResponse("Password updated successfully"))
@@ -1394,16 +1453,27 @@ export const staffChangePassword = async (req, res) => {
 export const staffSetupTOTP = async (req, res) => {
   try {
     const user = req.user
+    const existing = await prisma.staffMfa.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    })
+    if (existing) {
+      return res.status(409).json(
+        errorResponse("Authenticator MFA is already enabled. Contact an administrator to reset it.", 409),
+      )
+    }
+
     const { base32, qrCode, otpauth_url } = await generate2FASecret(
       user.email || user.id,
     )
     const recoveryPhrases = generateRecoveryPhrases(8)
 
-    // Store pending setup in Redis (15 mins)
-    await redis.set(`totp_pending:${user.id}`, base32, { ex: 900 })
+    // Pending data expires quickly. The secret is encrypted and phrases are
+    // hashed even in temporary storage; plaintext phrases are returned once.
+    await redis.set(`totp_pending:${user.id}`, encryptTOTPSecret(base32), { ex: 900 })
     await redis.set(
       `totp_backup_pending:${user.id}`,
-      JSON.stringify(recoveryPhrases),
+      JSON.stringify(hashRecoveryPhrases(recoveryPhrases)),
       { ex: 900 },
     )
 
@@ -1444,10 +1514,10 @@ export const staffEnableTOTP = async (req, res) => {
         .json(errorResponse("Verification code is required", 400))
     }
 
-    const pendingSecret = await redis.get(`totp_pending:${userId}`)
+    const pendingSecretCiphertext = await redis.get(`totp_pending:${userId}`)
     const pendingBackupJson = await redis.get(`totp_backup_pending:${userId}`)
 
-    if (!pendingSecret) {
+    if (!pendingSecretCiphertext || !pendingBackupJson) {
       return res
         .status(400)
         .json(
@@ -1458,6 +1528,7 @@ export const staffEnableTOTP = async (req, res) => {
         )
     }
 
+    const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
     const cleanCode = code.toString().trim()
     const isValid = verifyTOTP(cleanCode, pendingSecret)
     if (!isValid) {
@@ -1471,27 +1542,28 @@ export const staffEnableTOTP = async (req, res) => {
         )
     }
 
-    // Persist permanently in Redis
-    await redis.set(`totp:${userId}`, pendingSecret)
-    if (pendingBackupJson) {
-      await redis.set(`totp_backup:${userId}`, pendingBackupJson)
-    }
+    const recoveryCodeHashes = JSON.parse(pendingBackupJson)
+    const initialStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+
+    // Create-only activation prevents an authenticated request from silently
+    // replacing a previously enrolled authenticator.
+    await prisma.staffMfa.create({
+      data: {
+        userId,
+        totpSecretCiphertext: pendingSecretCiphertext,
+        recoveryCodeHashes,
+        lastUsedTotpStep: initialStep,
+      },
+    })
 
     // Clean up temporary keys
     await redis.del(`totp_pending:${userId}`)
     await redis.del(`totp_backup_pending:${userId}`)
 
-    let savedPhrases = []
-    try {
-      savedPhrases = JSON.parse(pendingBackupJson)
-    } catch (e) {}
-
     return res.status(200).json(
       successResponse("Google Authenticator MFA enabled successfully!", {
         enabled: true,
-        savedRecoveryPhrases: savedPhrases,
-        notice:
-          "Save your recovery phrases in a safe place. You will need them if you lose access to your authenticator app.",
+        notice: "Your recovery phrases were shown once during setup. Keep the saved copy offline.",
       }),
     )
   } catch (error) {
@@ -1504,68 +1576,7 @@ export const staffEnableTOTP = async (req, res) => {
  * View QR Code & Recovery Phrases in Browser as a styled web page
  */
 export const staffViewQRPage = async (req, res) => {
-  try {
-    const user = req.user
-    const { base32, qrCode } = await generate2FASecret(user.email || user.id)
-    const recoveryPhrases = generateRecoveryPhrases(8)
-
-    await redis.set(`totp_pending:${user.id}`, base32, { ex: 900 })
-    await redis.set(
-      `totp_backup_pending:${user.id}`,
-      JSON.stringify(recoveryPhrases),
-      { ex: 900 },
-    )
-
-    const phrasesHtml = recoveryPhrases
-      .map(
-        (p, i) =>
-          `<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;font-family:monospace;font-size:14px;color:#0f172a;border:1px solid #cbd5e1;box-shadow:0 1px 2px rgba(0,0,0,0.05);">${i + 1}. <strong>${p}</strong></div>`,
-      )
-      .join("")
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HabeshaGo - Setup Google Authenticator</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b1329; color: #f8fafc; padding: 40px 20px; display: flex; justify-content: center; }
-    .card { background: #1e293b; border-radius: 20px; padding: 36px; max-width: 540px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); text-align: center; border: 1px solid #334155; }
-    h2 { color: #14b8a6; margin-top: 0; font-size: 24px; }
-    p { color: #94a3b8; font-size: 14px; line-height: 1.5; }
-    .qr-box { background: white; padding: 18px; border-radius: 16px; display: inline-block; margin: 18px 0; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-    .secret-box { background: #0f172a; padding: 12px; border-radius: 10px; font-family: monospace; font-size: 16px; letter-spacing: 2px; color: #38bdf8; margin: 12px 0; border: 1px solid #1e293b; user-select: all; }
-    .phrases { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; margin: 18px 0; }
-    .warning { background: #451a03; border-left: 4px solid #f59e0b; padding: 14px; text-align: left; font-size: 13px; color: #fde68a; border-radius: 8px; margin-top: 20px; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>🔐 HabeshaGo Staff 2FA Setup</h2>
-    <p>Scan this QR code with <strong>Google Authenticator</strong>, <strong>Authy</strong>, or <strong>1Password</strong>.</p>
-    <div class="qr-box">
-      <img src="${qrCode}" alt="Scan QR Code" style="display:block; width:240px; height:240px;" />
-    </div>
-    <div style="font-size:12px; color:#94a3b8;">Can't scan? Enter this manual setup key:</div>
-    <div class="secret-box">${base32}</div>
-    <h3 style="color:#f8fafc; font-size:16px; margin-top:28px; text-align:left;">📝 Recovery Phrases (Save These Offline!):</h3>
-    <div class="phrases">
-      ${phrasesHtml}
-    </div>
-    <div class="warning">
-      ⚠️ <strong>Important:</strong> Save these 8 recovery phrases now. If you ever lose your phone or authenticator app, you can enter any of these phrases during login to regain access.
-    </div>
-  </div>
-</body>
-</html>`
-
-    res.setHeader("Content-Type", "text/html")
-    return res.send(html)
-  } catch (error) {
-    console.error("View QR page error:", error)
-    return res.status(500).send("Failed to render QR setup page")
-  }
+  return res.status(404).json(errorResponse("Route not found", 404))
 }
 
 /**
@@ -1613,4 +1624,3 @@ export const adminSetStaffPassword = async (req, res) => {
     return res.status(500).json(errorResponse("Failed to set password", 500))
   }
 }
-

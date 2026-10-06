@@ -2,7 +2,9 @@ import crypto from "node:crypto"
 import speakeasy from "speakeasy"
 import QRCode from "qrcode"
 
-// Words dictionary for human-friendly recovery phrases
+// Human-friendly vocabulary. Twelve independently selected words provides
+// about 59 bits of entropy with this 30-word list; the random numeric suffix
+// adds another ~20 bits. Recovery phrases are also rate-limited and one-time.
 const PHRASE_WORDS = [
   "alpha", "bravo", "cedar", "delta", "ember", "falcon",
   "galaxy", "harbor", "island", "jungle", "karma", "lagoon",
@@ -18,33 +20,42 @@ const PHRASE_WORDS = [
 export const generateRecoveryPhrases = (count = 8) => {
   const phrases = []
   for (let i = 0; i < count; i++) {
-    const w1 = PHRASE_WORDS[crypto.randomInt(0, PHRASE_WORDS.length)]
-    const w2 = PHRASE_WORDS[crypto.randomInt(0, PHRASE_WORDS.length)]
-    const num = crypto.randomInt(100, 999)
-    phrases.push(`${w1}-${w2}-${num}`)
+    const words = Array.from(
+      { length: 12 },
+      () => PHRASE_WORDS[crypto.randomInt(0, PHRASE_WORDS.length)],
+    )
+    const num = crypto.randomInt(100000, 1000000)
+    phrases.push(`${words.join("-")}-${num}`)
   }
   return phrases
 }
 
+export const normalizeRecoveryPhrase = (value) =>
+  value.toString().toLowerCase().trim().replace(/\s+/g, "-")
+
+export const hashRecoveryPhrase = (phrase) =>
+  crypto.createHash("sha256").update(normalizeRecoveryPhrase(phrase)).digest("hex")
+
+export const hashRecoveryPhrases = (phrases) =>
+  phrases.map(hashRecoveryPhrase)
+
 /**
  * Validate and consume a single-use recovery phrase
  */
-export const verifyRecoveryPhrase = (inputPhrase, savedPhrases = []) => {
+export const verifyRecoveryPhrase = (inputPhrase, savedHashes = []) => {
   if (
     !inputPhrase ||
     typeof inputPhrase !== "string" ||
-    !Array.isArray(savedPhrases)
+    !Array.isArray(savedHashes)
   ) {
-    return { valid: false, remaining: savedPhrases }
+    return { valid: false, remaining: savedHashes }
   }
 
-  const normalizedInput = inputPhrase.toLowerCase().trim()
-  const inputBuf = Buffer.from(normalizedInput)
+  const inputBuf = Buffer.from(hashRecoveryPhrase(inputPhrase), "hex")
 
   let matchedIndex = -1
-  for (let i = 0; i < savedPhrases.length; i++) {
-    const candidate = savedPhrases[i].toString().toLowerCase().trim()
-    const candidateBuf = Buffer.from(candidate)
+  for (let i = 0; i < savedHashes.length; i++) {
+    const candidateBuf = Buffer.from(savedHashes[i], "hex")
 
     if (
       inputBuf.length === candidateBuf.length &&
@@ -56,12 +67,50 @@ export const verifyRecoveryPhrase = (inputPhrase, savedPhrases = []) => {
   }
 
   if (matchedIndex !== -1) {
-    const remaining = [...savedPhrases]
+    const remaining = [...savedHashes]
     remaining.splice(matchedIndex, 1)
     return { valid: true, remaining }
   }
 
-  return { valid: false, remaining: savedPhrases }
+  return { valid: false, remaining: savedHashes }
+}
+
+const getEncryptionKey = () => {
+  const configured = process.env.MFA_ENCRYPTION_KEY
+  if (!configured) throw new Error("MFA_ENCRYPTION_KEY is not configured")
+
+  const key = /^[a-f0-9]{64}$/i.test(configured)
+    ? Buffer.from(configured, "hex")
+    : Buffer.from(configured, "base64")
+  if (key.length !== 32) {
+    throw new Error("MFA_ENCRYPTION_KEY must be 32 bytes encoded as hex or base64")
+  }
+  return key
+}
+
+export const encryptTOTPSecret = (secret) => {
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv)
+  const ciphertext = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${ciphertext.toString("base64url")}`
+}
+
+export const decryptTOTPSecret = (encrypted) => {
+  const [version, ivValue, tagValue, ciphertextValue] = encrypted.split(".")
+  if (version !== "v1" || !ivValue || !tagValue || !ciphertextValue) {
+    throw new Error("Invalid encrypted TOTP secret")
+  }
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    getEncryptionKey(),
+    Buffer.from(ivValue, "base64url"),
+  )
+  decipher.setAuthTag(Buffer.from(tagValue, "base64url"))
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertextValue, "base64url")),
+    decipher.final(),
+  ]).toString("utf8")
 }
 
 /**
@@ -91,15 +140,24 @@ export const generate2FASecret = async (email) => {
  * Verify a 6-digit TOTP token against the base32 secret
  */
 export const verifyTOTP = (token, secret) => {
-  if (!token || !secret) return false
+  return verifyTOTPWithStep(token, secret) !== null
+}
+
+export const verifyTOTPWithStep = (token, secret, time = Date.now()) => {
+  if (!token || !secret) return null
 
   const normalizedToken = token.toString().replace(/\s+/g, "")
+  if (!/^\d{6}$/.test(normalizedToken)) return null
 
-  return speakeasy.totp.verify({
+  const result = speakeasy.totp.verifyDelta({
     secret,
     encoding: "base32",
     token: normalizedToken,
     window: 1, // allow +/- 30 seconds clock drift
+    time: Math.floor(time / 1000),
   })
+  if (!result) return null
+  return getTOTPTimeStep(time) + result.delta
 }
 
+export const getTOTPTimeStep = (time = Date.now()) => Math.floor(time / 1000 / 30)

@@ -22,12 +22,12 @@ import {
   staffResendMFA,
   staffChangePassword,
   staffSetupTOTP,
-  staffViewQRPage,
   staffEnableTOTP,
   adminSetStaffPassword,
 } from "../controllers/auth.controller.js"
 import {
   authenticate,
+  optionalAuthenticate,
   requireAdmin,
   restrictTo,
 } from "../middlewares/authenticate.js"
@@ -58,7 +58,7 @@ router.post("/app/verify-otp", authLimiter, verifyOTPApp)
 router.post("/app/refresh", refreshTokenApp)
 
 router.post("/refresh", refreshToken)
-router.post("/logout", authenticate, logout)
+router.post("/logout", optionalAuthenticate, logout)
 router.post("/logout-all", authenticate, logoutAll)
 
 // Get authenticated user data
@@ -117,12 +117,6 @@ router.get(
   authenticate,
   restrictTo(...STAFF_ROLES),
   staffSetupTOTP,
-)
-router.get(
-  "/staff/totp/view",
-  authenticate,
-  restrictTo(...STAFF_ROLES),
-  staffViewQRPage,
 )
 router.post(
   "/staff/totp/enable",

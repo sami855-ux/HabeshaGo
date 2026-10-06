@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -37,6 +38,7 @@ model User {
 
   sessions Session[]
   otpCodes OtpCode[]
+  staffMfa StaffMfa?
 
   sharedBookingsSent     BookingShare[] @relation("ShareOwner")
   sharedBookingsReceived BookingShare[] @relation("ShareReceiver")
@@ -118,6 +120,20 @@ model OtpCode {
 
   @@index([userId])
   @@map("otp_code")
+}
+
+model StaffMfa {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  totpSecretCiphertext String
+  recoveryCodeHashes   String[]
+  lastUsedTotpStep     Int?
+  enabledAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("staff_mfa")
 }
 
 model Notification {
@@ -335,7 +351,7 @@ model WalletTransaction {
   parkingSessionId     String?
   parkingReservationId String?
 
-  parkingSession     ParkingSession?   @relation(fields: [parkingSessionId], references: [id])
+  parkingSession     ParkingSession?     @relation(fields: [parkingSessionId], references: [id])
   parkingReservation ParkingReservation? @relation(fields: [parkingReservationId], references: [id])
 
   createdAt DateTime @default(now())
@@ -1144,7 +1160,7 @@ model ParkingReservation {
 
   status ParkingStatus @default(PENDING)
 
-  reservedAt DateTime @default(now())
+  reservedAt DateTime  @default(now())
   expiresAt  DateTime?
 
   qrCode String?

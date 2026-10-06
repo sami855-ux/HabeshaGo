@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken"
 import prisma from "../prisma/client.js"
 import { errorResponse } from "../utils/apiResponse.js"
 import { redis } from "../config/redis.js"
-import { hashToken } from "../services/token.service.js"
+import { hashToken, verifyAccessToken } from "../services/token.service.js"
 
 /**
  * Authentication middleware
@@ -38,13 +38,15 @@ export const authenticate = async (req, res, next) => {
 
     let decoded
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET)
+      decoded = verifyAccessToken(token)
     } catch (err) {
       return res
         .status(401)
         .json(errorResponse("Invalid or expired access token", 401))
     }
 
+    // Pending MFA tokens are deliberately signed with the same key, but they
+    // are never access tokens and must not cross the authenticated boundary.
     const user = await prisma.user.findUnique({
       where: { id: decoded.id || decoded.sub },
     })
@@ -128,6 +130,45 @@ export const restrictTo = (...roles) => {
         message: "You do not have permission to perform this action",
       })
     }
+    next()
+  }
+}
+
+/**
+ * Optional authentication middleware:
+ * Populates req.user if a valid or salvageable token exists, but does not block if missing or expired.
+ * Critical for logout so expired tokens still clear cookies and database sessions.
+ */
+export const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null
+
+    if (!token) {
+      return next()
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ["HS256"],
+      })
+      if (decoded.type === "mfa_pending" || !decoded.sessionId) return next()
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id || decoded.sub },
+      })
+      if (user && !user.isDeleted && !user.isSuspended) {
+        req.user = {
+          id: user.id,
+          role: user.role,
+          email: user.email,
+          sessionId: decoded.sessionId || null,
+        }
+      }
+    } catch {}
+    next()
+  } catch (err) {
     next()
   }
 }

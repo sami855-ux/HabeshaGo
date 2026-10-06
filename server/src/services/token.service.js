@@ -3,6 +3,7 @@ import crypto from "crypto"
 
 const ACCESS_TOKEN_EXPIRES = "60m"
 const REFRESH_TOKEN_EXPIRES = "15d"
+export const REFRESH_TOKEN_MS = 15 * 24 * 60 * 60 * 1000 // 15 days consistent with JWT
 const JWT_ALGORITHM = "HS256"
 
 import prisma from "../prisma/client.js"
@@ -26,7 +27,7 @@ export const issueTokens = async (user, req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -42,7 +43,7 @@ export const issueTokens = async (user, req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_MS,
       path: "/",
     })
 
@@ -117,7 +118,7 @@ export const issueTokensSocial = async (user, req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -133,7 +134,7 @@ export const issueTokensSocial = async (user, req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_MS,
       path: "/",
     })
 
@@ -144,13 +145,13 @@ export const issueTokensSocial = async (user, req, res) => {
     const base = process.env.FRONTEND_URL
     const roleRedirects = {
       ADMIN: `${base}/admin`,
-      DRIVER: `${base}/driver`,
-      PASSENGER: `${base}/user`,
       EV_CHARGER_MANAGER: `${base}/ev-charge-manager`,
-      PARKING_MANAGER: `${base}/parking-manager`,
+      PARKING_MANAGER: `${base}/admin/manage-parking`,
+      PASSENGER: `${base}/user`,
+      DRIVER: `${base}/admin`, // default for driver in web app
     }
 
-    const redirectUrl = roleRedirects[user.role] || base
+    const redirectUrl = roleRedirects[user.role] || `${base}/admin`
     return res.redirect(`${redirectUrl}?code=${code}`)
   } catch (err) {
     console.error("Token issuance failed:", err)
@@ -160,7 +161,7 @@ export const issueTokensSocial = async (user, req, res) => {
 
 export const generateAccessToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
-  return jwt.sign(payload, process.env.JWT_SECRET, {
+  return jwt.sign({ ...payload, type: "access" }, process.env.JWT_SECRET, {
     algorithm: JWT_ALGORITHM,
     expiresIn: ACCESS_TOKEN_EXPIRES,
   })
@@ -168,9 +169,13 @@ export const generateAccessToken = (payload) => {
 
 export const verifyAccessToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET, {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
     })
+    if (decoded.type === "mfa_pending" || !decoded.sessionId) {
+      throw new Error("Invalid access token type")
+    }
+    return decoded
   } catch (err) {
     throw new Error("Invalid or expired access token")
   }
@@ -226,4 +231,3 @@ export const verifyMFAToken = (token) => {
     throw new Error("Invalid or expired MFA session")
   }
 }
-

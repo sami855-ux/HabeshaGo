@@ -2,12 +2,77 @@ import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "node:crypto";
+import { hashPassword } from "../src/services/password.service.js";
 
 const prisma = new PrismaClient();
 
 // Fix for __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const seedUsers = [
+  {
+    name: "Demo Passenger",
+    email: "passenger.demo@habeshago.local",
+    role: "PASSENGER",
+  },
+  {
+    name: "Demo Administrator",
+    email: "admin.demo@habeshago.local",
+    role: "ADMIN",
+  },
+  {
+    name: "Demo EV Charger Manager",
+    email: "ev.manager.demo@habeshago.local",
+    role: "EV_CHARGER_MANAGER",
+  },
+];
+
+const generateSeedPassword = () =>
+  `${crypto.randomBytes(18).toString("base64url")}Aa1!`;
+
+async function seedDemoUsers() {
+  console.log("Seeding demo users...");
+
+  const credentials = [];
+  for (const definition of seedUsers) {
+    const existing = await prisma.user.findUnique({
+      where: { email: definition.email },
+      select: { id: true, role: true },
+    });
+
+    if (existing) {
+      credentials.push({
+        email: definition.email,
+        role: existing.role,
+        status: "already existed; credentials unchanged",
+      });
+      continue;
+    }
+
+    const password =
+      definition.role === "PASSENGER" ? null : generateSeedPassword();
+    const user = await prisma.user.create({
+      data: {
+        ...definition,
+        emailVerified: definition.role !== "PASSENGER",
+        ...(password ? { password: await hashPassword(password) } : {}),
+        wallet: { create: {} },
+      },
+      select: { id: true, email: true, role: true },
+    });
+
+    credentials.push({
+      ...user,
+      password: password || "Email OTP (development OTP is returned by the API)",
+      status: "created",
+    });
+  }
+
+  console.log("Demo user seed result:");
+  console.table(credentials);
+}
 
 // Map JSON filenames (plural) to Prisma client properties (singular)
 const modelMap = {
@@ -45,6 +110,8 @@ async function seedModel(modelName, data) {
  * Main seeding function
  */
 async function main() {
+  await seedDemoUsers();
+
   const dataDir = path.join(__dirname, "data");
   const files = fs.readdirSync(dataDir);
 

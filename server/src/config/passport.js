@@ -3,6 +3,13 @@ import passport from "passport"
 import { Strategy as GoogleStrategy } from "passport-google-oauth20"
 import prisma from "../prisma/client.js"
 
+const STAFF_ROLES = new Set([
+  "DRIVER",
+  "ADMIN",
+  "EV_CHARGER_MANAGER",
+  "PARKING_MANAGER",
+])
+
 //  GOOGLE STRATEGY
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(
@@ -27,6 +34,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             })
 
             if (existingUser) {
+              if (STAFF_ROLES.has(existingUser.role)) {
+                return done(null, false, { message: "Use staff sign-in" })
+              }
               user = await prisma.user.update({
                 where: { email },
                 data: { googleId: profile.id },
@@ -48,6 +58,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
         }
 
+        if (user && STAFF_ROLES.has(user.role)) {
+          return done(null, false, { message: "Use staff sign-in" })
+        }
         done(null, user)
       } catch (err) {
         done(err, null)

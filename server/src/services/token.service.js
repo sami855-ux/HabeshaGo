@@ -207,7 +207,7 @@ export const generateMFAToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
   const jti = crypto.randomUUID()
   return jwt.sign(
-    { ...payload, type: "mfa_pending", jti },
+    { ...payload, id: payload.sub || payload.id, type: "mfa_pending", jti },
     process.env.JWT_SECRET,
     { algorithm: JWT_ALGORITHM, expiresIn: "5m" },
   )

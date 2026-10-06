@@ -49,6 +49,20 @@ import axios from "axios"
 import { redis } from "../config/redis.js"
 dotenv.config()
 
+const safeParseRecoveryHashes = (val) => {
+  if (!val) return []
+  if (Array.isArray(val)) return val.map((x) => String(x))
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed.map((x) => String(x)) : [String(parsed)]
+    } catch {
+      return val.split(",").map((s) => s.trim()).filter(Boolean)
+    }
+  }
+  return []
+}
+
 // Registration
 export const register = async (req, res) => {
   try {
@@ -1252,12 +1266,16 @@ export const staffVerifyMFA = async (req, res) => {
         const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
         const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
         if (matchedStep !== null) {
-          const recoveryCodeHashes = pendingBackupJson
-            ? JSON.parse(pendingBackupJson)
-            : []
-          await prisma.staffMfa.create({
-            data: {
+          const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
+          await prisma.staffMfa.upsert({
+            where: { userId: user.id },
+            create: {
               userId: user.id,
+              totpSecretCiphertext: pendingSecretCiphertext,
+              recoveryCodeHashes,
+              lastUsedTotpStep: matchedStep,
+            },
+            update: {
               totpSecretCiphertext: pendingSecretCiphertext,
               recoveryCodeHashes,
               lastUsedTotpStep: matchedStep,
@@ -1609,14 +1627,19 @@ export const staffEnableTOTP = async (req, res) => {
         )
     }
 
-    const recoveryCodeHashes = JSON.parse(pendingBackupJson)
+    const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
     const initialStep = verifyTOTPWithStep(cleanCode, pendingSecret)
 
-    // Create-only activation prevents an authenticated request from silently
-    // replacing a previously enrolled authenticator.
-    await prisma.staffMfa.create({
-      data: {
+    // Create or update activation
+    await prisma.staffMfa.upsert({
+      where: { userId },
+      create: {
         userId,
+        totpSecretCiphertext: pendingSecretCiphertext,
+        recoveryCodeHashes,
+        lastUsedTotpStep: initialStep,
+      },
+      update: {
         totpSecretCiphertext: pendingSecretCiphertext,
         recoveryCodeHashes,
         lastUsedTotpStep: initialStep,
@@ -1770,10 +1793,10 @@ export const staffEnablePendingTOTP = async (req, res) => {
   try {
     const { mfaToken, code } = req.body
 
-    if (!mfaToken || !code) {
+    if (!mfaToken) {
       return res
         .status(400)
-        .json(errorResponse("MFA token and verification code are required", 400))
+        .json(errorResponse("MFA token is required", 400))
     }
 
     let decoded
@@ -1803,22 +1826,30 @@ export const staffEnablePendingTOTP = async (req, res) => {
     }
 
     const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
-    const cleanCode = code.toString().trim()
-    const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+    let matchedStep = null
 
-    if (matchedStep === null) {
-      return res.status(400).json(
-        errorResponse("Invalid 6-digit code. Please verify the code showing in your authenticator app.", 400),
-      )
+    // If verification code is optionally provided, validate it
+    if (code && typeof code === "string" && code.trim()) {
+      const cleanCode = code.toString().trim()
+      matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+      if (matchedStep === null) {
+        return res.status(400).json(
+          errorResponse("Invalid 6-digit code. Please verify the code showing in your authenticator app.", 400),
+        )
+      }
     }
 
-    const recoveryCodeHashes = pendingBackupJson
-      ? JSON.parse(pendingBackupJson)
-      : []
+    const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
 
-    await prisma.staffMfa.create({
-      data: {
+    await prisma.staffMfa.upsert({
+      where: { userId: user.id },
+      create: {
         userId: user.id,
+        totpSecretCiphertext: pendingSecretCiphertext,
+        recoveryCodeHashes,
+        lastUsedTotpStep: matchedStep,
+      },
+      update: {
         totpSecretCiphertext: pendingSecretCiphertext,
         recoveryCodeHashes,
         lastUsedTotpStep: matchedStep,

@@ -5,13 +5,22 @@ export interface StaffLoginPayload {
   password: string
 }
 
+export interface StaffSetupData {
+  qrCode: string
+  secret: string
+  otpauth_url: string
+  recoveryPhrases: string[]
+  instructions: string[]
+}
+
 export interface StaffLoginResponse {
   success: boolean
   message?: string
   data?: {
     mfaRequired: boolean
     mfaToken: string
-    mfaMethod: "TOTP_OR_EMAIL" | "EMAIL_OTP"
+    hasTotp?: boolean
+    mfaMethod: "TOTP" | "SETUP_TOTP" | "TOTP_OR_EMAIL" | "EMAIL_OTP" | string
     expiresIn: number
     user: {
       id: string
@@ -19,6 +28,7 @@ export interface StaffLoginResponse {
       email: string
       role: "DRIVER" | "ADMIN" | "EV_CHARGER_MANAGER" | "PARKING_MANAGER" | string
     }
+    setupData?: StaffSetupData
     devOtp?: string
   }
 }
@@ -179,3 +189,52 @@ export const staffEnableTOTPApi = async (
     }
   }
 }
+
+/**
+ * Regenerate or fetch TOTP setup payload during pending staff login (before full session)
+ */
+export const staffSetupPendingTOTPApi = async (
+  mfaToken: string,
+): Promise<StaffTOTPSetupResponse> => {
+  try {
+    const res = await axiosInstance.post("/auth/staff/totp/setup-pending", {
+      mfaToken,
+    })
+    return res.data
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to setup authenticator app"
+    return {
+      success: false,
+      message,
+    }
+  }
+}
+
+/**
+ * Confirm and enable TOTP during pending staff login and retrieve authenticated tokens
+ */
+export const staffEnablePendingTOTPApi = async (
+  mfaToken: string,
+  code?: string,
+): Promise<StaffVerifyMFAResponse> => {
+  try {
+    const res = await axiosInstance.post("/auth/staff/totp/enable-pending", {
+      mfaToken,
+      ...(code ? { code } : {}),
+    })
+    return res.data
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to activate authenticator app"
+    return {
+      success: false,
+      message,
+    }
+  }
+}
+

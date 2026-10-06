@@ -198,23 +198,23 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
           className="flex items-center gap-3"
         >
           <div className="relative">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-2xl shadow-primary/30">
-              <Bus className="h-7 w-7 text-white" />
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <Bus className="h-6 w-6 text-white" />
             </div>
-            <div className="absolute -inset-1 bg-gradient-to-br from-primary/50 to-transparent rounded-2xl blur-xl -z-10" />
+            <div className="absolute -inset-1 bg-gradient-to-tr from-orange-500/40 to-transparent rounded-2xl blur-lg -z-10" />
           </div>
           <div>
-            <span className="text-3xl font-bold text-white font-grotesk">
-              HabeshaGo
+            <span className="text-2xl font-extrabold tracking-tight text-white font-grotesk">
+              Habesha<span className="text-orange-500">Go</span>
             </span>
-            <span className="block text-xs text-white/60 mt-1">
-              Travel smarter
+            <span className="block text-xs text-white/70 font-medium">
+              Travel smarter across Ethiopia
             </span>
           </div>
         </motion.div>
 
         {/* Text Content with Animations */}
-        <div className="max-w-xl mt-auto mb-20">
+        <div className="max-w-xl mt-auto mb-16">
           <motion.div
             key={slideIndex}
             initial={{ opacity: 0, y: 20 }}
@@ -223,19 +223,19 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
           >
             {/* Accent Badge */}
             <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-${slide.accent}/10 backdrop-blur-xl border border-white/10 mb-6`}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 mb-5"
             >
               <div
-                className={`w-2 h-2 rounded-full bg-${slide.accent} animate-pulse`}
+                className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"
               />
               <span
-                className={`text-xs font-medium text-${slide.accent} font-jakarta`}
+                className="text-xs font-semibold text-orange-300 font-jakarta"
               >
-                New Feature
+                HabeshaGo Transit
               </span>
             </div>
 
-            <h1 className="text-5xl font-bold text-white mb-4 leading-tight font-mozilla">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-jakarta tracking-tight">
               {slide.title}
             </h1>
 

@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeft,
-  Smartphone,
   Key,
   AlertCircle,
   Copy,
@@ -27,7 +26,7 @@ import { toast } from "sonner"
 import { useDispatch } from "react-redux"
 import { setAccessToken, setUser } from "@/store/slices/userSlice"
 import { AppDispatch } from "@/store"
-import { getMe, verifyOTP } from "@/services/auth.user.api"
+import { getMe, verifyOTP, register } from "@/services/auth.user.api"
 import { AuthSlider } from "@/components/AuthSlider"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -110,9 +109,14 @@ function VerifyPageContent() {
   }
 
   const resendOtp = async () => {
-    if (!canResend) return
+    if (!canResend || !email) return
 
     try {
+      const res = await register({ email })
+      if (!res?.success) {
+        toast.error(res?.message || "Failed to resend code")
+        return
+      }
       setResendCooldown(60)
       setCanResend(false)
       setAttempts(0)
@@ -194,363 +198,246 @@ function VerifyPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
+    <div className="h-screen max-h-screen overflow-hidden flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-inter">
+      {/* Left Side: Visual Showcase Slider */}
       <AuthSlider />
 
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10"
-      >
+      {/* Right Side: Clean Centered Verify Card (No Scrolling) */}
+      <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-hidden font-inter">
         <div className="w-full max-w-md mx-auto">
-          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden p-6 sm:p-8">
-            <CardContent className="p-0">
+          <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
+            <CardContent className="p-7 sm:p-9 space-y-6">
               {/* Back Button */}
               <button
+                type="button"
                 onClick={() => router.back()}
-                className="mb-6 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer font-inter"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back
+                <span>Back</span>
               </button>
 
-          {/* Header */}
-          <div className="mb-10">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mb-6"
-            >
-              <div
-                className={cn(
-                  "inline-flex p-3 rounded-2xl bg-gradient-to-br relative",
-                  verificationStatus === "success"
-                    ? "from-green-500/20 to-emerald-500/20"
-                    : verificationStatus === "error"
-                      ? "from-destructive/20 to-rose-500/20"
-                      : "from-primary/20 to-primary/5",
-                )}
-              >
-                <AnimatePresence mode="wait">
-                  {verificationStatus === "success" ? (
-                    <motion.div
-                      key="success"
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      exit={{ scale: 0, rotate: 180 }}
-                    >
-                      <CheckCircle2 className="h-8 w-8 text-green-500" />
-                    </motion.div>
-                  ) : verificationStatus === "error" ? (
-                    <motion.div
-                      key="error"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                    >
-                      <XCircle className="h-8 w-8 text-destructive" />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="idle"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                    >
-                      <Shield className="h-8 w-8 text-primary" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-
-            <motion.h1
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-3xl font-bold mb-2"
-            >
-              Verify your email
-            </motion.h1>
-
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="text-muted-foreground"
-            >
-              We've sent a 6-digit code to
-            </motion.p>
-          </div>
-
-          {/* Email Display */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mb-10"
-          >
-            <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-accent  transition-colors group">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Mail className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span className="font-mono text-sm text-foreground">
-                    {maskedEmail}
+              {/* Header */}
+              <div className="text-center space-y-2">
+                <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
+                  <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-inter">
+                    Habesha<span className="text-orange-500">Go</span>
                   </span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Check your inbox
-                  </p>
+                </div>
+
+                <div className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-1">
+                  <AnimatePresence mode="wait">
+                    {verificationStatus === "success" ? (
+                      <motion.div
+                        key="success"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        exit={{ scale: 0, rotate: 180 }}
+                      >
+                        <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+                      </motion.div>
+                    ) : verificationStatus === "error" ? (
+                      <motion.div
+                        key="error"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                      >
+                        <XCircle className="h-7 w-7 text-red-500" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="idle"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                      >
+                        <Shield className="h-7 w-7 text-orange-500" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-inter">
+                  Verify your email
+                </h1>
+
+                <p className="text-xs sm:text-sm text-slate-500 font-inter">
+                  We've sent a 6-digit code to
+                </p>
+
+                {/* Email Chip */}
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-xs mt-1">
+                  <Mail className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                  <span className="font-semibold text-slate-800 font-inter">
+                    {maskedEmail || email || "your email"}
+                  </span>
+                  {email && (
+                    <button
+                      type="button"
+                      onClick={copyEmail}
+                      className="p-1 hover:bg-slate-200/70 rounded-md text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                      title="Copy email"
+                    >
+                      {copied ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={copyEmail}
-                className="p-2 hover:bg-muted rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+
+              {/* OTP Input Section */}
+              <div
+                ref={otpContainerRef}
+                className="space-y-4"
+                onKeyDown={handleKeyDown}
               >
-                {copied ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-          </motion.div>
+                <div className="flex justify-center py-1">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={handleOtpChange}
+                    disabled={
+                      verifyPending ||
+                      verificationStatus === "verifying" ||
+                      verificationStatus === "success"
+                    }
+                  >
+                    <InputOTPGroup className="gap-2 sm:gap-2.5">
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <InputOTPSlot
+                          key={index}
+                          index={index}
+                          ref={index === 0 ? firstSlotRef : undefined}
+                          className={cn(
+                            "h-12 w-10 sm:h-13 sm:w-11 text-lg font-bold bg-white border border-slate-200 rounded-xl text-slate-900 transition-all font-inter shadow-none",
+                            "data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20",
+                            verificationStatus === "error" &&
+                              "border-red-400 bg-red-50/30 text-red-700",
+                            verificationStatus === "success" &&
+                              "border-emerald-500 bg-emerald-50/30 text-emerald-700",
+                          )}
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
 
-          {/* OTP Input Section */}
-          <motion.div
-            ref={otpContainerRef}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="mb-8"
-          >
-            <div
-              className="flex flex-col items-center"
-              onKeyDown={handleKeyDown}
-            >
-              <InputOTP
-                maxLength={6}
-                value={otp}
-                onChange={handleOtpChange}
-                className="gap-3"
-                disabled={
-                  verifyPending ||
-                  verificationStatus === "verifying" ||
-                  verificationStatus === "success"
-                }
-              >
-                <InputOTPGroup>
-                  {[0, 1, 2].map((index) => (
-                    <InputOTPSlot
-                      key={index}
-                      index={index}
-                      ref={index === 0 ? firstSlotRef : undefined}
-                      className={cn(
-                        "h-16 w-16 text-2xl font-bold border-2 transition-all duration-200",
-                        verificationStatus === "error"
-                          ? "border-destructive bg-destructive/5"
-                          : verificationStatus === "success"
-                            ? "border-green-500 bg-green-500/5"
-                            : "border-slate-200 dark:border-slate-800 focus:border-primary",
+                {/* Status / Feedback Messages */}
+                <div className="text-center min-h-[20px]">
+                  <AnimatePresence mode="wait">
+                    {verificationStatus === "verifying" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        className="flex items-center justify-center gap-1.5 text-xs text-orange-600 font-medium font-inter"
+                      >
+                        <Loader className="h-3.5 w-3.5 animate-spin" />
+                        <span>Verifying your code...</span>
+                      </motion.div>
+                    )}
+
+                    {isOtpCompleted &&
+                      verificationStatus === "idle" &&
+                      !verifyPending && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center justify-center gap-1.5 text-xs text-orange-600 font-medium font-inter"
+                        >
+                          <Loader className="h-3 w-3 animate-spin" />
+                          <span>Auto-verifying...</span>
+                        </motion.div>
                       )}
-                    />
-                  ))}
-                </InputOTPGroup>
-                <InputOTPGroup>
-                  {[3, 4, 5].map((index) => (
-                    <InputOTPSlot
-                      key={index}
-                      index={index}
-                      className={cn(
-                        "h-16 w-16 text-2xl font-bold border-2 transition-all duration-200",
-                        verificationStatus === "error"
-                          ? "border-destructive bg-destructive/5"
-                          : verificationStatus === "success"
-                            ? "border-green-500 bg-green-500/5"
-                            : "border-slate-200 dark:border-slate-800 focus:border-primary",
-                      )}
-                    />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
 
-            {/* Status Messages */}
-            <div className="mt-6 text-center min-h-[40px]">
-              <AnimatePresence mode="wait">
-                {verificationStatus === "verifying" && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="flex items-center justify-center gap-2 text-primary"
-                  >
-                    <Loader className="h-4 w-4 animate-spin" />
-                    <span>Verifying your code...</span>
-                  </motion.div>
-                )}
+                    {attempts > 0 && verificationStatus === "idle" && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center justify-center gap-1.5 text-xs text-red-600 font-medium font-inter"
+                      >
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span>{3 - attempts} attempts remaining</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-                {isOtpCompleted &&
-                  verificationStatus === "idle" &&
-                  !verifyPending && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center justify-center gap-2 text-primary"
-                    >
-                      <Loader className="h-3 w-3 animate-spin" />
-                      <span className="text-sm">Auto-verifying...</span>
-                    </motion.div>
-                  )}
-
-                {attempts > 0 && verificationStatus === "idle" && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-                  >
-                    <AlertCircle className="h-3 w-3" />
-                    <span>{3 - attempts} attempts remaining</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Verify Button */}
-            <Button
-              className={cn(
-                "w-full h-11 text-sm font-semibold mt-4 rounded-xl shadow-none transition-colors cursor-pointer",
-                verificationStatus === "success"
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white",
-              )}
-              disabled={
-                verifyPending ||
-                !isOtpCompleted ||
-                verificationStatus === "verifying" ||
-                verificationStatus === "success"
-              }
-              onClick={verifyAccount}
-            >
-              <AnimatePresence mode="wait">
-                {verifyPending || verificationStatus === "verifying" ? (
-                  <motion.div
-                    key="verifying"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
-                    <Loader className="animate-spin h-5 w-5" />
-                    Verifying...
-                  </motion.div>
-                ) : verificationStatus === "success" ? (
-                  <motion.div
-                    key="success"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="h-5 w-5" />
-                    Verified!
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="verify"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
-                    <Key className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-                    Verify Account
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Button>
-          </motion.div>
-
-          {/* Resend Section */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="space-y-6"
-          >
-            {/* Timer Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Timer className="h-4 w-4" />
-                  Code expires in
-                </span>
-                <span
+                {/* Verify Button */}
+                <Button
                   className={cn(
-                    "font-mono font-medium",
-                    resendCooldown < 10 && "text-destructive animate-pulse",
+                    "w-full h-11 text-sm font-semibold rounded-xl shadow-none transition-colors cursor-pointer font-inter",
+                    verificationStatus === "success"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white",
                   )}
+                  disabled={
+                    verifyPending ||
+                    !isOtpCompleted ||
+                    verificationStatus === "verifying" ||
+                    verificationStatus === "success"
+                  }
+                  onClick={verifyAccount}
                 >
-                  {formatTime(resendCooldown)}
-                </span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: "100%" }}
-                  animate={{ width: `${(resendCooldown / 60) * 100}%` }}
-                  className={cn(
-                    "h-full rounded-full",
-                    resendCooldown < 10 ? "bg-destructive" : "bg-primary",
+                  {verifyPending || verificationStatus === "verifying" ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader className="animate-spin h-4 w-4 text-white" />
+                      <span>Verifying...</span>
+                    </div>
+                  ) : verificationStatus === "success" ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-white" />
+                      <span>Verified!</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Key className="h-4 w-4 text-white" />
+                      <span>Verify Code</span>
+                    </div>
                   )}
-                />
+                </Button>
+
+                {/* Resend & Expiry Timer Row (No Progress Bar) */}
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-inter">
+                  <div className="flex items-center gap-1.5">
+                    <Timer className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Expires in</span>
+                    <span
+                      className={cn(
+                        "font-semibold text-slate-700 font-inter",
+                        resendCooldown < 10 && "text-red-500 animate-pulse",
+                      )}
+                    >
+                      {formatTime(resendCooldown)}
+                    </span>
+                  </div>
+
+                  {canResend ? (
+                    <button
+                      type="button"
+                      onClick={resendOtp}
+                      disabled={verificationStatus === "verifying"}
+                      className="text-orange-600 hover:text-orange-700 font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer font-inter"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Resend code</span>
+                    </button>
+                  ) : (
+                    <span className="text-slate-400 font-inter">
+                      Resend in {resendCooldown}s
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={resendOtp}
-              disabled={
-                !canResend ||
-                verificationStatus === "verifying" ||
-                verificationStatus === "success"
-              }
-              className="w-full h-12 border-2 hover:bg-muted/50 transition-all disabled:opacity-50"
-            >
-              <RefreshCw
-                className={cn(
-                  "mr-2 h-4 w-4",
-                  canResend &&
-                    "group-hover:rotate-180 transition-transform duration-500",
-                )}
-              />
-              Resend Code
-            </Button>
-
-            {/* Help Text */}
-            <p className="text-xs text-center text-muted-foreground">
-              Didn't receive the code? Check your spam folder or{" "}
-              <button
-                onClick={() => toast.info("Contacting support...")}
-                className="text-primary hover:underline font-medium"
-              >
-                contact support
-              </button>
-            </p>
-
-            {/* Device Trust */}
-            <div className="flex items-center justify-center gap-2 pt-4 text-xs text-slate-400 border-t border-slate-100">
-              <Smartphone className="h-3 w-3" />
-              <span>Trust this device? You won't need to verify again</span>
-            </div>
-          </motion.div>
-          </CardContent>
+            </CardContent>
           </Card>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

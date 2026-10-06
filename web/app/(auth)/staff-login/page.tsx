@@ -38,6 +38,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp"
 import { cn } from "@/lib/utils"
+import type { User } from "@/types/user"
 import { setAccessToken, setUser } from "@/store/slices/userSlice"
 import {
   staffLoginApi,
@@ -45,6 +46,7 @@ import {
   staffResendMFAApi,
   staffSetupTOTPApi,
   staffEnableTOTPApi,
+  type StaffAuthUser,
 } from "@/services/staff.auth.api"
 
 export default function StaffLoginPage() {
@@ -106,6 +108,10 @@ export default function StaffLoginPage() {
   const [setupSuccess, setSetupSuccess] = useState(false)
   const [copiedSecret, setCopiedSecret] = useState(false)
   const [copiedPhrases, setCopiedPhrases] = useState(false)
+  const [setupSession, setSetupSession] = useState<{
+    accessToken: string
+    user: StaffAuthUser
+  } | null>(null)
 
   // Keyboard CapsLock detection
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -153,13 +159,6 @@ export default function StaffLoginPage() {
       handleVerifyMFA(totpCode)
     }
   }, [totpCode, mfaTab])
-
-  // Auto-submit 6-digit Email OTP code
-  useEffect(() => {
-    if (mfaTab === "email" && emailOtpCode.length === 6 && !verifyPending) {
-      handleVerifyMFA(emailOtpCode)
-    }
-  }, [emailOtpCode, mfaTab])
 
   // -------------------------------------------------------------
   // STEP 1: Submit Credentials
@@ -213,6 +212,22 @@ export default function StaffLoginPage() {
   // -------------------------------------------------------------
   // STEP 2: Verify MFA (TOTP / Recovery Phrase / Email OTP)
   // -------------------------------------------------------------
+  const finishLogin = (accessToken: string, user: StaffAuthUser) => {
+    dispatch(setAccessToken(accessToken))
+    dispatch(setUser({ user: user as unknown as User }))
+    if (typeof window !== "undefined") {
+      localStorage.setItem("habeshagoUser", JSON.stringify(user))
+    }
+
+    toast.success(`Welcome back, ${user.name || user.email}!`)
+    setTimeout(() => {
+      if (user.role === "ADMIN") router.replace("/admin")
+      else if (user.role === "EV_CHARGER_MANAGER") router.replace("/ev-charge-manager")
+      else if (user.role === "PARKING_MANAGER") router.replace("/admin/manage-parking")
+      else router.replace("/admin")
+    }, 500)
+  }
+
   const handleVerifyMFA = async (codeToVerify?: string) => {
     let code = codeToVerify
     if (!code) {
@@ -238,31 +253,7 @@ export default function StaffLoginPage() {
         return
       }
 
-      const { accessToken, user } = res.data
-
-      // Save user to Redux & LocalStorage
-      dispatch(setAccessToken(accessToken))
-      dispatch(setUser({ user: user as any }))
-      if (typeof window !== "undefined") {
-        localStorage.setItem("habeshagoUser", JSON.stringify(user))
-      }
-
-      toast.success(`Welcome back, ${user.name || user.email}!`)
-
-      // Smart redirection based on role
-      setTimeout(() => {
-        if (user.role === "ADMIN") {
-          router.replace("/admin")
-        } else if (user.role === "EV_CHARGER_MANAGER") {
-          router.replace("/ev-charge-manager")
-        } else if (user.role === "DRIVER") {
-          router.replace("/driver")
-        } else if (user.role === "PARKING_MANAGER") {
-          router.replace("/admin")
-        } else {
-          router.replace("/admin")
-        }
-      }, 500)
+      finishLogin(res.data.accessToken, res.data.user)
     } catch (err: any) {
       toast.error("MFA verification failed. Please try again.")
     } finally {
@@ -299,13 +290,34 @@ export default function StaffLoginPage() {
   // Load TOTP Setup Details (Modal, after email & password)
   // -------------------------------------------------------------
   const openSetupModal = async () => {
+    if (emailOtpCode.length !== 6) {
+      toast.error("Enter the 6-digit email code before setting up the app")
+      return
+    }
     setShowSetupModal(true)
     setSetupSuccess(false)
     setSetupTestCode("")
     setSetupLoading(true)
 
     try {
-      const res = await staffSetupTOTPApi(mfaToken)
+      // First complete the existing email second factor. TOTP enrollment is
+      // allowed only with the resulting full access token, never an MFA token.
+      const verified = await staffVerifyMFAApi({
+        mfaToken,
+        code: emailOtpCode,
+      })
+      if (!verified.success || !verified.data) {
+        toast.error(verified.message || "Invalid email verification code")
+        setShowSetupModal(false)
+        return
+      }
+      const session = {
+        accessToken: verified.data.accessToken,
+        user: verified.data.user,
+      }
+      setSetupSession(session)
+
+      const res = await staffSetupTOTPApi(session.accessToken)
       if (res.success && res.data) {
         setSetupData(res.data)
       } else {
@@ -327,17 +339,24 @@ export default function StaffLoginPage() {
 
     setSetupActivating(true)
     try {
-      const res = await staffEnableTOTPApi(setupTestCode, mfaToken)
+      if (!setupSession) {
+        toast.error("Secure setup session expired. Please sign in again.")
+        return
+      }
+      const res = await staffEnableTOTPApi(
+        setupTestCode,
+        setupSession.accessToken,
+      )
       if (res.success) {
         setSetupSuccess(true)
         toast.success("Google Authenticator successfully activated!")
         setMfaMethod("TOTP_OR_EMAIL")
         setMfaTab("totp")
 
-        // Automatically log in with the verified 6-digit code
+        // The email challenge already established the authenticated session.
         setTimeout(() => {
           setShowSetupModal(false)
-          handleVerifyMFA(setupTestCode)
+          finishLogin(setupSession.accessToken, setupSession.user)
         }, 1000)
       } else {
         toast.error(res.message || "Invalid 6-digit code")
@@ -346,6 +365,13 @@ export default function StaffLoginPage() {
       toast.error("Activation failed")
     } finally {
       setSetupActivating(false)
+    }
+  }
+
+  const closeSetupModal = () => {
+    setShowSetupModal(false)
+    if (setupSession && !setupSuccess) {
+      finishLogin(setupSession.accessToken, setupSession.user)
     }
   }
 
@@ -395,7 +421,7 @@ export default function StaffLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 text-slate-900 flex items-center justify-center p-4 selection:bg-orange-500/15 selection:text-orange-900 relative">
+    <div className="h-screen max-h-screen overflow-hidden flex items-center justify-center p-4 sm:p-6 bg-slate-50/60 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-inter relative">
       {/* Centered Flat Card with NO Shadow */}
       <div className="w-full max-w-md mx-auto">
         <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
@@ -415,17 +441,17 @@ export default function StaffLoginPage() {
                 >
                   <div className="text-center space-y-2">
                     <div className="inline-flex items-center gap-2 mb-1">
-                      <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                      <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-inter">
                         Habesha<span className="text-orange-500">Go</span>
                       </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-200">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-200 font-inter">
                         Staff
                       </span>
                     </div>
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight font-jakarta">
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight font-inter">
                       Staff Sign In
                     </h1>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 font-inter">
                       Enter your work email and password to continue.
                     </p>
                   </div>
@@ -693,7 +719,8 @@ export default function StaffLoginPage() {
                         <button
                           type="button"
                           onClick={openSetupModal}
-                          className="text-orange-600 hover:text-orange-700 font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          disabled={verifyPending || emailOtpCode.length !== 6}
+                          className="text-orange-600 hover:text-orange-700 disabled:text-slate-400 disabled:cursor-not-allowed font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <QrCode className="h-3.5 w-3.5" />
                           <span>Set Up 2FA App</span>
@@ -790,16 +817,10 @@ export default function StaffLoginPage() {
                           )}
                         </Button>
 
-                        <div className="text-center">
-                          <button
-                            type="button"
-                            onClick={openSetupModal}
-                            className="text-xs text-slate-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <QrCode className="h-3.5 w-3.5" />
-                            <span>Re-scan QR Code to setup on new device</span>
-                          </button>
-                        </div>
+                        <p className="text-center text-xs text-slate-500">
+                          Need to move 2FA to a new device? Contact an administrator
+                          for a secure reset.
+                        </p>
                       </TabsContent>
 
                       {/* TAB 2: Recovery Phrase */}
@@ -819,7 +840,7 @@ export default function StaffLoginPage() {
                             <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input
                               type="text"
-                              placeholder="word-word-number (e.g. falcon-ember-482)"
+                              placeholder="Paste one complete saved recovery phrase"
                               value={recoveryPhrase}
                               onChange={(e) =>
                                 setRecoveryPhrase(e.target.value.toLowerCase())
@@ -949,7 +970,7 @@ export default function StaffLoginPage() {
               {/* Close Button */}
               <button
                 type="button"
-                onClick={() => setShowSetupModal(false)}
+                onClick={closeSetupModal}
                 className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -961,7 +982,7 @@ export default function StaffLoginPage() {
                   <ShieldCheck className="h-3.5 w-3.5" />
                   <span>Set Up Two-Factor Authentication</span>
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight font-jakarta">
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight font-inter">
                   Google Authenticator & Backup Phrases
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -1084,7 +1105,7 @@ export default function StaffLoginPage() {
                       {setupData.recoveryPhrases.map((phrase, idx) => (
                         <div
                           key={idx}
-                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xs text-slate-800 shadow-none"
+                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xs text-slate-800 shadow-none break-words"
                         >
                           <span className="text-[10px] text-slate-400 block">
                             #{idx + 1}

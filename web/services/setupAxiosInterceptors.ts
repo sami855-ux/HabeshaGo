@@ -19,14 +19,26 @@ export const setupAxiosInterceptors = (store: AppStore) => {
     async (error) => {
       const originalRequest = error.config
 
+      const isNonRefreshableAuthUrl =
+        originalRequest.url?.includes("/auth/refresh") ||
+        originalRequest.url?.includes("/auth/logout") ||
+        originalRequest.url?.includes("/auth/staff/login") ||
+        originalRequest.url?.includes("/auth/staff/mfa/verify") ||
+        originalRequest.url?.includes("/auth/register") ||
+        originalRequest.url?.includes("/auth/verify-otp")
+
       if (
         error.response?.status === 401 &&
         !originalRequest._retry &&
-        !originalRequest.url?.includes("/auth/refresh")
+        !isNonRefreshableAuthUrl
       ) {
         originalRequest._retry = true
         try {
-          const res = await axiosInstance.post("/auth/refresh")
+          const res = await axiosInstance.post(
+            "/auth/refresh",
+            {},
+            { withCredentials: true },
+          )
           const newToken = res.data.accessToken
 
           store.dispatch(setAccessToken(newToken))
@@ -35,10 +47,22 @@ export const setupAxiosInterceptors = (store: AppStore) => {
 
           return axiosInstance(originalRequest)
         } catch (err) {
-          console.log("Axios", err)
           store.dispatch(clearUser())
-          // ✅ reset isReady so useRequireRole can redirect cleanly
-          window.location.replace("/login?error=axios")
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("habeshagoUser")
+            const pathname = window.location.pathname
+            const isStaffRoute =
+              pathname.startsWith("/admin") ||
+              pathname.startsWith("/ev-charge-manager") ||
+              pathname.startsWith("/staff")
+            if (isStaffRoute) {
+              if (pathname !== "/staff-login") {
+                window.location.replace("/staff-login")
+              }
+            } else if (pathname.startsWith("/user")) {
+              window.location.replace("/login")
+            }
+          }
         }
       }
 

@@ -210,26 +210,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
+    <div className="h-screen max-h-screen overflow-hidden flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-inter">
       {/* Left Side: Visual Showcase Slider */}
       <AuthSlider />
 
       {/* Right Side: Clean Centered Register Card */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
+      <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-y-auto lg:overflow-hidden font-inter">
         <div className="w-full max-w-md mx-auto">
           <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
             <CardContent className="p-7 sm:p-9 space-y-6">
               {/* Header */}
               <div className="text-center space-y-1.5">
                 <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                  <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-inter">
                     Habesha<span className="text-orange-500">Go</span>
                   </span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-jakarta">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-inter">
                   Create an account
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500">
+                <p className="text-xs sm:text-sm text-slate-500 font-inter">
                   Sign up in seconds to start booking trips and passes
                 </p>
               </div>

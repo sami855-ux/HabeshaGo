@@ -188,17 +188,22 @@ export default function PhoneLoginPage() {
           const userRes = await getMe()
 
           if (userRes.success) {
-            console.log(userRes.user.role)
             dispatch(setUser({ user: userRes.user }))
+            if (typeof window !== "undefined") {
+              localStorage.setItem("habeshagoUser", JSON.stringify(userRes.user))
+            }
 
             setTimeout(() => {
               if (userRes.user.role === "PASSENGER") {
                 router.push("/user")
-              }
-              if (userRes.user.role === "ADMIN") {
+              } else if (userRes.user.role === "EV_CHARGER_MANAGER") {
+                router.push("/ev-charge-manager")
+              } else if (userRes.user.role === "PARKING_MANAGER") {
+                router.push("/admin/manage-parking")
+              } else {
                 router.push("/admin")
               }
-            }, 1000)
+            }, 800)
           }
         }
       } catch (error: any) {
@@ -251,22 +256,22 @@ export default function PhoneLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
+    <div className="h-screen max-h-screen overflow-hidden flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-inter">
       <AuthSlider />
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
+      <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-y-auto lg:overflow-hidden font-inter">
         <div className="w-full max-w-md mx-auto">
           <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
             <CardHeader className="text-center p-6 pb-2 sm:p-8 sm:pb-2">
               <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
-                <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-inter">
                   Habesha<span className="text-orange-500">Go</span>
                 </span>
               </div>
-              <CardTitle className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-jakarta">
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-inter">
                 Phone Verification
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm text-slate-500">
+              <CardDescription className="text-xs sm:text-sm text-slate-500 font-inter">
                 Sign in or register with your Ethiopian mobile number
               </CardDescription>
             </CardHeader>
@@ -435,7 +440,7 @@ export default function PhoneLoginPage() {
                     {countdown > 0 ? (
                       <span className="text-sm text-muted-foreground">
                         Resend in{" "}
-                        <span className="font-mono font-bold">
+                        <span className="font-inter font-bold">
                           {countdown}s
                         </span>
                       </span>

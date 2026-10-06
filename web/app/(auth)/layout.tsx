@@ -2,8 +2,8 @@ import { ReactNode } from "react"
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className=" ">
-      <div className="">{children}</div>
+    <div className="h-screen w-full overflow-hidden font-inter">
+      {children}
     </div>
   )
 }

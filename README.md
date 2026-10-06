@@ -67,6 +67,28 @@ The application follows a modern full-stack architecture:
 ### Authentication
 - JWT Authentication
 - Role-Based Access Control (RBAC)
+- Staff email/password authentication with Google Authenticator TOTP and
+  single-use recovery phrases
+
+### Staff MFA configuration
+
+The backend requires a dedicated 32-byte key for encrypting authenticator
+secrets. Generate one for each environment and store it in the server's secret
+manager or local `.env` file:
+
+```bash
+openssl rand -base64 32
+```
+
+Set the result as `MFA_ENCRYPTION_KEY`, then apply the database migration before
+starting the server:
+
+```bash
+cd server
+npx prisma migrate deploy
+```
+
+Do not reuse `JWT_SECRET` as the MFA encryption key, and do not commit the key.
 
 ---
 

@@ -118,16 +118,13 @@ export const getMe = async (accessToken?: string) => {
       }),
     })
 
-    if (res.data.success) {
+    if (res.data?.success && res.data?.user) {
       return res.data
-    } else {
-      return {
-        success: false,
-      }
     }
+    throw new Error(res.data?.message || "Failed to fetch user")
   } catch (error) {
     console.error("Failed to fetch user:", error)
-    return { success: false }
+    throw error
   }
 }
 

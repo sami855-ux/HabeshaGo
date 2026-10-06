@@ -89,18 +89,16 @@ function Header({ className }: { className?: string }) {
   const handleLogout = async () => {
     setIsLoading(true)
     try {
-      router.push("/")
       await logoutUser()
-
-      setTimeout(() => {
-        dispatch(clearUser())
-      }, 2000)
-
-      localStorage.removeItem("habeshagoUser")
     } catch (error) {
       console.error("Logout failed:", error)
     } finally {
+      dispatch(clearUser())
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("habeshagoUser")
+      }
       setIsLoading(false)
+      router.replace("/staff-login")
     }
   }
 

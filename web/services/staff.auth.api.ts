@@ -28,20 +28,22 @@ export interface StaffVerifyMFAPayload {
   code: string
 }
 
+export interface StaffAuthUser {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  avaterUrl?: string | null
+  phone?: string | null
+}
+
 export interface StaffVerifyMFAResponse {
   success: boolean
   message?: string
   data?: {
     accessToken: string
     refreshToken: string
-    user: {
-      id: string
-      name: string | null
-      email: string
-      role: string
-      avaterUrl?: string | null
-      phone?: string | null
-    }
+    user: StaffAuthUser
   }
 }
 
@@ -62,7 +64,6 @@ export interface StaffTOTPEnableResponse {
   message?: string
   data?: {
     enabled: boolean
-    savedRecoveryPhrases: string[]
     notice: string
   }
 }
@@ -129,7 +130,7 @@ export const staffResendMFAApi = async (mfaToken: string) => {
 }
 
 /**
- * Fetch TOTP setup payload (QR Code + Recovery Phrases)
+ * Fetch TOTP setup payload after completing email MFA.
  */
 export const staffSetupTOTPApi = async (
   token?: string,
@@ -152,7 +153,7 @@ export const staffSetupTOTPApi = async (
 }
 
 /**
- * Confirm and enable TOTP with test 6-digit code
+ * Confirm and enable TOTP with a full access token.
  */
 export const staffEnableTOTPApi = async (
   code: string,

@@ -161,15 +161,21 @@ function VerifyPageContent() {
 
           if (userRes.success) {
             dispatch(setUser({ user: userRes.user }))
+            if (typeof window !== "undefined") {
+              localStorage.setItem("habeshagoUser", JSON.stringify(userRes.user))
+            }
 
             setTimeout(() => {
               if (userRes.user.role === "PASSENGER") {
                 router.push("/user")
-              }
-              if (userRes.user.role === "ADMIN") {
+              } else if (userRes.user.role === "EV_CHARGER_MANAGER") {
+                router.push("/ev-charge-manager")
+              } else if (userRes.user.role === "PARKING_MANAGER") {
+                router.push("/admin/manage-parking")
+              } else {
                 router.push("/admin")
               }
-            }, 1000)
+            }, 800)
           }
         }
       } catch (error: any) {

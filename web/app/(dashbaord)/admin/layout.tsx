@@ -47,7 +47,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
-  useRequireRole(["ADMIN"])
+  useRequireRole(["ADMIN", "PARKING_MANAGER"])
   useOAuthExchange()
 
   return (

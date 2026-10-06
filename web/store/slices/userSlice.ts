@@ -37,6 +37,9 @@ export const fetchCurrentUser = createAsyncThunk(
 
       // Fetch from backend — pass token explicitly if provided
       const response = await getMe(accessToken)
+      if (!response?.user) {
+        throw new Error("No user profile returned")
+      }
       const backendUser = response.user
 
       if (typeof window !== "undefined") {
@@ -78,6 +81,9 @@ const userSlice = createSlice({
       state.accessToken = null
       state.isAuthenticated = false
       state.isReady = false
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("habeshagoUser")
+      }
     },
     markReady: (state) => {
       state.isReady = true

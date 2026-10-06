@@ -398,7 +398,7 @@ export default function StaffLoginPage() {
     <div className="min-h-screen bg-slate-50/60 text-slate-900 flex items-center justify-center p-4 selection:bg-orange-500/15 selection:text-orange-900 relative">
       {/* Centered Flat Card with NO Shadow */}
       <div className="w-full max-w-md mx-auto">
-        <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+        <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
           <CardContent className="p-7 sm:p-8">
             <AnimatePresence mode="wait">
               {/* -------------------------------------------------------- */}

@@ -217,7 +217,7 @@ export default function RegisterPage() {
       {/* Right Side: Clean Centered Register Card */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md mx-auto">
-          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+          <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
             <CardContent className="p-7 sm:p-9 space-y-6">
               {/* Header */}
               <div className="text-center space-y-1.5">
@@ -397,27 +397,6 @@ export default function RegisterPage() {
                 </Link>
               </div>
 
-              {/* Terms notice */}
-              <div className="pt-3 border-t border-slate-100 text-center space-y-2">
-                <p className="text-[11px] text-slate-400">
-                  By registering, you agree to HabeshaGo's{" "}
-                  <button
-                    type="button"
-                    onClick={() => toast.info("Terms of Service")}
-                    className="text-slate-600 hover:text-slate-900 underline underline-offset-2"
-                  >
-                    Terms
-                  </button>{" "}
-                  &{" "}
-                  <button
-                    type="button"
-                    onClick={() => toast.info("Privacy Policy")}
-                    className="text-slate-600 hover:text-slate-900 underline underline-offset-2"
-                  >
-                    Privacy Policy
-                  </button>
-                </p>
-              </div>
             </CardContent>
           </Card>
         </div>

@@ -251,40 +251,36 @@ export default function PhoneLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
+    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
       <AuthSlider />
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6">
-        <Card className="w-full max-w-md shadow-none border-none bg-background">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-mozilla">
-              Welcome to HabeshaGo
-            </CardTitle>
-            <CardDescription>
-              Verify your phone number to continue
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-muted-foreground hover:text-foreground -mt-2"
-              onClick={() => router.push("/login")}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Back to email login
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-3 text-muted-foreground">
-                  Phone verification
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-md mx-auto">
+          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden">
+            <CardHeader className="text-center p-6 pb-2 sm:p-8 sm:pb-2">
+              <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
+                <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-grotesk">
+                  Habesha<span className="text-orange-500">Go</span>
                 </span>
               </div>
-            </div>
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-jakarta">
+                Phone Verification
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm text-slate-500">
+                Sign in or register with your Ethiopian mobile number
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-6 pt-2 sm:p-8 sm:pt-2 space-y-5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 -ml-2 h-8 px-2"
+                onClick={() => router.push("/login")}
+              >
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                Back to email login
+              </Button>
 
             {!otpSent ? (
               <div className="space-y-4">
@@ -355,8 +351,7 @@ export default function PhoneLoginPage() {
                 <Button
                   onClick={sendOtp}
                   disabled={!phoneNumber || !!phoneError || sendOtpPending}
-                  className="w-full h-12 transition-all"
-                  size="lg"
+                  className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm shadow-none transition-colors cursor-pointer"
                 >
                   {sendOtpPending ? (
                     <>
@@ -468,9 +463,9 @@ export default function PhoneLoginPage() {
                     variant="outline"
                     onClick={resetForm}
                     disabled={verifyOtpPending}
-                    className="h-12"
+                    className="h-11 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer shadow-none"
                   >
-                    <Phone className="h-4 w-4 mr-2" />
+                    <Phone className="h-3.5 w-3.5 mr-2" />
                     Change
                   </Button>
 
@@ -479,21 +474,21 @@ export default function PhoneLoginPage() {
                     disabled={
                       otp.length !== 6 || verifyOtpPending || otpVerified
                     }
-                    className="h-12 transition-all"
+                    className="h-11 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm shadow-none transition-colors cursor-pointer"
                   >
                     {verifyOtpPending ? (
                       <>
-                        <Loader className="h-4 w-4 animate-spin mr-2" />
+                        <Loader className="h-4 w-4 animate-spin mr-2 text-white" />
                         Verifying
                       </>
                     ) : otpVerified ? (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
+                        <Check className="h-4 w-4 mr-2 text-white" />
                         Verified
                       </>
                     ) : (
                       <>
-                        <Key className="h-4 w-4 mr-2" />
+                        <Key className="h-4 w-4 mr-2 text-white" />
                         Verify
                       </>
                     )}
@@ -523,6 +518,7 @@ export default function PhoneLoginPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {/* reCAPTCHA container */}

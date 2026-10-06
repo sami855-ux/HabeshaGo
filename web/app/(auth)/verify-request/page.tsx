@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   InputOTP,
   InputOTPGroup,
@@ -193,27 +194,26 @@ function VerifyPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
+    <div className="min-h-screen flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900">
       <AuthSlider />
 
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="flex w-full lg:w-1/2 items-center justify-center px-8 py-4"
+        className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-10"
       >
-        <div className="w-full max-w-md">
-          {/* Back Button */}
-          <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            onClick={() => router.back()}
-            className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-            Back
-          </motion.button>
+        <div className="w-full max-w-md mx-auto">
+          <Card className="bg-white border border-slate-200/90 rounded-2xl shadow-none overflow-hidden p-6 sm:p-8">
+            <CardContent className="p-0">
+              {/* Back Button */}
+              <button
+                onClick={() => router.back()}
+                className="mb-6 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+              </button>
 
           {/* Header */}
           <div className="mb-10">
@@ -423,9 +423,10 @@ function VerifyPageContent() {
             {/* Verify Button */}
             <Button
               className={cn(
-                "w-full h-14 text-base font-semibold mt-4 relative overflow-hidden group",
-                verificationStatus === "success" &&
-                  "bg-green-500 hover:bg-green-600",
+                "w-full h-11 text-sm font-semibold mt-4 rounded-xl shadow-none transition-colors cursor-pointer",
+                verificationStatus === "success"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white",
               )}
               disabled={
                 verifyPending ||
@@ -434,7 +435,6 @@ function VerifyPageContent() {
                 verificationStatus === "success"
               }
               onClick={verifyAccount}
-              size="lg"
             >
               <AnimatePresence mode="wait">
                 {verifyPending || verificationStatus === "verifying" ? (
@@ -542,11 +542,13 @@ function VerifyPageContent() {
             </p>
 
             {/* Device Trust */}
-            <div className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-center gap-2 pt-4 text-xs text-slate-400 border-t border-slate-100">
               <Smartphone className="h-3 w-3" />
               <span>Trust this device? You won't need to verify again</span>
             </div>
           </motion.div>
+          </CardContent>
+          </Card>
         </div>
       </motion.div>
     </div>

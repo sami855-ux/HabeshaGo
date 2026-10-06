@@ -1,15 +1,5 @@
 // components/auth/AuthSlider.tsx
-import {
-  Bus,
-  Wallet,
-  MapPin,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  Clock,
-  Shield,
-  CreditCard,
-} from "lucide-react"
+import { Bus } from "lucide-react"
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -54,19 +44,7 @@ const SLIDES = [
   },
 ]
 
-const FEATURES = [
-  { icon: <Bus className="h-4 w-4" />, label: "Bus Booking", color: "amber" },
-  { icon: <MapPin className="h-4 w-4" />, label: "Live Routes", color: "blue" },
-  { icon: <Wallet className="h-4 w-4" />, label: "Wallet", color: "green" },
-  { icon: <Shield className="h-4 w-4" />, label: "Secure", color: "purple" },
-]
 
-const STATS = [
-  { value: "50K+", label: "Happy Customers", icon: Star },
-  { value: "100+", label: "Daily Routes", icon: Clock },
-  { value: "99.9%", label: "Safety Rate", icon: Shield },
-  { value: "24/7", label: "Support", icon: CreditCard },
-]
 
 interface AuthSliderProps {
   autoPlayInterval?: number
@@ -125,7 +103,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
 
   return (
     <div
-      className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950"
+      className="hidden lg:flex lg:w-1/2 h-full relative overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950 font-inter"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -163,33 +141,10 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse animation-delay-2000" />
       </div>
 
-      {/* Modern Navigation Buttons */}
-      <div className="absolute right-8 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-3">
-        <button
-          onClick={prevSlide}
-          aria-label="Previous slide"
-          className="group relative w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-110"
-        >
-          <ChevronLeft className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-white group-hover:scale-110 transition-transform" />
-          <span className="absolute -left-20 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black/80 backdrop-blur-xl rounded-lg text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Previous
-          </span>
-        </button>
 
-        <button
-          onClick={nextSlide}
-          aria-label="Next slide"
-          className="group relative w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-110"
-        >
-          <ChevronRight className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-white group-hover:scale-110 transition-transform" />
-          <span className="absolute -right-20 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black/80 backdrop-blur-xl rounded-lg text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Next
-          </span>
-        </button>
-      </div>
 
       {/* Main Content */}
-      <div className="relative z-40 p-16 flex flex-col justify-between w-full">
+      <div className="relative z-40 p-16 flex flex-col justify-between w-full h-full">
         {/* Enhanced Logo with Glass Effect */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -204,7 +159,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             <div className="absolute -inset-1 bg-gradient-to-tr from-orange-500/40 to-transparent rounded-2xl blur-lg -z-10" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold tracking-tight text-white font-grotesk">
+            <span className="text-2xl font-extrabold tracking-tight text-white font-inter">
               Habesha<span className="text-orange-500">Go</span>
             </span>
             <span className="block text-xs text-white/70 font-medium">
@@ -229,13 +184,13 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
                 className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"
               />
               <span
-                className="text-xs font-semibold text-orange-300 font-jakarta"
+                className="text-xs font-semibold text-orange-300 font-inter"
               >
                 HabeshaGo Transit
               </span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-jakarta tracking-tight">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-inter tracking-tight">
               {slide.title}
             </h1>
 
@@ -248,25 +203,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             </p>
           </motion.div>
 
-          {/* Modern Feature Pills */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap gap-3 mt-8"
-          >
-            {FEATURES.map((f, i) => (
-              <div key={i} className="group relative">
-                <div className="flex items-center gap-2 rounded-full bg-white/5 backdrop-blur-xl borde-none px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-default">
-                  <span className={`text-${f.color}-400`}>{f.icon}</span>
-                  <span className="font-jakarta">{f.label}</span>
-                </div>
-                <div
-                  className={`absolute -inset-0.5 bg-gradient-to-r from-${f.color}-500/20 to-transparent rounded-full blur opacity-0 group-hover:opacity-100 transition-opacity -z-10`}
-                />
-              </div>
-            ))}
-          </motion.div>
+
         </div>
 
         {/* Enhanced Progress Dots */}
@@ -300,11 +237,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             ))}
           </div>
 
-          {/* Current Slide Indicator */}
-          <div className="text-xs text-white/40 font-mono">
-            {String(slideIndex + 1).padStart(2, "0")} /{" "}
-            {String(SLIDES.length).padStart(2, "0")}
-          </div>
+
         </motion.div>
       </div>
 

@@ -79,6 +79,7 @@ model User {
   agentStatus    SupportAgentStatus?
   ParkingSession ParkingSession[]
 
+  @@index([referredById])
   @@map("user")
 }
 

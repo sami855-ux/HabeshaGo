@@ -1052,29 +1052,70 @@ export const staffLogin = async (req, res) => {
       }),
     )
 
-    // Send MFA OTP code to staff email
-    const rawOtp = await sendOTP(user, "login")
-
-    // Generate short-lived MFA token (5 minutes)
+    // Generate short-lived MFA token
     const mfaToken = generateMFAToken({
       sub: user.id,
       email: user.email,
       role: user.role,
     })
 
+    if (hasTotp) {
+      // 2FA is already configured: prompt user to type their 6-digit TOTP code
+      return res.status(200).json(
+        successResponse("Credentials verified. Please enter your 2FA code.", {
+          mfaRequired: true,
+          hasTotp: true,
+          mfaToken,
+          mfaMethod: "TOTP",
+          expiresIn: 300,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        }),
+      )
+    }
+
+    // 2FA is NOT set up: generate setup details directly so user can finish setup inline
+    const { base32, qrCode, otpauth_url } = await generate2FASecret(
+      user.email || user.id,
+    )
+    const recoveryPhrases = generateRecoveryPhrases(8)
+
+    await redis.set(`totp_pending:${user.id}`, encryptTOTPSecret(base32), { ex: 900 })
+    await redis.set(
+      `totp_backup_pending:${user.id}`,
+      JSON.stringify(hashRecoveryPhrases(recoveryPhrases)),
+      { ex: 900 },
+    )
+
     return res.status(200).json(
-      successResponse("Credentials verified. Please complete MFA verification.", {
+      successResponse("Credentials verified. Two-factor authentication setup is required.", {
         mfaRequired: true,
+        hasTotp: false,
         mfaToken,
-        mfaMethod: hasTotp ? "TOTP_OR_EMAIL" : "EMAIL_OTP",
-        expiresIn: 300,
+        mfaMethod: "SETUP_TOTP",
+        expiresIn: 900,
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
         },
-        ...(process.env.NODE_ENV !== "production" ? { devOtp: rawOtp } : {}),
+        setupData: {
+          qrCode,
+          secret: base32,
+          otpauth_url,
+          recoveryPhrases,
+          instructions: [
+            "1. Open Google Authenticator (or Authy / 1Password) on your device.",
+            "2. Tap '+' and scan the QR code or enter the manual secret key.",
+            "3. Copy and save your 8 backup recovery phrases securely offline.",
+            "4. Enter the 6-digit code shown in your app to activate and sign in.",
+          ],
+        },
       }),
     )
   } catch (error) {
@@ -1203,7 +1244,33 @@ export const staffVerifyMFA = async (req, res) => {
       }
     }
 
-    // 3. If not verified via TOTP or Recovery Phrase, verify via Email OTP code
+    // 3. If user is in pending 2FA setup state, verify code against pending secret and activate MFA
+    if (!isValidMFA && !staffMfa) {
+      const pendingSecretCiphertext = await redis.get(`totp_pending:${user.id}`)
+      const pendingBackupJson = await redis.get(`totp_backup_pending:${user.id}`)
+      if (pendingSecretCiphertext && /^\d{6}$/.test(cleanCode)) {
+        const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
+        const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+        if (matchedStep !== null) {
+          const recoveryCodeHashes = pendingBackupJson
+            ? JSON.parse(pendingBackupJson)
+            : []
+          await prisma.staffMfa.create({
+            data: {
+              userId: user.id,
+              totpSecretCiphertext: pendingSecretCiphertext,
+              recoveryCodeHashes,
+              lastUsedTotpStep: matchedStep,
+            },
+          })
+          await redis.del(`totp_pending:${user.id}`)
+          await redis.del(`totp_backup_pending:${user.id}`)
+          isValidMFA = true
+        }
+      }
+    }
+
+    // 4. Fallback verification if applicable
     if (!isValidMFA) {
       const otpRecord = await prisma.otpCode.findFirst({
         where: {
@@ -1624,3 +1691,187 @@ export const adminSetStaffPassword = async (req, res) => {
     return res.status(500).json(errorResponse("Failed to set password", 500))
   }
 }
+
+/**
+ * Regenerate or fetch pending TOTP setup during staff login before full session exists
+ */
+export const staffSetupPendingTOTP = async (req, res) => {
+  try {
+    const { mfaToken } = req.body
+
+    if (!mfaToken) {
+      return res.status(400).json(errorResponse("MFA token is required", 400))
+    }
+
+    let decoded
+    try {
+      decoded = verifyMFAToken(mfaToken)
+    } catch (err) {
+      return res
+        .status(401)
+        .json(errorResponse("MFA session expired. Please log in again.", 401))
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+    })
+
+    if (!user || user.isSuspended || user.isDeleted) {
+      return res.status(403).json(errorResponse("Account suspended or not found", 403))
+    }
+
+    const existing = await prisma.staffMfa.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    })
+    if (existing) {
+      return res.status(409).json(
+        errorResponse("2FA is already configured for this account. Contact an administrator to reset it.", 409),
+      )
+    }
+
+    const { base32, qrCode, otpauth_url } = await generate2FASecret(
+      user.email || user.id,
+    )
+    const recoveryPhrases = generateRecoveryPhrases(8)
+
+    await redis.set(`totp_pending:${user.id}`, encryptTOTPSecret(base32), { ex: 900 })
+    await redis.set(
+      `totp_backup_pending:${user.id}`,
+      JSON.stringify(hashRecoveryPhrases(recoveryPhrases)),
+      { ex: 900 },
+    )
+
+    return res.status(200).json(
+      successResponse("Scan QR code and save your recovery phrases", {
+        qrCode,
+        secret: base32,
+        otpauth_url,
+        recoveryPhrases,
+        instructions: [
+          "1. Open Google Authenticator (or Authy / 1Password) on your device.",
+          "2. Tap '+' and select 'Scan a QR code' to scan the QR code image.",
+          "3. Alternatively, enter the manual secret key into your authenticator app.",
+          "4. Copy and store the 8 recovery phrases securely offline in case you lose your device.",
+          "5. Submit the 6-digit code showing in your authenticator app to complete setup and log in.",
+        ],
+      }),
+    )
+  } catch (error) {
+    console.error("Setup pending TOTP error:", error)
+    return res.status(500).json(errorResponse("Failed to generate 2FA setup", 500))
+  }
+}
+
+/**
+ * Enable TOTP for pending staff login and authenticate directly
+ */
+export const staffEnablePendingTOTP = async (req, res) => {
+  try {
+    const { mfaToken, code } = req.body
+
+    if (!mfaToken || !code) {
+      return res
+        .status(400)
+        .json(errorResponse("MFA token and verification code are required", 400))
+    }
+
+    let decoded
+    try {
+      decoded = verifyMFAToken(mfaToken)
+    } catch (err) {
+      return res
+        .status(401)
+        .json(errorResponse("MFA session expired. Please log in again.", 401))
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+    })
+
+    if (!user || user.isSuspended || user.isDeleted) {
+      return res.status(403).json(errorResponse("Account suspended or not found", 403))
+    }
+
+    const pendingSecretCiphertext = await redis.get(`totp_pending:${user.id}`)
+    const pendingBackupJson = await redis.get(`totp_backup_pending:${user.id}`)
+
+    if (!pendingSecretCiphertext) {
+      return res.status(400).json(
+        errorResponse("2FA setup session expired. Please log in again.", 400),
+      )
+    }
+
+    const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
+    const cleanCode = code.toString().trim()
+    const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+
+    if (matchedStep === null) {
+      return res.status(400).json(
+        errorResponse("Invalid 6-digit code. Please verify the code showing in your authenticator app.", 400),
+      )
+    }
+
+    const recoveryCodeHashes = pendingBackupJson
+      ? JSON.parse(pendingBackupJson)
+      : []
+
+    await prisma.staffMfa.create({
+      data: {
+        userId: user.id,
+        totpSecretCiphertext: pendingSecretCiphertext,
+        recoveryCodeHashes,
+        lastUsedTotpStep: matchedStep,
+      },
+    })
+
+    await redis.del(`totp_pending:${user.id}`)
+    await redis.del(`totp_backup_pending:${user.id}`)
+
+    // Create session and issue tokens
+    const refreshToken = generateRefreshToken({ sub: user.id })
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshTokenHash: hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      },
+    })
+
+    const accessToken = generateAccessToken({
+      id: user.id,
+      role: user.role,
+      sessionId: session.id,
+    })
+
+    const isProduction = process.env.NODE_ENV === "production"
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: REFRESH_TOKEN_MS,
+      path: "/",
+    })
+
+    return res.status(200).json(
+      successResponse("2FA successfully enabled and authenticated", {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avaterUrl: user.avaterUrl,
+          phone: user.phone,
+        },
+      }),
+    )
+  } catch (error) {
+    console.error("Enable pending TOTP error:", error)
+    return res.status(500).json(errorResponse("Failed to complete 2FA setup", 500))
+  }
+}
+

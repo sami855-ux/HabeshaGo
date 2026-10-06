@@ -23,6 +23,8 @@ import {
   staffChangePassword,
   staffSetupTOTP,
   staffEnableTOTP,
+  staffSetupPendingTOTP,
+  staffEnablePendingTOTP,
   adminSetStaffPassword,
 } from "../controllers/auth.controller.js"
 import {
@@ -124,6 +126,10 @@ router.post(
   restrictTo(...STAFF_ROLES),
   staffEnableTOTP,
 )
+
+// Staff TOTP setup & activation for pending login (before authenticated session exists)
+router.post("/staff/totp/setup-pending", authLimiter, staffSetupPendingTOTP)
+router.post("/staff/totp/enable-pending", authLimiter, staffEnablePendingTOTP)
 
 // Admin set/reset password for staff members
 router.post(

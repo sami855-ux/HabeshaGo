@@ -87,6 +87,7 @@ export default function StaffLoginPage() {
 
   // Step 2B (2FA NOT set up): Inline Setup state
   const [setupData, setSetupData] = useState<StaffSetupData | null>(null)
+  const [enrollmentAuthorized, setEnrollmentAuthorized] = useState(false)
   const [setupLoading, setSetupLoading] = useState(false)
   const [setupActivating, setSetupActivating] = useState(false)
   const [copiedSecret, setCopiedSecret] = useState(false)
@@ -171,15 +172,14 @@ export default function StaffLoginPage() {
         setStep(2)
         toast.success("Credentials verified. Enter your 2FA code.")
       } else {
-        // 2FA is NOT set up: prompt to finish setup inline
+        // First enrollment must verify the emailed code before setup details
+        // are disclosed.
         setHasTotp(false)
-        if (res.data.setupData) {
-          setSetupData(res.data.setupData)
-        } else {
-          loadPendingSetup(res.data.mfaToken)
-        }
+        setEnrollmentAuthorized(false)
+        setSetupData(null)
+        setTotpCode("")
         setStep(2)
-        toast.info("Please finish two-factor authentication setup to continue.")
+        toast.info("Enter the verification code sent to your work email.")
       }
     } catch (err: any) {
       setFormError("An unexpected error occurred. Please try again.")
@@ -232,6 +232,26 @@ export default function StaffLoginPage() {
         return
       }
 
+      if (res.data.setupRequired) {
+        const enrollmentToken =
+          res.data.enrollmentToken || res.data.mfaToken
+        if (!enrollmentToken) {
+          toast.error("The server did not return an enrollment token.")
+          return
+        }
+        setMfaToken(enrollmentToken)
+        setEnrollmentAuthorized(true)
+        setSessionSeconds(res.data.expiresIn || 600)
+        setTotpCode("")
+        await loadPendingSetup(enrollmentToken)
+        toast.success("Email verified. Connect your authenticator app.")
+        return
+      }
+
+      if (!res.data.accessToken) {
+        toast.error("Authentication response did not include an access token.")
+        return
+      }
       finishLogin(res.data.accessToken, res.data.user)
     } catch {
       toast.error("2FA verification failed. Please try again.")
@@ -257,9 +277,13 @@ export default function StaffLoginPage() {
   // STEP 2B: Finish Setup & Sign In (Confirmed by Alert Dialog)
   // -------------------------------------------------------------
   const handleCompleteSetup = async () => {
+    if (!/^\d{6}$/.test(totpCode)) {
+      toast.error("Enter the 6-digit code from your authenticator app.")
+      return
+    }
     setSetupActivating(true)
     try {
-      const res = await staffEnablePendingTOTPApi(mfaToken)
+      const res = await staffEnablePendingTOTPApi(mfaToken, totpCode)
 
       if (!res.success || !res.data) {
         toast.error(res.message || "Failed to complete 2FA setup. Please try again.")
@@ -267,6 +291,10 @@ export default function StaffLoginPage() {
       }
 
       toast.success("Two-factor authentication enabled successfully!")
+      if (!res.data.accessToken) {
+        toast.error("Authentication response did not include an access token.")
+        return
+      }
       finishLogin(res.data.accessToken, res.data.user)
     } catch {
       toast.error("Failed to activate 2FA. Please try again.")
@@ -339,6 +367,71 @@ export default function StaffLoginPage() {
             )}
           >
             <AnimatePresence mode="wait">
+              {step === 2 && !hasTotp && !enrollmentAuthorized && (
+                <motion.div
+                  key="step-email-verify"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-5 font-inter"
+                >
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setStep(1)}
+                      className="text-xs text-slate-600 hover:text-slate-900 -ml-2 h-7 px-2"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+                      Back to Sign In
+                    </Button>
+                    <span className="text-xs text-slate-500">
+                      {Math.floor(sessionSeconds / 60)}:
+                      {(sessionSeconds % 60).toString().padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-2 rounded-xl bg-orange-50 text-orange-600">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      Verify your work email
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Enter the six-digit code sent to {mfaUser?.email || email} before connecting an authenticator.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={totpCode}
+                      onChange={setTotpCode}
+                      disabled={verifyPending}
+                    >
+                      <InputOTPGroup>
+                        {[0, 1, 2, 3, 4, 5].map((index) => (
+                          <InputOTPSlot key={index} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button
+                    onClick={() => handleVerifyTotp(totpCode)}
+                    disabled={verifyPending || totpCode.length !== 6}
+                    className="w-full h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl"
+                  >
+                    {verifyPending ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Verify Email & Continue"
+                    )}
+                  </Button>
+                </motion.div>
+              )}
+
               {/* -------------------------------------------------------- */}
               {/* STEP 1: EMAIL & PASSWORD CREDENTIALS                     */}
               {/* -------------------------------------------------------- */}
@@ -635,7 +728,7 @@ export default function StaffLoginPage() {
               {/* -------------------------------------------------------- */}
               {/* STEP 2B: INLINE 2FA SETUP (CLEAN SIDE-BY-SIDE IN H-SCREEN) */}
               {/* -------------------------------------------------------- */}
-              {step === 2 && !hasTotp && (
+              {step === 2 && !hasTotp && enrollmentAuthorized && (
                 <motion.div
                   key="step-2fa-setup"
                   initial={{ opacity: 0, y: 10 }}
@@ -747,12 +840,31 @@ export default function StaffLoginPage() {
                           </div>
                         </div>
 
+                        <div className="space-y-2 pt-2 border-t border-slate-200/70">
+                          <span className="text-[11px] font-semibold text-slate-700">
+                            2. Enter the current authenticator code
+                          </span>
+                          <Input
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={totpCode}
+                            onChange={(event) =>
+                              setTotpCode(
+                                event.target.value.replace(/\D/g, "").slice(0, 6),
+                              )
+                            }
+                            placeholder="000000"
+                            className="h-10 text-center tracking-[0.35em] font-bold"
+                          />
+                        </div>
+
                         {/* Direct Setup Complete Button (Triggers Confirmation Alert Dialog) */}
                         <div className="pt-2 border-t border-slate-200/70">
                           <Button
                             type="button"
                             onClick={() => setConfirmDialogOpen(true)}
-                            disabled={setupActivating}
+                            disabled={setupActivating || totpCode.length !== 6}
                             className="w-full h-10 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold font-inter rounded-xl text-sm cursor-pointer shadow-none transition-colors flex items-center justify-center gap-2"
                           >
                             {setupActivating ? (
@@ -778,7 +890,7 @@ export default function StaffLoginPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="space-y-0.5">
                             <span className="text-xs font-bold text-slate-900 font-inter">
-                              2. Save 8 Backup Recovery Phrases
+                              3. Save 8 Backup Recovery Phrases
                             </span>
                             <p className="text-[11px] text-slate-500 font-inter">
                               Emergency offline keys if you ever lose your phone.
@@ -867,7 +979,7 @@ export default function StaffLoginPage() {
               Confirm Two-Factor Setup
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs text-slate-600 font-inter leading-relaxed">
-              Please ensure you have scanned the QR code with your authenticator app and securely saved your 8 emergency backup recovery phrases before continuing.
+                              Please ensure you scanned the QR code, saved your 8 emergency recovery phrases, and entered the current six-digit authenticator code.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex items-center justify-end gap-2 pt-2">

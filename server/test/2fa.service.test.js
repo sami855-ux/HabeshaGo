@@ -4,7 +4,9 @@ import crypto from "node:crypto"
 import speakeasy from "speakeasy"
 
 process.env.MFA_ENCRYPTION_KEY = crypto.randomBytes(32).toString("base64")
-process.env.JWT_SECRET = "test-jwt-secret-that-is-long-enough-for-local-tests"
+process.env.JWT_SECRET = crypto.randomBytes(64).toString("base64url")
+process.env.JWT_REFRESH_SECRET = crypto.randomBytes(64).toString("base64url")
+process.env.SESSION_SECRET = crypto.randomBytes(32).toString("base64url")
 
 const {
   decryptTOTPSecret,
@@ -17,8 +19,13 @@ const {
 } = await import("../src/services/2fa.service.js")
 const {
   generateAccessToken,
+  generateMFAEnrollmentToken,
   generateMFAToken,
+  generateRefreshToken,
+  validateAuthSecrets,
   verifyAccessToken,
+  verifyMFAEnrollmentToken,
+  verifyRefreshToken,
 } = await import("../src/services/token.service.js")
 
 test("encrypts TOTP secrets with authenticated encryption", () => {
@@ -59,4 +66,32 @@ test("never accepts an MFA-pending JWT as an access token", () => {
     sessionId: "session-1",
   })
   assert.equal(verifyAccessToken(access).type, "access")
+  assert.equal(verifyAccessToken(access).sub, "staff-1")
+  assert.equal(typeof verifyAccessToken(access).jti, "string")
+})
+
+test("creates unique, strictly typed refresh tokens", () => {
+  const first = generateRefreshToken({ sub: "staff-1" })
+  const second = generateRefreshToken({ sub: "staff-1" })
+  assert.notEqual(first, second)
+  assert.equal(verifyRefreshToken(first).type, "refresh")
+  assert.equal(verifyRefreshToken(first).sub, "staff-1")
+  assert.throws(() => verifyAccessToken(first))
+})
+
+test("keeps enrollment tokens outside the access-token boundary", () => {
+  const enrollment = generateMFAEnrollmentToken({
+    sub: "staff-1",
+    role: "ADMIN",
+  })
+  assert.equal(verifyMFAEnrollmentToken(enrollment).type, "mfa_enrollment")
+  assert.throws(() => verifyAccessToken(enrollment))
+})
+
+test("requires strong, distinct authentication secrets", () => {
+  assert.doesNotThrow(() => validateAuthSecrets())
+  const original = process.env.JWT_REFRESH_SECRET
+  process.env.JWT_REFRESH_SECRET = process.env.JWT_SECRET
+  assert.throws(() => validateAuthSecrets(), /distinct/)
+  process.env.JWT_REFRESH_SECRET = original
 })

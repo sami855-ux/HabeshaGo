@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken"
 import prisma from "../prisma/client.js"
 import { errorResponse } from "../utils/apiResponse.js"
 import { redis } from "../config/redis.js"
@@ -78,7 +77,12 @@ export const authenticate = async (req, res, next) => {
       const session = await prisma.session.findUnique({
         where: { id: decoded.sessionId },
       })
-      if (!session || session.revoked || session.expiresAt < new Date()) {
+      if (
+        !session ||
+        session.userId !== user.id ||
+        session.revoked ||
+        session.expiresAt < new Date()
+      ) {
         return res
           .status(401)
           .json(errorResponse("Session has been revoked or expired", 401))
@@ -151,10 +155,7 @@ export const optionalAuthenticate = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-        algorithms: ["HS256"],
-      })
-      if (decoded.type === "mfa_pending" || !decoded.sessionId) return next()
+      const decoded = verifyAccessToken(token)
       const user = await prisma.user.findUnique({
         where: { id: decoded.id || decoded.sub },
       })

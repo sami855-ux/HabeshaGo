@@ -3,6 +3,7 @@ import prisma from "../prisma/client.js"
 import { sendOTP } from "../services/otp.service.js"
 import {
   generateAccessToken,
+  generateMFAEnrollmentToken,
   generateMFAToken,
   generateRefreshToken,
   hashToken,
@@ -10,6 +11,7 @@ import {
   issueTokens,
   issueTokensSocial,
   verifyMFAToken,
+  verifyMFAEnrollmentToken,
   verifyRefreshToken,
   DUMMY_BCRYPT_HASH,
   REFRESH_TOKEN_MS,
@@ -61,6 +63,41 @@ const safeParseRecoveryHashes = (val) => {
     }
   }
   return []
+}
+
+const consumeOtpRecord = async (otp) => {
+  const consumed = await prisma.otpCode.updateMany({
+    where: {
+      id: otp.id,
+      used: false,
+      expiresAt: { gt: new Date() },
+      attempts: { lt: otp.maxAttempts },
+    },
+    data: { used: true },
+  })
+  return consumed.count === 1
+}
+
+const recordFailedOtpAttempt = (otp) =>
+  prisma.otpCode.updateMany({
+    where: {
+      id: otp.id,
+      used: false,
+      attempts: { lt: otp.maxAttempts },
+    },
+    data: { attempts: { increment: 1 } },
+  })
+
+const revokeAllUserSessions = async (userId) => {
+  await prisma.session.updateMany({
+    where: { userId, revoked: false },
+    data: { revoked: true },
+  })
+  try {
+    await redis.set(`user_revoked_all:${userId}`, Date.now().toString(), {
+      ex: 86400,
+    })
+  } catch {}
 }
 
 // Registration
@@ -203,17 +240,15 @@ export const verifyOTP = async (req, res) => {
 
     const isValid = await verifyPassword(code, otp.codeHash)
     if (!isValid) {
-      await prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
-      })
+      await recordFailedOtpAttempt(otp)
       return res.status(400).json({ message: "Invalid OTP", success: false })
     }
 
-    await prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { used: true },
-    })
+    if (!(await consumeOtpRecord(otp))) {
+      return res
+        .status(401)
+        .json({ message: "OTP has already been used", success: false })
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true },
@@ -260,17 +295,15 @@ export const verifyOTPApp = async (req, res) => {
 
     const isValid = await verifyPassword(code, otp.codeHash)
     if (!isValid) {
-      await prisma.otpCode.update({
-        where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
-      })
+      await recordFailedOtpAttempt(otp)
       return res.status(400).json({ message: "Invalid OTP", success: false })
     }
 
-    await prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { used: true },
-    })
+    if (!(await consumeOtpRecord(otp))) {
+      return res
+        .status(401)
+        .json({ message: "OTP has already been used", success: false })
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true },
@@ -461,17 +494,7 @@ export const refreshToken = async (req, res) => {
         console.warn(
           `[SECURITY ALERT] Refresh token reuse detected for user ${decoded.sub}. Revoking all sessions.`,
         )
-        await prisma.session.updateMany({
-          where: { userId: decoded.sub },
-          data: { revoked: true },
-        })
-        try {
-          await redis.set(
-            `user_revoked_all:${decoded.sub}`,
-            Date.now().toString(),
-            { ex: 86400 },
-          )
-        } catch (e) {}
+        await revokeAllUserSessions(decoded.sub)
         return res
           .status(403)
           .json(
@@ -484,8 +507,8 @@ export const refreshToken = async (req, res) => {
       return res.status(403).json(errorResponse("Invalid or expired session", 403))
     }
 
-    if (session.user.isSuspended) {
-      return res.status(403).json({ message: "Account suspended" })
+    if (session.user.isSuspended || session.user.isDeleted) {
+      return res.status(403).json({ message: "Account unavailable" })
     }
 
     const user = session.user
@@ -494,14 +517,25 @@ export const refreshToken = async (req, res) => {
     const newRefreshToken = generateRefreshToken({ sub: user.id })
     const newHashedToken = hashToken(newRefreshToken)
 
-    await prisma.session.update({
-      where: { id: session.id },
+    const rotated = await prisma.session.updateMany({
+      where: {
+        id: session.id,
+        refreshTokenHash: incomingHash,
+        revoked: false,
+        expiresAt: { gt: new Date() },
+      },
       data: {
         refreshTokenHash: newHashedToken,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         lastActiveAt: new Date(),
       },
     })
+    if (rotated.count !== 1) {
+      await revokeAllUserSessions(user.id)
+      return res
+        .status(403)
+        .json(errorResponse("Security alert: refresh token reuse detected", 403))
+    }
 
     const accessToken = generateAccessToken({
       id: user.id,
@@ -544,7 +578,7 @@ export const refreshTokenApp = async (req, res) => {
     }
 
     // Verify JWT signature
-    verifyRefreshToken(refreshToken)
+    const decoded = verifyRefreshToken(refreshToken)
 
     // Hash incoming token to match DB (deterministic SHA-256)
     const hashedToken = hashToken(refreshToken)
@@ -552,6 +586,7 @@ export const refreshTokenApp = async (req, res) => {
     // Find valid session
     const session = await prisma.session.findFirst({
       where: {
+        userId: decoded.sub,
         refreshTokenHash: hashedToken,
         revoked: false,
         expiresAt: { gt: new Date() },
@@ -570,17 +605,7 @@ export const refreshTokenApp = async (req, res) => {
         console.warn(
           `[SECURITY ALERT] Mobile refresh token reuse detected for user ${revokedSession.userId}. Revoking all sessions.`,
         )
-        await prisma.session.updateMany({
-          where: { userId: revokedSession.userId },
-          data: { revoked: true },
-        })
-        try {
-          await redis.set(
-            `user_revoked_all:${revokedSession.userId}`,
-            Date.now().toString(),
-            { ex: 86400 },
-          )
-        } catch (e) {}
+        await revokeAllUserSessions(revokedSession.userId)
         return res
           .status(403)
           .json(
@@ -593,22 +618,33 @@ export const refreshTokenApp = async (req, res) => {
       return res.status(403).json(errorResponse("Invalid or expired session", 403))
     }
 
-    if (session.user.isSuspended) {
-      return res.status(403).json(errorResponse("Account suspended", 403))
+    if (session.user.isSuspended || session.user.isDeleted) {
+      return res.status(403).json(errorResponse("Account unavailable", 403))
     }
 
     // Rotate refresh token
     const newRefreshToken = generateRefreshToken({ sub: session.user.id })
     const newHashedToken = hashToken(newRefreshToken)
 
-    await prisma.session.update({
-      where: { id: session.id },
+    const rotated = await prisma.session.updateMany({
+      where: {
+        id: session.id,
+        refreshTokenHash: hashedToken,
+        revoked: false,
+        expiresAt: { gt: new Date() },
+      },
       data: {
         refreshTokenHash: newHashedToken,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         lastActiveAt: new Date(),
       },
     })
+    if (rotated.count !== 1) {
+      await revokeAllUserSessions(session.user.id)
+      return res
+        .status(403)
+        .json(errorResponse("Security alert: refresh token reuse detected", 403))
+    }
 
     // Generate new access token
     const accessToken = generateAccessToken({
@@ -1092,44 +1128,24 @@ export const staffLogin = async (req, res) => {
       )
     }
 
-    // 2FA is NOT set up: generate setup details directly so user can finish setup inline
-    const { base32, qrCode, otpauth_url } = await generate2FASecret(
-      user.email || user.id,
-    )
-    const recoveryPhrases = generateRecoveryPhrases(8)
-
-    await redis.set(`totp_pending:${user.id}`, encryptTOTPSecret(base32), { ex: 900 })
-    await redis.set(
-      `totp_backup_pending:${user.id}`,
-      JSON.stringify(hashRecoveryPhrases(recoveryPhrases)),
-      { ex: 900 },
-    )
+    // First enrollment requires a separate email factor before any authenticator
+    // secret or recovery phrase is disclosed.
+    const rawOtp = await sendOTP(user, "login")
 
     return res.status(200).json(
-      successResponse("Credentials verified. Two-factor authentication setup is required.", {
+      successResponse("Credentials verified. Verify the code sent to your email to enroll an authenticator.", {
         mfaRequired: true,
         hasTotp: false,
         mfaToken,
-        mfaMethod: "SETUP_TOTP",
-        expiresIn: 900,
+        mfaMethod: "EMAIL_OTP",
+        expiresIn: 300,
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
         },
-        setupData: {
-          qrCode,
-          secret: base32,
-          otpauth_url,
-          recoveryPhrases,
-          instructions: [
-            "1. Open Google Authenticator (or Authy / 1Password) on your device.",
-            "2. Tap '+' and scan the QR code or enter the manual secret key.",
-            "3. Copy and save your 8 backup recovery phrases securely offline.",
-            "4. Enter the 6-digit code shown in your app to activate and sign in.",
-          ],
-        },
+        ...(process.env.NODE_ENV !== "production" ? { devOtp: rawOtp } : {}),
       }),
     )
   } catch (error) {
@@ -1219,77 +1235,54 @@ export const staffVerifyMFA = async (req, res) => {
       where: { userId: user.id },
     })
 
-    // 1. Verify and atomically consume a TOTP time step. This prevents the
-    // same authenticator code from creating multiple concurrent sessions.
-    if (staffMfa && /^\d{6}$/.test(cleanCode)) {
-      const secret = decryptTOTPSecret(staffMfa.totpSecretCiphertext)
-      const matchedStep = verifyTOTPWithStep(cleanCode, secret)
-      if (matchedStep !== null) {
-        const consumed = await prisma.staffMfa.updateMany({
-          where: {
-            id: staffMfa.id,
-            OR: [
-              { lastUsedTotpStep: null },
-              { lastUsedTotpStep: { lt: matchedStep } },
-            ],
-          },
-          data: { lastUsedTotpStep: matchedStep },
-        })
-        isValidMFA = consumed.count === 1
-      }
-    }
-
-    // 2. Try single-use recovery phrase verification if user saved phrases
-    if (!isValidMFA && staffMfa) {
-      const phraseHash = hashRecoveryPhrase(cleanCode)
-      const { valid, remaining } = verifyRecoveryPhrase(
-        cleanCode,
-        staffMfa.recoveryCodeHashes,
-      )
-      if (valid) {
-        const consumed = await prisma.staffMfa.updateMany({
-          where: {
-            id: staffMfa.id,
-            recoveryCodeHashes: { has: phraseHash },
-          },
-          data: { recoveryCodeHashes: { set: remaining } },
-        })
-        isValidMFA = consumed.count === 1
-      }
-    }
-
-    // 3. If user is in pending 2FA setup state, verify code against pending secret and activate MFA
-    if (!isValidMFA && !staffMfa) {
-      const pendingSecretCiphertext = await redis.get(`totp_pending:${user.id}`)
-      const pendingBackupJson = await redis.get(`totp_backup_pending:${user.id}`)
-      if (pendingSecretCiphertext && /^\d{6}$/.test(cleanCode)) {
-        const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
-        const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+    if (staffMfa) {
+      // Enrolled staff may use only their authenticator or a one-time recovery
+      // phrase. Email OTP is not a downgrade path for an existing enrollment.
+      if (/^\d{6}$/.test(cleanCode)) {
+        const secret = decryptTOTPSecret(staffMfa.totpSecretCiphertext)
+        const matchedStep = verifyTOTPWithStep(cleanCode, secret)
         if (matchedStep !== null) {
-          const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
-          await prisma.staffMfa.upsert({
-            where: { userId: user.id },
-            create: {
-              userId: user.id,
-              totpSecretCiphertext: pendingSecretCiphertext,
-              recoveryCodeHashes,
-              lastUsedTotpStep: matchedStep,
+          const consumed = await prisma.staffMfa.updateMany({
+            where: {
+              id: staffMfa.id,
+              OR: [
+                { lastUsedTotpStep: null },
+                { lastUsedTotpStep: { lt: matchedStep } },
+              ],
             },
-            update: {
-              totpSecretCiphertext: pendingSecretCiphertext,
-              recoveryCodeHashes,
-              lastUsedTotpStep: matchedStep,
-            },
+            data: { lastUsedTotpStep: matchedStep },
           })
-          await redis.del(`totp_pending:${user.id}`)
-          await redis.del(`totp_backup_pending:${user.id}`)
-          isValidMFA = true
+          isValidMFA = consumed.count === 1
         }
       }
-    }
 
-    // 4. Fallback verification if applicable
-    if (!isValidMFA) {
+      if (!isValidMFA) {
+        const phraseHash = hashRecoveryPhrase(cleanCode)
+        const { valid, remaining } = verifyRecoveryPhrase(
+          cleanCode,
+          staffMfa.recoveryCodeHashes,
+        )
+        if (valid) {
+          const consumed = await prisma.staffMfa.updateMany({
+            where: {
+              id: staffMfa.id,
+              recoveryCodeHashes: { has: phraseHash },
+            },
+            data: { recoveryCodeHashes: { set: remaining } },
+          })
+          isValidMFA = consumed.count === 1
+        }
+      }
+
+      if (!isValidMFA) {
+        try {
+          await redis.incr(mfaFailsKey)
+          await redis.expire(mfaFailsKey, 300)
+        } catch {}
+        return res.status(400).json(errorResponse("Invalid MFA code", 400))
+      }
+    } else {
+      // A separate email factor authorizes first-time authenticator enrollment.
       const otpRecord = await prisma.otpCode.findFirst({
         where: {
           userId: user.id,
@@ -1325,15 +1318,13 @@ export const staffVerifyMFA = async (req, res) => {
           )
       }
 
-      if (otpRecord.codeHash) {
-        isValidMFA = await verifyPassword(cleanCode, otpRecord.codeHash)
-      }
+      isValidMFA = Boolean(
+        otpRecord.codeHash &&
+          (await verifyPassword(cleanCode, otpRecord.codeHash)),
+      )
 
       if (!isValidMFA) {
-        await prisma.otpCode.update({
-          where: { id: otpRecord.id },
-          data: { attempts: { increment: 1 } },
-        })
+        await recordFailedOtpAttempt(otpRecord)
         try {
           await redis.incr(mfaFailsKey)
           await redis.expire(mfaFailsKey, 300)
@@ -1341,13 +1332,41 @@ export const staffVerifyMFA = async (req, res) => {
         return res.status(400).json(errorResponse("Invalid MFA code", 400))
       }
 
-      const consumed = await prisma.otpCode.updateMany({
-        where: { id: otpRecord.id, used: false },
-        data: { used: true },
-      })
-      if (consumed.count !== 1) {
+      if (!(await consumeOtpRecord(otpRecord))) {
         return res.status(401).json(errorResponse("MFA code has already been used", 401))
       }
+
+      try {
+        const claimed = await redis.set(`mfa_used:${decoded.jti}`, "1", {
+          nx: true,
+          ex: 300,
+        })
+        if (claimed !== "OK") {
+          return res.status(401).json(errorResponse("MFA session has already been used", 401))
+        }
+        await redis.del(mfaFailsKey)
+      } catch {
+        return res.status(503).json(errorResponse("MFA verification is temporarily unavailable", 503))
+      }
+
+      const enrollmentToken = generateMFAEnrollmentToken({
+        sub: user.id,
+        role: user.role,
+      })
+      return res.status(200).json(
+        successResponse("Email verified. Complete authenticator enrollment.", {
+          setupRequired: true,
+          enrollmentToken,
+          mfaToken: enrollmentToken,
+          expiresIn: 600,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        }),
+      )
     }
 
     // Atomically consume the pending login itself. NX closes the concurrent
@@ -1440,6 +1459,16 @@ export const staffResendMFA = async (req, res) => {
       return res
         .status(403)
         .json(errorResponse("Account suspended or not found", 403))
+    }
+
+    const configuredMfa = await prisma.staffMfa.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    })
+    if (configuredMfa) {
+      return res
+        .status(400)
+        .json(errorResponse("Use your authenticator code or a recovery phrase", 400))
     }
 
     const rawOtp = await sendOTP(user, "resend")
@@ -1630,16 +1659,10 @@ export const staffEnableTOTP = async (req, res) => {
     const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
     const initialStep = verifyTOTPWithStep(cleanCode, pendingSecret)
 
-    // Create or update activation
-    await prisma.staffMfa.upsert({
-      where: { userId },
-      create: {
+    // Create-only activation prevents a race from replacing an enrollment.
+    await prisma.staffMfa.create({
+      data: {
         userId,
-        totpSecretCiphertext: pendingSecretCiphertext,
-        recoveryCodeHashes,
-        lastUsedTotpStep: initialStep,
-      },
-      update: {
         totpSecretCiphertext: pendingSecretCiphertext,
         recoveryCodeHashes,
         lastUsedTotpStep: initialStep,
@@ -1695,12 +1718,16 @@ export const adminSetStaffPassword = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) return res.status(404).json(errorResponse("User not found", 404))
+    if (!STAFF_ROLES.includes(user.role)) {
+      return res.status(400).json(errorResponse("Target account is not staff", 400))
+    }
 
     const hashedPassword = await hashPassword(newPassword)
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     })
+    await revokeAllUserSessions(user.id)
 
     return res
       .status(200)
@@ -1728,18 +1755,23 @@ export const staffSetupPendingTOTP = async (req, res) => {
 
     let decoded
     try {
-      decoded = verifyMFAToken(mfaToken)
+      decoded = verifyMFAEnrollmentToken(mfaToken)
     } catch (err) {
       return res
         .status(401)
-        .json(errorResponse("MFA session expired. Please log in again.", 401))
+        .json(errorResponse("MFA enrollment expired. Please log in again.", 401))
     }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
     })
 
-    if (!user || user.isSuspended || user.isDeleted) {
+    if (
+      !user ||
+      user.isSuspended ||
+      user.isDeleted ||
+      !STAFF_ROLES.includes(user.role)
+    ) {
       return res.status(403).json(errorResponse("Account suspended or not found", 403))
     }
 
@@ -1793,83 +1825,89 @@ export const staffEnablePendingTOTP = async (req, res) => {
   try {
     const { mfaToken, code } = req.body
 
-    if (!mfaToken) {
+    if (!mfaToken || !code || typeof code !== "string") {
       return res
         .status(400)
-        .json(errorResponse("MFA token is required", 400))
+        .json(errorResponse("MFA enrollment token and authenticator code are required", 400))
     }
 
     let decoded
     try {
-      decoded = verifyMFAToken(mfaToken)
+      decoded = verifyMFAEnrollmentToken(mfaToken)
     } catch (err) {
       return res
         .status(401)
-        .json(errorResponse("MFA session expired. Please log in again.", 401))
+        .json(errorResponse("MFA enrollment expired. Please log in again.", 401))
     }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
     })
 
-    if (!user || user.isSuspended || user.isDeleted) {
+    if (
+      !user ||
+      user.isSuspended ||
+      user.isDeleted ||
+      !STAFF_ROLES.includes(user.role)
+    ) {
       return res.status(403).json(errorResponse("Account suspended or not found", 403))
     }
 
     const pendingSecretCiphertext = await redis.get(`totp_pending:${user.id}`)
     const pendingBackupJson = await redis.get(`totp_backup_pending:${user.id}`)
 
-    if (!pendingSecretCiphertext) {
+    if (!pendingSecretCiphertext || !pendingBackupJson) {
       return res.status(400).json(
         errorResponse("2FA setup session expired. Please log in again.", 400),
       )
     }
 
     const pendingSecret = decryptTOTPSecret(pendingSecretCiphertext)
-    let matchedStep = null
-
-    // If verification code is optionally provided, validate it
-    if (code && typeof code === "string" && code.trim()) {
-      const cleanCode = code.toString().trim()
-      matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
-      if (matchedStep === null) {
-        return res.status(400).json(
-          errorResponse("Invalid 6-digit code. Please verify the code showing in your authenticator app.", 400),
-        )
-      }
+    const cleanCode = code.trim()
+    const matchedStep = verifyTOTPWithStep(cleanCode, pendingSecret)
+    if (matchedStep === null) {
+      return res.status(400).json(
+        errorResponse("Invalid 6-digit code. Please verify the code showing in your authenticator app.", 400),
+      )
     }
 
     const recoveryCodeHashes = safeParseRecoveryHashes(pendingBackupJson)
 
-    await prisma.staffMfa.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        totpSecretCiphertext: pendingSecretCiphertext,
-        recoveryCodeHashes,
-        lastUsedTotpStep: matchedStep,
-      },
-      update: {
-        totpSecretCiphertext: pendingSecretCiphertext,
-        recoveryCodeHashes,
-        lastUsedTotpStep: matchedStep,
-      },
+    const enrollmentClaimed = await redis.set(
+      `mfa_enrollment_used:${decoded.jti}`,
+      "1",
+      { nx: true, ex: 600 },
+    )
+    if (enrollmentClaimed !== "OK") {
+      return res
+        .status(401)
+        .json(errorResponse("MFA enrollment has already been used", 401))
+    }
+
+    // Create session and issue tokens
+    const refreshToken = generateRefreshToken({ sub: user.id })
+    const session = await prisma.$transaction(async (tx) => {
+      await tx.staffMfa.create({
+        data: {
+          userId: user.id,
+          totpSecretCiphertext: pendingSecretCiphertext,
+          recoveryCodeHashes,
+          lastUsedTotpStep: matchedStep,
+        },
+      })
+      return tx.session.create({
+        data: {
+          userId: user.id,
+          refreshTokenHash: hashToken(refreshToken),
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        },
+      })
     })
 
     await redis.del(`totp_pending:${user.id}`)
     await redis.del(`totp_backup_pending:${user.id}`)
-
-    // Create session and issue tokens
-    const refreshToken = generateRefreshToken({ sub: user.id })
-    const session = await prisma.session.create({
-      data: {
-        userId: user.id,
-        refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      },
-    })
 
     const accessToken = generateAccessToken({
       id: user.id,
@@ -1905,4 +1943,3 @@ export const staffEnablePendingTOTP = async (req, res) => {
     return res.status(500).json(errorResponse("Failed to complete 2FA setup", 500))
   }
 }
-

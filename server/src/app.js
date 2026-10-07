@@ -14,6 +14,8 @@ import morgan from "morgan"
 import "./config/passport.js"
 import { initSocket } from "./socket/index.js"
 import { REQUIRED_ENV } from "./utils/constants.js"
+import { validateAuthSecrets } from "./services/token.service.js"
+import { validateMFAEncryptionKey } from "./services/2fa.service.js"
 import "./cron/cron.js"
 
 //  Routes
@@ -52,6 +54,14 @@ if (missingEnv.length > 0) {
   console.error(
     `❌ Missing required environment variables: ${missingEnv.join(", ")}`,
   )
+  process.exit(1)
+}
+
+try {
+  validateAuthSecrets()
+  validateMFAEncryptionKey()
+} catch (error) {
+  console.error(`❌ Invalid authentication configuration: ${error.message}`)
   process.exit(1)
 }
 

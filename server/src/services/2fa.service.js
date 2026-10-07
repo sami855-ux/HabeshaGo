@@ -75,24 +75,35 @@ export const verifyRecoveryPhrase = (inputPhrase, savedHashes = []) => {
   return { valid: false, remaining: savedHashes }
 }
 
-const getEncryptionKey = () => {
+export const validateMFAEncryptionKey = () => {
   const configured = process.env.MFA_ENCRYPTION_KEY
-  if (configured) {
-    try {
-      const key = /^[a-f0-9]{64}$/i.test(configured)
-        ? Buffer.from(configured, "hex")
-        : Buffer.from(configured, "base64")
-      if (key.length === 32) return key
-    } catch (e) {}
+  if (!configured) {
+    throw new Error("MFA_ENCRYPTION_KEY is required")
   }
 
-  // Safe deterministic 32-byte key fallback derived from JWT_SECRET or SESSION_SECRET
-  const seed =
-    process.env.JWT_SECRET ||
-    process.env.SESSION_SECRET ||
-    "habeshago-staff-mfa-encryption-fallback"
-  return crypto.createHash("sha256").update(`mfa-key:${seed}`).digest()
+  let key
+  try {
+    key = /^[a-f0-9]{64}$/i.test(configured)
+      ? Buffer.from(configured, "hex")
+      : Buffer.from(configured, "base64")
+  } catch {
+    throw new Error("MFA_ENCRYPTION_KEY must be valid base64 or 64-character hex")
+  }
+
+  if (key.length !== 32) {
+    throw new Error("MFA_ENCRYPTION_KEY must decode to exactly 32 bytes")
+  }
+  if (
+    configured === process.env.JWT_SECRET ||
+    configured === process.env.JWT_REFRESH_SECRET ||
+    configured === process.env.SESSION_SECRET
+  ) {
+    throw new Error("MFA_ENCRYPTION_KEY must be separate from token and session secrets")
+  }
+  return key
 }
+
+const getEncryptionKey = () => validateMFAEncryptionKey()
 
 export const encryptTOTPSecret = (secret) => {
   const iv = crypto.randomBytes(12)

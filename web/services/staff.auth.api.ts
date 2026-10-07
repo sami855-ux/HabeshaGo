@@ -51,9 +51,13 @@ export interface StaffVerifyMFAResponse {
   success: boolean
   message?: string
   data?: {
-    accessToken: string
-    refreshToken: string
+    accessToken?: string
+    refreshToken?: string
     user: StaffAuthUser
+    setupRequired?: boolean
+    enrollmentToken?: string
+    mfaToken?: string
+    expiresIn?: number
   }
 }
 
@@ -218,12 +222,12 @@ export const staffSetupPendingTOTPApi = async (
  */
 export const staffEnablePendingTOTPApi = async (
   mfaToken: string,
-  code?: string,
+  code: string,
 ): Promise<StaffVerifyMFAResponse> => {
   try {
     const res = await axiosInstance.post("/auth/staff/totp/enable-pending", {
       mfaToken,
-      ...(code ? { code } : {}),
+      code,
     })
     return res.data
   } catch (error: any) {
@@ -237,4 +241,3 @@ export const staffEnablePendingTOTPApi = async (
     }
   }
 }
-

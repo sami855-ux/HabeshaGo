@@ -4,7 +4,9 @@ import crypto from "crypto"
 const ACCESS_TOKEN_EXPIRES = "60m"
 const REFRESH_TOKEN_EXPIRES = "15d"
 export const REFRESH_TOKEN_MS = 15 * 24 * 60 * 60 * 1000 // 15 days consistent with JWT
-const JWT_ALGORITHM = "HS256"
+const JWT_ALGORITHM = "HS512"
+const TOKEN_ISSUER = process.env.JWT_ISSUER || "habeshago-api"
+const TOKEN_AUDIENCE = process.env.JWT_AUDIENCE || "habeshago-clients"
 
 import prisma from "../prisma/client.js"
 // hashToken is defined locally in this file for refresh token hashing
@@ -74,7 +76,7 @@ export const issueMobileTokens = async (user, req, res) => {
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       },
@@ -161,9 +163,18 @@ export const issueTokensSocial = async (user, req, res) => {
 
 export const generateAccessToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
-  return jwt.sign({ ...payload, type: "access" }, process.env.JWT_SECRET, {
+  const subject = payload.sub || payload.id
+  if (!subject || !payload.sessionId) {
+    throw new Error("Access token subject and session are required")
+  }
+  const { sub: _sub, ...claims } = payload
+  return jwt.sign({ ...claims, type: "access" }, process.env.JWT_SECRET, {
     algorithm: JWT_ALGORITHM,
     expiresIn: ACCESS_TOKEN_EXPIRES,
+    issuer: TOKEN_ISSUER,
+    audience: TOKEN_AUDIENCE,
+    subject,
+    jwtid: crypto.randomUUID(),
   })
 }
 
@@ -171,8 +182,15 @@ export const verifyAccessToken = (token) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
     })
-    if (decoded.type === "mfa_pending" || !decoded.sessionId) {
+    if (
+      decoded.type !== "access" ||
+      typeof decoded.sub !== "string" ||
+      typeof decoded.jti !== "string" ||
+      typeof decoded.sessionId !== "string"
+    ) {
       throw new Error("Invalid access token type")
     }
     return decoded
@@ -184,17 +202,33 @@ export const verifyAccessToken = (token) => {
 export const generateRefreshToken = (payload) => {
   if (!process.env.JWT_REFRESH_SECRET)
     throw new Error("JWT_REFRESH_SECRET is not set")
-  return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+  const subject = payload.sub || payload.id
+  if (!subject) throw new Error("Refresh token subject is required")
+  return jwt.sign({ type: "refresh" }, process.env.JWT_REFRESH_SECRET, {
     algorithm: JWT_ALGORITHM,
     expiresIn: REFRESH_TOKEN_EXPIRES,
+    issuer: TOKEN_ISSUER,
+    audience: TOKEN_AUDIENCE,
+    subject,
+    jwtid: crypto.randomUUID(),
   })
 }
 
 export const verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_REFRESH_SECRET, {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET, {
       algorithms: [JWT_ALGORITHM],
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
     })
+    if (
+      decoded.type !== "refresh" ||
+      typeof decoded.sub !== "string" ||
+      typeof decoded.jti !== "string"
+    ) {
+      throw new Error("Invalid refresh token type")
+    }
+    return decoded
   } catch (err) {
     throw new Error("Invalid or expired refresh token")
   }
@@ -211,10 +245,20 @@ export const DUMMY_BCRYPT_HASH =
 export const generateMFAToken = (payload) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
   const jti = crypto.randomUUID()
+  const subject = payload.sub || payload.id
+  if (!subject) throw new Error("MFA token subject is required")
+  const { sub: _sub, ...claims } = payload
   return jwt.sign(
-    { ...payload, id: payload.sub || payload.id, type: "mfa_pending", jti },
+    { ...claims, id: subject, type: "mfa_pending" },
     process.env.JWT_SECRET,
-    { algorithm: JWT_ALGORITHM, expiresIn: "5m" },
+    {
+      algorithm: JWT_ALGORITHM,
+      expiresIn: "5m",
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+      subject,
+      jwtid: jti,
+    },
   )
 }
 
@@ -222,12 +266,79 @@ export const verifyMFAToken = (token) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
     })
-    if (decoded.type !== "mfa_pending") {
+    if (
+      decoded.type !== "mfa_pending" ||
+      typeof decoded.sub !== "string" ||
+      typeof decoded.jti !== "string"
+    ) {
       throw new Error("Invalid token type")
     }
     return decoded
   } catch (err) {
     throw new Error("Invalid or expired MFA session")
+  }
+}
+
+export const generateMFAEnrollmentToken = (payload) => {
+  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set")
+  const subject = payload.sub || payload.id
+  if (!subject) throw new Error("MFA enrollment subject is required")
+  return jwt.sign(
+    { role: payload.role, type: "mfa_enrollment" },
+    process.env.JWT_SECRET,
+    {
+      algorithm: JWT_ALGORITHM,
+      expiresIn: "10m",
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+      subject,
+      jwtid: crypto.randomUUID(),
+    },
+  )
+}
+
+export const verifyMFAEnrollmentToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+    })
+    if (
+      decoded.type !== "mfa_enrollment" ||
+      typeof decoded.sub !== "string" ||
+      typeof decoded.jti !== "string"
+    ) {
+      throw new Error("Invalid token type")
+    }
+    return decoded
+  } catch {
+    throw new Error("Invalid or expired MFA enrollment")
+  }
+}
+
+export const validateAuthSecrets = () => {
+  const jwtSecret = process.env.JWT_SECRET || ""
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || ""
+  const sessionSecret = process.env.SESSION_SECRET || ""
+
+  if (Buffer.byteLength(jwtSecret) < 64) {
+    throw new Error("JWT_SECRET must contain at least 64 bytes")
+  }
+  if (Buffer.byteLength(refreshSecret) < 64) {
+    throw new Error("JWT_REFRESH_SECRET must contain at least 64 bytes")
+  }
+  if (Buffer.byteLength(sessionSecret) < 32) {
+    throw new Error("SESSION_SECRET must contain at least 32 bytes")
+  }
+  if (
+    jwtSecret === refreshSecret ||
+    jwtSecret === sessionSecret ||
+    refreshSecret === sessionSecret
+  ) {
+    throw new Error("JWT, refresh-token, and session secrets must be distinct")
   }
 }

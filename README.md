@@ -72,23 +72,32 @@ The application follows a modern full-stack architecture:
 
 ### Staff MFA configuration
 
-The backend requires a dedicated 32-byte key for encrypting authenticator
-secrets. Generate one for each environment and store it in the server's secret
-manager or local `.env` file:
+The backend requires independent high-entropy secrets. Generate each value
+separately and store it in the server's secret manager or local `.env` file:
 
 ```bash
-openssl rand -base64 32
+openssl rand -base64 64 # JWT_SECRET
+openssl rand -base64 64 # JWT_REFRESH_SECRET
+openssl rand -base64 32 # SESSION_SECRET
+openssl rand -base64 32 # MFA_ENCRYPTION_KEY
 ```
 
-Set the result as `MFA_ENCRYPTION_KEY`, then apply the database migration before
-starting the server:
+Never reuse a value between variables and never commit or print deployed
+secrets. Rotating `JWT_SECRET`, `JWT_REFRESH_SECRET`, or `SESSION_SECRET`
+invalidates existing login state. Rotating `MFA_ENCRYPTION_KEY` without first
+re-encrypting stored TOTP secrets makes existing staff authenticator enrollment
+unreadable.
+
+Apply the database migration before starting the server:
 
 ```bash
 cd server
 npx prisma migrate deploy
 ```
 
-Do not reuse `JWT_SECRET` as the MFA encryption key, and do not commit the key.
+Access, refresh, enrollment, and pending-MFA tokens are signed with HS512 and
+validated against their exact type, issuer, audience, subject, expiry, and
+unique token ID. Access tokens also require a live database session.
 
 ---
 

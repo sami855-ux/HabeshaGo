@@ -21,18 +21,22 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import React, { useState, useTransition, useEffect, useRef, Suspense } from "react"
+import React, {
+  useState,
+  useTransition,
+  useEffect,
+  useRef,
+  useCallback,
+  Suspense,
+} from "react"
 import { toast } from "sonner"
-import { useDispatch } from "react-redux"
-import { setAccessToken, setUser } from "@/store/slices/userSlice"
-import { AppDispatch } from "@/store"
-import { getMe, verifyOTP, register } from "@/services/auth.user.api"
+import { verifyOTP, register } from "@/services/auth.user.api"
+import { establishAuthSession } from "@/services/authSession"
 import { AuthSlider } from "@/components/AuthSlider"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 function VerifyPageContent() {
-  const dispatch = useDispatch<AppDispatch>()
   const params = useSearchParams()
   const router = useRouter()
 
@@ -63,17 +67,6 @@ function VerifyPageContent() {
       firstSlotRef.current.focus()
     }
   }, [])
-
-  // Auto-verify when OTP is complete
-  useEffect(() => {
-    if (isOtpCompleted && !verifyPending && verificationStatus === "idle") {
-      const timer = setTimeout(() => {
-        verifyAccount()
-      }, 500)
-
-      return () => clearTimeout(timer)
-    }
-  }, [isOtpCompleted, verifyPending, verificationStatus])
 
   // Resend cooldown timer
   useEffect(() => {
@@ -122,7 +115,7 @@ function VerifyPageContent() {
       setAttempts(0)
       setOtp("")
       toast.success("New verification code sent!")
-    } catch (error) {
+    } catch {
       toast.error("Failed to resend code")
     }
   }
@@ -140,7 +133,7 @@ function VerifyPageContent() {
     toast.success("Email copied to clipboard")
   }
 
-  const verifyAccount = () => {
+  const verifyAccount = useCallback(() => {
     if (attempts >= 3) {
       toast.error("Too many attempts. Please request a new code.")
       return
@@ -155,34 +148,16 @@ function VerifyPageContent() {
           setVerificationStatus("success")
           toast.success("Email verified successfully!")
 
-          dispatch(setAccessToken(res.data?.accessToken))
-
-          const userRes = await getMe()
-
-          if (userRes.success) {
-            dispatch(setUser({ user: userRes.user }))
-            if (typeof window !== "undefined") {
-              localStorage.setItem("habeshagoUser", JSON.stringify(userRes.user))
-            }
-
-            setTimeout(() => {
-              if (userRes.user.role === "PASSENGER") {
-                router.push("/user")
-              } else if (userRes.user.role === "EV_CHARGER_MANAGER") {
-                router.push("/ev-charge-manager")
-              } else if (userRes.user.role === "PARKING_MANAGER") {
-                router.push("/admin/manage-parking")
-              } else {
-                router.push("/admin")
-              }
-            }, 800)
-          }
+          await establishAuthSession(res.data.accessToken)
+          setTimeout(() => router.push("/user"), 800)
+          return
         }
-      } catch (error: any) {
-        console.log(error)
+
+        throw new Error(res.message || "Invalid verification code")
+      } catch (error: unknown) {
         setVerificationStatus("error")
         toast.error(
-          error?.response?.data?.message || "Invalid verification code",
+          error instanceof Error ? error.message : "Invalid verification code",
         )
         setAttempts((prev) => prev + 1)
 
@@ -194,7 +169,15 @@ function VerifyPageContent() {
         }
       }
     })
-  }
+  }, [attempts, email, otp, router])
+
+  // Auto-verify when OTP is complete.
+  useEffect(() => {
+    if (isOtpCompleted && !verifyPending && verificationStatus === "idle") {
+      const timer = setTimeout(verifyAccount, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isOtpCompleted, verifyAccount, verifyPending, verificationStatus])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && isOtpCompleted) {
@@ -269,7 +252,7 @@ function VerifyPageContent() {
                 </h1>
 
                 <p className="text-xs sm:text-sm text-slate-500 font-inter">
-                  We've sent a 6-digit code to
+                  We&apos;ve sent a 6-digit code to
                 </p>
 
                 {/* Email Chip */}

@@ -7,6 +7,8 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/api-gateway",
+    "dev:gateway": "npm run dev -w apps/api-gateway",
+    "dev:auth": "npm run dev -w apps/auth-service",
     "start": "npm run start -w apps/api-gateway",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

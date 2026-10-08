@@ -7,7 +7,7 @@ import { useRequireRole } from "@/hooks/useRequireRole"
 import { SidebarProvider, useSidebar } from "@/context/sidebar-context"
 import { useOAuthExchange } from "@/hooks/useOAuthExchange"
 import { cn } from "@/lib/utils"
-import { useAppDispatch, useAppSelector } from "@/store/store"
+import { useAppSelector } from "@/store/store"
 import {
   Bell,
   Check,
@@ -20,8 +20,7 @@ import {
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
-  const dispatch = useAppDispatch()
-  const { isReady, isAuthenticated } = useAppSelector((state) => state.user)
+  const { isReady } = useAppSelector((state) => state.user)
 
   // ✅ block render until auth is resolved
   if (!isReady) {
@@ -47,7 +46,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
-  useRequireRole(["ADMIN", "PARKING_MANAGER"])
+  useRequireRole([
+    "ADMIN",
+    "DRIVER",
+    "EV_CHARGER_MANAGER",
+    "PARKING_MANAGER",
+  ])
   useOAuthExchange()
 
   return (

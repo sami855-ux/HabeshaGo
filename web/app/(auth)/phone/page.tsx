@@ -41,13 +41,18 @@ import {
   ConfirmationResult,
 } from "firebase/auth"
 import { axiosInstance } from "@/services/axiosInstance"
-import { useAppDispatch } from "@/store/store"
-import { setAccessToken, setUser } from "@/store/slices/userSlice"
-import { getMe } from "@/services/auth.user.api"
+import { establishAuthSession } from "@/services/authSession"
+import axios from "axios"
+
+const errorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || error.message || fallback
+  }
+  return error instanceof Error ? error.message : fallback
+}
 
 export default function PhoneLoginPage() {
   const router = useRouter()
-  const dispatch = useAppDispatch()
 
   const [sendOtpPending, startSendOtp] = useTransition()
   const [verifyOtpPending, startVerifyOtp] = useTransition()
@@ -138,13 +143,14 @@ export default function PhoneLoginPage() {
         toast.success("OTP sent successfully", {
           description: `Verification code sent to ${phone}`,
         })
-      } catch (error: any) {
-        console.error(error)
+      } catch (error: unknown) {
         recaptchaRef.current?.clear()
         recaptchaRef.current = null
         toast.error("Failed to send OTP", {
-          description:
-            error.message || "Please check your phone number and try again",
+          description: errorMessage(
+            error,
+            "Please check your phone number and try again",
+          ),
         })
       }
     })
@@ -183,32 +189,12 @@ export default function PhoneLoginPage() {
             description: "Redirecting to your account...",
           })
 
-          dispatch(setAccessToken(res.data?.accessToken))
-
-          const userRes = await getMe()
-
-          if (userRes.success) {
-            dispatch(setUser({ user: userRes.user }))
-            if (typeof window !== "undefined") {
-              localStorage.setItem("habeshagoUser", JSON.stringify(userRes.user))
-            }
-
-            setTimeout(() => {
-              if (userRes.user.role === "PASSENGER") {
-                router.push("/user")
-              } else if (userRes.user.role === "EV_CHARGER_MANAGER") {
-                router.push("/ev-charge-manager")
-              } else if (userRes.user.role === "PARKING_MANAGER") {
-                router.push("/admin/manage-parking")
-              } else {
-                router.push("/admin")
-              }
-            }, 800)
-          }
+          await establishAuthSession(res.data.accessToken)
+          setTimeout(() => router.push("/user"), 800)
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast.error("Verification failed", {
-          description: error.response?.data?.message || error.message,
+          description: errorMessage(error, "Please try again"),
         })
       }
     })
@@ -232,12 +218,11 @@ export default function PhoneLoginPage() {
       toast.success("New OTP sent", {
         description: "Please check your messages",
       })
-    } catch (error: any) {
-      console.error(error)
+    } catch (error: unknown) {
       recaptchaRef.current?.clear()
       recaptchaRef.current = null
       toast.error("Failed to resend OTP", {
-        description: error.message || "Please try again",
+        description: errorMessage(error, "Please try again"),
       })
     }
   }

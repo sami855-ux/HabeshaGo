@@ -71,7 +71,6 @@ import Image from "next/image"
 
 import { fetchDriverById } from "@/services/driver.api"
 import { axiosInstance } from "@/services/axiosInstance"
-import axios from "axios"
 
 // Types
 enum Status {
@@ -406,7 +405,7 @@ export default function EditDriverPage() {
   // Handle delete driver
   const handleDeleteDriver = async () => {
     try {
-      await axios.delete(`/api/admin/drivers/${driverId}`)
+      await axiosInstance.delete(`/api/admin/drivers/${driverId}`)
       toast.success("Driver deleted successfully")
       router.push("/admin/drivers")
     } catch (error) {

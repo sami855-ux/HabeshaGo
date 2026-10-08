@@ -1,5 +1,14 @@
+import axios from "axios"
 import { axiosInstance } from "./axiosInstance"
+import { logoutAuthSession } from "./authSession"
 import { User } from "@/types/user"
+
+const apiErrorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || error.message || fallback
+  }
+  return error instanceof Error ? error.message : fallback
+}
 
 // Common API Response Type
 export interface ApiResponse<T> {
@@ -23,12 +32,10 @@ export const register = async (payload: RegisterPayload) => {
         data: res.data,
       }
     }
-  } catch (error: any) {
-    console.error("Register failed:", error)
+  } catch (error: unknown) {
     return {
       success: false,
-      message:
-        error?.response?.data?.message || error.message || "Register failed",
+      message: apiErrorMessage(error, "Register failed"),
     }
   }
 }
@@ -52,6 +59,7 @@ export const verifyOTP = async (
   try {
     const { data } = await axiosInstance.post<{
       accessToken: string
+      userId: string
     }>("/auth/verify-otp", payload)
 
     return {
@@ -61,16 +69,11 @@ export const verifyOTP = async (
         userId: data.userId,
       },
     }
-  } catch (error: any) {
-    console.error("OTP verification failed:", error)
-
+  } catch (error: unknown) {
     return {
       success: false,
       data: { accessToken: "", userId: "" },
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        "OTP verification failed",
+      message: apiErrorMessage(error, "OTP verification failed"),
     }
   }
 }
@@ -79,11 +82,10 @@ export const verifyOTP = async (
 export const continueWithApple = async (idToken: string) => {
   try {
     await axiosInstance.post("/auth/apple", { idToken })
-  } catch (error: any) {
-    console.error("Register failed:", error)
+  } catch (error: unknown) {
     return {
       success: false,
-      message: error?.response?.data?.message || error.message || "Failed",
+      message: apiErrorMessage(error, "Failed"),
     }
   }
 }
@@ -97,47 +99,27 @@ export const getUserById = async (id: string): Promise<ApiResponse<User>> => {
       success: true,
       data,
     }
-  } catch (error: any) {
-    console.error("Failed to fetch user:", error)
+  } catch (error: unknown) {
     return {
       success: false,
-      message:
-        error?.response?.data?.message ||
-        error.message ||
-        "Failed to fetch user",
+      message: apiErrorMessage(error, "Failed to fetch user"),
     }
   }
 }
 
-export const getMe = async (accessToken?: string) => {
+export const getMe = async () => {
   try {
-    const res = await axiosInstance.get("/auth/me", {
-      withCredentials: true,
-      ...(accessToken && {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-    })
+    const res = await axiosInstance.get("/auth/me")
 
     if (res.data?.success && res.data?.user) {
       return res.data
     }
     throw new Error(res.data?.message || "Failed to fetch user")
-  } catch (error) {
-    console.error("Failed to fetch user:", error)
-    throw error
+  } catch (error: unknown) {
+    throw new Error(apiErrorMessage(error, "Failed to fetch user"))
   }
 }
 
 export const logoutUser = async () => {
-  try {
-    const res = await axiosInstance.post(
-      "/auth/logout",
-      {},
-      { withCredentials: true },
-    )
-    return res.data
-  } catch (err) {
-    console.error("Logout failed:", err)
-    throw err
-  }
+  await logoutAuthSession()
 }

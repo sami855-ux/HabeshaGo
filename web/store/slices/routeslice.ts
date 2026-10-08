@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import { axiosInstance } from "@/services/axiosInstance"
 
 export interface Route {
   id: number;
@@ -31,11 +31,11 @@ export const fetchRoutes = createAsyncThunk(
   "route/fetchRoutes",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await axios.get("http://localhost:5000/api/route");
+      const res = await axiosInstance.get("/route");
       return res.data.data; // match your backend { data: [...routes], meta: ... }
-    } catch (err: any) {
+    } catch (error: unknown) {
       return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch routes"
+        error instanceof Error ? error.message : "Failed to fetch routes"
       );
     }
   }
@@ -46,11 +46,11 @@ export const fetchRouteById = createAsyncThunk(
   "route/fetchRouteById",
   async (id: number, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/route/${id}`);
+      const res = await axiosInstance.get(`/route/${id}`);
       return res.data;
-    } catch (err: any) {
+    } catch (error: unknown) {
       return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch route"
+        error instanceof Error ? error.message : "Failed to fetch route"
       );
     }
   }

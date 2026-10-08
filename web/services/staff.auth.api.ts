@@ -1,4 +1,12 @@
 import { axiosInstance } from "./axiosInstance"
+import axios from "axios"
+
+const apiErrorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || error.message || fallback
+  }
+  return error instanceof Error ? error.message : fallback
+}
 
 export interface StaffLoginPayload {
   email: string
@@ -52,7 +60,6 @@ export interface StaffVerifyMFAResponse {
   message?: string
   data?: {
     accessToken?: string
-    refreshToken?: string
     user: StaffAuthUser
     setupRequired?: boolean
     enrollmentToken?: string
@@ -91,11 +98,8 @@ export const staffLoginApi = async (
   try {
     const res = await axiosInstance.post("/auth/staff/login", payload)
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Staff authentication failed"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Staff authentication failed")
     return {
       success: false,
       message,
@@ -112,11 +116,8 @@ export const staffVerifyMFAApi = async (
   try {
     const res = await axiosInstance.post("/auth/staff/mfa/verify", payload)
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "MFA verification failed"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "MFA verification failed")
     return {
       success: false,
       message,
@@ -131,11 +132,8 @@ export const staffResendMFAApi = async (mfaToken: string) => {
   try {
     const res = await axiosInstance.post("/auth/staff/mfa/resend", { mfaToken })
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to resend code"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Failed to resend code")
     return {
       success: false,
       message,
@@ -154,11 +152,8 @@ export const staffSetupTOTPApi = async (
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to setup Google Authenticator"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Failed to setup Google Authenticator")
     return {
       success: false,
       message,
@@ -182,11 +177,8 @@ export const staffEnableTOTPApi = async (
       },
     )
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to activate Google Authenticator"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Failed to activate Google Authenticator")
     return {
       success: false,
       message,
@@ -205,11 +197,8 @@ export const staffSetupPendingTOTPApi = async (
       mfaToken,
     })
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to setup authenticator app"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Failed to setup authenticator app")
     return {
       success: false,
       message,
@@ -230,11 +219,8 @@ export const staffEnablePendingTOTPApi = async (
       code,
     })
     return res.data
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to activate authenticator app"
+  } catch (error: unknown) {
+    const message = apiErrorMessage(error, "Failed to activate authenticator app")
     return {
       success: false,
       message,

@@ -11,6 +11,11 @@ interface UserState {
   isReady: boolean
 }
 
+interface EstablishedSession {
+  accessToken: string
+  user: User
+}
+
 const initialState: UserState = {
   user: null,
   accessToken: null,
@@ -22,21 +27,9 @@ const initialState: UserState = {
 
 export const fetchCurrentUser = createAsyncThunk(
   "user/fetchCurrentUser",
-  async (
-    accessToken: string | undefined = undefined,
-    { dispatch, rejectWithValue },
-  ) => {
+  async (_, { rejectWithValue }) => {
     try {
-      // Load cached user for instant UI
-      if (typeof window !== "undefined") {
-        const cachedUser = localStorage.getItem("habeshagoUser")
-        if (cachedUser) {
-          dispatch(setUser({ user: JSON.parse(cachedUser) }))
-        }
-      }
-
-      // Fetch from backend — pass token explicitly if provided
-      const response = await getMe(accessToken)
+      const response = await getMe()
       if (!response?.user) {
         throw new Error("No user profile returned")
       }
@@ -50,12 +43,11 @@ export const fetchCurrentUser = createAsyncThunk(
       }
 
       return backendUser
-    } catch (err: any) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("habeshagoUser")
-      }
+    } catch (error: unknown) {
       return rejectWithValue(
-        err.response?.data || { message: "Failed to fetch user" },
+        error instanceof Error
+          ? { message: error.message }
+          : { message: "Failed to fetch user" },
       )
     }
   },
@@ -71,6 +63,17 @@ const userSlice = createSlice({
       state.loading = false
       state.isReady = true
     },
+    establishSession: (
+      state,
+      action: PayloadAction<EstablishedSession>,
+    ) => {
+      state.user = action.payload.user
+      state.accessToken = action.payload.accessToken
+      state.isAuthenticated = true
+      state.loading = false
+      state.error = undefined
+      state.isReady = true
+    },
     updateUser: (state, action: PayloadAction<Partial<UserState["user"]>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload }
@@ -80,7 +83,8 @@ const userSlice = createSlice({
       state.user = null
       state.accessToken = null
       state.isAuthenticated = false
-      state.isReady = false
+      state.loading = false
+      state.isReady = true
       if (typeof window !== "undefined") {
         localStorage.removeItem("habeshagoUser")
       }
@@ -91,7 +95,7 @@ const userSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload
     },
-    setAccessToken: (state, action: PayloadAction<any>) => {
+    setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload
       state.isAuthenticated = true
     },
@@ -113,17 +117,22 @@ const userSlice = createSlice({
           state.isReady = true
         },
       )
-      .addCase(fetchCurrentUser.rejected, (state) => {
-        state.user = null
-        state.isAuthenticated = false
+      .addCase(fetchCurrentUser.rejected, (state, action) => {
         state.loading = false
         state.isReady = true
+        state.error =
+          typeof action.payload === "object" &&
+          action.payload !== null &&
+          "message" in action.payload
+            ? String(action.payload.message)
+            : "Failed to fetch user"
       })
   },
 })
 
 export const {
   setUser,
+  establishSession,
   updateUser,
   clearUser,
   setLoading,

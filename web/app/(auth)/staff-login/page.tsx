@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useDispatch } from "react-redux"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import {
@@ -42,20 +41,18 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp"
 import { cn } from "@/lib/utils"
-import type { User } from "@/types/user"
-import { setAccessToken, setUser } from "@/store/slices/userSlice"
+import { establishAuthSession } from "@/services/authSession"
 import {
   staffLoginApi,
+  staffResendMFAApi,
   staffVerifyMFAApi,
   staffSetupPendingTOTPApi,
   staffEnablePendingTOTPApi,
-  type StaffAuthUser,
   type StaffSetupData,
 } from "@/services/staff.auth.api"
 
 export default function StaffLoginPage() {
   const router = useRouter()
-  const dispatch = useDispatch()
 
   // Step 1: Credentials, Step 2: 2FA Verification (if setup) or 2FA Setup (if not setup)
   const [step, setStep] = useState<1 | 2>(1)
@@ -119,19 +116,11 @@ export default function StaffLoginPage() {
   }, [step])
 
   // Finalize successful authentication
-  const finishLogin = (accessToken: string, user: StaffAuthUser) => {
-    dispatch(setAccessToken(accessToken))
-    dispatch(setUser({ user: user as unknown as User }))
-    if (typeof window !== "undefined") {
-      localStorage.setItem("habeshagoUser", JSON.stringify(user))
-    }
-
+  const finishLogin = async (accessToken: string) => {
+    const user = await establishAuthSession(accessToken)
     toast.success(`Welcome back, ${user.name || user.email}!`)
     setTimeout(() => {
-      if (user.role === "ADMIN") router.replace("/admin")
-      else if (user.role === "EV_CHARGER_MANAGER") router.replace("/ev-charge-manager")
-      else if (user.role === "PARKING_MANAGER") router.replace("/admin/manage-parking")
-      else router.replace("/admin")
+      router.replace("/admin")
     }, 500)
   }
 
@@ -181,7 +170,7 @@ export default function StaffLoginPage() {
         setStep(2)
         toast.info("Enter the verification code sent to your work email.")
       }
-    } catch (err: any) {
+    } catch {
       setFormError("An unexpected error occurred. Please try again.")
     } finally {
       setLoginPending(false)
@@ -252,7 +241,7 @@ export default function StaffLoginPage() {
         toast.error("Authentication response did not include an access token.")
         return
       }
-      finishLogin(res.data.accessToken, res.data.user)
+      await finishLogin(res.data.accessToken)
     } catch {
       toast.error("2FA verification failed. Please try again.")
     } finally {
@@ -260,18 +249,23 @@ export default function StaffLoginPage() {
     }
   }
 
-  // Auto-submit 6-digit TOTP code when 6 digits are typed
-  useEffect(() => {
-    if (
-      step === 2 &&
-      hasTotp &&
-      !useRecoveryPhrase &&
-      totpCode.length === 6 &&
-      !verifyPending
-    ) {
-      handleVerifyTotp(totpCode)
+  const handleResendEmailCode = async () => {
+    setVerifyPending(true)
+    try {
+      const res = await staffResendMFAApi(mfaToken)
+      if (!res.success) {
+        toast.error(res.message || "Failed to resend the verification code.")
+        return
+      }
+      setSessionSeconds(300)
+      setTotpCode("")
+      toast.success("A new verification code was sent to your work email.")
+    } catch {
+      toast.error("Failed to resend the verification code.")
+    } finally {
+      setVerifyPending(false)
     }
-  }, [step, hasTotp, useRecoveryPhrase, totpCode])
+  }
 
   // -------------------------------------------------------------
   // STEP 2B: Finish Setup & Sign In (Confirmed by Alert Dialog)
@@ -295,7 +289,7 @@ export default function StaffLoginPage() {
         toast.error("Authentication response did not include an access token.")
         return
       }
-      finishLogin(res.data.accessToken, res.data.user)
+      await finishLogin(res.data.accessToken)
     } catch {
       toast.error("Failed to activate 2FA. Please try again.")
     } finally {
@@ -429,6 +423,14 @@ export default function StaffLoginPage() {
                       "Verify Email & Continue"
                     )}
                   </Button>
+                  <button
+                    type="button"
+                    onClick={handleResendEmailCode}
+                    disabled={verifyPending}
+                    className="w-full text-xs font-medium text-slate-500 hover:text-orange-600 disabled:opacity-50"
+                  >
+                    Didn&apos;t receive it? Send a new code
+                  </button>
                 </motion.div>
               )}
 

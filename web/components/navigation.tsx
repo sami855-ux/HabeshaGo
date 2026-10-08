@@ -7,10 +7,19 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, Ticket, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { useAppSelector } from "@/store/store"
+
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeLink, setActiveLink] = useState("")
+  const [mounted, setMounted] = useState(false)
+
+  const { isAuthenticated, user } = useAppSelector((state) => state.user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -44,6 +53,14 @@ export function Navigation() {
     { href: "#testimonials", label: "Reviews" },
     { href: "#faq", label: "FAQ" },
   ]
+
+  const isAuth = mounted && isAuthenticated && !!user
+  const bookTicketHref = isAuth ? "/user/bus" : "/login"
+  const dashboardHref = isAuth
+    ? user?.role === "PASSENGER"
+      ? "/user"
+      : "/admin"
+    : "/login"
 
   return (
     <header
@@ -89,13 +106,13 @@ export function Navigation() {
             })}
           </nav>
 
-          {/* Right Section: Sign In & Book Ticket */}
+          {/* Right Section: Sign In / Dashboard & Book Ticket */}
           <div className="flex items-center gap-3 sm:gap-4">
             <Link
-              href="/login"
+              href={dashboardHref}
               className="hidden sm:inline-flex text-sm font-semibold text-gray-800 hover:text-orange-600 transition-colors drop-shadow-xs"
             >
-              Sign In
+              {isAuth ? "Dashboard" : "Sign In"}
             </Link>
 
             <Button
@@ -103,7 +120,7 @@ export function Navigation() {
               size="sm"
               className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-md shadow-sm transition-all"
             >
-              <Link href="/user/bus" className="flex items-center gap-1.5">
+              <Link href={bookTicketHref} className="flex items-center gap-1.5">
                 <Ticket className="w-3.5 h-3.5" />
                 <span>Book Ticket</span>
               </Link>
@@ -154,18 +171,18 @@ export function Navigation() {
 
                 <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
                   <Link
-                    href="/login"
+                    href={dashboardHref}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="w-full text-center py-2 text-sm text-gray-700 hover:text-gray-900"
                   >
-                    Sign In
+                    {isAuth ? "Dashboard" : "Sign In"}
                   </Link>
                   <Button
                     asChild
                     size="sm"
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-md"
                   >
-                    <Link href="/user/bus" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Link href={bookTicketHref} onClick={() => setIsMobileMenuOpen(false)}>
                       Book Bus Ticket
                     </Link>
                   </Button>

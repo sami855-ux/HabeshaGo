@@ -315,9 +315,7 @@ function Sidebar() {
             closeMobileSidebar()
           }}
         >
-          <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-600 text-white shadow-2xs flex-shrink-0">
-            <Bus className="h-4.5 w-4.5" />
-          </div>
+          
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
               <span className="text-[13px] font-bold text-slate-900 dark:text-foreground tracking-tight leading-none">

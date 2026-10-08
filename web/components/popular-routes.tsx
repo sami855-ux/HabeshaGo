@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useAppSelector } from "@/store/store"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MapPin,
@@ -144,6 +145,14 @@ const POPULAR_ROUTES: RouteItem[] = [
 
 export function PopularRoutesSection({ id }: { id?: string }) {
   const [selectedRegion, setSelectedRegion] = useState<"all" | "south" | "north" | "east" | "west">("all")
+  const [mounted, setMounted] = useState(false)
+  const { isAuthenticated, user } = useAppSelector((state) => state.user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isAuth = mounted && isAuthenticated && !!user
 
   const filteredRoutes =
     selectedRegion === "all"
@@ -302,9 +311,13 @@ export function PopularRoutesSection({ id }: { id?: string }) {
                       className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-semibold text-xs sm:text-sm px-4 rounded-xl shadow-md shadow-orange-500/20 group-hover:scale-105 transition-all duration-200"
                     >
                       <Link
-                        href={`/user/bus?from=${encodeURIComponent(
-                          route.origin
-                        )}&to=${encodeURIComponent(route.destination)}`}
+                        href={
+                          isAuth
+                            ? `/user/bus?from=${encodeURIComponent(
+                                route.origin
+                              )}&to=${encodeURIComponent(route.destination)}`
+                            : "/login"
+                        }
                         className="flex items-center gap-1"
                       >
                         <span>Select Seat</span>
@@ -321,7 +334,7 @@ export function PopularRoutesSection({ id }: { id?: string }) {
         {/* View All Routes Banner */}
         <div className="mt-12 text-center">
           <Link
-            href="/user/bus"
+            href={isAuth ? "/user/bus" : "/login"}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-sm font-bold transition-all hover:gap-3"
           >
             <span>Explore All 50+ Intercity &amp; Regional Schedules in Ethiopia</span>

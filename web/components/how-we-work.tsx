@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -13,6 +13,7 @@ import {
   Bus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAppSelector } from "@/store/store"
 
 interface HowWeWorksProps {
   id?: string
@@ -20,6 +21,14 @@ interface HowWeWorksProps {
 
 export default function HowWeWorks({ id }: HowWeWorksProps) {
   const [activeStep, setActiveStep] = useState(0)
+  const [mounted, setMounted] = useState(false)
+  const { isAuthenticated, user } = useAppSelector((state) => state.user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isAuth = mounted && isAuthenticated && !!user
 
   const steps = [
     {
@@ -183,7 +192,7 @@ export default function HowWeWorks({ id }: HowWeWorksProps) {
                     asChild
                     className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl text-xs sm:text-sm shadow-md shadow-orange-500/20"
                   >
-                    <Link href="/user/bus">
+                    <Link href={isAuth ? "/user/bus" : "/login"}>
                       <span>Book a Seat Now</span>
                       <ArrowRight className="w-4 h-4 ml-1" />
                     </Link>

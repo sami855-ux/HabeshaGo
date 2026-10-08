@@ -12,6 +12,7 @@ import {
   Navigation as NavigationIcon,
 } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useAppSelector } from "@/store/store"
 
 const POPULAR_CITIES = [
   "Addis Ababa",
@@ -32,6 +33,12 @@ export function HeroSection() {
   const router = useRouter()
   const { scrollY } = useScroll()
   const y = useTransform(scrollY, [0, 500], [0, 80])
+  const [mounted, setMounted] = useState(false)
+  const { isAuthenticated, user } = useAppSelector((state) => state.user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const [fromCity, setFromCity] = useState("Addis Ababa")
   const [toCity, setToCity] = useState("Hawassa")
@@ -70,7 +77,12 @@ export function HeroSection() {
       date: travelDate,
       passengers,
     })
-    router.push(`/user/bus?${query.toString()}`)
+    const isAuth = mounted && isAuthenticated && !!user
+    if (isAuth) {
+      router.push(`/user/bus?${query.toString()}`)
+    } else {
+      router.push(`/login`)
+    }
   }
 
   return (

@@ -371,74 +371,67 @@ export default function AdminDashboardPage() {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {kpisLoading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <Card
-                key={i}
-                className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs p-4 rounded-xl"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <Skeleton className="h-8 w-8 rounded-lg" />
-                  <Skeleton className="h-5 w-14 rounded-full" />
+        {displayKpis.slice(0, 4).map((kpi, index) => {
+          const Icon = KPI_ICONS[index] || Bus
+          const isUp = kpi.trend === "up"
+
+          return (
+            <Card
+              key={index}
+              className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all rounded-xl"
+            >
+              <CardContent className="p-3.5 sm:p-4">
+                {/* Header Row: Icon + Trend Badge / Skeleton */}
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50">
+                    <Icon className="h-4 w-4" />
+                  </div>
+
+                  {kpisLoading ? (
+                    <Skeleton className="h-5 w-14 rounded-full bg-slate-100 dark:bg-slate-800 animate-pulse" />
+                  ) : (
+                    <div
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                        isUp
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : "bg-rose-50 text-rose-700 border border-rose-200/60 dark:bg-rose-950/30 dark:text-rose-400"
+                      }`}
+                    >
+                      {isUp ? (
+                        <TrendingUp className="h-3 w-3" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3" />
+                      )}
+                      <span>{kpi.change}</span>
+                    </div>
+                  )}
                 </div>
-                <Skeleton className="h-3 w-20 mb-2" />
-                <Skeleton className="h-7 w-28 mb-3" />
-                <Skeleton className="h-3 w-36 pt-2" />
-              </Card>
-            ))
-          : displayKpis.slice(0, 4).map((kpi, index) => {
-              const Icon = KPI_ICONS[index] || Bus
-              const isUp = kpi.trend === "up"
 
-              return (
-                <Card
-                  key={index}
-                  className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all rounded-xl"
-                >
-                  <CardContent className="p-3.5 sm:p-4">
-                    {/* Header Row: Icon + Trend Badge */}
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50">
-                        <Icon className="h-4 w-4" />
-                      </div>
+                {/* Title + Value / Skeleton */}
+                <div className="space-y-0.5">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
+                    {kpi.title}
+                  </p>
+                  {kpisLoading ? (
+                    <Skeleton className="h-7 w-28 rounded-md bg-slate-100 dark:bg-slate-800 animate-pulse my-0.5" />
+                  ) : (
+                    <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground tabular-nums">
+                      {kpi.value}
+                    </p>
+                  )}
+                </div>
 
-                      <div
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          isUp
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400"
-                            : "bg-rose-50 text-rose-700 border border-rose-200/60 dark:bg-rose-950/30 dark:text-rose-400"
-                        }`}
-                      >
-                        {isUp ? (
-                          <TrendingUp className="h-3 w-3" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3" />
-                        )}
-                        <span>{kpi.change}</span>
-                      </div>
-                    </div>
-
-                    {/* Title + Value */}
-                    <div className="space-y-0.5">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
-                        {kpi.title}
-                      </p>
-                      <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground tabular-nums">
-                        {kpi.value}
-                      </p>
-                    </div>
-
-                    {/* Subtitle / Details */}
-                    {(kpi.subtitle || kpi.details) && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-border/60 text-[11px] text-slate-500 dark:text-muted-foreground flex items-center justify-between">
-                        <span className="truncate">{kpi.subtitle || kpi.details}</span>
-                        <span className="text-[10px] text-slate-400 shrink-0 ml-1">vs prev</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+                {/* Subtitle / Details */}
+                {(kpi.subtitle || kpi.details) && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-border/60 text-[11px] text-slate-500 dark:text-muted-foreground flex items-center justify-between">
+                    <span className="truncate">{kpi.subtitle || kpi.details}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0 ml-1">vs prev</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Quick Access Modules */}

@@ -21,27 +21,20 @@ export const useRequireRole = (allowedRoles: string[]) => {
     if (code) return
     if (!isReady) return
 
-    // ✅ global small delay BEFORE running any auth logic
-    const timer = setTimeout(() => {
-      if (redirectTimer.current) clearTimeout(redirectTimer.current)
+    if (!isAuthenticated || !user) {
+      const isPassengerOnly =
+        allowedRoles.includes("PASSENGER") && allowedRoles.length === 1
+      router.replace(isPassengerOnly ? "/login" : "/staff-login")
+      return
+    }
 
-      if (!isAuthenticated || !user) {
-        const isPassengerOnly =
-          allowedRoles.includes("PASSENGER") && allowedRoles.length === 1
-        router.replace(isPassengerOnly ? "/login" : "/staff-login")
-        return
-      }
-
-      if (!allowedRoles.includes(user.role)) {
-        if (user.role === "PASSENGER") router.replace("/user")
-        else if (user.role === "EV_CHARGER_MANAGER")
-          router.replace("/ev-charge-manager")
-        else if (user.role === "PARKING_MANAGER")
-          router.replace("/admin/manage-parking")
-        else router.replace("/admin") // default fallback for staff & admin
-      }
-    }, 400)
-
-    return () => clearTimeout(timer)
+    if (!allowedRoles.includes(user.role)) {
+      if (user.role === "PASSENGER") router.replace("/user")
+      else if (user.role === "EV_CHARGER_MANAGER")
+        router.replace("/ev-charge-manager")
+      else if (user.role === "PARKING_MANAGER")
+        router.replace("/admin/manage-parking")
+      else router.replace("/admin") // default fallback for staff & admin
+    }
   }, [isReady, isAuthenticated, user, allowedRoles, router])
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Ticket,
@@ -9,12 +10,21 @@ import {
   ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
+import { useAppSelector } from "@/store/store"
 
 interface ServicesSectionProps {
   id?: string
 }
 
 export function ServicesSection({ id }: ServicesSectionProps) {
+  const [mounted, setMounted] = useState(false)
+  const { isAuthenticated, user } = useAppSelector((state) => state.user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isAuth = mounted && isAuthenticated && !!user
   const coreFeatures = [
     {
       title: "Instant Seat Selection",
@@ -96,7 +106,7 @@ export function ServicesSection({ id }: ServicesSectionProps) {
               </div>
 
               <Link
-                href="/user/bus"
+                href={isAuth ? "/user/bus" : "/login"}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors pt-1"
               >
                 <span>Book now</span>

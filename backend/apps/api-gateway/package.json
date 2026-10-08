@@ -27,6 +27,7 @@
     "rate-limit-redis": "^4.2.0"
   },
   "devDependencies": {
+    "@habeshago/service-auth": "*",
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

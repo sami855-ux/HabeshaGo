@@ -1,14 +1,13 @@
 "use client"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { markReady, setAccessToken } from "@/store/slices/userSlice"
-import { fetchCurrentUser } from "@/store/slices/userSlice"
-import { clearUser } from "@/store/slices/userSlice"
-import { useAppDispatch } from "@/store/store"
 import { axiosInstance } from "@/services/axiosInstance"
+import {
+  establishAuthSession,
+  logoutAuthSession,
+} from "@/services/authSession"
 
 export const useOAuthExchange = () => {
-  const dispatch = useAppDispatch()
   const router = useRouter()
 
   useEffect(() => {
@@ -24,24 +23,16 @@ export const useOAuthExchange = () => {
           withCredentials: true,
         })
 
-        // Set token first
-        dispatch(setAccessToken(data.accessToken))
-
-        const result = await dispatch(
-          fetchCurrentUser(data.accessToken),
-        ).unwrap()
-        if (!result) throw new Error("No user returned")
+        await establishAuthSession(data.accessToken)
 
         // Clean URL after everything is ready
         router.replace(window.location.pathname)
-      } catch (err) {
-        console.error("OAuth exchange error:", err)
-        dispatch(clearUser())
-        dispatch(markReady())
+      } catch {
+        await logoutAuthSession().catch(() => undefined)
         router.replace("/login?error=auth_failed")
       }
     }
 
     exchange()
-  }, [])
+  }, [router])
 }

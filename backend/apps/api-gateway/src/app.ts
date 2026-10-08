@@ -24,6 +24,10 @@ export function createApp() {
       genReqId: (req) => (req as any).id,
       customProps: (req) => ({ requestId: (req as any).id }),
       autoLogging: { ignore: (req) => req.url === "/health" || req.url === "/ready" },
+      customSuccessMessage: (req, res, responseTime) =>
+        `${req.method} ${req.url} ${res.statusCode} (${Math.round(responseTime)}ms)`,
+      customErrorMessage: (req, res, err) =>
+        `${req.method} ${req.url} ${res.statusCode}: ${err.message}`,
     }),
   );
   app.use(metricsMiddleware);

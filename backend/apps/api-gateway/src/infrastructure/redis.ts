@@ -8,7 +8,20 @@ export const redis = new Redis(env.REDIS_URL, {
   retryStrategy: (times) => Math.min(times * 200, 3000),
 });
 
-redis.on("error", (err) => logger.error({ err }, "redis error"));
-redis.on("connect", () => logger.info("redis connected"));
+let lastErrorLogTime = 0;
+const ERROR_LOG_THROTTLE_MS = 10_000;
+
+redis.on("error", (err) => {
+  const now = Date.now();
+  if (now - lastErrorLogTime > ERROR_LOG_THROTTLE_MS) {
+    lastErrorLogTime = now;
+    logger.error({ err }, "Redis connection failed. Rate limiting operates in fallback mode.");
+  }
+});
+
+redis.on("connect", () => {
+  lastErrorLogTime = 0;
+  logger.info("Redis connected successfully");
+});
 
 export default redis;

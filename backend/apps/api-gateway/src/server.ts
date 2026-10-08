@@ -80,7 +80,10 @@ export async function shutdown(signal: string) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
-process.on("unhandledRejection", (reason) => logger.error({ reason }, "unhandled rejection"));
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error({ err }, "unhandled rejection");
+});
 process.on("uncaughtException", (err) => {
   logger.fatal({ err }, "uncaught exception");
   process.exit(1);

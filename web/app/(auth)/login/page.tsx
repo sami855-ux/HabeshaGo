@@ -194,11 +194,7 @@ export default function LoginPage() {
 
   const signInWithGoogle = async () => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
-      if (!backendUrl) {
-        throw new Error("Backend URL is missing")
-      }
-      window.location.href = `${backendUrl}/auth/google`
+      window.location.href = "/api/auth/google"
     } catch (error: any) {
       console.error(error)
       toast.error(error?.message || "Google sign in failed")

@@ -5,8 +5,9 @@ import axios, {
 } from "axios"
 import type { User } from "@/types/user"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api"
+// Keep requests same-origin. Next.js proxies /api to BACKEND_URL, allowing the
+// HttpOnly refresh cookie to remain first-party and survive a full page reload.
+const API_BASE_URL = "/api"
 
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,

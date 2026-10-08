@@ -1,29 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { fetchKpis, KpiItem } from "@/services/admin-stats"
+import { useState } from "react"
+import { fetchKpis } from "@/services/admin-stats"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  LineChart,
   Line,
   BarChart,
   Bar,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from "recharts"
 import {
   Card,
@@ -33,10 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -45,7 +33,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useDispatch, useSelector } from "react-redux"
 import {
   Bus,
   Car,
@@ -58,34 +45,18 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
-  CheckCircle,
-  Activity,
-  Download,
-  Filter,
   RefreshCw,
-  Menu,
-  Bell,
-  User,
-  Sun,
-  Moon,
-  BarChart3,
   LineChart as LineChartIcon,
-  PieChart as PieChartIcon,
+  BarChart3,
   Map,
-  Settings,
-  FileText,
-  Shield,
   Wrench,
   AlertTriangle,
-  CreditCard,
-  Clock,
-  Calendar,
-  MoreHorizontal,
-  ChevronRight,
+  Activity,
   Tag,
+  ChevronRight,
+  CheckCircle2,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { RootState } from "@/store"
 import { useQuery } from "@tanstack/react-query"
 
 // Chart data
@@ -108,123 +79,56 @@ const parkingRevenueData = [
   { month: "Jun", revenue: 98000, occupancy: 82 },
 ]
 
-const routePerformanceData = [
-  { route: "Route 42", performance: 92, passengers: 450 },
-  { route: "Route 15", performance: 85, passengers: 320 },
-  { route: "Route 7", performance: 78, passengers: 280 },
-  { route: "Route 23", performance: 95, passengers: 520 },
-  { route: "Route 89", performance: 88, passengers: 410 },
-]
-
 // Activity feed data
 const activityData = [
   {
     id: 1,
     type: "ticket",
-    description: "Ticket #T-2345 sold - ₹150",
-    user: "John Doe",
+    description: "Ticket #HG-8821 booked - Addis to Hawassa",
+    user: "Abebe Kebede",
+    time: "2 mins ago",
     status: "completed",
   },
   {
     id: 2,
     type: "driver",
-    description: "Driver check-in - Bus #B-142",
-    user: "Rajesh Kumar",
+    description: "Driver check-in verified - Bus #B-142",
+    user: "Dawit Tadesse",
+    time: "15 mins ago",
     status: "active",
   },
   {
     id: 3,
     type: "maintenance",
-    description: "EV Station #EV-23 maintenance completed",
-    user: "Maintenance Team",
+    description: "Bole Station #EV-04 inspection finished",
+    user: "Tech Team",
+    time: "42 mins ago",
     status: "completed",
   },
   {
     id: 4,
     type: "dispute",
-    description: "Refund processed - Ticket #T-1987",
-    user: "Sarah Smith",
+    description: "Refund approved - Seat rebooked #T-1987",
+    user: "Sara Hailu",
+    time: "1 hour ago",
     status: "pending",
   },
   {
     id: 5,
     type: "ticket",
-    description: "Monthly pass validated - User #U-789",
-    user: "Amit Patel",
+    description: "QR Pass scanned at Stadium Terminal",
+    user: "Yohannes M.",
+    time: "2 hours ago",
     status: "completed",
   },
-  {
-    id: 6,
-    type: "driver",
-    description: "Route deviation reported - Route 15",
-    user: "Driver #D-45",
-    status: "alert",
-  },
-  {
-    id: 7,
-    type: "maintenance",
-    description: "Parking sensor calibration - Lot B",
-    user: "Tech Team",
-    status: "in-progress",
-  },
-  {
-    id: 8,
-    type: "ticket",
-    description: "Bulk ticket purchase - Corporate account",
-    user: "Corporate XYZ",
-    status: "completed",
-  },
-  {
-    id: 1,
-    type: "ticket",
-    description: "Ticket #T-2345 sold - ₹150",
-    user: "John Doe",
-    status: "completed",
-  },
-  {
-    id: 2,
-    type: "driver",
-    description: "Driver check-in - Bus #B-142",
-    user: "Rajesh Kumar",
-    status: "active",
-  },
-  {
-    id: 3,
-    type: "maintenance",
-    description: "EV Station #EV-23 maintenance completed",
-    user: "Maintenance Team",
-    status: "completed",
-  },
-]
-
-// Reports snapshot data
-const reportsData = [
-  { name: "Mon", sales: 1850, revenue: 12500 },
-  { name: "Tue", sales: 2150, revenue: 14500 },
-  { name: "Wed", sales: 2800, revenue: 18500 },
-  { name: "Thu", sales: 2540, revenue: 16500 },
-  { name: "Fri", sales: 3200, revenue: 21000 },
-  { name: "Sat", sales: 3847, revenue: 24500 },
-  { name: "Sun", sales: 2940, revenue: 19500 },
 ]
 
 const evChargingData = [
-  { station: "EV-1", usage: 85, status: "active" },
-  { station: "EV-2", usage: 92, status: "active" },
-  { station: "EV-3", usage: 45, status: "active" },
-  { station: "EV-4", usage: 78, status: "maintenance" },
-  { station: "EV-5", usage: 60, status: "active" },
-]
-
-const fleetUtilizationData = [
-  { hour: "6AM", utilization: 35 },
-  { hour: "8AM", utilization: 85 },
-  { hour: "10AM", utilization: 65 },
-  { hour: "12PM", utilization: 70 },
-  { hour: "2PM", utilization: 60 },
-  { hour: "4PM", utilization: 80 },
-  { hour: "6PM", utilization: 75 },
-  { hour: "8PM", utilization: 40 },
+  { station: "Meskel Square Station", usage: 85, status: "active" },
+  { station: "Bole Medhanialem EV-1", usage: 92, status: "active" },
+  { station: "Megenagna Transit Hub", usage: 45, status: "active" },
+  { station: "Sarbet Terminal EV-2", usage: 78, status: "maintenance" },
+  { station: "Piassa City Lot", usage: 60, status: "active" },
 ]
 
 // Quick access panels
@@ -232,843 +136,762 @@ const quickAccessPanels = [
   {
     title: "Manage Buses",
     icon: Bus,
-    description: "Fleet management & scheduling",
-    color: "bg-blue-500",
-    count: 2,
-    colSpan: 2,
-    rowSpan: 1,
+    description: "Fleet & scheduling",
+    color: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/60",
+    count: 142,
     path: "/admin/manage-bus",
   },
   {
     title: "Manage Routes",
     icon: Route,
-    description: "Route planning & optimization",
-    color: "bg-green-500",
-    count: 23,
-    colSpan: 1,
-    rowSpan: 1,
+    description: "Intercity routes",
+    color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60",
+    count: 28,
     path: "/admin/manage-route",
   },
   {
-    title: "Manage Parking Stations",
+    title: "Parking Stations",
     icon: MapPin,
-    description: "Parking lot operations",
-    color: "bg-purple-500",
+    description: "City parking hubs",
+    color: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-200/60",
     count: 18,
-    colSpan: 1,
-    rowSpan: 2,
     path: "/admin/manage-parking",
   },
   {
-    title: "Manage EV Stations",
+    title: "EV Stations",
     icon: Battery,
-    description: "Charging infrastructure",
-    color: "bg-emerald-500",
+    description: "Charging points",
+    color: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400 border-teal-200/60",
     count: 45,
-    colSpan: 2,
-    rowSpan: 1,
     path: "/admin/infrastructure/ev-stations",
   },
   {
-    title: "Manage Drivers/Staff",
+    title: "Drivers & Staff",
     icon: Users,
-    description: "Personnel management",
-    color: "bg-amber-500",
+    description: "Personnel records",
+    color: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200/60",
     count: 89,
-    colSpan: 1,
-    rowSpan: 1,
     path: "/admin/manage-staff",
   },
   {
     title: "Promo Codes",
     icon: Tag,
-    description: "Create and manage discount promo codes",
-    color: "bg-red-500",
-    count: "2.8K",
-    colSpan: 2,
-    rowSpan: 1,
+    description: "Discounts & loyalty",
+    color: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60",
+    count: 12,
     path: "/admin/add-promo-code",
   },
 ]
 
-export default function DashboardWithCharts() {
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+export default function AdminDashboardPage() {
   const router = useRouter()
-  const { user } = useSelector((state: RootState) => state.user)
+  const [timeRange, setTimeRange] = useState<"today" | "7d" | "30d">("7d")
+  const [selectedFleetTab, setSelectedFleetTab] = useState<"all" | "bus" | "parking" | "ev">("all")
 
   const {
     data: kpis = [],
     isLoading: kpisLoading,
+    isRefetching,
     error,
     refetch,
   } = useQuery({
     queryKey: ["admin-kpis"],
     queryFn: async () => {
       const result = await fetchKpis()
-
       if (!result.success) {
         throw new Error(result.message)
       }
-
       return result.data
     },
-
-    staleTime: 1000 * 60 * 5, // cache for 5 min
-    gcTime: 1000 * 60 * 10, // keep in memory for 10 min
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
   })
 
-  const KPI_META = [
-    { icon: Bus, color: "bg-primary" },
-    { icon: Car, color: "bg-primary" },
-    { icon: Zap, color: "bg-primary" },
-    { icon: Ticket, color: "bg-primary" },
+  // Default fallback KPIs for clean preview when backend is not connected
+  const fallbackKpis = [
+    {
+      title: "Total Booked Tickets",
+      value: "18,492",
+      subtitle: "ETB 2,410,500 total revenue",
+      change: "+12.4%",
+      trend: "up" as const,
+      details: "420 trips operated this week",
+    },
+    {
+      title: "Active Fleet Vehicles",
+      value: "142 Buses",
+      subtitle: "94.2% on-time dispatch rate",
+      change: "+3.1%",
+      trend: "up" as const,
+      details: "8 buses undergoing scheduled service",
+    },
+    {
+      title: "EV Charging Sessions",
+      value: "1,280 kWh",
+      subtitle: "45 stations online",
+      change: "+8.6%",
+      trend: "up" as const,
+      details: "Peak usage 7:00 AM - 10:00 AM",
+    },
+    {
+      title: "Parking Occupancy",
+      value: "78%",
+      subtitle: "18 city terminals active",
+      change: "-1.2%",
+      trend: "down" as const,
+      details: "340 vacant bays available",
+    },
   ]
 
-  const mergedKpis = kpis.map((kpi, idx) => ({
-    ...kpi,
-    icon: KPI_META[idx]?.icon ?? Bus,
-    color: KPI_META[idx]?.color ?? "bg-primary",
-  }))
+  const displayKpis = kpis && kpis.length > 0 ? kpis : fallbackKpis
+
+  const KPI_ICONS = [Ticket, Bus, Zap, Car]
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400">
             Completed
-          </Badge>
+          </span>
         )
       case "active":
         return (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/30 dark:text-blue-400">
             Active
-          </Badge>
+          </span>
         )
       case "pending":
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/60 dark:bg-amber-950/30 dark:text-amber-400">
             Pending
-          </Badge>
-        )
-      case "alert":
-        return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
-            Alert
-          </Badge>
-        )
-      case "in-progress":
-        return (
-          <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
-            In Progress
-          </Badge>
+          </span>
         )
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {status}
+          </span>
+        )
     }
   }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "ticket":
-        return <Ticket className="h-4 w-4" />
+        return <Ticket className="h-3.5 w-3.5 text-emerald-600" />
       case "driver":
-        return <Users className="h-4 w-4" />
+        return <Users className="h-3.5 w-3.5 text-blue-600" />
       case "maintenance":
-        return <Wrench className="h-4 w-4" />
+        return <Wrench className="h-3.5 w-3.5 text-amber-600" />
       case "dispute":
-        return <AlertTriangle className="h-4 w-4" />
+        return <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
       default:
-        return <Activity className="h-4 w-4" />
+        return <Activity className="h-3.5 w-3.5 text-slate-600" />
     }
   }
 
   return (
     <div
-      className={`min-h-screen rounded-2xl ${
-        theme === "dark" ? "dark bg-background" : "bg-background"
-      } `}
+      style={{ fontFamily: 'var(--font-inter), "Inter", sans-serif' }}
+      className="w-full max-w-[1600px] mx-auto p-4 sm:p-5 lg:p-6 space-y-4 font-inter text-slate-900 dark:text-foreground"
     >
-      <main className="container mx-auto px-4 py-6 rounded-xl">
-        {/* Header with Actions */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h2 className="text-lg md:text-2xl font-bold text-foreground">
-              Dashboard Analytics
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Real-time insights and visual analytics for transit management
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+      {/* Page Header with Time Filters and Actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1 border-b border-slate-200/60 dark:border-border/60">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-foreground leading-tight">
+            Dashboard Overview
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5">
+            Real-time fleet operations, ticket booking metrics, and transit performance.
+          </p>
         </div>
 
-        {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {(error as Error).message}
+        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+          {/* Time Filter Pills */}
+          <div className="inline-flex items-center p-0.5 bg-slate-100 dark:bg-muted rounded-lg border border-slate-200/70 dark:border-border text-xs">
+            <button
+              onClick={() => setTimeRange("today")}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                timeRange === "today"
+                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setTimeRange("7d")}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                timeRange === "7d"
+                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              onClick={() => setTimeRange("30d")}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                timeRange === "30d"
+                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              }`}
+            >
+              30 Days
+            </button>
           </div>
-        )}
-        <div className="grid grid-cols-1 gap-5 mb-8 sm:grid-cols-2 lg:grid-cols-4">
-          {kpisLoading
-            ? Array.from({ length: 4 }).map((_, i) => (
+
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="h-8 text-xs font-medium border-slate-200 hover:bg-slate-50 dark:border-border"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 mr-1.5 text-slate-500 ${
+                isRefetching ? "animate-spin" : ""
+              }`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Error alert if fetch failed */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Error loading live metrics: {(error as Error).message}</span>
+        </div>
+      )}
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {kpisLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Card
+                key={i}
+                className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs p-4 rounded-xl"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-28 mb-3" />
+                <Skeleton className="h-3 w-36 pt-2" />
+              </Card>
+            ))
+          : displayKpis.slice(0, 4).map((kpi, index) => {
+              const Icon = KPI_ICONS[index] || Bus
+              const isUp = kpi.trend === "up"
+
+              return (
                 <Card
-                  key={i}
-                  className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/90"
+                  key={index}
+                  className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all rounded-xl"
                 >
-                  <CardContent className="p-6">
-                    {/* Icon + trend row */}
-                    <div className="mb-4 flex items-start justify-between">
-                      <Skeleton className="h-11 w-11 rounded-xl" />
-                      <Skeleton className="h-6 w-16 rounded-full" />
-                    </div>
-                    {/* Title + value */}
-                    <div className="space-y-2">
-                      <Skeleton className="h-3 w-24" />
-                      <Skeleton className="h-8 w-20" />
-                      {/* Divider section */}
-                      <div className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-1">
-                        <Skeleton className="h-3 w-28" />
-                        <Skeleton className="h-3 w-36" />
+                  <CardContent className="p-3.5 sm:p-4">
+                    {/* Header Row: Icon + Trend Badge */}
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50">
+                        <Icon className="h-4 w-4" />
+                      </div>
+
+                      <div
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          isUp
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400"
+                            : "bg-rose-50 text-rose-700 border border-rose-200/60 dark:bg-rose-950/30 dark:text-rose-400"
+                        }`}
+                      >
+                        {isUp ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
+                        <span>{kpi.change}</span>
                       </div>
                     </div>
+
+                    {/* Title + Value */}
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
+                        {kpi.title}
+                      </p>
+                      <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground tabular-nums">
+                        {kpi.value}
+                      </p>
+                    </div>
+
+                    {/* Subtitle / Details */}
+                    {(kpi.subtitle || kpi.details) && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-border/60 text-[11px] text-slate-500 dark:text-muted-foreground flex items-center justify-between">
+                        <span className="truncate">{kpi.subtitle || kpi.details}</span>
+                        <span className="text-[10px] text-slate-400 shrink-0 ml-1">vs prev</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              ))
-            : mergedKpis.map((kpi, index) => (
-                <div key={index} className="h-full">
-                  <Card className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900/90">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400/20 to-teal-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <CardContent className="relative p-6">
-                      <div className="mb-4 flex items-start justify-between">
-                        <div className="relative">
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
-                          <div className="relative rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 p-3 shadow-lg transition-transform duration-300 group-hover:scale-110">
-                            <kpi.icon className="h-5 w-5 text-white" />
-                          </div>
-                        </div>
-                        <div
-                          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-                            kpi.trend === "up"
-                              ? "bg-emerald-50 dark:bg-emerald-950/30"
-                              : "bg-red-50 dark:bg-red-950/30"
-                          }`}
-                        >
-                          {kpi.trend === "up" ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                          )}
-                          <span
-                            className={`text-xs font-semibold ${
-                              kpi.trend === "up"
-                                ? "text-emerald-700 dark:text-emerald-400"
-                                : "text-red-700 dark:text-red-400"
-                            }`}
-                          >
-                            {kpi.change}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">
-                          {kpi.title}
-                        </p>
-                        <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                          {kpi.value}
-                        </p>
-                        {(kpi.subtitle || kpi.details) && (
-                          <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-                            {kpi.subtitle && (
-                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {kpi.subtitle}
-                              </p>
-                            )}
-                            {kpi.details && (
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                {kpi.details}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+              )
+            })}
+      </div>
+
+      {/* Quick Access Modules */}
+      <div>
+        <div className="flex items-center justify-between mb-2 px-0.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
+            Quick Operations
+          </h2>
+          <span className="text-[11px] text-slate-400">6 Primary Modules</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {quickAccessPanels.map((panel, index) => (
+            <div
+              key={index}
+              onClick={() => panel.path && router.push(panel.path)}
+              className="bg-white dark:bg-card border border-slate-200/80 dark:border-border hover:border-emerald-300 dark:hover:border-emerald-700/60 rounded-xl p-3 shadow-2xs hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div
+                  className={`flex items-center justify-center h-8 w-8 rounded-lg border ${panel.color}`}
+                >
+                  <panel.icon className="h-4 w-4" />
                 </div>
-              ))}
-        </div>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {panel.count}
+                </span>
+              </div>
 
-        {/* Quick Access Panels */}
-        <div className="mb-4 min-h-96 px-2">
-          <h3 className="text-xl font-semibold mb-4">Quick Access Panels</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickAccessPanels.map((panel, index) => (
-              <Card
-                key={index}
-                onClick={() => {
-                  if (panel.path) {
-                    router.push(panel.path)
-                  }
-                }}
-                className="relative border-background transition-shadow cursor-pointer h-38 hover:border-card hover:shadow-lg"
-              >
-                <CardContent className="p-2 px-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-3 rounded-lg ${panel.color}`}>
-                      <panel.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <Badge variant="secondary">{panel.count}</Badge>
-                  </div>
-                  <h4 className="font-semibold text-lg mb-2">{panel.title}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {panel.description}
-                  </p>
-                  {/* Arrow icon for hover */}
-                  <div className="absolute right-4 z-50 top-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                    <ChevronRight className="w-5 h-5 text-orange-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="space-y-6 mb-8">
-          {/* Row 1: Ticket Sales & Parking Revenue */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Ticket Sales Trend */}
-            <Card className="border-none">
-              <CardHeader>
+              <div>
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <LineChartIcon className="h-5 w-5 text-primary" />
-                      Ticket Sales Trend
-                    </CardTitle>
-                    <CardDescription>
-                      Weekly ticket sales and revenue
-                    </CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-green-600 border-green-200"
-                  >
-                    +12.5% this week
-                  </Badge>
+                  <h3 className="text-xs font-semibold text-slate-900 dark:text-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
+                    {panel.title}
+                  </h3>
+                  <ChevronRight className="h-3 w-3 text-slate-300 group-hover:text-emerald-600 transition-colors" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={ticketSalesData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--muted))"
-                      />
-                      <XAxis
-                        dataKey="day"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Legend />
-                      {/* Tickets Sold Line - solid orange */}
-                      <Line
-                        type="monotone"
-                        dataKey="tickets"
-                        stroke="#FF8C42" // orange color
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: "#FF8C42" }}
-                        activeDot={{ r: 6, fill: "#FF8C42" }}
-                        name="Tickets Sold"
-                      />
-                      {/* Revenue Line - lighter orange dashed */}
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#FFA65C" // lighter orange
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={{ r: 4, fill: "#FFA65C" }}
-                        activeDot={{ r: 6, fill: "#FFA65C" }}
-                        name="Revenue ($)"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Parking Revenue Trend */}
-            <Card className="border-none">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      Parking Revenue & Occupancy
-                    </CardTitle>
-                    <CardDescription>
-                      Monthly parking performance
-                    </CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-green-600 border-green-200"
-                  >
-                    +8.3% this month
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={parkingRevenueData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--muted))"
-                      />
-                      <XAxis
-                        dataKey="month"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis
-                        yAxisId="left"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Legend />
-                      {/* Revenue bars - deep orange */}
-                      <Bar
-                        yAxisId="left"
-                        dataKey="revenue"
-                        fill="#FF8C42" // deep orange
-                        name="Revenue ($)"
-                        radius={[4, 4, 0, 0]}
-                      />
-                      {/* Occupancy bars - lighter orange */}
-                      <Bar
-                        yAxisId="right"
-                        dataKey="occupancy"
-                        fill="#FFA65C" // lighter orange
-                        fillOpacity={0.6}
-                        name="Occupancy (%)"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Additional Stats Row */}
-          <Card className="border-none">
-            <CardHeader>
-              <CardTitle>Route Performance Comparison</CardTitle>
-              <CardDescription>
-                Top performing routes by passenger count
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={routePerformanceData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--muted))"
-                    />
-                    <XAxis
-                      dataKey="route"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        borderColor: "hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    {/* Performance bars - deep orange */}
-                    <Bar
-                      yAxisId="left"
-                      dataKey="performance"
-                      fill="#FF8C42" // deep orange
-                      name="Performance (%)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    {/* Passengers bars - lighter orange */}
-                    <Bar
-                      yAxisId="right"
-                      dataKey="passengers"
-                      fill="#FFA65C" // lighter orange
-                      fillOpacity={0.6}
-                      name="Passengers"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Activity Feed */}
-          <Card className="lg:col-span-2 border-none">
-            <CardHeader>
-              <CardTitle>Activity Feed / Recent Events</CardTitle>
-              <CardDescription>
-                Real-time updates on system activities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activityData.map((activity) => (
-                      <TableRow key={activity.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getActivityIcon(activity.type)}
-                            <span className="capitalize">{activity.type}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {activity.description}
-                        </TableCell>
-                        <TableCell>{activity.user}</TableCell>
-                        <TableCell>{activity.time}</TableCell>
-                        <TableCell>{getStatusBadge(activity.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Reports Snapshot */}
-          <Card className="border-none">
-            <CardHeader>
-              <CardTitle>Reports Snapshot</CardTitle>
-              <CardDescription>Quick overview of trends</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">Daily Ticket Sales</h4>
-                  <Badge variant="outline" className="text-green-600">
-                    +12.5%
-                  </Badge>
-                </div>
-                <div className="h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportsData}>
-                      <defs>
-                        <linearGradient
-                          id="orangeGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="hsl(34, 100%, 50%)"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="hsl(34, 100%, 50%)"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <Area
-                        type="monotone"
-                        dataKey="sales"
-                        stroke="hsl(34, 100%, 50%)"
-                        fill="url(#orangeGradient)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">EV Charging Usage</h4>
-                  <Badge variant="outline" className="text-green-600">
-                    +8.3%
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  {evChargingData.map((station) => (
-                    <div
-                      key={station.station}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm w-32">{station.station}</span>
-                      <div className="flex items-center gap-2">
-                        <Progress
-                          value={station.usage}
-                          className="flex-1 h-2 rounded-full bg-orange-100"
-                          style={{
-                            background: "#FFE5B4", // soft orange background
-                          }}
-                        />
-                        <span className="text-sm w-10 text-right">
-                          {station.usage}%
-                        </span>
-                        <Badge
-                          variant="default"
-                          className={`text-xs px-2 py-1 ${
-                            station.status === "active"
-                              ? "bg-orange-500 text-white"
-                              : "bg-orange-200 text-orange-800"
-                          }`}
-                        >
-                          {station.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Map Overview */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Map className="h-5 w-5 text-primary" />
-                  Live Map Overview
-                </CardTitle>
-                <CardDescription>
-                  Real-time operational insight across the city
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
+                <p className="text-[11px] text-slate-500 dark:text-muted-foreground truncate mt-0.5">
+                  {panel.description}
+                </p>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 1: Primary Trends & Performance Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        {/* Ticket Sales Trend */}
+        <Card className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs rounded-xl">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-foreground">
+                <LineChartIcon className="h-4 w-4 text-emerald-600" />
+                Ticket Sales & Revenue
+              </CardTitle>
+              <CardDescription className="text-[11px] text-slate-500">
+                Weekly intercity bookings across Ethiopia
+              </CardDescription>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+              +12.5% this week
+            </span>
           </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg h-96 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden">
-              {/* Mock Map Content */}
-              <div className="absolute inset-0 p-6">
-                <div className="grid grid-cols-3 gap-4 h-full">
-                  {/* Bus Locations */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Bus className="h-5 w-5 text-blue-500" />
-                      <h4 className="font-semibold">Bus Locations</h4>
-                      <Badge className="ml-auto">142 Active</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {[1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`h-2 w-2 rounded-full ${
-                                i === 1
-                                  ? "bg-green-500"
-                                  : i === 2
-                                    ? "bg-yellow-500"
-                                    : "bg-red-500"
-                              }`}
-                            ></div>
-                            <span>Bus #{100 + i}</span>
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            Route {i * 15}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Parking Stations */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-                    <div className="flex items-center gap-2 mb-4">
-                      <MapPin className="h-5 w-5 text-purple-500" />
-                      <h4 className="font-semibold">Parking Stations</h4>
-                      <Badge className="ml-auto">78% Full</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {["Downtown", "Central", "North Side"].map(
-                        (location, i) => (
-                          <div
-                            key={location}
-                            className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
-                          >
-                            <span>{location}</span>
-                            <div className="flex items-center gap-2">
-                              <Progress
-                                value={[65, 85, 45][i]}
-                                className="w-20"
-                              />
-                              <span className="text-sm">
-                                {[65, 85, 45][i]}%
-                              </span>
-                            </div>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-
-                  {/* EV Charging Stations */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Battery className="h-5 w-5 text-emerald-500" />
-                      <h4 className="font-semibold">EV Stations</h4>
-                      <Badge className="ml-auto">32/45 In Use</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {["EV-1", "EV-2", "EV-3"].map((station, i) => (
-                        <div
-                          key={station}
-                          className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
-                        >
-                          <span>{station}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                ["active", "active", "warning"][i] as any
-                              }
-                            >
-                              {["Available", "Charging", "Maintenance"][i]}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Map Legend */}
-                <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 rounded-lg p-3 shadow">
-                  <h5 className="font-medium mb-2">Legend</h5>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                      <span className="text-sm">Buses</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-purple-500"></div>
-                      <span className="text-sm">Parking</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-emerald-500"></div>
-                      <span className="text-sm">EV Stations</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                      <span className="text-sm">On Time</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                      <span className="text-sm">Delayed</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">142</div>
-                <div className="text-sm text-muted-foreground">
-                  Active Buses
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">18</div>
-                <div className="text-sm text-muted-foreground">
-                  Parking Stations
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">45</div>
-                <div className="text-sm text-muted-foreground">EV Stations</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">92%</div>
-                <div className="text-sm text-muted-foreground">
-                  On-time Performance
-                </div>
-              </div>
+          <CardContent className="p-4 pt-1">
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ticketSalesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="ticketGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis
+                    dataKey="day"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: "#E2E8F0" }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#FFFFFF",
+                      borderColor: "#E2E8F0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: "11px", paddingBottom: "8px" }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="tickets"
+                    name="Tickets"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#ticketGradient)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Revenue (ETB)"
+                    stroke="#6366F1"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#6366F1" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
-      </main>
+
+        {/* Parking Revenue & Occupancy */}
+        <Card className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs rounded-xl">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-foreground">
+                <BarChart3 className="h-4 w-4 text-emerald-600" />
+                Parking Revenue & Occupancy
+              </CardTitle>
+              <CardDescription className="text-[11px] text-slate-500">
+                Monthly bay utilization and earnings
+              </CardDescription>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+              +8.3% vs target
+            </span>
+          </CardHeader>
+          <CardContent className="p-4 pt-1">
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={parkingRevenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: "#E2E8F0" }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#FFFFFF",
+                      borderColor: "#E2E8F0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: "11px", paddingBottom: "8px" }}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="revenue"
+                    name="Revenue (ETB)"
+                    fill="#10B981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    yAxisId="right"
+                    dataKey="occupancy"
+                    name="Occupancy %"
+                    fill="#94A3B8"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 2: Live Activity Feed & EV Charging Station Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+        {/* Recent Operational Activity */}
+        <Card className="lg:col-span-2 bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs rounded-xl">
+          <CardHeader className="p-4 pb-2.5 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-foreground">
+                <Activity className="h-4 w-4 text-emerald-600" />
+                Live System Activity
+              </CardTitle>
+              <CardDescription className="text-[11px] text-slate-500">
+                Latest transactions, driver check-ins, and refunds
+              </CardDescription>
+            </div>
+            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Real-time feed
+            </span>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-100 hover:bg-transparent">
+                    <TableHead className="text-[11px] font-semibold text-slate-400 h-8">Action</TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-400 h-8">Details</TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-400 h-8">User</TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-400 h-8">Time</TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-400 h-8 text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activityData.map((activity) => (
+                    <TableRow key={activity.id} className="border-slate-100 hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {getActivityIcon(activity.type)}
+                          <span className="text-xs font-medium capitalize text-slate-700 dark:text-slate-200">
+                            {activity.type}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5 text-xs font-medium text-slate-900 dark:text-foreground">
+                        {activity.description}
+                      </TableCell>
+                      <TableCell className="py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                        {activity.user}
+                      </TableCell>
+                      <TableCell className="py-2.5 text-[11px] text-slate-400">
+                        {activity.time}
+                      </TableCell>
+                      <TableCell className="py-2.5 text-right">
+                        {getStatusBadge(activity.status)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* EV Station Snapshot */}
+        <Card className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs rounded-xl">
+          <CardHeader className="p-4 pb-2.5 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-foreground">
+                <Battery className="h-4 w-4 text-teal-600" />
+                EV Charging Stations
+              </CardTitle>
+              <CardDescription className="text-[11px] text-slate-500">
+                Hub capacity & live utilization
+              </CardDescription>
+            </div>
+            <span className="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/50">
+              38/45 Active
+            </span>
+          </CardHeader>
+          <CardContent className="p-4 pt-1 space-y-3">
+            {evChargingData.map((station, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-800 dark:text-slate-200 truncate pr-2">
+                    {station.station}
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                    {station.usage}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Progress
+                    value={station.usage}
+                    className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 flex-1"
+                  />
+                  <span
+                    className={`text-[10px] font-medium px-1.5 py-0.2 rounded ${
+                      station.status === "active"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {station.status === "active" ? "Online" : "Service"}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            <div className="pt-2 border-t border-slate-100 dark:border-border flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> 98.4% uptime
+              </span>
+              <button
+                onClick={() => router.push("/admin/infrastructure/ev-stations")}
+                className="text-emerald-700 font-medium hover:underline text-[11px]"
+              >
+                View all stations →
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3: Live Transit Map & Fleet Operations Summary */}
+      <Card className="bg-white dark:bg-card border-slate-200/80 dark:border-border shadow-xs rounded-xl overflow-hidden">
+        <CardHeader className="p-4 pb-2.5 flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-foreground">
+              <Map className="h-4 w-4 text-emerald-600" />
+              Live Transit & Station Map
+            </CardTitle>
+            <CardDescription className="text-[11px] text-slate-500">
+              Active buses on transit corridors, charging hubs, and terminal bays
+            </CardDescription>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <div className="inline-flex items-center p-0.5 bg-slate-100 dark:bg-muted rounded-md text-[11px]">
+              <button
+                onClick={() => setSelectedFleetTab("all")}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                  selectedFleetTab === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setSelectedFleetTab("bus")}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                  selectedFleetTab === "bus" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
+              >
+                Buses
+              </button>
+              <button
+                onClick={() => setSelectedFleetTab("parking")}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                  selectedFleetTab === "parking" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
+              >
+                Parking
+              </button>
+              <button
+                onClick={() => setSelectedFleetTab("ev")}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                  selectedFleetTab === "ev" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
+              >
+                EV
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 pt-1">
+          {/* Simulated Transit Map Visual */}
+          <div className="relative h-56 rounded-lg bg-slate-900 text-white overflow-hidden border border-slate-800 flex items-center justify-center">
+            {/* Grid background effect */}
+            <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
+
+            {/* Simulated route lines */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-50">
+              <path
+                d="M 50 160 Q 200 40 400 110 T 750 80"
+                fill="none"
+                stroke="#10B981"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+              />
+              <path
+                d="M 120 40 Q 320 180 580 90 T 900 170"
+                fill="none"
+                stroke="#6366F1"
+                strokeWidth="2"
+              />
+            </svg>
+
+            {/* Map nodes */}
+            <div className="absolute left-[15%] top-[30%] flex items-center gap-1.5 bg-slate-800/90 border border-emerald-500/50 px-2 py-1 rounded-md text-[11px]">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Bus #HG-101 (Hawassa Express)</span>
+            </div>
+
+            <div className="absolute left-[52%] top-[45%] flex items-center gap-1.5 bg-slate-800/90 border border-blue-500/50 px-2 py-1 rounded-md text-[11px]">
+              <span className="h-2 w-2 rounded-full bg-blue-400" />
+              <span>Stadium Terminal (84% Full)</span>
+            </div>
+
+            <div className="absolute right-[18%] top-[25%] flex items-center gap-1.5 bg-slate-800/90 border border-teal-500/50 px-2 py-1 rounded-md text-[11px]">
+              <span className="h-2 w-2 rounded-full bg-teal-400" />
+              <span>Bole Hub EV Charger #02</span>
+            </div>
+
+            {/* Map corner legend */}
+            <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-xs border border-slate-800 rounded-md px-2.5 py-1.5 flex items-center gap-3 text-[10px] text-slate-300">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active Bus
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-blue-500" /> Parking Bay
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-teal-500" /> EV Station
+              </span>
+            </div>
+          </div>
+
+          {/* 4 Bottom Highlights */}
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-border">
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/40 text-center">
+              <p className="text-base font-bold text-slate-900 dark:text-foreground">142</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">Active Buses</p>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/40 text-center">
+              <p className="text-base font-bold text-slate-900 dark:text-foreground">18</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">Parking Lots</p>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/40 text-center">
+              <p className="text-base font-bold text-slate-900 dark:text-foreground">45</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">EV Chargers</p>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/40 text-center">
+              <p className="text-base font-bold text-emerald-600">94.8%</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">On-Time Performance</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -28,17 +28,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div
+      style={{ fontFamily: 'var(--font-inter), "Inter", sans-serif' }}
+      className="flex min-h-screen bg-slate-50/70 dark:bg-background text-slate-900 dark:text-foreground font-inter antialiased"
+    >
       <Sidebar />
       <div
         className={cn(
-          "flex-1 flex flex-col min-w-0 transition-all duration-300",
-          isCollapsed ? "lg:ml-20" : "lg:ml-64",
+          "flex-1 flex flex-col min-w-0 transition-all duration-200",
+          isCollapsed ? "lg:ml-[68px]" : "lg:ml-60",
         )}
       >
         <Header />
-        <main className="flex-1 overflow-auto p-1 md:p-3 bg-card">
-          <div className="bg-card">{children}</div>
+        <main className="flex-1 overflow-y-auto">
+          {children}
         </main>
       </div>
     </div>

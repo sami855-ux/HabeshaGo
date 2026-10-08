@@ -1,18 +1,18 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import {
   Search,
   Bell,
   ChevronDown,
   X,
   User,
-  Sun,
   LogOut,
   Settings2,
   LifeBuoy,
   MessageSquare,
   Shield,
+  Menu,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQuery } from "@tanstack/react-query"
 import { fetchAllNotification } from "@/services/notification.api"
 import { motion } from "framer-motion"
+import { useSidebar } from "@/context/sidebar-context"
 
 const notificationKeys = {
   all: ["notifications"] as const,
@@ -59,6 +60,7 @@ const notificationKeys = {
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
+  const { toggleMobileSidebar } = useSidebar()
   const { user, loading } = useSelector((state: RootState) => state.user)
 
   const { data: notifications = [] } = useQuery({
@@ -70,30 +72,18 @@ function Header({ className }: { className?: string }) {
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false)
-
-  // State to force close dropdown when theme changes
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  // Mock unread count - you can update this based on your notification state
-
-  // / Mock unread count - you can update this based on your notification state
   const unreadNotificationCount = useMemo(() => {
-    return notifications.filter((n) => !n.isRead).length
+    if (!Array.isArray(notifications)) return 0
+    return notifications.filter((n: { isRead?: boolean }) => !n.isRead).length
   }, [notifications])
-
-  // Close all modals and dropdowns on theme change
-  useEffect(() => {
-    // This effect can be used to handle any cleanup when theme changes
-    // The ThemeToggle component should handle closing dropdowns when clicked
-  }, [])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Searching for:", searchQuery)
     setShowSearchModal(false)
     setSearchQuery("")
   }
@@ -113,254 +103,233 @@ function Header({ className }: { className?: string }) {
   return (
     <>
       <header
+        style={{ fontFamily: 'var(--font-inter), "Inter", sans-serif' }}
         className={cn(
-          "sticky top-0 z-10 bg-background border-b w-full ",
-          isExpanded ? "h-32" : "h-16",
+          "sticky top-0 z-30 h-14 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-slate-200/80 dark:border-border font-inter px-3 sm:px-5 flex items-center justify-between transition-colors",
           className,
         )}
       >
-        <div className="mx-auto w-full h-full">
-          <div className="flex items-center justify-end h-full">
-            {/* Center & Right Section */}
-            <div className="flex gap-2">
-              {/* Search Input (Desktop) */}
-              <div className="hidden md:flex items-center max-w-lg">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative w-full cursor-pointer">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          placeholder="Search transactions, payments, or reports..."
-                          className="w-full pl-10 cursor-pointer"
-                          onClick={() => setShowSearchModal(true)}
-                          readOnly
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Click to open search</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+        {/* Left Section: Mobile Toggle & Context Breadcrumb */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-8 w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            onClick={toggleMobileSidebar}
+          >
+            <Menu className="h-4.5 w-4.5" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
 
-              {/* Right Section */}
-              <div className="flex items-center gap-2">
-                {/* Mobile Search Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-900 dark:text-foreground">
+              Admin
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:inline">
+              Overview
+            </span>
+
+            <span className="hidden md:inline-flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Operational
+            </span>
+          </div>
+        </div>
+
+        {/* Right Section: Search, Notifications, Theme, Profile */}
+        <div className="flex items-center gap-2">
+          {/* Quick Search Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowSearchModal(true)}
+            className="flex items-center justify-between gap-2 h-8.5 w-36 sm:w-56 md:w-64 lg:w-72 px-3 text-xs text-slate-500 bg-slate-50 hover:bg-slate-100/90 dark:bg-muted/40 dark:hover:bg-muted/60 border border-slate-200/80 dark:border-border rounded-lg transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <Search className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300 transition-colors" />
+              <span className="truncate">Search system...</span>
+            </div>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-2xs">
+              ⌘K
+            </kbd>
+          </button>
+
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
+          {/* Notifications Trigger */}
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowSearchModal(true)}
-                  className="md:hidden"
+                  className="relative h-8.5 w-8.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800"
+                  onClick={() => setIsNotificationSheetOpen(true)}
                 >
-                  <Search className="w-5 h-5" />
+                  <Bell className="h-4 w-4" />
+                  {unreadNotificationCount > 0 && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500 }}
+                    >
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-1 -right-1 px-1 min-w-0 h-4.5 min-w-[18px] flex items-center justify-center text-[10px] p-0 font-bold"
+                      >
+                        {unreadNotificationCount > 9
+                          ? "9+"
+                          : unreadNotificationCount}
+                      </Badge>
+                    </motion.div>
+                  )}
                 </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="font-inter text-xs">
+                <p>Notifications</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-                <ThemeToggle />
+          {/* User Profile Dropdown */}
+          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8.5 px-2 gap-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <Avatar className="h-6.5 w-6.5 border border-slate-200 dark:border-slate-700">
+                  {loading ? (
+                    <Skeleton className="w-full h-full rounded-full" />
+                  ) : (
+                    <>
+                      <AvatarImage src={user?.avaterUrl} />
+                      <AvatarFallback className="bg-slate-900 text-white text-[11px] font-semibold">
+                        {user?.name?.charAt(0) || "A"}
+                      </AvatarFallback>
+                    </>
+                  )}
+                </Avatar>
 
-                {/* Notifications Bell Button */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="relative"
-                        onClick={() => setIsNotificationSheetOpen(true)}
-                      >
-                        <Bell className="w-5 h-5" />
-                        {unreadNotificationCount > 0 && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 500 }}
-                          >
-                            <Badge
-                              variant="destructive"
-                              className="absolute -top-1.5 -right-1 px-1 min-w-0 w-6 h-6 flex items-center justify-center text-xs p-0"
-                            >
-                              {unreadNotificationCount > 10
-                                ? "10+"
-                                : unreadNotificationCount}
-                            </Badge>
-                          </motion.div>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Notifications</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div className="hidden md:flex flex-col text-left">
+                  {loading ? (
+                    <Skeleton className="h-3 w-16" />
+                  ) : (
+                    <span className="text-xs font-semibold text-slate-800 dark:text-foreground leading-none">
+                      {user?.name || "Admin"}
+                    </span>
+                  )}
+                </div>
 
-                {/* Profile Dropdown */}
-                <DropdownMenu
-                  open={isDropdownOpen}
-                  onOpenChange={setIsDropdownOpen}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-2">
-                      <Avatar className="w-8 h-8">
-                        {loading ? (
-                          <Skeleton className="w-full h-full rounded-full" />
-                        ) : (
-                          <>
-                            <AvatarImage src={user?.avaterUrl} />
-                            <AvatarFallback className="bg-primary">
-                              {user?.name?.charAt(0) || "G"}
-                            </AvatarFallback>
-                          </>
-                        )}
-                      </Avatar>
-                      <div className="hidden md:block text-left">
-                        {loading ? (
-                          <>
-                            <Skeleton className="h-4 w-24 mb-1" />
-                            <Skeleton className="h-3 w-32" />
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm font-medium">
-                              {user?.name || "Guest"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {user?.email}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <ChevronDown className="hidden md:block w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-80"
-                    onCloseAutoFocus={(e) => {
-                      e.preventDefault()
-                    }}
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="end"
+              className="w-64 font-inter p-1"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              {/* User Details */}
+              <div className="px-3 py-2.5 bg-slate-50/80 dark:bg-muted/40 rounded-md mb-1">
+                <p className="text-xs font-bold text-slate-900 dark:text-foreground truncate">
+                  {user?.name || "Administrator"}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-muted-foreground truncate">
+                  {user?.email || "admin@habeshago.com"}
+                </p>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 bg-white dark:bg-slate-900 border-slate-200 text-slate-600 dark:text-slate-300 font-medium"
                   >
-                    {/* Enhanced User Info Section */}
-                    <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-t-lg">
-                      <Avatar className="h-12 w-12 border-2 border-white shadow-md">
-                        <AvatarImage src={user?.avaterUrl} />
-                        <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-lg">
-                          {user?.name?.charAt(0) || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold leading-none truncate capitalize">
-                            {user?.name || "User"}
-                          </p>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-100"
-                          >
-                            {user?.role || "User"}
-                          </Badge>
-                        </div>
-                        {user?.email && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {user.email}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <DropdownMenuSeparator />
-
-                    {/* Account Section */}
-                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-4 pt-3 pb-1">
-                      ACCOUNT
-                    </DropdownMenuLabel>
-                    <div className="px-2 py-1">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          router.push("/user/profile")
-                        }}
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
-                      >
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Profile</span>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          router.push("/user/settings")
-                        }}
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
-                      >
-                        <Settings2 className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Settings</span>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          router.push("/user/security")
-                        }}
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
-                      >
-                        <Shield className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Security</span>
-                      </DropdownMenuItem>
-                    </div>
-
-                    <DropdownMenuSeparator />
-
-                    {/* Support Section */}
-                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-4 pt-3 pb-1">
-                      SUPPORT
-                    </DropdownMenuLabel>
-                    <div className="px-2 py-1">
-                      <DropdownMenuItem
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          router.push("/user/help")
-                        }}
-                      >
-                        <LifeBuoy className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Help Center</span>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg"
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          router.push("/user/feedback")
-                        }}
-                      >
-                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Send Feedback</span>
-                      </DropdownMenuItem>
-                    </div>
-
-                    <DropdownMenuSeparator />
-
-                    {/* Logout Section */}
-                    <div className="px-2 py-2">
-                      <DropdownMenuItem
-                        className="cursor-pointer gap-3 py-2.5 rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10"
-                        onClick={() => {
-                          setIsDropdownOpen(false)
-                          setIsLogoutModalOpen(true)
-                        }}
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span className="text-sm font-medium">Log out</span>
-                      </DropdownMenuItem>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    {user?.role || "ADMIN"}
+                  </Badge>
+                </div>
               </div>
-            </div>
-          </div>
+
+              <DropdownMenuSeparator />
+
+              {/* Navigation Links */}
+              <DropdownMenuLabel className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 py-1">
+                Account
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  router.push("/user/profile")
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md"
+              >
+                <User className="h-3.5 w-3.5 text-slate-500" />
+                <span>My Profile</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  router.push("/user/settings")
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md"
+              >
+                <Settings2 className="h-3.5 w-3.5 text-slate-500" />
+                <span>Preferences</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  router.push("/user/security")
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md"
+              >
+                <Shield className="h-3.5 w-3.5 text-slate-500" />
+                <span>Security</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuLabel className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 py-1">
+                Support
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  router.push("/user/help")
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md"
+              >
+                <LifeBuoy className="h-3.5 w-3.5 text-slate-500" />
+                <span>Help Center</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  router.push("/user/feedback")
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md"
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-slate-500" />
+                <span>Feedback</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              {/* Logout */}
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsDropdownOpen(false)
+                  setIsLogoutModalOpen(true)
+                }}
+                className="cursor-pointer gap-2.5 py-2 text-xs rounded-md text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/30"
+              >
+                <LogOut className="h-3.5 w-3.5 text-red-500" />
+                <span className="font-medium">Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -373,29 +342,26 @@ function Header({ className }: { className?: string }) {
       {/* Search Modal */}
       <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>
         <DialogContent
-          className="sm:max-w-[700px] p-0 gap-0"
-          onCloseAutoFocus={(e) => {
-            // Prevent focus trapping issues
-            e.preventDefault()
-          }}
+          className="sm:max-w-[560px] p-0 font-inter rounded-xl overflow-hidden"
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <DialogHeader className="p-6 pb-4">
-            <DialogTitle>Search</DialogTitle>
-            <DialogDescription>
-              Search across payments, transactions, and users
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <DialogTitle className="text-sm font-semibold">Quick Search</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Search routes, vehicles, staff, payments, or tickets
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 pb-4">
+          <div className="p-4 pt-2">
             <form onSubmit={handleSearchSubmit}>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for payments, transactions, users..."
-                  className="w-full pl-10 pr-10 text-lg py-6"
+                  placeholder="Type a command or search term..."
+                  className="h-10 pl-9 pr-9 text-xs bg-slate-50 border-slate-200"
                   autoFocus
                 />
                 {searchQuery && (
@@ -403,14 +369,19 @@ function Header({ className }: { className?: string }) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-400 hover:text-slate-600"
                     onClick={() => setSearchQuery("")}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
             </form>
+
+            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span>Press Enter to execute search</span>
+              <span>ESC to exit</span>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

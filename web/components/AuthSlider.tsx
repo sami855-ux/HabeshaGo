@@ -153,9 +153,6 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
           className="flex items-center gap-3"
         >
           <div className="relative">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <Bus className="h-6 w-6 text-white" />
-            </div>
             <div className="absolute -inset-1 bg-gradient-to-tr from-orange-500/40 to-transparent rounded-2xl blur-lg -z-10" />
           </div>
           <div>
@@ -176,19 +173,6 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            {/* Accent Badge */}
-            <div
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 mb-5"
-            >
-              <div
-                className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"
-              />
-              <span
-                className="text-xs font-semibold text-orange-300 font-inter"
-              >
-                HabeshaGo Transit
-              </span>
-            </div>
 
             <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-inter tracking-tight">
               {slide.title}

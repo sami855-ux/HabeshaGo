@@ -1,0 +1,39 @@
+name: habeshago
+
+networks:
+  backend:
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: apps/api-gateway/Dockerfile
+    env_file: ../../apps/api-gateway/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROFILE_SERVICE_URL: http://profile-service:4002
+      MOBILITY_SERVICE_URL: http://mobility-service:4003
+      TICKET_SERVICE_URL: http://ticket-service:4004
+      PAYMENT_SERVICE_URL: http://payment-service:4005
+      PARKING_SERVICE_URL: http://parking-service:4006
+      EV_SERVICE_URL: http://ev-service:4007
+      EMPLOYEE_SERVICE_URL: http://employee-service:4008
+      NOTIFICATION_SERVICE_URL: http://notification-service:4009
+      REPORTING_SERVICE_URL: http://reporting-service:4010
+    ports:
+      - "8080:8080"
+    networks: [backend]
+    depends_on:
+      redis:
+        condition: service_healthy

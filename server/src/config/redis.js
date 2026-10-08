@@ -92,6 +92,7 @@ class InMemoryCache {
 }
 
 const memoryFallback = new InMemoryCache()
+const isProduction = process.env.NODE_ENV === "production"
 
 let upstashClient = null
 if (
@@ -120,6 +121,9 @@ const createResilientRedis = () => {
         // If Upstash client is missing or currently cooled down, use memory fallback immediately
         const isCooldown = upstashDisabled && Date.now() - lastFailureTime < RETRY_COOLDOWN_MS
         if (!upstashClient || isCooldown) {
+          if (isProduction) {
+            throw new Error("Shared Redis is unavailable")
+          }
           if (typeof memoryFallback[prop] === "function") {
             return memoryFallback[prop](...args)
           }
@@ -142,6 +146,10 @@ const createResilientRedis = () => {
           }
           upstashDisabled = true
           lastFailureTime = Date.now()
+
+          if (isProduction) {
+            throw new Error("Shared Redis operation failed", { cause: error })
+          }
 
           // Execute operation on in-memory fallback
           if (typeof memoryFallback[prop] === "function") {

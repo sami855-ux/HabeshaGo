@@ -170,7 +170,7 @@ app.use(passport.initialize())
 app.use(passport.session())
 
 //  Health check (no auth, no rate limit)
-app.get("/health", (req, res) => {
+app.get(["/", "/health"], (req, res) => {
   res.status(200).json({
     status: "ok",
     env: process.env.NODE_ENV,

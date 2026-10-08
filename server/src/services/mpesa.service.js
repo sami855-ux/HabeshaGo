@@ -78,21 +78,3 @@ export const stkPush = async ({ phone, amount, reference }) => {
   }
 }
 
-// Example usage
-// stkPush({ phone: "0708374149", amount: 1, reference: "Test123" });
-const getToken = async () => {
-  try {
-    const auth = Buffer.from(
-      `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`,
-    ).toString("base64")
-    const res = await axios.get(
-      "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-      { headers: { Authorization: `Basic ${auth}` } },
-    )
-    console.log("✅ Token:", res.data.access_token)
-  } catch (err) {
-    console.error("❌ Token Error:", err.response?.data || err.message)
-  }
-}
-
-getToken()

@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
 
-const ACCESS_TOKEN_EXPIRES = "60m"
+const ACCESS_TOKEN_EXPIRES = "15m"
 const REFRESH_TOKEN_EXPIRES = "15d"
 export const REFRESH_TOKEN_MS = 15 * 24 * 60 * 60 * 1000 // 15 days consistent with JWT
 const JWT_ALGORITHM = "HS512"

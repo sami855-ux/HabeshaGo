@@ -426,9 +426,6 @@ export const getMe = async (req, res) => {
             isActive: true,
           },
         },
-        bookings: true,
-        minibusReservations: true,
-        parkingReservations: true,
       },
     })
 

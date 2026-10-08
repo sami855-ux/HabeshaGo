@@ -14,6 +14,7 @@ const {
   generate2FASecret,
   generateRecoveryPhrases,
   hashRecoveryPhrases,
+  validateMFAEncryptionKey,
   verifyRecoveryPhrase,
   verifyTOTPWithStep,
 } = await import("../src/services/2fa.service.js")
@@ -34,6 +35,16 @@ test("encrypts TOTP secrets with authenticated encryption", () => {
   assert.notEqual(encrypted, secret)
   assert.equal(decryptTOTPSecret(encrypted), secret)
   assert.throws(() => decryptTOTPSecret(`${encrypted}tampered`))
+})
+
+test("rejects a missing or malformed dedicated MFA encryption key", () => {
+  const original = process.env.MFA_ENCRYPTION_KEY
+  assert.doesNotThrow(() => validateMFAEncryptionKey())
+  delete process.env.MFA_ENCRYPTION_KEY
+  assert.throws(() => validateMFAEncryptionKey(), /required/)
+  process.env.MFA_ENCRYPTION_KEY = "too-short"
+  assert.throws(() => validateMFAEncryptionKey(), /32 bytes/)
+  process.env.MFA_ENCRYPTION_KEY = original
 })
 
 test("generates random recovery phrases and stores verifiable hashes", () => {

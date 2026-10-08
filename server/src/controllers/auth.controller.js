@@ -555,7 +555,6 @@ export const refreshToken = async (req, res) => {
 
     return res.json({
       accessToken,
-      refreshToken: newRefreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -1414,7 +1413,6 @@ export const staffVerifyMFA = async (req, res) => {
     return res.status(200).json(
       successResponse("Staff authentication successful", {
         accessToken,
-        refreshToken,
         user: {
           id: user.id,
           name: user.name,
@@ -1927,7 +1925,6 @@ export const staffEnablePendingTOTP = async (req, res) => {
     return res.status(200).json(
       successResponse("2FA successfully enabled and authenticated", {
         accessToken,
-        refreshToken,
         user: {
           id: user.id,
           name: user.name,

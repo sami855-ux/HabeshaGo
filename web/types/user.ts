@@ -7,7 +7,7 @@ export interface User {
   bio: string | null
   location: string | null
 
-  role: "PASSENGER" | "DRIVER" | "ADMIN"
+  role: UserRole
 
   emailVerified: boolean
   phoneVerified: boolean
@@ -85,7 +85,12 @@ export type UserTableData = User & {
   lastLogin?: string
 }
 
-export type UserRole = "PASSENGER" | "DRIVER" | "ADMIN"
+export type UserRole =
+  | "PASSENGER"
+  | "DRIVER"
+  | "ADMIN"
+  | "EV_CHARGER_MANAGER"
+  | "PARKING_MANAGER"
 
 // Theme types
 export type Theme = "light" | "dark" | "system"

@@ -22,7 +22,9 @@ export interface RegisterPayload {
   email: string
 }
 
-export const register = async (payload: RegisterPayload) => {
+export const register = async (
+  payload: RegisterPayload,
+): Promise<ApiResponse<unknown>> => {
   try {
     const res = await axiosInstance.post("/auth/register", payload)
 
@@ -31,6 +33,10 @@ export const register = async (payload: RegisterPayload) => {
         success: true,
         data: res.data,
       }
+    }
+    return {
+      success: false,
+      message: res.data?.message || "Register failed",
     }
   } catch (error: unknown) {
     return {

@@ -206,21 +206,11 @@ const downloadDocuments = async (
   driverId: string,
   documentType: "license" | "id",
 ): Promise<Blob> => {
-  const response = await fetch(
-    `/api/admin/drivers/${driverId}/documents/${documentType}/download`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-      },
-    },
+  const response = await axiosInstance.get(
+    `/admin/drivers/${driverId}/documents/${documentType}/download`,
+    { responseType: "blob" },
   )
-
-  if (!response.ok) {
-    throw new Error("Failed to download document")
-  }
-
-  return await response.blob()
+  return response.data
 }
 
 // Helper functions

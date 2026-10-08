@@ -49,7 +49,9 @@ import {
   staffSetupPendingTOTPApi,
   staffEnablePendingTOTPApi,
   type StaffSetupData,
+  type StaffAuthUser,
 } from "@/services/staff.auth.api"
+import type { User } from "@/types/user"
 
 export default function StaffLoginPage() {
   const router = useRouter()
@@ -116,12 +118,31 @@ export default function StaffLoginPage() {
   }, [step])
 
   // Finalize successful authentication
-  const finishLogin = async (accessToken: string) => {
-    const user = await establishAuthSession(accessToken)
-    toast.success(`Welcome back, ${user.name || user.email}!`)
-    setTimeout(() => {
-      router.replace("/admin")
-    }, 500)
+  const finishLogin = async (
+    accessToken: string,
+    suppliedUser?: StaffAuthUser,
+  ) => {
+    try {
+      const user = await establishAuthSession(
+        accessToken,
+        suppliedUser as unknown as User,
+      )
+      toast.success(`Welcome back, ${user.name || user.email}!`)
+      setTimeout(() => {
+        if (user.role === "EV_CHARGER_MANAGER") {
+          router.replace("/ev-charge-manager")
+        } else if (user.role === "PARKING_MANAGER") {
+          router.replace("/admin/manage-parking")
+        } else {
+          router.replace("/admin")
+        }
+      }, 500)
+    } catch (err: unknown) {
+      console.error("Failed to establish auth session:", err)
+      toast.error(
+        err instanceof Error ? err.message : "Failed to establish staff session",
+      )
+    }
   }
 
   // -------------------------------------------------------------
@@ -241,7 +262,7 @@ export default function StaffLoginPage() {
         toast.error("Authentication response did not include an access token.")
         return
       }
-      await finishLogin(res.data.accessToken)
+      await finishLogin(res.data.accessToken, res.data.user)
     } catch {
       toast.error("2FA verification failed. Please try again.")
     } finally {
@@ -289,7 +310,7 @@ export default function StaffLoginPage() {
         toast.error("Authentication response did not include an access token.")
         return
       }
-      await finishLogin(res.data.accessToken)
+      await finishLogin(res.data.accessToken, res.data.user)
     } catch {
       toast.error("Failed to activate 2FA. Please try again.")
     } finally {

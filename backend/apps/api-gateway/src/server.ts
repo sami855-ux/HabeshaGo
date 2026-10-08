@@ -34,10 +34,14 @@ server.on("upgrade", (req, socket, head) => {
 
   try {
     const claims = jwt.verify(token, env.JWT_ACCESS_SECRET, {
-      algorithms: ["HS256"],
-    }) as { sub: string; roles?: string[]; sid?: string };
+      algorithms: ["HS256", "HS512"],
+    }) as any;
 
-    const user = { id: claims.sub, roles: claims.roles ?? [], sessionId: claims.sid };
+    const user = {
+      id: claims.sub || claims.id,
+      roles: Array.isArray(claims.roles) ? claims.roles : (claims.role ? [claims.role] : []),
+      sessionId: claims.sid || claims.sessionId,
+    };
 
     for (const name of STRIPPED_HEADERS) delete req.headers[name];
     req.headers["x-internal-token"] = signInternalToken(user, randomUUID());

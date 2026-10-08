@@ -5,9 +5,12 @@ import { Errors } from "../shared/errors";
 import type { ServiceRoute } from "../config/services";
 
 interface AccessClaims {
-  sub: string;
+  sub?: string;
+  id?: string;
   roles?: string[];
+  role?: string;
   sid?: string;
+  sessionId?: string;
 }
 
 export function isPublic(route: ServiceRoute, req: Request): boolean {
@@ -26,10 +29,18 @@ export function authenticate(route: ServiceRoute) {
 
     try {
       const claims = jwt.verify(header.slice(7), env.JWT_ACCESS_SECRET, {
-        algorithms: ["HS256"],
+        algorithms: ["HS256", "HS512"],
       }) as AccessClaims;
 
-      req.user = { id: claims.sub, roles: claims.roles ?? [], sessionId: claims.sid };
+      const userId = claims.sub || claims.id || "";
+      const roles = Array.isArray(claims.roles)
+        ? claims.roles
+        : claims.role
+          ? [claims.role]
+          : [];
+      const sessionId = claims.sid || claims.sessionId;
+
+      req.user = { id: userId, roles, sessionId };
       next();
     } catch {
       next(Errors.unauthorized("Invalid or expired token"));

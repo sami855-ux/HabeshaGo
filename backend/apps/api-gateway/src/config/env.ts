@@ -2,14 +2,19 @@ import { parseEnv, csv, z } from "@habeshago/config";
 
 const url = z.string().url();
 
+// Normalize JWT_SECRET to JWT_ACCESS_SECRET if needed
+if (!process.env.JWT_ACCESS_SECRET && process.env.JWT_SECRET) {
+  process.env.JWT_ACCESS_SECRET = process.env.JWT_SECRET;
+}
+
 export const env = parseEnv({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(8080),
   LOG_LEVEL: z.string().default("info"),
   CORS_ORIGINS: csv,
   REDIS_URL: url,
-  JWT_ACCESS_SECRET: z.string().min(32),
-  INTERNAL_JWT_SECRET: z.string().min(32),
+  JWT_ACCESS_SECRET: z.string().min(16),
+  INTERNAL_JWT_SECRET: z.string().min(16),
   INTERNAL_TOKEN_TTL_SECONDS: z.coerce.number().default(60),
   MAX_BODY_BYTES: z.coerce.number().default(1048576),
   RATE_LIMIT_IP_PER_MINUTE: z.coerce.number().default(300),

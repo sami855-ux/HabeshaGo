@@ -35,10 +35,9 @@ import {
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "../themeToggle"
 import { RootState } from "@/store"
-import { useDispatch, useSelector } from "react-redux"
+import { useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
 import { LogoutModal } from "../logout-modal"
-import { clearUser } from "@/store/slices/userSlice"
 import { logoutUser } from "@/services/auth.user.api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { motion } from "framer-motion"
@@ -56,7 +55,6 @@ const notificationKeys = {
 
 function Header({ className }: { className?: string }) {
   const router = useRouter()
-  const dispatch = useDispatch()
   const { user, loading } = useSelector((state: RootState) => state.user)
 
   const { data: notifications = [] } = useQuery({
@@ -93,10 +91,6 @@ function Header({ className }: { className?: string }) {
     } catch (error) {
       console.error("Logout failed:", error)
     } finally {
-      dispatch(clearUser())
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("habeshagoUser")
-      }
       setIsLoading(false)
       router.replace("/staff-login")
     }

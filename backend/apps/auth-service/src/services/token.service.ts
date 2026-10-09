@@ -16,7 +16,7 @@ export interface TokenPayload {
 export interface MfaChallengePayload {
   sub: string;
   email: string;
-  purpose: "mfa_challenge";
+  purpose: "mfa_challenge" | "staff_mfa_setup";
   roles: string[];
 }
 
@@ -62,11 +62,15 @@ export function generateAccessToken(payload: TokenPayload): string {
 /**
  * Generate Short-Lived MFA Challenge Token (5-minute expiry)
  */
-export function generateMfaChallengeToken(user: User, roles: string[]): string {
+export function generateMfaChallengeToken(
+  user: User,
+  roles: string[],
+  purpose: "mfa_challenge" | "staff_mfa_setup" = "mfa_challenge"
+): string {
   const payload: MfaChallengePayload = {
     sub: user.id,
     email: user.email,
-    purpose: "mfa_challenge",
+    purpose,
     roles,
   };
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
@@ -88,7 +92,7 @@ export function verifyMfaChallengeToken(token: string): MfaChallengePayload {
       audience: "habeshago-clients",
     }) as MfaChallengePayload;
 
-    if (decoded.purpose !== "mfa_challenge") {
+    if (decoded.purpose !== "mfa_challenge" && decoded.purpose !== "staff_mfa_setup") {
       throw new AuthError("INVALID_MFA_TOKEN", "Invalid MFA token purpose", 401);
     }
     return decoded;
@@ -101,6 +105,45 @@ export function verifyMfaChallengeToken(token: string): MfaChallengePayload {
 /**
  * Extract active roles for a user from UserRoleGrant relation
  */
+/**
+ * Resolve highest priority role when user has multiple roles granted
+ */
+export function resolvePrimaryRole(roles: string[]): string {
+  const priority = [
+    "ADMIN",
+    "EV_CHARGER_MANAGER",
+    "PARKING_MANAGER",
+    "EMPLOYEE",
+    "DRIVER",
+    "PASSENGER",
+  ];
+  for (const p of priority) {
+    if (roles.includes(p)) return p;
+  }
+  return roles[0] || "PASSENGER";
+}
+
+/**
+ * Default web redirect target based on primary role
+ */
+export function getRoleRedirectUrl(role: string): string {
+  switch (role) {
+    case "ADMIN":
+      return "/admin";
+    case "EV_CHARGER_MANAGER":
+      return "/ev-charge-manager";
+    case "PARKING_MANAGER":
+      return "/admin/manage-parking";
+    case "EMPLOYEE":
+      return "/admin";
+    case "DRIVER":
+      return "/admin";
+    case "PASSENGER":
+    default:
+      return "/user";
+  }
+}
+
 export function extractActiveRoles(roleGrants?: { role: UserRole; revokedAt: Date | null }[]): string[] {
   if (!roleGrants || roleGrants.length === 0) {
     return ["PASSENGER"];
@@ -182,10 +225,16 @@ export async function issueAuthSession({
     });
   }
 
+  const primaryRole = resolvePrimaryRole(roles);
+  const defaultRedirect = getRoleRedirectUrl(primaryRole);
+
   const userDto = {
     id: user.id,
     email: user.email,
     roles,
+    role: primaryRole,
+    primaryRole,
+    defaultRedirect,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt,
   };

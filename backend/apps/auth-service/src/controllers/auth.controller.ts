@@ -1,7 +1,12 @@
 import type { Request, Response } from "express";
 import { env } from "../config/env";
 import { prisma } from "../prisma";
-import { requestLoginOtp, verifyLoginOtp } from "../services/otp.service";
+import {
+  requestLoginOtp,
+  verifyLoginOtp,
+  requestStaffLoginOtp,
+  STAFF_ROLES,
+} from "../services/otp.service";
 import {
   AuthError,
   generateMfaChallengeToken,
@@ -10,6 +15,8 @@ import {
   rotateRefreshToken,
   terminateSession,
   extractActiveRoles,
+  resolvePrimaryRole,
+  getRoleRedirectUrl,
 } from "../services/token.service";
 import {
   setupUserMfa,
@@ -181,6 +188,159 @@ export async function verifyMfa(req: Request, res: Response) {
 }
 
 /**
+ * Staff Login - Step 1: Request OTP
+ * Checks staff role, validates account status, and dispatches OTP
+ * POST /api/v1/auth/staff/login
+ */
+export async function staffLogin(req: Request, res: Response) {
+  try {
+    const { email } = req.body || {};
+    const result = await requestStaffLoginOtp(email, req.ip);
+
+    return res.status(200).json({
+      success: true,
+      message: "Staff OTP sent to email",
+      email: result.user.email,
+      expiresIn: result.expiresInSeconds,
+      ...(env.NODE_ENV !== "production" ? { devOtp: result.rawOtp } : {}),
+      data: {
+        email: result.user.email,
+        expiresIn: result.expiresInSeconds,
+      },
+    });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * Staff Login - Step 2: Verify OTP
+ * - If MFA is NOT yet enabled: starts it up immediately and returns setup QR/secret
+ * - If MFA IS already enabled: returns challenge token to type authenticator numbers
+ * POST /api/v1/auth/staff/verify-otp
+ */
+export async function staffVerifyOtp(req: Request, res: Response) {
+  try {
+    const { email, code } = req.body || {};
+    const { user, roles, mfaRequired } = await verifyLoginOtp(email, code, req.ip);
+
+    // Verify staff role
+    const isStaff = roles.some((r) => STAFF_ROLES.includes(r));
+    if (!isStaff) {
+      throw new AuthError("STAFF_ACCESS_DENIED", "Access restricted to authorized staff members", 403);
+    }
+
+    // If MFA is not yet enabled, automatically start it up!
+    if (!mfaRequired) {
+      const setupData = await setupUserMfa(user.id, user.email);
+      const mfaToken = generateMfaChallengeToken(user, roles, "staff_mfa_setup");
+
+      return res.status(200).json({
+        success: true,
+        mfaRequired: true,
+        mfaSetupRequired: true,
+        mfaToken,
+        mfaMethod: "SETUP_TOTP",
+        secret: setupData.secret,
+        otpauthUri: setupData.otpauthUri,
+        recoveryCodes: setupData.recoveryCodes,
+        expiresIn: 300,
+        message: "Email OTP verified. MFA is required for staff accounts. Please scan the QR code and enter the 6-digit authenticator code.",
+        data: {
+          mfaRequired: true,
+          mfaSetupRequired: true,
+          mfaToken,
+          mfaMethod: "SETUP_TOTP",
+          secret: setupData.secret,
+          otpauthUri: setupData.otpauthUri,
+          recoveryCodes: setupData.recoveryCodes,
+          expiresIn: 300,
+        },
+      });
+    }
+
+    // MFA is already configured: prompt staff to type the 6-digit authenticator numbers
+    const mfaToken = generateMfaChallengeToken(user, roles, "mfa_challenge");
+    return res.status(200).json({
+      success: true,
+      mfaRequired: true,
+      mfaSetupRequired: false,
+      mfaToken,
+      mfaMethod: "TOTP",
+      expiresIn: 300,
+      message: "Email OTP verified. Please enter the 6-digit code from your authenticator app.",
+      data: {
+        mfaRequired: true,
+        mfaSetupRequired: false,
+        mfaToken,
+        mfaMethod: "TOTP",
+        expiresIn: 300,
+      },
+    });
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * Staff Login - Step 3: Complete Staff Login via MFA
+ * - If first-time enrollment: activates TOTP and completes login
+ * - If existing TOTP: validates code/recovery phrase and completes login
+ * POST /api/v1/auth/staff/mfa/verify
+ */
+export async function staffVerifyMfa(req: Request, res: Response) {
+  try {
+    const { mfaToken, code, isRecoveryCode } = req.body || {};
+
+    if (!mfaToken) {
+      throw new AuthError("MFA_TOKEN_REQUIRED", "MFA challenge token is required", 400);
+    }
+    if (!code) {
+      throw new AuthError("CODE_REQUIRED", "Verification code is required", 400);
+    }
+
+    const payload = verifyMfaChallengeToken(mfaToken);
+
+    // If initial setup flow, enable MFA now
+    if (payload.purpose === "staff_mfa_setup") {
+      await enableUserMfa(payload.sub, code, req.ip);
+    } else {
+      // Existing MFA verification
+      await verifyMfaChallenge({
+        userId: payload.sub,
+        code,
+        isRecoveryCode: Boolean(isRecoveryCode),
+        ipAddress: req.ip,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { roleGrants: true },
+    });
+
+    if (!user) {
+      throw new AuthError("USER_NOT_FOUND", "User not found", 404);
+    }
+
+    const roles = extractActiveRoles(user.roleGrants);
+
+    const responsePayload = await issueAuthSession({
+      user,
+      roles,
+      req,
+      res,
+      mfaVerified: true,
+    });
+
+    return res.status(200).json(responsePayload);
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+
+/**
  * Rotate Refresh Token
  * POST /api/v1/auth/refresh
  */
@@ -313,12 +473,18 @@ export async function getMe(req: Request, res: Response) {
 
     if (user) {
       const roles = extractActiveRoles(user.roleGrants);
+      const primaryRole = resolvePrimaryRole(roles);
+      const defaultRedirect = getRoleRedirectUrl(primaryRole);
+
       return res.status(200).json({
         success: true,
         user: {
           id: user.id,
           email: user.email,
           roles,
+          role: primaryRole,
+          primaryRole,
+          defaultRedirect,
           status: user.status,
           emailVerifiedAt: user.emailVerifiedAt,
           mfaEnabled: Boolean(user.mfa?.enabledAt),
@@ -328,11 +494,16 @@ export async function getMe(req: Request, res: Response) {
       });
     }
 
+    const fallbackRoles = userClaims.roles || ["PASSENGER"];
+    const fallbackPrimaryRole = resolvePrimaryRole(fallbackRoles);
     return res.status(200).json({
       success: true,
       user: {
         id: userClaims.id,
-        roles: userClaims.roles || ["PASSENGER"],
+        roles: fallbackRoles,
+        role: fallbackPrimaryRole,
+        primaryRole: fallbackPrimaryRole,
+        defaultRedirect: getRoleRedirectUrl(fallbackPrimaryRole),
       },
       requestId: (req as any).id,
     });

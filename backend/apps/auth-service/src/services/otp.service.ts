@@ -252,3 +252,103 @@ export async function verifyLoginOtp(
     mfaRequired,
   };
 }
+
+export const STAFF_ROLES: string[] = [
+  "ADMIN",
+  "EV_CHARGER_MANAGER",
+  "PARKING_MANAGER",
+  "EMPLOYEE",
+];
+
+/**
+ * Initiate OTP for authorized staff members only
+ */
+export async function requestStaffLoginOtp(
+  rawEmail: string,
+  ipAddress?: string
+): Promise<RequestOtpResult> {
+  const email = normalizeEmail(rawEmail);
+
+  // Rate limiting check
+  const cooldownPeriod = new Date(Date.now() - env.OTP_RATE_LIMIT_SECONDS * 1000);
+  const recentOtp = await prisma.otpCode.findFirst({
+    where: {
+      email,
+      purpose: "LOGIN",
+      consumedAt: null,
+      createdAt: { gt: cooldownPeriod },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (recentOtp) {
+    const elapsedSeconds = Math.floor((Date.now() - recentOtp.createdAt.getTime()) / 1000);
+    const retryAfter = env.OTP_RATE_LIMIT_SECONDS - elapsedSeconds;
+    throw new AuthError(
+      "OTP_RATE_LIMIT",
+      `Please wait ${retryAfter > 0 ? retryAfter : 1} seconds before requesting a new OTP`,
+      429
+    );
+  }
+
+  // Find user
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { roleGrants: true },
+  });
+
+  if (!user) {
+    throw new AuthError("STAFF_ACCESS_DENIED", "Access restricted to authorized staff members", 403);
+  }
+
+  const activeRoles = extractActiveRoles(user.roleGrants);
+  const isStaff = activeRoles.some((r) => STAFF_ROLES.includes(r));
+  if (!isStaff) {
+    throw new AuthError("STAFF_ACCESS_DENIED", "Access restricted to authorized staff members", 403);
+  }
+
+  if (user.status === "SUSPENDED") {
+    throw new AuthError(
+      "ACCOUNT_SUSPENDED",
+      user.suspensionReason || "Account suspended. Contact administrator.",
+      403
+    );
+  }
+  if (user.status === "DELETED") {
+    throw new AuthError("ACCOUNT_DELETED", "Account has been deleted.", 403);
+  }
+
+  // Invalidate any existing unconsumed OTPs for this email
+  await prisma.otpCode.updateMany({
+    where: { email, purpose: "LOGIN", consumedAt: null },
+    data: { consumedAt: new Date() },
+  });
+
+  const rawOtp = generateOtpCode(6);
+  const codeHash = await hashOtpCode(rawOtp);
+  const ttlMs = env.OTP_TTL_MINUTES * 60 * 1000;
+  const expiresAt = new Date(Date.now() + ttlMs);
+
+  await prisma.otpCode.create({
+    data: {
+      email,
+      purpose: "LOGIN",
+      userId: user.id,
+      codeHash,
+      attempts: 0,
+      maxAttempts: env.OTP_MAX_ATTEMPTS,
+      expiresAt,
+      ipAddress,
+    },
+  });
+
+  logger.info({ email, userId: user.id }, "Staff OTP generated successfully");
+
+  return {
+    user,
+    rawOtp,
+    isNewUser: false,
+    expiresInSeconds: env.OTP_TTL_MINUTES * 60,
+  };
+}
+

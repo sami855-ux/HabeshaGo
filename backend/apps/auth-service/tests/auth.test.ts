@@ -402,4 +402,115 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
 
     expect(refreshAfterLogout.status).toBe(401);
   });
+
+  it("rejects non-staff user or non-existent user when attempting staff login", async () => {
+    // Non-existent user
+    const nonExistentRes = await request(app)
+      .post("/api/v1/auth/staff/login")
+      .send({ email: uniqueEmail("ghost.staff") });
+
+    expect(nonExistentRes.status).toBe(403);
+    expect(nonExistentRes.body.error.code).toBe("STAFF_ACCESS_DENIED");
+
+    // Passenger user (not a staff role)
+    const email = uniqueEmail("passenger.only");
+    const user = await prisma.user.create({
+      data: {
+        email,
+        status: "ACTIVE",
+        roleGrants: { create: { role: "PASSENGER" } },
+      },
+    });
+    createdUserIds.push(user.id);
+
+    const passengerRes = await request(app)
+      .post("/api/v1/auth/staff/login")
+      .send({ email });
+
+    expect(passengerRes.status).toBe(403);
+    expect(passengerRes.body.error.code).toBe("STAFF_ACCESS_DENIED");
+  });
+
+  it("handles staff login: starts up MFA if not enabled, then prompts for TOTP once enabled", async () => {
+    const email = uniqueEmail("admin.staff");
+    const user = await prisma.user.create({
+      data: {
+        email,
+        status: "ACTIVE",
+        roleGrants: { create: { role: "ADMIN" } },
+      },
+    });
+    createdUserIds.push(user.id);
+
+    // Step 1: Staff Login -> dispatches OTP
+    const loginRes = await request(app)
+      .post("/api/v1/auth/staff/login")
+      .send({ email });
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.success).toBe(true);
+    expect(loginRes.body.devOtp).toMatch(/^\d{6}$/);
+
+    // Step 2: Staff Verify OTP -> MFA is NOT yet enabled, so it automatically starts up MFA
+    const verifyRes = await request(app)
+      .post("/api/v1/auth/staff/verify-otp")
+      .send({ email, code: loginRes.body.devOtp });
+
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.mfaRequired).toBe(true);
+    expect(verifyRes.body.mfaSetupRequired).toBe(true);
+    expect(verifyRes.body.secret).toBeDefined();
+    expect(verifyRes.body.otpauthUri).toBeDefined();
+    expect(verifyRes.body.recoveryCodes).toHaveLength(10);
+    expect(verifyRes.body.mfaToken).toBeDefined();
+
+    const mfaSecret = verifyRes.body.secret;
+    const mfaToken1 = verifyRes.body.mfaToken;
+
+    // Step 3: Complete Staff Login via MFA Setup verification
+    const totp1 = generateTOTP(mfaSecret);
+    const mfaRes = await request(app)
+      .post("/api/v1/auth/staff/mfa/verify")
+      .send({
+        mfaToken: mfaToken1,
+        code: totp1,
+      });
+
+    expect(mfaRes.status).toBe(200);
+    expect(mfaRes.body.accessToken).toBeDefined();
+    expect(mfaRes.body.refreshToken).toBeDefined();
+    expect(mfaRes.body.user.primaryRole).toBe("ADMIN");
+    expect(mfaRes.body.user.defaultRedirect).toBe("/admin/dashboard");
+
+    // Subsequent Login: MFA is now enabled, so staff user is prompted to type numbers (mfaSetupRequired: false)
+    const login2 = await request(app)
+      .post("/api/v1/auth/staff/login")
+      .send({ email });
+
+    expect(login2.status).toBe(200);
+    expect(login2.body.devOtp).toBeDefined();
+
+    const verify2 = await request(app)
+      .post("/api/v1/auth/staff/verify-otp")
+      .send({ email, code: login2.body.devOtp });
+
+    expect(verify2.status).toBe(200);
+    expect(verify2.body.mfaRequired).toBe(true);
+    expect(verify2.body.mfaSetupRequired).toBe(false);
+    expect(verify2.body.mfaMethod).toBe("TOTP");
+    expect(verify2.body.mfaToken).toBeDefined();
+
+    // Verify existing MFA challenge with authenticator numbers
+    const totp2 = generateTOTP(mfaSecret);
+    const mfaRes2 = await request(app)
+      .post("/api/v1/auth/staff/mfa/verify")
+      .send({
+        mfaToken: verify2.body.mfaToken,
+        code: totp2,
+      });
+
+    expect(mfaRes2.status).toBe(200);
+    expect(mfaRes2.body.accessToken).toBeDefined();
+    expect(mfaRes2.body.refreshToken).toBeDefined();
+  });
 });

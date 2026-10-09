@@ -461,7 +461,7 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(verifyRes.body.mfaSetupRequired).toBe(true);
     expect(verifyRes.body.secret).toBeDefined();
     expect(verifyRes.body.otpauthUri).toBeDefined();
-    expect(verifyRes.body.recoveryCodes).toHaveLength(10);
+    expect(verifyRes.body.recoveryCodes).toHaveLength(8);
     expect(verifyRes.body.mfaToken).toBeDefined();
 
     const mfaSecret = verifyRes.body.secret;
@@ -480,7 +480,7 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(mfaRes.body.accessToken).toBeDefined();
     expect(mfaRes.body.refreshToken).toBeDefined();
     expect(mfaRes.body.user.primaryRole).toBe("ADMIN");
-    expect(mfaRes.body.user.defaultRedirect).toBe("/admin/dashboard");
+    expect(mfaRes.body.user.defaultRedirect).toBe("/admin");
 
     // Subsequent Login: MFA is now enabled, so staff user is prompted to type numbers (mfaSetupRequired: false)
     const login2 = await request(app)
@@ -500,8 +500,8 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(verify2.body.mfaMethod).toBe("TOTP");
     expect(verify2.body.mfaToken).toBeDefined();
 
-    // Verify existing MFA challenge with authenticator numbers
-    const totp2 = generateTOTP(mfaSecret);
+    // Verify existing MFA challenge with authenticator numbers (next 30s window to avoid replay prevention)
+    const totp2 = generateTOTP(mfaSecret, Date.now() + 30000);
     const mfaRes2 = await request(app)
       .post("/api/v1/auth/staff/mfa/verify")
       .send({

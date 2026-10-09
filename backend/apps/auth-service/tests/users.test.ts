@@ -192,7 +192,7 @@ describe("D1. Admin Users and Status Endpoints (/api/v1/admin/users)", () => {
     expect(suspendRes.status).toBe(200);
     expect(suspendRes.body.success).toBe(true);
     expect(suspendRes.body.user.status).toBe("SUSPENDED");
-    expect(suspendRes.body.user.suspendedReason).toBe("Terms of service violation");
+    expect(suspendRes.body.user.suspensionReason).toBe("Terms of service violation");
 
     // Check user in DB
     const refreshed = await prisma.user.findUnique({ where: { id: subjectUser.id } });

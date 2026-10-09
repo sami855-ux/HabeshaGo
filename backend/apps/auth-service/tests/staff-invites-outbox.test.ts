@@ -47,19 +47,19 @@ describe("D3. Staff Invites, Audit and Outbox (Admin)", () => {
     createdUserIds.push(adminUser.id);
     const adminToken = makeAdminToken(adminUser.id, adminEmail);
 
-    const inviteeEmail = uniqueEmail("new.driver");
+    const inviteeEmail = uniqueEmail("new.staff");
     const createRes = await request(app)
       .post("/api/v1/admin/staff-invites")
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         email: inviteeEmail,
-        role: "DRIVER",
+        role: "EMPLOYEE",
       });
 
     expect(createRes.status).toBe(201);
     expect(createRes.body.success).toBe(true);
     expect(createRes.body.invite.email).toBe(inviteeEmail);
-    expect(createRes.body.invite.role).toBe("DRIVER");
+    expect(createRes.body.invite.role).toBe("EMPLOYEE");
     expect(createRes.body.invite.token).toBeDefined();
     expect(createRes.body.invite.inviteUrl).toContain("/staff/accept-invite?token=");
     createdInviteIds.push(createRes.body.invite.id);

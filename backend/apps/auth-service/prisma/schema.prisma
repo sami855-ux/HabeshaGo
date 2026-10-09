@@ -11,10 +11,10 @@ datasource db {
 enum UserRole {
   PASSENGER
   DRIVER
-  EMPLOYEE
   EV_CHARGER_MANAGER
   PARKING_MANAGER
   ADMIN
+  EMPLOYEE
 }
 
 enum UserStatus {

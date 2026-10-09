@@ -1,43 +1,43 @@
-import { Router, type Request, type Response } from "express";
-import { requireGateway } from "@habeshago/service-auth";
-import { env } from "../config/env";
+import { Router } from "express";
+import {
+  continueWithEmail,
+  resendOtp,
+  verifyOtp,
+  verifyMfa,
+  refresh,
+  logout,
+  setupMfa,
+  enableMfa,
+  disableMfa,
+  getMe,
+} from "../controllers/auth.controller";
+import { authenticateUser } from "../middleware/auth.middleware";
 
 export const authRouter = Router();
 
-// Public routes (forwarded by API Gateway without client bearer token required)
-authRouter.post("/register", async (req: Request, res: Response) => {
-  res.status(200).json({
-    message: "Registration endpoint scaffolded",
-    todo: "Implement User registration logic with hashed password",
-  });
-});
+// Public routes (No bearer token required)
 
-authRouter.post("/login", async (req: Request, res: Response) => {
-  res.status(200).json({
-    message: "Login endpoint scaffolded",
-    todo: "Implement authentication and token issuance",
-  });
-});
+// Unified Email OTP initiation (single entry point for both register & login)
+authRouter.post("/continue-with-email", continueWithEmail);
+authRouter.post("/resend-otp", resendOtp);
 
-authRouter.post("/refresh", async (req: Request, res: Response) => {
-  res.status(200).json({
-    message: "Refresh token endpoint scaffolded",
-    todo: "Implement refresh token rotation",
-  });
-});
+// OTP Verification (Dual web & mobile support, checks if MFA is enabled)
+authRouter.post("/verify-otp", verifyOtp);
 
-// Protected routes (require x-internal-token minted by API Gateway)
-authRouter.use(requireGateway(env.INTERNAL_JWT_SECRET));
+// Multi-Factor Authentication Challenge Verification
+authRouter.post("/mfa/verify", verifyMfa);
+authRouter.post("/totp/verify", verifyMfa);
 
-authRouter.get("/me", (req: Request, res: Response) => {
-  res.status(200).json({
-    user: (req as any).user,
-    requestId: (req as any).id,
-  });
-});
+// Token Refresh (Cookie for Web, JSON body for Mobile, Token Rotation + Reuse Detection)
+authRouter.post("/refresh", refresh);
 
-authRouter.post("/logout", (req: Request, res: Response) => {
-  res.status(200).json({
-    message: "Logged out successfully",
-  });
-});
+// Protected routes (Require Gateway Internal Token or Client Bearer Token)
+authRouter.use(authenticateUser);
+
+authRouter.get("/me", getMe);
+authRouter.post("/logout", logout);
+
+// MFA Configuration
+authRouter.post("/mfa/setup", setupMfa);
+authRouter.post("/mfa/enable", enableMfa);
+authRouter.post("/mfa/disable", disableMfa);

@@ -15,4 +15,10 @@ export const env = parseEnv({
   INTERNAL_JWT_SECRET: z.string().min(16),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
+  MFA_ENCRYPTION_KEY: z
+    .string()
+    .default("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+  OTP_TTL_MINUTES: z.coerce.number().default(10),
+  OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
+  OTP_RATE_LIMIT_SECONDS: z.coerce.number().default(60),
 });

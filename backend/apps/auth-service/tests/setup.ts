@@ -4,3 +4,7 @@ process.env.LOG_LEVEL = "silent";
 process.env.JWT_ACCESS_SECRET = "01234567890123456789012345678901";
 process.env.JWT_REFRESH_SECRET = "01234567890123456789012345678902";
 process.env.INTERNAL_JWT_SECRET = "98765432109876543210987654321098";
+process.env.GOOGLE_CLIENT_ID = "test_google_client_id.apps.googleusercontent.com";
+process.env.GOOGLE_CLIENT_SECRET = "test_google_client_secret";
+process.env.GOOGLE_CALLBACK_URL = "http://localhost:4001/api/v1/auth/google/callback";
+process.env.FRONTEND_URL = "http://localhost:3000";

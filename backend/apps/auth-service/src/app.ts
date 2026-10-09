@@ -4,8 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { logger } from "./observability/logger";
-import { healthRouter } from "./routes/health.routes";
-import { authRouter } from "./routes/auth.routes";
+import { healthRouter, authRouter } from "./routes";
 
 export function createApp() {
   const app = express();
@@ -29,8 +28,9 @@ export function createApp() {
   // Health and readiness probes
   app.use("/", healthRouter);
 
-  // Auth routes (prefixed as /api/v1/auth)
+  // Auth routes (prefixed as /api/v1/auth and aliased to /api/auth)
   app.use("/api/v1/auth", authRouter);
+  app.use("/api/auth", authRouter);
 
   // 404 handler
   app.use((req, res) => {

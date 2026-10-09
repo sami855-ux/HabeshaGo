@@ -21,4 +21,8 @@ export const env = parseEnv({
   OTP_TTL_MINUTES: z.coerce.number().default(10),
   OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
   OTP_RATE_LIMIT_SECONDS: z.coerce.number().default(60),
+  GOOGLE_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
+  GOOGLE_CALLBACK_URL: z.string().optional().default(""),
+  FRONTEND_URL: z.string().default("http://localhost:3000"),
 });

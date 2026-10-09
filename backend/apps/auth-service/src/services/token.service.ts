@@ -16,7 +16,7 @@ export interface TokenPayload {
 export interface MfaChallengePayload {
   sub: string;
   email: string;
-  purpose: "mfa_challenge" | "staff_mfa_setup";
+  purpose: "mfa_challenge" | "staff_mfa_setup" | "mfa_enrollment";
   roles: string[];
 }
 
@@ -65,7 +65,7 @@ export function generateAccessToken(payload: TokenPayload): string {
 export function generateMfaChallengeToken(
   user: User,
   roles: string[],
-  purpose: "mfa_challenge" | "staff_mfa_setup" = "mfa_challenge"
+  purpose: "mfa_challenge" | "staff_mfa_setup" | "mfa_enrollment" = "mfa_challenge"
 ): string {
   const payload: MfaChallengePayload = {
     sub: user.id,
@@ -84,7 +84,10 @@ export function generateMfaChallengeToken(
 /**
  * Verify and decode an MFA Challenge Token
  */
-export function verifyMfaChallengeToken(token: string): MfaChallengePayload {
+export function verifyMfaChallengeToken(
+  token: string,
+  expectedPurpose?: "mfa_challenge" | "staff_mfa_setup" | "mfa_enrollment"
+): MfaChallengePayload {
   try {
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, {
       algorithms: ["HS256"],
@@ -92,7 +95,23 @@ export function verifyMfaChallengeToken(token: string): MfaChallengePayload {
       audience: "habeshago-clients",
     }) as MfaChallengePayload;
 
-    if (decoded.purpose !== "mfa_challenge" && decoded.purpose !== "staff_mfa_setup") {
+    if (expectedPurpose) {
+      const matches =
+        decoded.purpose === expectedPurpose ||
+        (expectedPurpose === "mfa_enrollment" && decoded.purpose === "staff_mfa_setup") ||
+        (expectedPurpose === "staff_mfa_setup" && decoded.purpose === "mfa_enrollment");
+      if (!matches) {
+        throw new AuthError(
+          "INVALID_MFA_TOKEN",
+          `Invalid MFA token purpose: expected ${expectedPurpose}`,
+          401
+        );
+      }
+    } else if (
+      decoded.purpose !== "mfa_challenge" &&
+      decoded.purpose !== "staff_mfa_setup" &&
+      decoded.purpose !== "mfa_enrollment"
+    ) {
       throw new AuthError("INVALID_MFA_TOKEN", "Invalid MFA token purpose", 401);
     }
     return decoded;
@@ -395,23 +414,32 @@ export async function rotateRefreshToken(req: Request, res: Response) {
 }
 
 /**
- * Revoke Session & Logout
+ * Revoke Session & Logout (Current Session - Web & Mobile)
  */
 export async function terminateSession(req: Request, res: Response) {
   const rawToken = req.body?.refreshToken || req.cookies?.refreshToken;
   const sessionId = (req as any).user?.sessionId;
+  let userId = (req as any).user?.id;
 
   if (sessionId) {
-    await prisma.session.updateMany({
-      where: { id: sessionId, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: "USER_LOGOUT" },
-    });
-  } else if (rawToken) {
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (session) {
+      userId = userId || session.userId;
+      await prisma.session.updateMany({
+        where: { id: sessionId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: "USER_LOGOUT" },
+      });
+    }
+  }
+
+  if (rawToken && typeof rawToken === "string") {
     const tokenHash = hashToken(rawToken);
     const tokenRecord = await prisma.refreshToken.findUnique({
       where: { tokenHash },
+      include: { session: true },
     });
-    if (tokenRecord) {
+    if (tokenRecord?.session) {
+      userId = userId || tokenRecord.session.userId;
       await prisma.session.updateMany({
         where: { id: tokenRecord.sessionId, revokedAt: null },
         data: { revokedAt: new Date(), revokedReason: "USER_LOGOUT" },
@@ -419,10 +447,94 @@ export async function terminateSession(req: Request, res: Response) {
     }
   }
 
-  res.clearCookie("refreshToken", { path: "/" });
+  // Audit log
+  if (userId) {
+    await prisma.auditLog.create({
+      data: {
+        action: "LOGOUT",
+        actorId: userId,
+        targetUserId: userId,
+        reason: "User logged out current session",
+        ipAddress: req.ip,
+        userAgent: req.header("user-agent"),
+      },
+    }).catch(() => undefined);
+  }
+
+  // Clear cookie for web clients
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
+  });
 
   return {
     success: true,
     message: "Logged out successfully",
+  };
+}
+
+/**
+ * Revoke All Sessions for Current User (Web & Mobile)
+ */
+export async function terminateAllSessions(req: Request, res: Response) {
+  let userId = (req as any).user?.id;
+  const rawToken = req.body?.refreshToken || req.cookies?.refreshToken;
+
+  if (!userId && rawToken && typeof rawToken === "string") {
+    const tokenHash = hashToken(rawToken);
+    const tokenRecord = await prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { session: true },
+    });
+    if (tokenRecord?.session) {
+      userId = tokenRecord.session.userId;
+    }
+  }
+
+  if (!userId) {
+    throw new AuthError("UNAUTHORIZED", "Authentication required to revoke all sessions", 401);
+  }
+
+  // Revoke all active sessions for this user
+  const result = await prisma.session.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: new Date(),
+      revokedReason: "USER_LOGOUT_ALL",
+    },
+  });
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      action: "SESSION_REVOKED",
+      actorId: userId,
+      targetUserId: userId,
+      reason: "User revoked all active sessions",
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent"),
+    },
+  }).catch(() => undefined);
+
+  // Clear cookie for web clients
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
+  });
+
+  return {
+    success: true,
+    message: "All sessions revoked successfully",
+    revokedCount: result.count,
+    data: {
+      revokedCount: result.count,
+    },
   };
 }

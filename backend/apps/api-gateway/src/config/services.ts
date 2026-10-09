@@ -29,8 +29,8 @@ export const services: ServiceRoute[] = [
     prefix: "/api/v1/auth",
     target: env.AUTH_SERVICE_URL,
     publicRules: [
-      { method: "POST", path: /^\/api\/v1\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/verify|totp\/verify|refresh|staff\/(login|verify-otp|otp\/verify|mfa\/verify|resend-otp))$/ },
-      { method: "GET", path: /^\/api\/v1\/auth\/google(\/callback)?$/ },
+      { method: "POST", path: /^\/api\/v1\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/(verify|recovery|enroll\/(setup|verify))|refresh|google|mobile\/google|exchange|logout|logout-all|staff\/(login|verify-otp|resend-otp))$/ },
+      { method: "GET", path: /^\/api\/v1\/auth\/(google(\/(callback|url))?|exchange)$/ },
     ],
     timeoutMs: 8000,
   },

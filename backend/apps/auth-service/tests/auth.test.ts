@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { prisma } from "../src/prisma";
@@ -190,18 +190,19 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
 
     expect(mfaSetup.status).toBe(200);
     expect(mfaSetup.body.secret).toBeDefined();
-    expect(mfaSetup.body.recoveryCodes).toHaveLength(8);
+    expect(mfaSetup.body.otpauthUri).toBeDefined();
     const secret = mfaSetup.body.secret;
 
-    // 3. Enable MFA with first TOTP code
+    // 3. Confirm and enable MFA with verify-setup -> returns recovery codes once
     const totpCode = generateTOTP(secret);
     const enableRes = await request(app)
-      .post("/api/v1/auth/mfa/enable")
+      .post("/api/v1/auth/mfa/verify-setup")
       .set("Authorization", `Bearer ${token}`)
       .send({ code: totpCode });
 
     expect(enableRes.status).toBe(200);
     expect(enableRes.body.success).toBe(true);
+    expect(enableRes.body.recoveryCodes).toHaveLength(8);
 
     // 4. Now, simulate NEW login for this MFA-enabled user
     const loginAgain = await request(app)
@@ -261,12 +262,14 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
       .set("Authorization", `Bearer ${token}`);
 
     const secret = mfaSetup.body.secret;
-    const recoveryCode = mfaSetup.body.recoveryCodes[0];
 
-    await request(app)
-      .post("/api/v1/auth/mfa/enable")
+    const enableRes = await request(app)
+      .post("/api/v1/auth/mfa/verify-setup")
       .set("Authorization", `Bearer ${token}`)
       .send({ code: generateTOTP(secret) });
+
+    expect(enableRes.body.recoveryCodes).toHaveLength(8);
+    const recoveryCode = enableRes.body.recoveryCodes[0];
 
     // 3. Login again -> get mfaToken
     const loginRes = await request(app)
@@ -279,13 +282,12 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
 
     const mfaToken = challengeRes.body.mfaToken;
 
-    // 4. Verify using recovery code
+    // 4. Verify using recovery code via POST /api/v1/auth/mfa/recovery
     const recoveryVerifyRes = await request(app)
-      .post("/api/v1/auth/mfa/verify")
+      .post("/api/v1/auth/mfa/recovery")
       .send({
         mfaToken,
-        code: recoveryCode,
-        isRecoveryCode: true,
+        recoveryCode,
         clientType: "mobile",
       });
 
@@ -302,11 +304,10 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
       .send({ email, code: loginAgain.body.devOtp });
 
     const reuseRes = await request(app)
-      .post("/api/v1/auth/mfa/verify")
+      .post("/api/v1/auth/mfa/recovery")
       .send({
         mfaToken: challenge2.body.mfaToken,
-        code: recoveryCode,
-        isRecoveryCode: true,
+        recoveryCode,
       });
 
     expect(reuseRes.status).toBe(400);
@@ -403,6 +404,146 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(refreshAfterLogout.status).toBe(401);
   });
 
+  it("handles mobile logout via body refreshToken: revokes session without cookies", async () => {
+    const email = uniqueEmail("mobilelogout");
+
+    // Login on mobile
+    const init = await request(app)
+      .post("/api/v1/auth/continue-with-email")
+      .send({ email, clientType: "mobile" });
+
+    const verify = await request(app)
+      .post("/api/v1/auth/verify-otp")
+      .send({ email, code: init.body.devOtp, clientType: "mobile" });
+
+    const refreshToken = verify.body.refreshToken;
+    if (verify.body.user?.id) createdUserIds.push(verify.body.user.id);
+
+    // Logout from mobile using refreshToken in body
+    const logoutRes = await request(app)
+      .post("/api/v1/auth/logout")
+      .send({ refreshToken, clientType: "mobile" });
+
+    expect(logoutRes.status).toBe(200);
+    expect(logoutRes.body.success).toBe(true);
+    expect(logoutRes.body.message).toBe("Logged out successfully");
+
+    // Refreshing should now fail
+    const refreshRes = await request(app)
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken, clientType: "mobile" });
+
+    expect(refreshRes.status).toBe(401);
+  });
+
+  it("handles web logout via HttpOnly cookie: clears cookie and revokes session", async () => {
+    const email = uniqueEmail("weblogout");
+
+    // Login on web
+    const init = await request(app)
+      .post("/api/v1/auth/continue-with-email")
+      .send({ email, clientType: "web" });
+
+    const verify = await request(app)
+      .post("/api/v1/auth/verify-otp")
+      .send({ email, code: init.body.devOtp, clientType: "web" });
+
+    const cookieHeader = verify.headers["set-cookie"];
+    expect(cookieHeader).toBeDefined();
+    const refreshCookie = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+    if (verify.body.user?.id) createdUserIds.push(verify.body.user.id);
+
+    // Logout on web passing only the cookie
+    const logoutRes = await request(app)
+      .post("/api/v1/auth/logout")
+      .set("Cookie", refreshCookie);
+
+    expect(logoutRes.status).toBe(200);
+    expect(logoutRes.body.success).toBe(true);
+
+    // Cookie is cleared on response
+    const clearedCookies = logoutRes.headers["set-cookie"];
+    expect(clearedCookies).toBeDefined();
+    const clearedStr = Array.isArray(clearedCookies) ? clearedCookies.join(";") : clearedCookies;
+    expect(clearedStr).toContain("refreshToken=;");
+
+    // Refreshing with original cookie now fails
+    const refreshRes = await request(app)
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", refreshCookie);
+
+    expect(refreshRes.status).toBe(401);
+  });
+
+  it("handles logout-all: revokes all active sessions for current user across multiple devices", async () => {
+    const email = uniqueEmail("logoutall");
+
+    // Device 1: Mobile login
+    const init1 = await request(app)
+      .post("/api/v1/auth/continue-with-email")
+      .send({ email, clientType: "mobile" });
+
+    const verify1 = await request(app)
+      .post("/api/v1/auth/verify-otp")
+      .send({ email, code: init1.body.devOtp, clientType: "mobile" });
+
+    const token1 = verify1.body.refreshToken;
+    const access1 = verify1.body.accessToken;
+    const userId = verify1.body.user.id;
+    if (userId) createdUserIds.push(userId);
+
+    // Device 2: Web login
+    const init2 = await request(app)
+      .post("/api/v1/auth/continue-with-email")
+      .send({ email, clientType: "web" });
+
+    const verify2 = await request(app)
+      .post("/api/v1/auth/verify-otp")
+      .send({ email, code: init2.body.devOtp, clientType: "web" });
+
+    const token2 = verify2.body.refreshToken;
+
+    // Both sessions should be valid and active in DB
+    const activeSessionsBefore = await prisma.session.count({
+      where: { userId, revokedAt: null },
+    });
+    expect(activeSessionsBefore).toBe(2);
+
+    // Call /logout-all from Device 1 with Authorization header
+    const logoutAllRes = await request(app)
+      .post("/api/v1/auth/logout-all")
+      .set("Authorization", `Bearer ${access1}`);
+
+    expect(logoutAllRes.status).toBe(200);
+    expect(logoutAllRes.body.success).toBe(true);
+    expect(logoutAllRes.body.message).toBe("All sessions revoked successfully");
+    expect(logoutAllRes.body.revokedCount).toBe(2);
+
+    // Both sessions should now be revoked in DB
+    const activeSessionsAfter = await prisma.session.count({
+      where: { userId, revokedAt: null },
+    });
+    expect(activeSessionsAfter).toBe(0);
+
+    // Both device refresh tokens must now be rejected
+    const refresh1 = await request(app)
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken: token1 });
+    expect(refresh1.status).toBe(401);
+
+    const refresh2 = await request(app)
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken: token2 });
+    expect(refresh2.status).toBe(401);
+  });
+
+  it("rejects unauthenticated logout-all request", async () => {
+    const res = await request(app).post("/api/v1/auth/logout-all");
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe("UNAUTHORIZED");
+  });
+
   it("rejects non-staff user or non-existent user when attempting staff login", async () => {
     // Non-existent user
     const nonExistentRes = await request(app)
@@ -467,10 +608,10 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     const mfaSecret = verifyRes.body.secret;
     const mfaToken1 = verifyRes.body.mfaToken;
 
-    // Step 3: Complete Staff Login via MFA Setup verification
+    // Step 3: Complete Staff Login via MFA Setup verification at /mfa/enroll/verify
     const totp1 = generateTOTP(mfaSecret);
     const mfaRes = await request(app)
-      .post("/api/v1/auth/staff/mfa/verify")
+      .post("/api/v1/auth/mfa/enroll/verify")
       .send({
         mfaToken: mfaToken1,
         code: totp1,
@@ -479,6 +620,7 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(mfaRes.status).toBe(200);
     expect(mfaRes.body.accessToken).toBeDefined();
     expect(mfaRes.body.refreshToken).toBeDefined();
+    expect(mfaRes.body.recoveryCodes).toHaveLength(8);
     expect(mfaRes.body.user.primaryRole).toBe("ADMIN");
     expect(mfaRes.body.user.defaultRedirect).toBe("/admin");
 
@@ -500,10 +642,10 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(verify2.body.mfaMethod).toBe("TOTP");
     expect(verify2.body.mfaToken).toBeDefined();
 
-    // Verify existing MFA challenge with authenticator numbers (next 30s window to avoid replay prevention)
+    // Verify existing MFA challenge with authenticator numbers at /mfa/verify (next 30s window to avoid replay prevention)
     const totp2 = generateTOTP(mfaSecret, Date.now() + 30000);
     const mfaRes2 = await request(app)
-      .post("/api/v1/auth/staff/mfa/verify")
+      .post("/api/v1/auth/mfa/verify")
       .send({
         mfaToken: verify2.body.mfaToken,
         code: totp2,
@@ -512,5 +654,226 @@ describe("auth-service register/login with OTP and MFA (Web & Mobile)", () => {
     expect(mfaRes2.status).toBe(200);
     expect(mfaRes2.body.accessToken).toBeDefined();
     expect(mfaRes2.body.refreshToken).toBeDefined();
+  });
+});
+
+describe("auth-service Google Sign-In & OAuth Code Exchange", () => {
+  const app = createApp();
+  const createdUserIds: string[] = [];
+
+  const uniqueEmail = (prefix: string) =>
+    `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}@example.com`;
+
+  afterAll(async () => {
+    if (createdUserIds.length > 0) {
+      await prisma.user.deleteMany({
+        where: { id: { in: createdUserIds } },
+      });
+    }
+  });
+
+  it("generates Google OAuth URL via /google/url and redirects via /google", async () => {
+    const resUrl = await request(app).get("/api/v1/auth/google/url");
+    expect(resUrl.status).toBe(200);
+    expect(resUrl.body.success).toBe(true);
+    expect(resUrl.body.url).toContain("accounts.google.com/o/oauth2/v2/auth");
+    expect(resUrl.body.url).toContain("client_id=");
+    expect(resUrl.body.url).toContain("redirect_uri=");
+    expect(resUrl.body.url).toContain("scope=openid+email+profile");
+
+    const resRedirect = await request(app).get("/api/v1/auth/google");
+    expect(resRedirect.status).toBe(302);
+    expect(resRedirect.header.location).toContain("accounts.google.com/o/oauth2/v2/auth");
+  });
+
+  it("authenticates new user with Google token: creates user, role grant, and OAuthAccount", async () => {
+    const googleEmail = uniqueEmail("google.new");
+    const googleSub = `google_${Date.now()}`;
+
+    // Mock global fetch for Google verification
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("tokeninfo") || urlStr.includes("userinfo")) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: googleSub,
+            email: googleEmail,
+            email_verified: "true",
+            name: "New Google User",
+            picture: "https://example.com/photo.jpg",
+          }),
+        } as any;
+      }
+      return { ok: false, status: 400, json: async () => ({}) } as any;
+    });
+
+    try {
+      const res = await request(app)
+        .post("/api/v1/auth/google")
+        .send({
+          token: "mock_google_id_token",
+          clientType: "mobile",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.accessToken).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+      expect(res.body.user.email).toBe(googleEmail);
+      expect(res.body.user.role).toBe("PASSENGER");
+      createdUserIds.push(res.body.user.id);
+
+      // Verify DB record
+      const dbUser = await prisma.user.findUnique({
+        where: { id: res.body.user.id },
+        include: { roleGrants: true, oauthAccounts: true },
+      });
+
+      expect(dbUser).toBeDefined();
+      expect(dbUser?.email).toBe(googleEmail);
+      expect(dbUser?.emailVerifiedAt).not.toBeNull();
+      expect(dbUser?.roleGrants[0].role).toBe("PASSENGER");
+      expect(dbUser?.oauthAccounts).toHaveLength(1);
+      expect(dbUser?.oauthAccounts[0].provider).toBe("GOOGLE");
+      expect(dbUser?.oauthAccounts[0].providerAccountId).toBe(googleSub);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("links Google account to existing user with same email", async () => {
+    const existingEmail = uniqueEmail("google.existing");
+    const googleSub = `google_${Date.now()}`;
+
+    // Create user manually first
+    const created = await prisma.user.create({
+      data: {
+        email: existingEmail,
+        status: "ACTIVE",
+        roleGrants: { create: { role: "PASSENGER" } },
+      },
+    });
+    createdUserIds.push(created.id);
+
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation(async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          sub: googleSub,
+          email: existingEmail,
+          email_verified: true,
+          name: "Linked Google User",
+        }),
+      } as any;
+    });
+
+    try {
+      const res = await request(app)
+        .post("/api/v1/auth/google")
+        .send({ token: "valid_token" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.id).toBe(created.id);
+
+      // Check that OAuthAccount was linked in DB
+      const oauth = await prisma.oAuthAccount.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: "GOOGLE",
+            providerAccountId: googleSub,
+          },
+        },
+      });
+      expect(oauth).toBeDefined();
+      expect(oauth?.userId).toBe(created.id);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("rejects Google token with unverified email", async () => {
+    const unverifiedEmail = uniqueEmail("unverified");
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation(async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          sub: "sub_unverified",
+          email: unverifiedEmail,
+          email_verified: false,
+        }),
+      } as any;
+    });
+
+    try {
+      const res = await request(app)
+        .post("/api/v1/auth/google")
+        .send({ token: "unverified_token" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("GOOGLE_EMAIL_NOT_VERIFIED");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("handles Google OAuth callback with authorization code: redirects with one-time exchange code", async () => {
+    const callbackEmail = uniqueEmail("google.callback");
+    const googleSub = `google_${Date.now()}`;
+
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("oauth2.googleapis.com/token")) {
+        return {
+          ok: true,
+          json: async () => ({ access_token: "google_access_token_123" }),
+        } as any;
+      }
+      if (urlStr.includes("userinfo")) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: googleSub,
+            email: callbackEmail,
+            email_verified: true,
+            name: "Callback User",
+          }),
+        } as any;
+      }
+      return { ok: false, status: 400, json: async () => ({}) } as any;
+    });
+
+    try {
+      const res = await request(app)
+        .get("/api/v1/auth/google/callback?code=mock_google_auth_code");
+
+      expect(res.status).toBe(302);
+      expect(res.header.location).toContain("/user?code=");
+
+      // Verify user was registered
+      const user = await prisma.user.findUnique({ where: { email: callbackEmail } });
+      expect(user).toBeDefined();
+      if (user) createdUserIds.push(user.id);
+
+      // Extract code and test /exchange
+      const url = new URL(res.header.location);
+      const code = url.searchParams.get("code");
+      expect(code).toBeDefined();
+
+      // Exchange code for token
+      const exchangeRes = await request(app).get(`/api/v1/auth/exchange?code=${code}`);
+      expect(exchangeRes.status).toBe(200);
+      expect(exchangeRes.body.success).toBe(true);
+      expect(exchangeRes.body.accessToken).toBeDefined();
+
+      // Second exchange attempt must fail (one-time use)
+      const replayRes = await request(app).get(`/api/v1/auth/exchange?code=${code}`);
+      expect(replayRes.status).toBe(400);
+      expect(replayRes.body.error.code).toBe("INVALID_OAUTH_CODE");
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

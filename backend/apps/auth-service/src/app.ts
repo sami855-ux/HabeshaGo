@@ -4,7 +4,14 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { logger } from "./observability/logger";
-import { healthRouter, authRouter } from "./routes";
+import {
+  healthRouter,
+  authRouter,
+  usersRouter,
+  adminStaffInvitesRouter,
+  adminAuditLogsRouter,
+  adminOutboxRouter,
+} from "./routes";
 
 export function createApp() {
   const app = express();
@@ -31,6 +38,22 @@ export function createApp() {
   // Auth routes (prefixed as /api/v1/auth and aliased to /api/auth)
   app.use("/api/v1/auth", authRouter);
   app.use("/api/auth", authRouter);
+
+  // Admin user management routes (under /api/v1/admin/users and aliased to /api/admin/users)
+  app.use("/api/v1/admin/users", usersRouter);
+  app.use("/api/admin/users", usersRouter);
+
+  // Admin staff invites routes
+  app.use("/api/v1/admin/staff-invites", adminStaffInvitesRouter);
+  app.use("/api/admin/staff-invites", adminStaffInvitesRouter);
+
+  // Admin audit logs routes
+  app.use("/api/v1/admin/audit-logs", adminAuditLogsRouter);
+  app.use("/api/admin/audit-logs", adminAuditLogsRouter);
+
+  // Admin outbox events routes
+  app.use("/api/v1/admin/outbox-events", adminOutboxRouter);
+  app.use("/api/admin/outbox-events", adminOutboxRouter);
 
   // 404 handler
   app.use((req, res) => {

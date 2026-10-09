@@ -60,4 +60,28 @@ export function authenticateUser(req: Request, res: Response, next: NextFunction
   });
 }
 
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({
+      success: false,
+      error: { code: "UNAUTHORIZED", message: "Authentication required" },
+      message: "Authentication required",
+    });
+  }
+
+  const roles: string[] = user.roles || [];
+  const isAdmin = roles.some((r) => r.toUpperCase() === "ADMIN");
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: { code: "FORBIDDEN", message: "Admin privileges required" },
+      message: "Admin privileges required",
+    });
+  }
+
+  return next();
+}
+
+
 

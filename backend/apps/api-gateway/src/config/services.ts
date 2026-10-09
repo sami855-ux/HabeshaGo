@@ -29,9 +29,17 @@ export const services: ServiceRoute[] = [
     prefix: "/api/v1/auth",
     target: env.AUTH_SERVICE_URL,
     publicRules: [
-      { method: "POST", path: /^\/api\/v1\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/(verify|recovery|enroll\/(setup|verify))|refresh|google|mobile\/google|exchange|logout|logout-all|staff\/(login|verify-otp|resend-otp))$/ },
+      { method: "POST", path: /^\/api\/v1\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/(verify|recovery|enroll\/(setup|verify))|refresh|google|mobile\/google|exchange|logout|logout-all|staff\/(login|verify-otp|resend-otp)|staff-invites\/accept)$/ },
       { method: "GET", path: /^\/api\/v1\/auth\/(google(\/(callback|url))?|exchange)$/ },
     ],
+    timeoutMs: 8000,
+  },
+  {
+    ...base,
+    name: "admin-auth",
+    prefix: "/api/v1/admin",
+    target: env.AUTH_SERVICE_URL,
+    roles: ["admin", "ADMIN"],
     timeoutMs: 8000,
   },
   {

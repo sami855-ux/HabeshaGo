@@ -4,3 +4,4 @@ export * from "./staff.controller";
 export * from "./google.controller";
 export * from "./session.controller";
 export * from "./mfa.controller";
+export * from "./users.controller";

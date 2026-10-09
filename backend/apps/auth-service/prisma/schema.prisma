@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  EMPLOYEE
+  EV_CHARGER_MANAGER
+  PARKING_MANAGER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+enum OtpPurpose {
+  LOGIN
+  EMAIL_CHANGE
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  OTP_LOCKED
+  MFA_ENABLED
+  MFA_DISABLED
+  MFA_RESET
+  RECOVERY_CODE_USED
+  REFRESH_REUSE_DETECTED
+  SESSION_REVOKED
+  STAFF_INVITED
+  STAFF_INVITE_ACCEPTED
+  ROLE_GRANTED
+  ROLE_REVOKED
+  USER_SUSPENDED
+  USER_REACTIVATED
+  USER_DELETED
+  EMAIL_CHANGED
+}
+
+model User {
+  id               String     @id @default(cuid())
+  email            String     @unique
+  emailVerifiedAt  DateTime?
+  status           UserStatus @default(ACTIVE)
+  suspendedAt      DateTime?
+  suspendedById    String?
+  suspensionReason String?
+  deletedAt        DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  roleGrants    UserRoleGrant[]
+  sessions      Session[]
+  oauthAccounts OAuthAccount[]
+  mfa           UserMfa?
+
+  @@index([status])
+  @@map("users")
+}
+
+model UserRoleGrant {
+  id          String    @id @default(cuid())
+  userId      String
+  role        UserRole
+  grantedById String?
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  revokedById String?
+  reason      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId, revokedAt])
+  @@index([role, revokedAt])
+  @@map("user_role_grants")
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  email             String?
+  createdAt         DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id                String    @id @default(cuid())
+  userId            String
+  ipAddress         String?
+  userAgent         String?
+  deviceName        String?
+  mfaVerifiedAt     DateTime?
+  lastActiveAt      DateTime  @default(now())
+  absoluteExpiresAt DateTime
+  revokedAt         DateTime?
+  revokedReason     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@index([absoluteExpiresAt])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id           String    @id @default(cuid())
+  sessionId    String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model OtpCode {
+  id          String     @id @default(cuid())
+  email       String
+  purpose     OtpPurpose @default(LOGIN)
+  userId      String?
+  codeHash    String
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  ipAddress   String?
+  createdAt   DateTime   @default(now())
+
+  @@index([email, purpose, consumedAt])
+  @@index([email, purpose, createdAt])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model UserMfa {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  totpSecretCiphertext String
+  recoveryCodeHashes   String[]
+  lastUsedTotpStep     Int?
+  enabledAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_mfa")
+}
+
+model StaffInvite {
+  id          String    @id @default(cuid())
+  email       String
+  role        UserRole
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("staff_invites")
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  action       AuditAction
+  actorId      String?
+  actorRole    UserRole?
+  targetUserId String?
+  oldValue     Json?
+  newValue     Json?
+  reason       String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+
+  @@index([targetUserId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id            String    @id @default(cuid())
+  seq           BigInt    @unique @default(autoincrement())
+  type          String
+  version       Int       @default(1)
+  aggregateId   String
+  payload       Json
+  correlationId String?
+  occurredAt    DateTime  @default(now())
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lockedAt      DateTime?
+  lockedBy      String?
+  lastError     String?
+  failedAt      DateTime?
+  publishedAt   DateTime?
+
+  @@index([publishedAt, failedAt, nextAttemptAt])
+  @@index([aggregateId, seq])
+  @@map("outbox_events")
+}

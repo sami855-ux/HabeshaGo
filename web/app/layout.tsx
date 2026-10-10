@@ -6,13 +6,13 @@ import {
   Mozilla_Headline,
   Plus_Jakarta_Sans,
   Space_Grotesk,
-  Inter,
 } from "next/font/google"
 
-// 🔹 Inter (General Font Family)
-const inter = Inter({
+// 🔹 Plus Jakarta Sans (Primary Clean Modern Sans Font Family)
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
   display: "swap",
 })
 
@@ -21,14 +21,6 @@ const mozilla = Mozilla_Headline({
   subsets: ["latin"],
   weight: ["200", "300", "400", "500", "600", "700"],
   variable: "--font-mozilla",
-  display: "swap",
-})
-
-// 🔹 Plus Jakarta Sans
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700", "800"],
-  variable: "--font-jakarta",
   display: "swap",
 })
 
@@ -67,9 +59,9 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jakarta.variable} ${grotesk.variable} ${mozilla.variable} font-inter`}
+      className={`${jakarta.variable} ${grotesk.variable} ${mozilla.variable} font-sans`}
     >
-      <body className="font-inter">
+      <body className="font-sans">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

@@ -126,7 +126,7 @@ export const AppProvider: FC<AppProviderProps> = ({ children }) => {
           }}
           toastOptions={{
             style: {
-              fontFamily: "'Geist', sans-serif",
+              fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif",
               background: "rgba(10, 10, 15, 0.85)",
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(255, 255, 255, 0.08)",

@@ -1,34 +1,16 @@
 import { configureStore } from "@reduxjs/toolkit"
-import userReducer from "./slices/userSlice"
-import walletReducer from "./slices/walletSlice"
-import busReducer from "./slices/bus.Slice"
-import bookingReducer from "./slices/booking.Slice"
-import paymentReducer from "./slices/paymentSlice"
-import routeReducer from "./slices/routeslice"
-import { configureAuthSession } from "@/services/authSession"
-import {
+import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
+import userReducer, {
   clearUser,
   establishSession,
   setAccessToken,
   setLoading,
-} from "./slices/userSlice"
-import supportAgentReducer from "./slices/supportAgentSlice"
-import supportCustomerReducer from "./slices/supportCustomerSlice"
-import userparkingReducer from "./slices/parkingUserSlice"
-import AdminparkingReducer from "./slices/parkingAdminSlice"
+} from "./user-slice"
+import { configureAuthSession } from "@/services/auth-session"
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
-    wallet: walletReducer,
-    bus: busReducer,
-    booking: bookingReducer,
-    payment: paymentReducer,
-    route: routeReducer,
-    supportChat: supportAgentReducer,
-    supportCustomer: supportCustomerReducer,
-    parkingUser: userparkingReducer,
-    parking: AdminparkingReducer,
   },
 })
 
@@ -52,7 +34,9 @@ configureAuthSession({
 
 export type RootState = ReturnType<typeof store.getState>
 export type AppDispatch = typeof store.dispatch
+export type AppStore = typeof store
 
-// Use these instead of plain useDispatch and useSelector
-// export const useAppDispatch = () => useDispatch<AppDispatch>();
-// export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+export const useAppDispatch = () => useDispatch<AppDispatch>()
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+
+export * from "./user-slice"

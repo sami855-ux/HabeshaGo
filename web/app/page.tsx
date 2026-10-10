@@ -2,15 +2,17 @@
 
 import { useEffect } from "react"
 import { useTheme } from "next-themes"
-import { Navigation } from "@/components/navigation"
-import { HeroSection } from "@/components/hero-section"
-import { PaymentPartnersSection } from "@/components/payment-partners"
-import { ServicesSection } from "@/components/services-section"
-import { InteractivePreviewSection } from "@/components/interactive-preview"
-import HowWeWorks from "@/components/how-we-work"
-import { TestimonialsSection } from "@/components/testimonials"
-import { FAQSection } from "@/components/faq-section"
-import { Footer } from "@/components/footer"
+import {
+  Navigation,
+  HeroSection,
+  PaymentPartnersSection,
+  ServicesSection,
+  InteractivePreviewSection,
+  HowWeWorks,
+  TestimonialsSection,
+  FAQSection,
+  Footer,
+} from "@/components/landing"
 
 export default function Home() {
   const { setTheme } = useTheme()

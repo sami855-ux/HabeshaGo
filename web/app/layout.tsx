@@ -1,7 +1,6 @@
 import "./globals.css"
 import type { Metadata } from "next"
-import "mapbox-gl/dist/mapbox-gl.css"
-import AppProvider from "./Provider"
+import { AppProvider } from "@/providers"
 
 import {
   Mozilla_Headline,

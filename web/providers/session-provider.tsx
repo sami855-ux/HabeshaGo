@@ -10,4 +10,5 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  return <>{children}</>
 }

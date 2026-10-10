@@ -86,7 +86,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
       scale: 1,
       transition: {
         duration: 0.5,
-        type: "spring",
+        type: "spring" as const,
         stiffness: 300,
         damping: 30,
       },

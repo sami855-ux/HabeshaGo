@@ -103,7 +103,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
 
   return (
     <div
-      className="hidden lg:flex lg:w-1/2 h-full relative overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950 font-inter"
+      className="hidden lg:flex lg:w-1/2 h-full relative overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950 font-sans"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -156,7 +156,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             <div className="absolute -inset-1 bg-gradient-to-tr from-orange-500/40 to-transparent rounded-2xl blur-lg -z-10" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold tracking-tight text-white font-inter">
+            <span className="text-2xl font-extrabold tracking-tight text-white font-sans">
               Habesha<span className="text-orange-500">Go</span>
             </span>
             <span className="block text-xs text-white/70 font-medium">
@@ -174,7 +174,7 @@ export function AuthSlider({ autoPlayInterval = 6000 }: AuthSliderProps) {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
 
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-inter tracking-tight">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight font-sans tracking-tight">
               {slide.title}
             </h1>
 

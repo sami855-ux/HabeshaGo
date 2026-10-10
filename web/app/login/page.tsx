@@ -301,12 +301,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen max-h-screen overflow-hidden flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-inter">
+    <div className="h-screen max-h-screen overflow-hidden flex bg-slate-50/50 text-slate-900 selection:bg-orange-500/15 selection:text-orange-900 font-sans">
       {/* Left Side: Visual Showcase Slider */}
       <AuthSlider />
 
       {/* Right Side: Clean Centered Login Card */}
-      <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-y-auto lg:overflow-hidden font-inter">
+      <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-y-auto lg:overflow-hidden font-sans">
         <div className="w-full max-w-md mx-auto">
           <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
             <CardContent className="p-7 sm:p-9 space-y-6">
@@ -340,14 +340,14 @@ export default function LoginPage() {
                   {/* Header */}
                   <div className="text-center space-y-1.5">
                     <div className="flex lg:hidden items-center justify-center gap-2 mb-2">
-                      <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-inter">
+                      <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
                         Habesha<span className="text-orange-500">Go</span>
                       </span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-inter">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-sans">
                       Welcome back
                     </h1>
-                    <p className="text-xs sm:text-sm text-slate-500 font-inter">
+                    <p className="text-xs sm:text-sm text-slate-500 font-sans">
                       Sign in to your HabeshaGo account
                     </p>
                   </div>
@@ -568,7 +568,7 @@ export default function LoginPage() {
                               key={index}
                               index={index}
                               className={cn(
-                                "h-12 w-10 sm:h-13 sm:w-11 text-lg font-bold bg-white border border-slate-200 rounded-xl text-slate-900 transition-all font-inter shadow-none",
+                                "h-12 w-10 sm:h-13 sm:w-11 text-lg font-bold bg-white border border-slate-200 rounded-xl text-slate-900 transition-all font-sans shadow-none",
                                 "data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20",
                                 verificationStatus === "error" &&
                                   "border-red-400 bg-red-50/30 text-red-700",

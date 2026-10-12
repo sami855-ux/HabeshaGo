@@ -6,7 +6,7 @@ module.exports = {
       fontFamily: {
         sans: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],
         jakarta: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],
-        inter: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],
+        inter: ["var(--font-inter)", "Inter", "sans-serif"],
         geist: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],
         sora: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],
         roboto: ["var(--font-jakarta)", "Plus Jakarta Sans", "sans-serif"],

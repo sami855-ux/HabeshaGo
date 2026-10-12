@@ -3,10 +3,19 @@ import type { Metadata } from "next"
 import { AppProvider } from "@/providers"
 
 import {
+  Inter,
   Mozilla_Headline,
   Plus_Jakarta_Sans,
   Space_Grotesk,
 } from "next/font/google"
+
+// 🔹 Inter Font Family
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-inter",
+  display: "swap",
+})
 
 // 🔹 Plus Jakarta Sans (Primary Clean Modern Sans Font Family)
 const jakarta = Plus_Jakarta_Sans({
@@ -59,7 +68,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${jakarta.variable} ${grotesk.variable} ${mozilla.variable} font-sans`}
+      className={`${jakarta.variable} ${grotesk.variable} ${mozilla.variable} ${inter.variable} font-sans`}
     >
       <body className="font-sans">
         <AppProvider>{children}</AppProvider>

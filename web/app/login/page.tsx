@@ -497,6 +497,16 @@ export default function LoginPage() {
                         </>
                       )}
                     </Button>
+
+                    <div className="pt-3 text-center border-t border-slate-100">
+                      <Link
+                        href="/staff/login"
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-orange-600 transition-colors font-medium"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-orange-500" />
+                        <span>Staff & Operations Console? MFA Login →</span>
+                      </Link>
+                    </div>
                   </form>
                 </>
               ) : (

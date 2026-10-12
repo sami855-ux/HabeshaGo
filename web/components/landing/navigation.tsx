@@ -47,11 +47,12 @@ export function Navigation() {
   }, [])
 
   const navLinks = [
-    { href: "#features", label: "Features" },
-    { href: "#digital-pass", label: "Digital Pass" },
-    { href: "#how-we-work", label: "How It Works" },
-    { href: "#testimonials", label: "Reviews" },
-    { href: "#faq", label: "FAQ" },
+    { href: "/passenger", label: "Passenger App" },
+    { href: "/admin", label: "Admin Portal" },
+    { href: "/#features", label: "Features" },
+    { href: "/#digital-pass", label: "Digital Pass" },
+    { href: "/#how-we-work", label: "How It Works" },
+    { href: "/#testimonials", label: "Reviews" },
   ]
 
   const isAuth = mounted && isAuthenticated && !!user
@@ -139,7 +140,7 @@ export function Navigation() {
               size="sm"
               className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-md shadow-sm transition-all"
             >
-              <Link href={isAuth ? "#features" : "/login"} className="flex items-center gap-1.5">
+              <Link href="/passenger" className="flex items-center gap-1.5">
                 <Ticket className="w-3.5 h-3.5" />
                 <span>Book Ticket</span>
               </Link>
@@ -215,7 +216,7 @@ export function Navigation() {
                     size="sm"
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-md"
                   >
-                    <Link href={isAuth ? "#features" : "/login"} onClick={() => setIsMobileMenuOpen(false)}>
+                    <Link href="/passenger" onClick={() => setIsMobileMenuOpen(false)}>
                       Book Bus Ticket
                     </Link>
                   </Button>

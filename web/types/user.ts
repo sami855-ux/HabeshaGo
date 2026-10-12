@@ -89,6 +89,7 @@ export type UserRole =
   | "PASSENGER"
   | "DRIVER"
   | "ADMIN"
+  | "EMPLOYEE"
   | "EV_CHARGER_MANAGER"
   | "PARKING_MANAGER"
 

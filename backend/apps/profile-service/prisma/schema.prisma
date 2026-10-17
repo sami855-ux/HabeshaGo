@@ -1,0 +1,131 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+}
+
+enum Gender {
+    MALE
+    FEMALE
+    OTHER
+}
+
+enum Theme {
+    SYSTEM
+    LIGHT
+    DARK
+}
+
+enum Language {
+    EN
+    AM
+    OM
+    TI
+}
+
+enum Currency {
+    ETB
+    USD
+}
+
+enum Relationship {
+    PARENT
+    SPOUSE
+    SIBLING
+    CHILD
+    RELATIVE
+    FRIEND
+    OTHER
+}
+
+model Profile {
+    userId             String    @id
+    email              String    @unique
+    firstName          String?
+    lastName           String?
+    phone              String?   @unique
+    avatarKey          String?
+    dateOfBirth        DateTime?
+    gender             Gender?
+    city               String?
+    profileCompletedAt DateTime?
+    deletedAt          DateTime?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
+
+    preferences       UserPreference?
+    emergencyContacts EmergencyContact[]
+
+    @@index([lastName, firstName])
+    @@index([deletedAt])
+    @@map("profiles")
+}
+
+model UserPreference {
+    userId         String   @id
+    language       Language @default(EN)
+    timezone       String   @default("Africa/Addis_Ababa")
+    currency       Currency @default(ETB)
+    theme          Theme    @default(SYSTEM)
+    pushEnabled    Boolean  @default(true)
+    emailEnabled   Boolean  @default(true)
+    smsEnabled     Boolean  @default(false)
+    marketingOptIn Boolean  @default(false)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    profile Profile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@map("user_preferences")
+}
+
+model EmergencyContact {
+    id           String        @id @default(cuid())
+    userId       String
+    name         String
+    phone        String
+    relationship Relationship?
+    isPrimary    Boolean       @default(false)
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+
+    profile Profile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@index([userId])
+    @@map("emergency_contacts")
+}
+
+model ProcessedEvent {
+    eventId     String   @id
+    type        String
+    processedAt DateTime @default(now())
+
+    @@index([processedAt])
+    @@map("processed_events")
+}
+
+model OutboxEvent {
+    id            String    @id @default(cuid())
+    seq           BigInt    @unique @default(autoincrement())
+    type          String
+    version       Int       @default(1)
+    aggregateId   String
+    payload       Json
+    correlationId String?
+    occurredAt    DateTime  @default(now())
+    attempts      Int       @default(0)
+    nextAttemptAt DateTime  @default(now())
+    lockedAt      DateTime?
+    lockedBy      String?
+    lastError     String?
+    failedAt      DateTime?
+    publishedAt   DateTime?
+
+    @@index([publishedAt, failedAt, nextAttemptAt])
+    @@index([aggregateId, seq])
+    @@map("outbox_events")
+}

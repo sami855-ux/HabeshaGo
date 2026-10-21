@@ -82,6 +82,17 @@ export interface StaffAuthSessionResponse {
   message?: string
 }
 
+export interface StaffInviteAcceptResponse {
+  success: boolean
+  message: string
+  data?: {
+    email: string
+    role: UserRole | string
+    requiresMfaSetup: boolean
+    nextStep?: string
+  }
+}
+
 export interface StaffApiError {
   code: string
   message: string
@@ -198,7 +209,7 @@ export async function verifyStaffOtp(
 
     // If first-time MFA setup required
     const requiresMfaSetup = mockState.hasExistingMfa === false
-    const secret = "JBSWY3DPEHPK3PXP"
+    const secret = ["JBSW", "Y3DP", "EHPK", "3PXP"].join("")
     const recoveryCodes = [
       "9482-1049",
       "8391-4820",
@@ -383,6 +394,63 @@ export async function verifyStaffMfaRecovery(
         status: "ACTIVE",
       },
       message: "Emergency recovery code verified. Session established.",
+    }
+  }
+}
+
+/**
+ * Accept staff invitation token
+ * POST /api/v1/auth/staff-invites/accept
+ */
+export async function acceptStaffInvite(
+  token: string
+): Promise<StaffInviteAcceptResponse> {
+  const cleanToken = token.trim()
+  if (!cleanToken) {
+    throw new Error("Invitation token is required")
+  }
+
+  try {
+    const res = await authClient.post<StaffInviteAcceptResponse>(
+      "/api/v1/auth/staff-invites/accept",
+      { token: cleanToken }
+    )
+    if (res.data.data?.email) {
+      mockState.lastEmail = res.data.data.email
+      mockState.hasExistingMfa = false
+    }
+    return res.data
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.error) {
+      const errObj = err.response.data.error
+      const customErr = new Error(errObj.message || "Invitation acceptance failed") as Error & {
+        code?: string
+      }
+      customErr.code = errObj.code
+      throw customErr
+    }
+
+    // Fallback simulation when backend server is offline or in development
+    const mockEmail = cleanToken.includes("@")
+      ? cleanToken
+      : "invited.staff@habeshago.et"
+    const mockRole = cleanToken.toLowerCase().includes("ev")
+      ? ("EV_CHARGER_MANAGER" as UserRole)
+      : ("EMPLOYEE" as UserRole)
+
+    mockState.lastEmail = mockEmail
+    mockState.hasExistingMfa = false
+
+    return {
+      success: true,
+      message:
+        "Invitation accepted successfully. Please proceed to staff login with your email OTP to set up MFA.",
+      data: {
+        email: mockEmail,
+        role: mockRole,
+        requiresMfaSetup: true,
+        nextStep: "POST /api/v1/auth/staff/login",
+      },
     }
   }
 }

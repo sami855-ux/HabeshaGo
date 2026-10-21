@@ -422,6 +422,19 @@ export default function StaffLoginPage() {
                 </div>
               )}
             </Button>
+
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => router.push("/staff/accept-invite")}
+                className="text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                Received an invitation link?{" "}
+                <span className="underline underline-offset-2 font-medium">
+                  Accept invite token
+                </span>
+              </button>
+            </div>
           </motion.form>
         )}
 

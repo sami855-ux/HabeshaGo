@@ -12,8 +12,11 @@ import {
   ChevronDown, 
   User as UserIcon,
   Plus,
-  ArrowRight
+  ArrowRight,
+  LogOut,
+  LogIn
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -25,6 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAppSelector } from "@/store"
+import { logoutUser } from "@/services"
 
 interface PassengerHeaderProps {
   walletBalance: number
@@ -39,6 +44,30 @@ export function PassengerHeader({
   onOpenWallet,
   onOpenTickets,
 }: PassengerHeaderProps) {
+  const router = useRouter()
+  const { user, isAuthenticated } = useAppSelector((state) => state.user)
+
+  const displayName =
+    user?.name || (user?.email ? user.email.split("@")[0] : "Passenger")
+  const displayEmail = user?.email || "passenger@habeshago.et"
+  const initials =
+    displayName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "HG"
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser()
+      router.push("/login")
+    } catch (err) {
+      console.error("Logout failed:", err)
+      router.push("/login")
+    }
+  }
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-100 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90 shadow-xs font-inter">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -115,16 +144,20 @@ export function PassengerHeader({
                 <button className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors outline-hidden">
                   <Avatar className="size-8 border-2 border-orange-500/20">
                     <AvatarImage src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces" />
-                    <AvatarFallback className="bg-orange-500 text-white text-xs">HG</AvatarFallback>
+                    <AvatarFallback className="bg-orange-500 text-white text-xs">{initials}</AvatarFallback>
                   </Avatar>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden sm:block" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-60">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none">Selamawit Tadesse</p>
-                    <p className="text-xs text-slate-500 leading-none">selam.t@habeshago.et</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none truncate">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-slate-500 leading-none truncate">
+                      {displayEmail}
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -149,6 +182,23 @@ export function PassengerHeader({
                     <span>Back to Homepage</span>
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {isAuthenticated ? (
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/40"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild className="cursor-pointer text-orange-600">
+                    <Link href="/login">
+                      <LogIn className="mr-2 h-4 w-4" />
+                      <span>Sign In</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

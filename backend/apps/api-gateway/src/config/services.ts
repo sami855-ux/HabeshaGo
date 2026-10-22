@@ -71,6 +71,14 @@ export const services: ServiceRoute[] = [
   },
   {
     ...base,
+    name: "profile-singular",
+    prefix: "/api/v1/profile",
+    target: env.PROFILE_SERVICE_URL,
+    timeoutMs: 8000,
+    retries: 1,
+  },
+  {
+    ...base,
     name: "mobility",
     prefix: "/api/v1/mobility",
     target: env.MOBILITY_SERVICE_URL,

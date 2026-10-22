@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator"
 import { useRouter } from "next/navigation"
 import { useAppSelector } from "@/store"
 import { logoutAuthSession } from "@/services"
+import { StaffInviteDialog } from "./staff-invite-dialog"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -117,6 +118,9 @@ export function AdminHeader({ currentTabName }: AdminHeaderProps) {
 
       {/* Right Actions */}
       <div className="flex items-center gap-2.5 ml-auto">
+        {/* Staff Invitation Action Modal */}
+        <StaffInviteDialog />
+
         {/* Notifications Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -24,7 +24,7 @@ import {
   RefreshCw,
   Timer,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
   useEffect,
@@ -35,7 +35,12 @@ import {
 } from "react"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
-import { register, verifyOTP, establishAuthSession } from "@/services"
+import {
+  continueWithEmail,
+  resendOtp as requestResendOtp,
+  verifyOTP,
+  establishAuthSession,
+} from "@/services"
 import { AuthSlider } from "@/components/auth"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -60,6 +65,7 @@ const EMAIL_PROVIDERS = {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [googlePending] = useTransition()
   const [emailPending, startEmail] = useTransition()
@@ -77,6 +83,7 @@ export default function LoginPage() {
 
   // OTP state
   const [otp, setOtp] = useState("")
+  const [devOtp, setDevOtp] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(60)
   const [canResend, setCanResend] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<
@@ -87,6 +94,13 @@ export default function LoginPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
   const otpContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error")
+    if (errorParam) {
+      toast.error(decodeURIComponent(errorParam))
+    }
+  }, [searchParams])
 
   const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
@@ -214,15 +228,23 @@ export default function LoginPage() {
     }
 
     startEmail(async () => {
-      const res = await register({ email })
+      const res = await continueWithEmail({ email })
       if (!res.success) {
         setEmailError(res.message || "Failed to send verification code")
         toast.error(res.message || "Failed to send verification code")
         return
       }
-      toast.success("Verification code sent to your email")
+
+      toast.success(res.message || "Verification code sent to your email")
+      if (res.data?.devOtp) {
+        setDevOtp(res.data.devOtp)
+        toast.info(`Dev Mode: Code is ${res.data.devOtp}`, { duration: 10000 })
+      } else {
+        setDevOtp(null)
+      }
+
       setStep(2)
-      setResendCooldown(60)
+      setResendCooldown(res.data?.expiresIn || 60)
       setCanResend(false)
       setOtp("")
       setVerificationStatus("idle")
@@ -230,8 +252,8 @@ export default function LoginPage() {
   }
 
   const verifyAccount = useCallback(() => {
-    if (attempts >= 3) {
-      toast.error("Too many attempts. Please request a new code.")
+    if (attempts >= 5) {
+      toast.error("Too many failed attempts. Please request a new code.")
       return
     }
 
@@ -240,11 +262,20 @@ export default function LoginPage() {
       try {
         const res = await verifyOTP({ email, code: otp })
 
-        if (res.success) {
+        if (res.success && res.data.accessToken) {
           setVerificationStatus("success")
           toast.success("Welcome back! Signed in successfully.")
-          await establishAuthSession(res.data.accessToken)
-          setTimeout(() => router.push("/"), 700)
+          const user = await establishAuthSession(
+            res.data.accessToken,
+            res.data.user || res.user,
+            res.data.refreshToken,
+          )
+
+          const redirectParam = searchParams.get("redirect")
+          const destination =
+            redirectParam || user?.defaultRedirect || "/passenger"
+
+          setTimeout(() => router.push(destination), 600)
           return
         }
 
@@ -257,7 +288,7 @@ export default function LoginPage() {
         setAttempts((prev) => prev + 1)
       }
     })
-  }, [attempts, email, otp, router])
+  }, [attempts, email, otp, router, searchParams])
 
   // Auto-verify when OTP has 6 digits
   useEffect(() => {
@@ -271,12 +302,16 @@ export default function LoginPage() {
     if (!canResend || !email) return
 
     try {
-      const res = await register({ email })
+      const res = await requestResendOtp({ email })
       if (!res?.success) {
         toast.error(res?.message || "Failed to resend code")
         return
       }
-      setResendCooldown(60)
+      if (res.data?.devOtp) {
+        setDevOtp(res.data.devOtp)
+        toast.info(`Dev Mode: New code is ${res.data.devOtp}`, { duration: 10000 })
+      }
+      setResendCooldown(res.data?.expiresIn || 60)
       setCanResend(false)
       setAttempts(0)
       setOtp("")
@@ -288,7 +323,7 @@ export default function LoginPage() {
 
   const signInWithGoogle = async () => {
     try {
-      window.location.href = "/api/auth/google"
+      window.location.href = "/api/v1/auth/google"
     } catch (error: any) {
       console.error(error)
       toast.error(error?.message || "Google sign in failed")
@@ -590,6 +625,22 @@ export default function LoginPage() {
                         </InputOTPGroup>
                       </InputOTP>
                     </div>
+
+                    {devOtp && (
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOtp(devOtp)
+                            setVerificationStatus("idle")
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
+                        >
+                          <span>Dev Code: <strong className="font-mono tracking-wider">{devOtp}</strong></span>
+                          <span className="text-[10px] text-amber-600 bg-amber-100/90 px-1.5 py-0.5 rounded-md font-medium">Auto-fill</span>
+                        </button>
+                      </div>
+                    )}
 
                     <Button
                       onClick={verifyAccount}

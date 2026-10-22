@@ -22,7 +22,7 @@ export const AppProvider: FC<AppProviderProps> = ({ children }) => {
         disableTransitionOnChange
       >
         <Toaster
-          position="top-right"
+          position="bottom-center"
           visibleToasts={3}
           duration={4000}
           icons={{
@@ -131,7 +131,7 @@ export const AppProvider: FC<AppProviderProps> = ({ children }) => {
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               color: "#fff",
-              borderRadius: "5px",
+              borderRadius: "8px",
               padding: "14px 18px",
               fontSize: "14px",
               fontWeight: "500",

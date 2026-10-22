@@ -1,17 +1,37 @@
 import axios from "axios"
+import { axiosInstance } from "./auth-session"
 import type { UserRole } from "@/types/user"
 
-// Determine base API url: Auth service default is port 4001 or gateway
-const AUTH_BASE_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:4001"
+// Base URL resolution: In browser, use same-origin /api (rewritten by Next.js to API gateway)
+// This guarantees first-party HttpOnly cookies and eliminates cross-origin cookie omission.
+const getStaffAuthBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    return "/api"
+  }
+  const raw =
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "http://localhost:8080/api"
+  return raw.includes("onrender.com") ? "http://localhost:8080/api" : raw
+}
 
 const authClient = axios.create({
-  baseURL: AUTH_BASE_URL,
+  baseURL: getStaffAuthBaseUrl(),
   withCredentials: true,
-  timeout: 4000,
+  timeout: 15000,
 })
+
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (axios.isAxiosError<{ error?: { message?: string; code?: string }; message?: string }>(err)) {
+    return (
+      err.response?.data?.error?.message ||
+      err.response?.data?.message ||
+      err.message ||
+      fallback
+    )
+  }
+  return err instanceof Error ? err.message : fallback
+}
 
 export interface StaffLoginRequest {
   email: string
@@ -110,16 +130,6 @@ export const DEMO_STAFF_ACCOUNT = {
 
 export const DEMO_STAFF_ACCOUNTS = [DEMO_STAFF_ACCOUNT]
 
-// Mock state store for realistic client-side fallback testing
-const mockState: {
-  lastOtp?: string
-  lastEmail?: string
-  mfaToken?: string
-  secret?: string
-  recoveryCodes?: string[]
-  hasExistingMfa?: boolean
-} = {}
-
 /**
  * Step 1: Request staff login OTP
  * POST /api/v1/auth/staff/login
@@ -128,49 +138,20 @@ export async function requestStaffLogin(email: string): Promise<StaffLoginRespon
   const normalizedEmail = email.trim().toLowerCase()
 
   try {
-    const res = await authClient.post<StaffLoginResponse>("/api/v1/auth/staff/login", {
+    const res = await authClient.post<StaffLoginResponse>("/v1/auth/staff/login", {
       email: normalizedEmail,
     })
     return res.data
   } catch (err: unknown) {
-    // If backend returns a structured 403 or 400 error, pass it along
     if (axios.isAxiosError(err) && err.response?.data?.error) {
       const errorData = err.response.data.error
-      throw new Error(errorData.message || "Staff authorization failed")
+      const customErr = new Error(errorData.message || "Staff authorization failed") as Error & {
+        code?: string
+      }
+      customErr.code = errorData.code
+      throw customErr
     }
-
-    // Fallback simulation when backend server is offline or in development
-    const matchedStaff = DEMO_STAFF_ACCOUNTS.find(
-      (s) => s.email.toLowerCase() === normalizedEmail
-    )
-
-    // Check if unauthorized domain or passenger user
-    if (
-      !matchedStaff &&
-      (normalizedEmail.includes("passenger") ||
-        normalizedEmail.includes("ghost") ||
-        normalizedEmail.includes("user"))
-    ) {
-      throw new Error("Access restricted to authorized staff members (403 STAFF_ACCESS_DENIED)")
-    }
-
-    // Generate simulated dev OTP
-    const simulatedOtp = "849201"
-    mockState.lastOtp = simulatedOtp
-    mockState.lastEmail = normalizedEmail
-    mockState.hasExistingMfa = matchedStaff ? matchedStaff.hasExistingMfa : true
-
-    return {
-      success: true,
-      message: "Staff authentication code dispatched to corporate email",
-      email: normalizedEmail,
-      expiresIn: 300,
-      devOtp: simulatedOtp,
-      data: {
-        email: normalizedEmail,
-        expiresIn: 300,
-      },
-    }
+    throw new Error(getErrorMessage(err, "Staff authorization failed"))
   }
 }
 
@@ -187,72 +168,38 @@ export async function verifyStaffOtp(
 
   try {
     const res = await authClient.post<StaffVerifyOtpResponse>(
-      "/api/v1/auth/staff/verify-otp",
+      "/v1/auth/staff/verify-otp",
       {
         email: normalizedEmail,
         code: cleanCode,
       }
     )
-    return res.data
+
+    const raw = res.data as any
+    const dataObj = raw.data || {}
+
+    return {
+      success: raw.success ?? true,
+      mfaRequired: raw.mfaRequired ?? dataObj.mfaRequired ?? true,
+      mfaSetupRequired: raw.mfaSetupRequired ?? dataObj.mfaSetupRequired ?? false,
+      mfaToken: raw.mfaToken || dataObj.mfaToken || "",
+      mfaMethod: raw.mfaMethod || dataObj.mfaMethod || "TOTP",
+      secret: raw.secret || dataObj.secret,
+      otpauthUri: raw.otpauthUri || dataObj.otpauthUri,
+      recoveryCodes: raw.recoveryCodes || dataObj.recoveryCodes,
+      expiresIn: raw.expiresIn || dataObj.expiresIn || 300,
+      message: raw.message || "Email OTP verified",
+    }
   } catch (err: unknown) {
     if (axios.isAxiosError(err) && err.response?.data?.error) {
-      throw new Error(err.response.data.error.message || "OTP verification failed")
-    }
-
-    // Simulated fallback
-    if (mockState.lastOtp && cleanCode !== mockState.lastOtp && cleanCode !== "123456") {
-      throw new Error("Invalid or expired 6-digit verification code")
-    }
-
-    const mockToken = "mfa_token_" + Math.random().toString(36).substring(2, 15)
-    mockState.mfaToken = mockToken
-
-    // If first-time MFA setup required
-    const requiresMfaSetup = mockState.hasExistingMfa === false
-    const secret = ["JBSW", "Y3DP", "EHPK", "3PXP"].join("")
-    const recoveryCodes = [
-      "9482-1049",
-      "8391-4820",
-      "5729-1940",
-      "3829-5019",
-      "4920-8402",
-      "7193-2948",
-      "6820-1948",
-      "5928-3019",
-    ]
-
-    mockState.secret = secret
-    mockState.recoveryCodes = recoveryCodes
-
-    if (requiresMfaSetup) {
-      return {
-        success: true,
-        mfaRequired: true,
-        mfaSetupRequired: true,
-        mfaToken: mockToken,
-        mfaMethod: "SETUP_TOTP",
-        secret,
-        otpauthUri: `otpauth://totp/HabeshaGo:${encodeURIComponent(
-          normalizedEmail
-        )}?secret=${secret}&issuer=HabeshaGo`,
-        recoveryCodes,
-        expiresIn: 300,
-        message:
-          "Email OTP verified. MFA is required for staff accounts. Please scan the QR code and enter the 6-digit authenticator code.",
+      const errorData = err.response.data.error
+      const customErr = new Error(errorData.message || "OTP verification failed") as Error & {
+        code?: string
       }
+      customErr.code = errorData.code
+      throw customErr
     }
-
-    // Existing MFA TOTP prompt
-    return {
-      success: true,
-      mfaRequired: true,
-      mfaSetupRequired: false,
-      mfaToken: mockToken,
-      mfaMethod: "TOTP",
-      expiresIn: 300,
-      message:
-        "Email OTP verified. Please enter the 6-digit code from your authenticator app.",
-    }
+    throw new Error(getErrorMessage(err, "OTP verification failed"))
   }
 }
 
@@ -265,45 +212,49 @@ export async function verifyStaffMfaEnroll(
   code: string
 ): Promise<StaffAuthSessionResponse> {
   try {
-    const res = await authClient.post<StaffAuthSessionResponse>(
-      "/api/v1/auth/mfa/enroll/verify",
-      {
-        mfaToken,
-        code: code.trim(),
-      }
-    )
-    return res.data
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err) && err.response?.data?.error) {
-      throw new Error(err.response.data.error.message || "TOTP setup verification failed")
-    }
+    const res = await authClient.post<{
+      success: boolean
+      accessToken?: string
+      refreshToken?: string
+      user?: any
+      recoveryCodes?: string[]
+      message?: string
+      data?: any
+      error?: { code?: string; message?: string }
+    }>("/v1/auth/mfa/enroll/verify", {
+      mfaToken,
+      code: code.trim(),
+    })
 
-    // Mock fallback response
-    const email = mockState.lastEmail || "dispatch@habeshago.et"
-    const staffAccount = DEMO_STAFF_ACCOUNTS.find((a) => a.email === email)
-    const role: UserRole = staffAccount ? staffAccount.role : "ADMIN"
+    const raw = res.data
+    const rawUser = raw.user || raw.data?.user || {}
 
     return {
-      accessToken: "mock_jwt_access_token_" + Date.now() + "_" + Math.random().toString(36),
-      refreshToken: "mock_jwt_refresh_token_" + Date.now(),
-      recoveryCodes: mockState.recoveryCodes || [
-        "9482-1049",
-        "8391-4820",
-        "5729-1940",
-        "3829-5019",
-      ],
+      accessToken: raw.accessToken || raw.data?.accessToken || "",
+      refreshToken: raw.refreshToken || raw.data?.refreshToken,
+      recoveryCodes: raw.recoveryCodes || raw.data?.recoveryCodes,
       user: {
-        id: "staff_usr_" + Math.random().toString(36).substring(2, 9),
-        name: staffAccount ? staffAccount.name : "Staff Administrator",
-        email,
-        phone: "+251911223344",
-        primaryRole: role,
-        defaultRedirect: "/admin",
-        roles: [role],
-        status: "ACTIVE",
+        id: rawUser.id,
+        name: rawUser.name || (rawUser.email ? rawUser.email.split("@")[0] : "Staff Member"),
+        email: rawUser.email,
+        phone: rawUser.phone,
+        primaryRole: rawUser.primaryRole || rawUser.role || "ADMIN",
+        defaultRedirect: rawUser.defaultRedirect || "/admin",
+        roles: rawUser.roles || [rawUser.primaryRole || "ADMIN"],
+        status: rawUser.status || "ACTIVE",
       },
-      message: "MFA enrollment confirmed successfully. Session established.",
+      message: raw.message || "MFA enrollment confirmed successfully.",
     }
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.error) {
+      const errorData = err.response.data.error
+      const customErr = new Error(errorData.message || "TOTP setup verification failed") as Error & {
+        code?: string
+      }
+      customErr.code = errorData.code
+      throw customErr
+    }
+    throw new Error(getErrorMessage(err, "TOTP setup verification failed"))
   }
 }
 
@@ -316,39 +267,47 @@ export async function verifyStaffMfaChallenge(
   code: string
 ): Promise<StaffAuthSessionResponse> {
   try {
-    const res = await authClient.post<StaffAuthSessionResponse>(
-      "/api/v1/auth/mfa/verify",
-      {
-        mfaToken,
-        code: code.trim(),
-      }
-    )
-    return res.data
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err) && err.response?.data?.error) {
-      throw new Error(err.response.data.error.message || "Authenticator verification failed")
-    }
+    const res = await authClient.post<{
+      success: boolean
+      accessToken?: string
+      refreshToken?: string
+      user?: any
+      message?: string
+      data?: any
+      error?: { code?: string; message?: string }
+    }>("/v1/auth/mfa/verify", {
+      mfaToken,
+      code: code.trim(),
+    })
 
-    // Mock fallback response
-    const email = mockState.lastEmail || "admin@habeshago.et"
-    const staffAccount = DEMO_STAFF_ACCOUNTS.find((a) => a.email === email)
-    const role: UserRole = staffAccount ? staffAccount.role : "ADMIN"
+    const raw = res.data
+    const rawUser = raw.user || raw.data?.user || {}
 
     return {
-      accessToken: "mock_jwt_access_token_" + Date.now() + "_" + Math.random().toString(36),
-      refreshToken: "mock_jwt_refresh_token_" + Date.now(),
+      accessToken: raw.accessToken || raw.data?.accessToken || "",
+      refreshToken: raw.refreshToken || raw.data?.refreshToken,
       user: {
-        id: "staff_usr_" + Math.random().toString(36).substring(2, 9),
-        name: staffAccount ? staffAccount.name : "HabeshaGo Staff",
-        email,
-        phone: "+251911002233",
-        primaryRole: role,
-        defaultRedirect: "/admin",
-        roles: [role],
-        status: "ACTIVE",
+        id: rawUser.id,
+        name: rawUser.name || (rawUser.email ? rawUser.email.split("@")[0] : "Staff Member"),
+        email: rawUser.email,
+        phone: rawUser.phone,
+        primaryRole: rawUser.primaryRole || rawUser.role || "ADMIN",
+        defaultRedirect: rawUser.defaultRedirect || "/admin",
+        roles: rawUser.roles || [rawUser.primaryRole || "ADMIN"],
+        status: rawUser.status || "ACTIVE",
       },
-      message: "Staff authentication successful.",
+      message: raw.message || "Staff authentication successful.",
     }
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.error) {
+      const errorData = err.response.data.error
+      const customErr = new Error(errorData.message || "Authenticator verification failed") as Error & {
+        code?: string
+      }
+      customErr.code = errorData.code
+      throw customErr
+    }
+    throw new Error(getErrorMessage(err, "Authenticator verification failed"))
   }
 }
 
@@ -361,40 +320,51 @@ export async function verifyStaffMfaRecovery(
   recoveryCode: string
 ): Promise<StaffAuthSessionResponse> {
   try {
-    const res = await authClient.post<StaffAuthSessionResponse>(
-      "/api/v1/auth/mfa/recovery",
-      {
-        mfaToken,
-        recoveryCode: recoveryCode.trim(),
-      }
-    )
-    return res.data
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err) && err.response?.data?.error) {
-      throw new Error(err.response.data.error.message || "Recovery code invalid")
-    }
+    const res = await authClient.post<{
+      success: boolean
+      accessToken?: string
+      refreshToken?: string
+      user?: any
+      recoveryCodeUsed?: boolean
+      remainingRecoveryCodes?: number
+      message?: string
+      data?: any
+      error?: { code?: string; message?: string }
+    }>("/v1/auth/mfa/recovery", {
+      mfaToken,
+      recoveryCode: recoveryCode.trim(),
+    })
 
-    // Mock fallback response
-    const email = mockState.lastEmail || "admin@habeshago.et"
-    const staffAccount = DEMO_STAFF_ACCOUNTS.find((a) => a.email === email)
-    const role: UserRole = staffAccount ? staffAccount.role : "ADMIN"
+    const raw = res.data
+    const rawUser = raw.user || raw.data?.user || {}
 
     return {
-      accessToken: "mock_jwt_access_token_" + Date.now() + "_" + Math.random().toString(36),
-      refreshToken: "mock_jwt_refresh_token_" + Date.now(),
-      recoveryCodeUsed: true,
-      remainingRecoveryCodes: 7,
+      accessToken: raw.accessToken || raw.data?.accessToken || "",
+      refreshToken: raw.refreshToken || raw.data?.refreshToken,
+      recoveryCodeUsed: raw.recoveryCodeUsed ?? true,
+      remainingRecoveryCodes: raw.remainingRecoveryCodes,
       user: {
-        id: "staff_usr_" + Math.random().toString(36).substring(2, 9),
-        name: staffAccount ? staffAccount.name : "HabeshaGo Staff",
-        email,
-        primaryRole: role,
-        defaultRedirect: "/admin",
-        roles: [role],
-        status: "ACTIVE",
+        id: rawUser.id,
+        name: rawUser.name || (rawUser.email ? rawUser.email.split("@")[0] : "Staff Member"),
+        email: rawUser.email,
+        phone: rawUser.phone,
+        primaryRole: rawUser.primaryRole || rawUser.role || "ADMIN",
+        defaultRedirect: rawUser.defaultRedirect || "/admin",
+        roles: rawUser.roles || [rawUser.primaryRole || "ADMIN"],
+        status: rawUser.status || "ACTIVE",
       },
-      message: "Emergency recovery code verified. Session established.",
+      message: raw.message || "Emergency recovery code verified. Session established.",
     }
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.error) {
+      const errorData = err.response.data.error
+      const customErr = new Error(errorData.message || "Recovery code invalid") as Error & {
+        code?: string
+      }
+      customErr.code = errorData.code
+      throw customErr
+    }
+    throw new Error(getErrorMessage(err, "Recovery code invalid"))
   }
 }
 
@@ -412,13 +382,9 @@ export async function acceptStaffInvite(
 
   try {
     const res = await authClient.post<StaffInviteAcceptResponse>(
-      "/api/v1/auth/staff-invites/accept",
+      "/v1/auth/staff-invites/accept",
       { token: cleanToken }
     )
-    if (res.data.data?.email) {
-      mockState.lastEmail = res.data.data.email
-      mockState.hasExistingMfa = false
-    }
     return res.data
   } catch (err: unknown) {
     if (axios.isAxiosError(err) && err.response?.data?.error) {
@@ -429,28 +395,89 @@ export async function acceptStaffInvite(
       customErr.code = errObj.code
       throw customErr
     }
+    throw new Error(getErrorMessage(err, "Invitation acceptance failed"))
+  }
+}
 
-    // Fallback simulation when backend server is offline or in development
-    const mockEmail = cleanToken.includes("@")
-      ? cleanToken
-      : "invited.staff@habeshago.et"
-    const mockRole = cleanToken.toLowerCase().includes("ev")
-      ? ("EV_CHARGER_MANAGER" as UserRole)
-      : ("EMPLOYEE" as UserRole)
+// ─────────────────────────────────────────────────────────────
+// Admin Staff Invite Management (Requires Admin Session)
+// ─────────────────────────────────────────────────────────────
 
-    mockState.lastEmail = mockEmail
-    mockState.hasExistingMfa = false
+export interface CreateStaffInvitePayload {
+  email: string
+  role: string
+}
 
-    return {
-      success: true,
-      message:
-        "Invitation accepted successfully. Please proceed to staff login with your email OTP to set up MFA.",
-      data: {
-        email: mockEmail,
-        role: mockRole,
-        requiresMfaSetup: true,
-        nextStep: "POST /api/v1/auth/staff/login",
-      },
-    }
+export interface StaffInviteItem {
+  id: string
+  email: string
+  role: string
+  status: "pending" | "accepted" | "expired" | string
+  expiresAt: string
+  acceptedAt?: string | null
+  createdAt: string
+  inviteUrl?: string
+  token?: string
+}
+
+export interface CreateStaffInviteResponse {
+  success: boolean
+  message: string
+  invite: StaffInviteItem
+}
+
+/**
+ * Admin: Issue a new staff invite
+ * POST /api/v1/admin/staff-invites
+ */
+export async function createStaffInviteApi(
+  payload: CreateStaffInvitePayload
+): Promise<CreateStaffInviteResponse> {
+  try {
+    const res = await axiosInstance.post<CreateStaffInviteResponse>(
+      "/v1/admin/staff-invites",
+      payload
+    )
+    return res.data
+  } catch (err: unknown) {
+    throw new Error(getErrorMessage(err, "Failed to create staff invite"))
+  }
+}
+
+/**
+ * Admin: List staff invites
+ * GET /api/v1/admin/staff-invites
+ */
+export async function listStaffInvitesApi(params?: {
+  status?: string
+  role?: string
+  cursor?: string
+  limit?: number
+}): Promise<{ success: boolean; data: StaffInviteItem[] }> {
+  try {
+    const res = await axiosInstance.get<{ success: boolean; data: StaffInviteItem[] }>(
+      "/v1/admin/staff-invites",
+      { params }
+    )
+    return res.data
+  } catch (err: unknown) {
+    throw new Error(getErrorMessage(err, "Failed to list staff invites"))
+  }
+}
+
+/**
+ * Admin: Cancel a staff invite
+ * DELETE /api/v1/admin/staff-invites/:inviteId
+ */
+export async function cancelStaffInviteApi(
+  inviteId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await axiosInstance.delete<{ success: boolean; message: string }>(
+      `/v1/admin/staff-invites/${inviteId}`
+    )
+    return res.data
+  } catch (err: unknown) {
+    throw new Error(getErrorMessage(err, "Failed to cancel staff invite"))
   }
 }

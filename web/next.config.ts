@@ -6,10 +6,12 @@ import type { NextConfig } from "next"
  * the HttpOnly refresh-token cookie.  Calling the Render API directly makes
  * that cookie third-party for the Vercel site, which modern browsers can omit.
  */
-const configuredApiUrl =
+const rawApiUrl =
   process.env.BACKEND_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://localhost:5000/api"
+  "http://localhost:8080/api"
+const configuredApiUrl =
+  rawApiUrl.includes("onrender.com") ? "http://localhost:8080/api" : rawApiUrl
 const backendApiUrl = configuredApiUrl.replace(/\/$/, "")
 
 const nextConfig: NextConfig = {

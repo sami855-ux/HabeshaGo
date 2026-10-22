@@ -32,7 +32,18 @@ export const services: ServiceRoute[] = [
       { method: "POST", path: /^\/api\/v1\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/(verify|recovery|enroll\/(setup|verify))|refresh|google|mobile\/google|exchange|logout|logout-all|staff\/(login|verify-otp|resend-otp)|staff-invites\/accept)$/ },
       { method: "GET", path: /^\/api\/v1\/auth\/(google(\/(callback|url))?|exchange)$/ },
     ],
-    timeoutMs: 8000,
+    timeoutMs: 15000,
+  },
+  {
+    ...base,
+    name: "auth-alias",
+    prefix: "/api/auth",
+    target: env.AUTH_SERVICE_URL,
+    publicRules: [
+      { method: "POST", path: /^\/api\/auth\/(continue-with-email|verify-otp|resend-otp|mfa\/(verify|recovery|enroll\/(setup|verify))|refresh|google|mobile\/google|exchange|logout|logout-all|staff\/(login|verify-otp|resend-otp)|staff-invites\/accept)$/ },
+      { method: "GET", path: /^\/api\/auth\/(google(\/(callback|url))?|exchange)$/ },
+    ],
+    timeoutMs: 15000,
   },
   {
     ...base,
@@ -40,7 +51,15 @@ export const services: ServiceRoute[] = [
     prefix: "/api/v1/admin",
     target: env.AUTH_SERVICE_URL,
     roles: ["admin", "ADMIN"],
-    timeoutMs: 8000,
+    timeoutMs: 15000,
+  },
+  {
+    ...base,
+    name: "admin-auth-alias",
+    prefix: "/api/admin",
+    target: env.AUTH_SERVICE_URL,
+    roles: ["admin", "ADMIN"],
+    timeoutMs: 15000,
   },
   {
     ...base,

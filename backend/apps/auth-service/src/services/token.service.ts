@@ -152,14 +152,14 @@ export function getRoleRedirectUrl(role: string): string {
     case "EV_CHARGER_MANAGER":
       return "/ev-charge-manager";
     case "PARKING_MANAGER":
-      return "/admin/manage-parking";
+      return "/admin";
     case "EMPLOYEE":
       return "/admin";
     case "DRIVER":
       return "/admin";
     case "PASSENGER":
     default:
-      return "/user";
+      return "/passenger";
   }
 }
 

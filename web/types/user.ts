@@ -7,11 +7,14 @@ export interface User {
   bio: string | null
   location: string | null
 
-  role: UserRole
+  role?: UserRole
+  primaryRole?: UserRole
+  roles?: string[]
+  defaultRedirect?: string
 
-  emailVerified: boolean
-  phoneVerified: boolean
-  twoFactorEnabled: boolean
+  emailVerified?: boolean
+  phoneVerified?: boolean
+  twoFactorEnabled?: boolean
 
   isSuspended: boolean
   suspendedAt: string | null

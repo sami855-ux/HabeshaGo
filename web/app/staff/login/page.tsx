@@ -94,6 +94,9 @@ export default function StaffLoginPage() {
       bio: null,
       location: "Addis Ababa Central Command",
       role: rawUser.primaryRole,
+      primaryRole: rawUser.primaryRole,
+      roles: rawUser.roles || [rawUser.primaryRole],
+      defaultRedirect: rawUser.defaultRedirect || "/admin",
       emailVerified: true,
       phoneVerified: false,
       twoFactorEnabled: true,
@@ -262,12 +265,13 @@ export default function StaffLoginPage() {
     setStage("success")
 
     const user = formatStaffUser(session.user)
-    await establishAuthSession(session.accessToken, user)
+    await establishAuthSession(session.accessToken, user, session.refreshToken)
 
     toast.success(`Signed in as ${session.user.name || "Staff Member"}`)
 
+    const targetUrl = session.user.defaultRedirect || "/admin"
     setTimeout(() => {
-      router.push("/admin")
+      router.push(targetUrl)
     }, 900)
   }
 

@@ -21,6 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import {
   InputOTP,
   InputOTPGroup,
@@ -97,6 +98,9 @@ function AcceptInviteContent() {
   const [invitedEmail, setInvitedEmail] = React.useState("")
   const [assignedRole, setAssignedRole] = React.useState<string>("EMPLOYEE")
   const [inviteAccepted, setInviteAccepted] = React.useState(false)
+  const [autoAccepting, setAutoAccepting] = React.useState(false)
+  const [inviteError, setInviteError] = React.useState<{ code?: string; message: string } | null>(null)
+  const hasAutoAcceptedRef = React.useRef(false)
 
   // Step 2: Email OTP State
   const [emailOtp, setEmailOtp] = React.useState("")
@@ -118,14 +122,6 @@ function AcceptInviteContent() {
   // Shared UI Status
   const [loading, setLoading] = React.useState(false)
 
-  // Extract initial token from query param on mount
-  React.useEffect(() => {
-    const tokenFromUrl = searchParams.get("token")
-    if (tokenFromUrl && tokenFromUrl.trim()) {
-      setInviteToken(tokenFromUrl.trim())
-    }
-  }, [searchParams])
-
   // Countdown timer for email OTP
   React.useEffect(() => {
     let interval: NodeJS.Timeout
@@ -145,6 +141,9 @@ function AcceptInviteContent() {
       bio: null,
       location: "Addis Ababa Operations Hub",
       role: rawUser.primaryRole,
+      primaryRole: rawUser.primaryRole,
+      roles: rawUser.roles || [rawUser.primaryRole],
+      defaultRedirect: rawUser.defaultRedirect || "/admin",
       emailVerified: true,
       phoneVerified: false,
       twoFactorEnabled: true,
@@ -157,64 +156,8 @@ function AcceptInviteContent() {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // STEP 1: Accept Invitation
-  // ─────────────────────────────────────────────────────────────
-  const handleAcceptInvite = async () => {
-    const token = (inviteToken || searchParams.get("token") || "").trim()
-    if (!token) {
-      toast.error(
-        "No invitation token detected in the URL. Please ensure you opened the full link sent to your email."
-      )
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const response = await acceptStaffInvite(token)
-
-      const email = response.data?.email || "invited.staff@habeshago.et"
-      const role = response.data?.role || "EMPLOYEE"
-
-      setInvitedEmail(email)
-      setAssignedRole(String(role))
-      setInviteAccepted(true)
-
-      toast.success("Invitation accepted successfully!")
-
-      // Proceed to Step 2: Trigger OTP to the verified email
-      await triggerEmailOtp(email)
-      setCurrentStep("email_otp")
-    } catch (err: unknown) {
-      const customErr = err as { code?: string; message?: string }
-      if (customErr.code === "INVITE_ALREADY_ACCEPTED") {
-        toast.info(
-          "This invitation has already been accepted. If you are completing your setup, continue with email verification."
-        )
-        // Allow proceeding to email OTP with the email if available
-        if (invitedEmail || token.includes("@")) {
-          const emailFallback = invitedEmail || token
-          setInvitedEmail(emailFallback)
-          setInviteAccepted(true)
-        }
-      } else if (customErr.code === "INVITE_EXPIRED") {
-        toast.error(
-          "This staff invitation token has expired. Please contact your Operations Administrator to issue a new invitation."
-        )
-      } else {
-        toast.error(
-          customErr.message ||
-            "Unable to validate invitation token. Please check the link or contact operations support."
-        )
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Helper to send OTP to the email
-  const triggerEmailOtp = async (emailToSend: string) => {
+  // Helper to trigger email OTP
+  const triggerEmailOtp = React.useCallback(async (emailToSend: string) => {
     try {
       const res = await requestStaffLogin(emailToSend)
       if (res.devOtp) {
@@ -228,7 +171,101 @@ function AcceptInviteContent() {
           : "Failed to dispatch email verification code."
       toast.error(msg)
     }
-  }
+  }, [])
+
+  // ─────────────────────────────────────────────────────────────
+  // STEP 1: Accept Invitation (Manual & Automatic)
+  // ─────────────────────────────────────────────────────────────
+  const handleAcceptInvite = React.useCallback(
+    async (overrideToken?: string) => {
+      let token = (overrideToken || inviteToken || searchParams.get("token") || "").trim()
+
+      // Clean up token if full URL was pasted
+      if (token.includes("token=")) {
+        try {
+          const parsed = new URL(token, "http://localhost")
+          const param = parsed.searchParams.get("token")
+          if (param) token = param
+        } catch {
+          const match = token.match(/[?&]token=([^&]+)/)
+          if (match) token = match[1]
+        }
+      }
+
+      if (!token) {
+        toast.error("Please enter a valid invitation token.")
+        return
+      }
+
+      setLoading(true)
+      setAutoAccepting(true)
+      setInviteError(null)
+
+      try {
+        const response = await acceptStaffInvite(token)
+
+        const email = response.data?.email || "staff@habeshago.et"
+        const role = response.data?.role || "EMPLOYEE"
+
+        setInvitedEmail(email)
+        setAssignedRole(String(role))
+        setInviteAccepted(true)
+        setAutoAccepting(false)
+
+        toast.success(`Invitation accepted for ${email}!`)
+
+        // Proceed to Step 2: Trigger OTP to the verified corporate email
+        await triggerEmailOtp(email)
+        setCurrentStep("email_otp")
+      } catch (err: unknown) {
+        setAutoAccepting(false)
+        const customErr = err as { code?: string; message?: string }
+        if (customErr.code === "INVITE_ALREADY_ACCEPTED") {
+          setInviteError({
+            code: "INVITE_ALREADY_ACCEPTED",
+            message: "This invitation has already been accepted and activated.",
+          })
+          toast.info("This invitation was already accepted. You can log in directly to continue.")
+        } else if (customErr.code === "INVITE_EXPIRED") {
+          setInviteError({
+            code: "INVITE_EXPIRED",
+            message: "This staff invitation link has expired. Please contact your Operations Administrator.",
+          })
+          toast.error("This staff invitation token has expired.")
+        } else {
+          setInviteError({
+            code: customErr.code,
+            message: customErr.message || "Unable to validate invitation token.",
+          })
+          toast.error(
+            customErr.message ||
+              "Unable to validate invitation token. Please check the link or contact operations support."
+          )
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [inviteToken, searchParams, triggerEmailOtp]
+  )
+
+  // Extract initial token from query param and AUTO-ACCEPT immediately
+  React.useEffect(() => {
+    const tokenFromUrl =
+      searchParams.get("token") ||
+      searchParams.get("t") ||
+      searchParams.get("invite")
+
+    if (tokenFromUrl && tokenFromUrl.trim()) {
+      const cleanToken = tokenFromUrl.trim()
+      setInviteToken(cleanToken)
+
+      if (!hasAutoAcceptedRef.current) {
+        hasAutoAcceptedRef.current = true
+        handleAcceptInvite(cleanToken)
+      }
+    }
+  }, [searchParams, handleAcceptInvite])
 
   // Resend OTP handler
   const handleResendOtp = async () => {
@@ -310,7 +347,7 @@ function AcceptInviteContent() {
 
       // Establish session in auth context
       const formatted = formatStaffUser(session.user)
-      await establishAuthSession(session.accessToken, formatted)
+      await establishAuthSession(session.accessToken, formatted, session.refreshToken)
 
       setCurrentStep("complete")
       toast.success("Multi-Factor Authentication successfully activated!")
@@ -500,28 +537,100 @@ function AcceptInviteContent() {
                 </h1>
                 <p className="text-sm sm:text-base text-slate-500 leading-relaxed max-w-xl">
                   You have been invited to join the HabeshaGo Operations team.
-                  Click accept below to verify your corporate authorization and
-                  initiate your two-factor security setup.
+                  Verify your corporate authorization to proceed with your two-factor security setup.
                 </p>
               </div>
 
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  onClick={handleAcceptInvite}
-                  disabled={loading}
-                  className="w-full sm:w-auto min-w-0 sm:min-w-[240px] h-12 bg-slate-950 hover:bg-slate-900 active:bg-black text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer inline-flex items-center justify-center gap-2 px-8"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <span>Accept Invitation & Continue</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
+              {autoAccepting ? (
+                /* Auto-accepting loader state */
+                <div className="p-8 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center space-y-4 text-center max-w-lg">
+                  <div className="w-12 h-12 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-sm">
+                    <RefreshCw className="w-5 h-5 animate-spin text-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Validating Invitation Credentials...
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
+                      Verifying your invitation token, claiming your operations role, and issuing your corporate security challenge.
+                    </p>
+                  </div>
+                </div>
+              ) : inviteError?.code === "INVITE_ALREADY_ACCEPTED" ? (
+                /* Already accepted state with quick login redirect */
+                <div className="p-6 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-4 max-w-lg text-left">
+                  <div className="flex items-center gap-2.5 text-amber-900 font-bold text-sm">
+                    <ShieldCheck className="w-5 h-5 text-amber-600" />
+                    <span>Invitation Already Claimed</span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    This staff invitation link has already been accepted and activated. If your account was previously onboarded, sign in directly with your corporate email to access the console.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <Button
+                      type="button"
+                      onClick={() => router.push("/staff/login")}
+                      className="bg-slate-950 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl h-10 px-5 gap-2"
+                    >
+                      <span>Proceed to Staff Login</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setInviteError(null)
+                        setInviteToken("")
+                      }}
+                      className="text-xs font-medium rounded-xl h-10 border-amber-300 text-amber-900 hover:bg-amber-100"
+                    >
+                      Enter Different Token
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Manual token entry / confirmation form */
+                <div className="space-y-5 max-w-lg">
+                  {inviteError && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+                      {inviteError.message}
+                    </div>
                   )}
-                </Button>
-              </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <Label htmlFor="invite-input-token" className="text-xs font-semibold text-slate-700">
+                      Staff Invitation Token or URL
+                    </Label>
+                    <Input
+                      id="invite-input-token"
+                      type="text"
+                      placeholder="Paste token or link (e.g. habeshago_staff_demo_invite_token_2026)"
+                      value={inviteToken}
+                      onChange={(e) => setInviteToken(e.target.value)}
+                      className="h-11 text-xs rounded-xl"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      onClick={() => handleAcceptInvite()}
+                      disabled={loading || !inviteToken.trim()}
+                      className="w-full sm:w-auto min-w-0 sm:min-w-[240px] h-12 bg-slate-950 hover:bg-slate-900 active:bg-black text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer inline-flex items-center justify-center gap-2 px-8"
+                    >
+                      {loading ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <span>Accept Invitation & Continue</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 

@@ -33,8 +33,12 @@ import {
 } from "@/components/passenger/corridor-departure-board"
 import { PassengerWalletModal } from "@/components/passenger/passenger-wallet"
 import { toast } from "sonner"
+import { useAppSelector } from "@/store"
 
 export default function PassengerPage() {
+  const { user } = useAppSelector((state) => state.user)
+  const passengerName =
+    user?.name || (user?.email ? user.email.split("@")[0] : "Selamawit")
   const [walletBalance, setWalletBalance] = React.useState<number>(1450.0)
   const [activeTrip, setActiveTrip] = React.useState<{
     origin: string
@@ -135,7 +139,7 @@ export default function PassengerPage() {
               <span>Smart Commute Across Addis Ababa</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-inter">
-              Good morning, Selamawit 👋
+              Good morning, {passengerName} 👋
             </h1>
             <p className="text-white/90 text-sm mt-1 max-w-xl">
               Book fast corridor minibuses, private city comfort taxis, or intercity coach rides with Telebirr instant boarding.

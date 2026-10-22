@@ -20,7 +20,7 @@ export function registerRoutes(app: Express) {
     const { guard, proxy } = createServiceProxy(route);
 
     const chain = [
-      route.name === "auth" ? strictAuthRateLimit : (_req: any, _res: any, next: any) => next(),
+      route.name.startsWith("auth") ? strictAuthRateLimit : (_req: any, _res: any, next: any) => next(),
       authenticate(route),
       authorize(route),
       userRateLimit,

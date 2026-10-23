@@ -47,8 +47,6 @@ export function Navigation() {
   }, [])
 
   const navLinks = [
-    { href: "/passenger", label: "Passenger App" },
-    { href: "/admin", label: "Admin Portal" },
     { href: "/#features", label: "Features" },
     { href: "/#digital-pass", label: "Digital Pass" },
     { href: "/#how-we-work", label: "How It Works" },
@@ -70,7 +68,7 @@ export function Navigation() {
       className={cn(
         "fixed top-0 w-full z-50 transition-all duration-300",
         isScrolled
-          ? "bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm"
+          ? "bg-white/75 backdrop-blur-md border-b border-gray-100 shadow-none"
           : "bg-transparent border-transparent"
       )}
     >
@@ -141,7 +139,6 @@ export function Navigation() {
               className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-md shadow-sm transition-all"
             >
               <Link href="/passenger" className="flex items-center gap-1.5">
-                <Ticket className="w-3.5 h-3.5" />
                 <span>Book Ticket</span>
               </Link>
             </Button>

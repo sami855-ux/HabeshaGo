@@ -14,4 +14,9 @@ export const env = parseEnv({
   INTERNAL_SERVICE_TOKEN: z.string().default("habeshago_internal_secret_token_key_12345"),
   CDN_BASE_URL: z.string().default("https://cdn.habeshago.com"),
   STORAGE_UPLOAD_URL: z.string().default("https://storage.habeshago.com/upload"),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_URL: z.string().optional(),
+  CLOUDINARY_FOLDER: z.string().default("habeshago/avatars"),
 });

@@ -46,9 +46,12 @@ Base path: `/api/v1/profile/me/avatar`
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/upload-url` | Signed upload URL and object key, validating content type and max size |
+| POST | `/upload-url` | Signed Cloudinary upload URL, signature, and public ID (for direct client-to-Cloudinary upload) |
+| POST | `/` | Direct multipart form-data upload (`file` or `avatar`), streams directly to Cloudinary |
 | PUT | `/` | Body `{ key }`, confirms the upload and saves `avatarKey` |
-| DELETE | `/` | Clears `avatarKey` and removes the object |
+| DELETE | `/` | Clears `avatarKey` and removes the object from Cloudinary |
+
+Avatar URLs are automatically formatted with Cloudinary responsive transformations (`c_fill,g_face,w_400,h_400,q_auto,f_auto`).
 
 ### Preferences
 

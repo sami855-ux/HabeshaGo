@@ -136,12 +136,12 @@ export function HeroSection() {
         {/* Clean Light-Theme Search Box with rounded-md */}
         <form
           onSubmit={handleSearch}
-          className="rounded-md bg-white shadow-xl shadow-gray-900/10 p-5 sm:p-6 space-y-3 border border-gray-200"
+          className="rounded-t-4xl bg-white/50 shadow-xl shadow-gray-900/10 p-5 sm:p-6 space-y-3 border border-gray-200"
         >
           {/* Row 1: Departure & Destination with Swap */}
           <div className="grid grid-cols-1 md:grid-cols-11 gap-2.5 sm:gap-3 items-center">
             {/* Departure Box */}
-            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50 hover:bg-gray-100/80 border border-gray-200 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50/25 hover:bg-gray-100/25 border border-gray-200/25 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
                 Departure (From)
               </label>
@@ -174,7 +174,7 @@ export function HeroSection() {
             </div>
 
             {/* Destination Box */}
-            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50 hover:bg-gray-100/80 border border-gray-200 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50/25 hover:bg-gray-100/25 border border-gray-200/25 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
                 Destination (To)
               </label>
@@ -198,7 +198,7 @@ export function HeroSection() {
           {/* Row 2: Travel Date, Seats, and Find Buses CTA */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3 items-center">
             {/* Travel Date */}
-            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50 hover:bg-gray-100/80 border border-gray-200 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+            <div className="md:col-span-5 px-3.5 py-3 rounded-md bg-gray-50/25 hover:bg-gray-100/25 border border-gray-200/25 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
                 Travel Date
               </label>
@@ -215,7 +215,7 @@ export function HeroSection() {
             </div>
 
             {/* Seats / Passengers */}
-            <div className="md:col-span-3 px-3.5 py-3 rounded-md bg-gray-50 hover:bg-gray-100/80 border border-gray-200 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+            <div className="md:col-span-3 px-3.5 py-3 rounded-md bg-gray-50/25 hover:bg-gray-100/25 border border-gray-200/25 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
                 Seats
               </label>

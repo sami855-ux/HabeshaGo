@@ -11,12 +11,10 @@ import {
 } from "@/components/ui/input-otp"
 import {
   Loader,
-  CheckCircle,
   AlertCircle,
   Mail,
   X,
   ArrowRight,
-  ArrowLeft,
   Key,
   Shield,
   CheckCircle2,
@@ -25,7 +23,6 @@ import {
   Timer,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
 import {
   useEffect,
   useRef,
@@ -343,17 +340,10 @@ export default function LoginPage() {
       {/* Right Side: Clean Centered Login Card */}
       <div className="flex w-full lg:w-1/2 h-full items-center justify-center p-6 sm:p-10 overflow-y-auto lg:overflow-hidden font-sans">
         <div className="w-full max-w-md mx-auto">
-          <Card className="bg-white border-none shadow-none rounded-2xl overflow-hidden">
+          <Card className="bg-transparent border-none shadow-none rounded-2xl overflow-hidden">
             <CardContent className="p-7 sm:p-9 space-y-6">
               {/* Back to Home Link */}
               <div className="flex items-center justify-between">
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Back to Home</span>
-                </Link>
 
                 {step === 2 && (
                   <button
@@ -383,7 +373,7 @@ export default function LoginPage() {
                       Welcome back
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-500 font-sans">
-                      Sign in to your HabeshaGo account
+                      Create an account or sign in to your HabeshaGo account
                     </p>
                   </div>
 
@@ -440,7 +430,7 @@ export default function LoginPage() {
                           className={cn(
                             "pl-10 h-11 pr-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 text-sm rounded-xl transition-colors",
                             isValidEmail &&
-                              "border-emerald-300 focus-visible:border-emerald-500",
+                              "border-emerald-600   focus-visible:border-emerald-500",
                             emailError &&
                               "border-red-300 focus-visible:border-red-500",
                           )}
@@ -449,9 +439,6 @@ export default function LoginPage() {
 
                         {/* Status icon / Clear button */}
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                          {isValidEmail && (
-                            <CheckCircle className="h-4 w-4 text-emerald-500" />
-                          )}
                           {email && (
                             <button
                               type="button"
@@ -533,15 +520,6 @@ export default function LoginPage() {
                       )}
                     </Button>
 
-                    <div className="pt-3 text-center border-t border-slate-100">
-                      <Link
-                        href="/staff/login"
-                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-orange-600 transition-colors font-medium"
-                      >
-                        <Shield className="w-3.5 h-3.5 text-orange-500" />
-                        <span>Staff & Operations Console? MFA Login →</span>
-                      </Link>
-                    </div>
                   </form>
                 </>
               ) : (

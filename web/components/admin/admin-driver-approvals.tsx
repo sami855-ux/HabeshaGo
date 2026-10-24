@@ -140,7 +140,7 @@ export function AdminDriverApprovals({ onCountChange }: AdminDriverApprovalsProp
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                       {d.name}
                     </h4>
-                    <span className="text-xs text-slate-400 font-mono">#{d.id}</span>
+                    <span className="text-xs text-slate-400">#{d.id}</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600 dark:text-slate-400 mt-1">

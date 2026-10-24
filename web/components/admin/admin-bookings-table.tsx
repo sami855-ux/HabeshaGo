@@ -196,7 +196,7 @@ export function AdminBookingsTable() {
               <TableRow key={b.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-950/40">
                 {/* ID & Time */}
                 <TableCell>
-                  <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">
                     #{b.id}
                   </div>
                   <div className="text-[10px] text-slate-400">{b.timestamp}</div>
@@ -226,7 +226,7 @@ export function AdminBookingsTable() {
                     {b.service}
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {b.driver} • <span className="font-mono">{b.vehiclePlate}</span>
+                    {b.driver} • <span>{b.vehiclePlate}</span>
                   </div>
                 </TableCell>
 

@@ -178,7 +178,7 @@ export function AdminHeader({ currentTabName }: AdminHeaderProps) {
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
                   {currentUser?.name || "Sam Admin"}
                 </span>
-                <span className="text-xs text-slate-500 font-mono">
+                <span className="text-xs text-slate-500">
                   {currentUser?.email || "admin@habeshago.et"}
                 </span>
                 {currentUser?.role && (

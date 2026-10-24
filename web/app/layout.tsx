@@ -2,42 +2,13 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { AppProvider } from "@/providers"
 
-import {
-  Inter,
-  Mozilla_Headline,
-  Plus_Jakarta_Sans,
-  Space_Grotesk,
-} from "next/font/google"
+import { Plus_Jakarta_Sans } from "next/font/google"
 
-// 🔹 Inter Font Family
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-inter",
-  display: "swap",
-})
-
-// 🔹 Plus Jakarta Sans (Primary Clean Modern Sans Font Family)
+// 🔹 Single Unified Font Family across entire application
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-jakarta",
-  display: "swap",
-})
-
-// 🔹 Mozilla Headline
-const mozilla = Mozilla_Headline({
-  subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700"],
-  variable: "--font-mozilla",
-  display: "swap",
-})
-
-// 🔹 Space Grotesk
-const grotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-grotesk",
+  variable: "--font-sans",
   display: "swap",
 })
 
@@ -68,9 +39,9 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${jakarta.variable} ${grotesk.variable} ${mozilla.variable} ${inter.variable} font-sans`}
+      className={`${jakarta.variable} font-sans`}
     >
-      <body className="font-sans">
+      <body className="font-sans antialiased">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

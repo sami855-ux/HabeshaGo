@@ -36,6 +36,8 @@ import {
   continueWithEmail,
   resendOtp as requestResendOtp,
   verifyOTP,
+  verifyMfaLogin,
+  verifyMfaRecoveryLogin,
   establishAuthSession,
 } from "@/services"
 import { AuthSlider } from "@/components/auth"
@@ -68,8 +70,8 @@ export default function LoginPage() {
   const [emailPending, startEmail] = useTransition()
   const [verifyPending, startVerify] = useTransition()
 
-  // Step 1 = Email input, Step 2 = OTP verification
-  const [step, setStep] = useState<1 | 2>(1)
+  // Step 1 = Email input, Step 2 = OTP verification, Step 3 = MFA challenge
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [email, setEmail] = useState("")
   const [emailError, setEmailError] = useState("")
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -88,6 +90,13 @@ export default function LoginPage() {
   >("idle")
   const [attempts, setAttempts] = useState(0)
 
+  // MFA Challenge state
+  const [mfaToken, setMfaToken] = useState("")
+  const [mfaCode, setMfaCode] = useState("")
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState("")
+  const [mfaPending, startMfa] = useTransition()
+
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
   const otpContainerRef = useRef<HTMLDivElement>(null)
@@ -96,6 +105,14 @@ export default function LoginPage() {
     const errorParam = searchParams.get("error")
     if (errorParam) {
       toast.error(decodeURIComponent(errorParam))
+    }
+
+    const mfaParam = searchParams.get("mfa")
+    const mfaTokenParam = searchParams.get("mfaToken")
+    if (mfaParam === "true" && mfaTokenParam) {
+      setMfaToken(mfaTokenParam)
+      setStep(3)
+      toast.info("Two-Factor Authentication required. Enter your authenticator code.")
     }
   }, [searchParams])
 
@@ -259,6 +276,15 @@ export default function LoginPage() {
       try {
         const res = await verifyOTP({ email, code: otp })
 
+        // Check if user has MFA enabled!
+        if (res.success && res.mfaRequired && res.mfaToken) {
+          setMfaToken(res.mfaToken)
+          setStep(3)
+          setVerificationStatus("idle")
+          toast.info("Two-Factor Authentication required. Enter your authenticator code.")
+          return
+        }
+
         if (res.success && res.data.accessToken) {
           setVerificationStatus("success")
           toast.success("Welcome back! Signed in successfully.")
@@ -286,6 +312,62 @@ export default function LoginPage() {
       }
     })
   }, [attempts, email, otp, router, searchParams])
+
+  const verifyMfaAccount = useCallback(() => {
+    setVerificationStatus("verifying")
+    startMfa(async () => {
+      try {
+        let res: any
+        if (useRecoveryCode) {
+          if (!recoveryCode.trim()) {
+            toast.error("Please enter a recovery code")
+            setVerificationStatus("error")
+            return
+          }
+          res = await verifyMfaRecoveryLogin({ mfaToken, recoveryCode })
+        } else {
+          if (mfaCode.length !== 6) {
+            toast.error("Please enter the 6-digit code")
+            setVerificationStatus("error")
+            return
+          }
+          res = await verifyMfaLogin({ mfaToken, code: mfaCode })
+        }
+
+        if (res.success && res.data?.accessToken) {
+          setVerificationStatus("success")
+          toast.success("MFA verified! Welcome back.")
+          const user = await establishAuthSession(
+            res.data.accessToken,
+            res.data.user,
+            res.data.refreshToken,
+          )
+
+          const redirectParam = searchParams.get("redirect")
+          const destination =
+            redirectParam || user?.defaultRedirect || "/passenger"
+
+          setTimeout(() => router.push(destination), 600)
+          return
+        }
+
+        throw new Error(res.message || "Invalid authenticator code")
+      } catch (error: unknown) {
+        setVerificationStatus("error")
+        toast.error(
+          error instanceof Error ? error.message : "MFA verification failed",
+        )
+      }
+    })
+  }, [mfaCode, recoveryCode, useRecoveryCode, mfaToken, router, searchParams])
+
+  // Auto-verify when MFA has 6 digits
+  useEffect(() => {
+    if (step === 3 && !useRecoveryCode && mfaCode.length === 6 && !mfaPending && verificationStatus === "idle") {
+      const timer = setTimeout(verifyMfaAccount, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [step, useRecoveryCode, mfaCode, mfaPending, verificationStatus, verifyMfaAccount])
 
   // Auto-verify when OTP has 6 digits
   useEffect(() => {
@@ -522,7 +604,7 @@ export default function LoginPage() {
 
                   </form>
                 </>
-              ) : (
+              ) : step === 2 ? (
                 /* Step 2: OTP Verification */
                 <div className="space-y-6">
                   <div className="text-center space-y-2">
@@ -614,7 +696,7 @@ export default function LoginPage() {
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
                         >
-                          <span>Dev Code: <strong className="font-mono tracking-wider">{devOtp}</strong></span>
+                          <span>Dev Code: <strong className="tracking-wider">{devOtp}</strong></span>
                           <span className="text-[10px] text-amber-600 bg-amber-100/90 px-1.5 py-0.5 rounded-md font-medium">Auto-fill</span>
                         </button>
                       </div>
@@ -676,6 +758,164 @@ export default function LoginPage() {
                           Resend in {resendCooldown}s
                         </span>
                       )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Step 3: MFA Challenge (TOTP Authenticator or Recovery Code) */
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-1">
+                      <AnimatePresence mode="wait">
+                        {verificationStatus === "success" ? (
+                          <motion.div
+                            key="success"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                          >
+                            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+                          </motion.div>
+                        ) : verificationStatus === "error" ? (
+                          <motion.div
+                            key="error"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                          >
+                            <XCircle className="h-7 w-7 text-red-500" />
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="idle"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                          >
+                            <Shield className="h-7 w-7 text-orange-500" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                      {useRecoveryCode ? "Emergency Recovery Code" : "Two-Factor Authentication"}
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      {useRecoveryCode
+                        ? "Enter one of your 8-character backup recovery codes"
+                        : "Enter the 6-digit code from your authenticator app"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {!useRecoveryCode ? (
+                      <div className="flex justify-center py-1">
+                        <InputOTP
+                          maxLength={6}
+                          value={mfaCode}
+                          onChange={(val) => {
+                            if (/^\d*$/.test(val)) {
+                              setMfaCode(val)
+                              setVerificationStatus("idle")
+                            }
+                          }}
+                          disabled={mfaPending || verificationStatus === "success"}
+                        >
+                          <InputOTPGroup className="gap-2 sm:gap-2.5">
+                            {[0, 1, 2, 3, 4, 5].map((index) => (
+                              <InputOTPSlot
+                                key={index}
+                                index={index}
+                                className={cn(
+                                  "h-12 w-10 sm:h-13 sm:w-11 text-lg font-bold bg-white border border-slate-200 rounded-xl text-slate-900 transition-all font-sans shadow-none",
+                                  "data-[active=true]:border-orange-500 data-[active=true]:ring-2 data-[active=true]:ring-orange-500/20",
+                                  verificationStatus === "error" && "border-red-400 bg-red-50/30 text-red-700",
+                                  verificationStatus === "success" && "border-emerald-500 bg-emerald-50/30 text-emerald-700",
+                                )}
+                              />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">
+                          Backup Recovery Code
+                        </Label>
+                        <Input
+                          type="text"
+                          placeholder="e.g. A1B2C3D4"
+                          value={recoveryCode}
+                          onChange={(e) => {
+                            setRecoveryCode(e.target.value.trim().toUpperCase())
+                            setVerificationStatus("idle")
+                          }}
+                          className="h-12 text-center text-lg font-mono font-bold tracking-widest bg-white border-slate-200 rounded-xl uppercase"
+                        />
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={verifyMfaAccount}
+                      disabled={
+                        mfaPending ||
+                        (!useRecoveryCode && mfaCode.length < 6) ||
+                        (useRecoveryCode && !recoveryCode.trim()) ||
+                        verificationStatus === "success"
+                      }
+                      className={cn(
+                        "w-full h-11 text-sm font-semibold rounded-xl shadow-none transition-colors cursor-pointer",
+                        verificationStatus === "success"
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-orange-500 hover:bg-orange-600 text-white",
+                      )}
+                    >
+                      {mfaPending ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader className="animate-spin h-4 w-4 text-white" />
+                          <span>Verifying MFA...</span>
+                        </div>
+                      ) : verificationStatus === "success" ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                          <span>Verified!</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <Key className="h-4 w-4 text-white" />
+                          <span>Confirm &amp; Sign In</span>
+                        </div>
+                      )}
+                    </Button>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUseRecoveryCode(!useRecoveryCode)
+                          setMfaCode("")
+                          setRecoveryCode("")
+                          setVerificationStatus("idle")
+                        }}
+                        className="text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
+                      >
+                        {useRecoveryCode ? "Use Authenticator App" : "Use a recovery code instead"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep(1)
+                          setOtp("")
+                          setMfaCode("")
+                          setRecoveryCode("")
+                          setVerificationStatus("idle")
+                        }}
+                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        Back to email
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -173,7 +173,7 @@ export function AdminFleetTracker() {
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                     {v.driver}
                   </h4>
-                  <div className="text-[11px] font-mono text-slate-500 font-semibold">
+                  <div className="text-[11px] text-slate-500 font-semibold">
                     {v.plate}
                   </div>
                 </div>
